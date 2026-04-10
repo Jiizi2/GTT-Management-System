@@ -69,6 +69,32 @@ export function AppMainContent({
     [controller.groupRecords, controller.selectedVisaRow],
   );
 
+  if (controller.selectedGroupCode && !controller.selectedGroup) {
+    return (
+      <Suspense fallback={<ScreenLoadingFallback />}>
+        <LazyPlaceholderScreen
+          eyebrow="Group Detail"
+          title="Group belum ditemukan"
+          description="Endpoint group detail sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
+          icon="travel_explore"
+        />
+      </Suspense>
+    );
+  }
+
+  if (controller.selectedVisaGroupCode && !freshSelectedVisaRow) {
+    return (
+      <Suspense fallback={<ScreenLoadingFallback />}>
+        <LazyPlaceholderScreen
+          eyebrow="Visa Detail"
+          title="Visa detail belum ditemukan"
+          description="Endpoint visa detail sedang dibuka, tapi data visa group-nya belum tersedia di browser saat ini."
+          icon="fact_check"
+        />
+      </Suspense>
+    );
+  }
+
   if (controller.selectedGroup) {
     return (
       <Suspense fallback={<ScreenLoadingFallback />}>
@@ -123,7 +149,7 @@ export function AppMainContent({
       <Suspense fallback={<ScreenLoadingFallback />}>
         <LazyAddGroupWorkspaceScreen
           onSaveGroup={controller.handleSaveInputGroup}
-          onCancel={() => controller.handleNavigate("overview")}
+          onCancel={controller.handleBackToOverview}
         />
       </Suspense>
     );

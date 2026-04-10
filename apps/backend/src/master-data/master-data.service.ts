@@ -515,7 +515,11 @@ export class MasterDataService {
   }
 
   private assertSupportedCategory(categoryKey: string): string {
-    const normalizedCategoryKey = normalizeCategoryKey(categoryKey);
+    const normalizedCategoryKey = normalizeCategoryKey(categoryKey ?? "");
+    if (!normalizedCategoryKey) {
+      throw new BadRequestException("categoryKey is required.");
+    }
+
     const isKnownCategory = MASTER_DATA_CATEGORY_DEFINITIONS.some(
       (category) => category.key === normalizedCategoryKey,
     );

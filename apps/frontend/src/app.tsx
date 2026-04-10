@@ -5,7 +5,7 @@ import { MobileNav } from "./components/mobile-nav";
 import { MobileQuickActionsSheet } from "./components/mobile-quick-actions-sheet";
 import { ThemeToggleButton } from "./components/theme-toggle-button";
 import { loginWithBackend } from "./hooks/use-auth-backend";
-import { ACTIVE_NAV_STORAGE_KEY, useAppController } from "./hooks/use-app-controller";
+import { useAppController } from "./hooks/use-app-controller";
 import { type DevelopmentLoginAccountHint, LoginScreen, type LoginCredentials } from "./pages/login-page";
 import {
   AUTH_STATE_CHANGED_EVENT,
@@ -14,19 +14,14 @@ import {
   readPersistedAuthSession,
   type AuthSession,
 } from "./shared/auth-session";
+import { buildDashboardPath, buildLoginPath, isLoginRoute } from "./shared/app-route";
 
 function shouldRenderStandaloneLoginScreen(): boolean {
   if (typeof window === "undefined") {
     return false;
   }
 
-  const normalizedPath = window.location.pathname.replace(/\/+$/, "").toLowerCase();
-  if (normalizedPath === "/login" || normalizedPath === "/auth/login") {
-    return true;
-  }
-
-  const screenSearchParam = new URLSearchParams(window.location.search).get("screen");
-  return screenSearchParam?.trim().toLowerCase() === "login";
+  return isLoginRoute(window.location.pathname, window.location.search);
 }
 
 const DEVELOPMENT_LOGIN_ACCOUNTS: DevelopmentLoginAccountHint[] = [
@@ -207,17 +202,10 @@ export function App() {
     try {
       const nextSession = await loginWithBackend(credentials);
       persistAuthSession(nextSession);
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(ACTIVE_NAV_STORAGE_KEY, "overview");
-        } catch {
-          // No-op if storage is blocked or full.
-        }
-      }
       setAuthSession(nextSession);
 
-      if (typeof window !== "undefined" && shouldRenderStandaloneLoginScreen()) {
-        window.history.replaceState(null, "", "/");
+      if (typeof window !== "undefined" && isLoginRoute(window.location.pathname, window.location.search)) {
+        window.history.replaceState(null, "", buildDashboardPath("overview"));
       }
     } catch (error: unknown) {
       setLoginErrorMessage(
@@ -233,6 +221,9 @@ export function App() {
   const handleLogout = useCallback(() => {
     clearAuthSession();
     setAuthSession(null);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", buildLoginPath());
+    }
   }, []);
 
   if (shouldRenderStandaloneLoginScreen() || !authSession) {
