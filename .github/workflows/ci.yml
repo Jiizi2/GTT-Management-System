@@ -54,14 +54,14 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: gtt_ops
         ports:
-          - 5432:5432
+          - 6542:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d gtt_ops"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:6542/gtt_ops?schema=public
       DATA_SOURCE: prisma
     steps:
       - name: Checkout
