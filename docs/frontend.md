@@ -1,0 +1,109 @@
+# Dokumentasi Frontend
+
+Dokumen ini menjelaskan arsitektur frontend, alur state, integrasi API, dan command yang dipakai.
+
+## 1. Ringkasan Teknis
+
+- Lokasi: `apps/frontend`
+- Stack: React 19 + TypeScript + Tailwind CSS
+- Bundler/build: esbuild
+- Dev server: script custom `scripts/dev.mjs`
+- Testing: unit test, smoke test, dan Playwright e2e
+
+## 2. Struktur Penting
+
+Direktori utama:
+
+- `src/app.tsx`: root app shell + login gate + layout desktop/mobile.
+- `src/components/*`: komponen UI reusable.
+- `src/pages/*`: layar/halaman per fitur.
+- `src/hooks/*`: state orchestration dan komunikasi backend.
+- `src/shared/*`: tipe domain + helper bisnis frontend.
+- `public/*`: aset statis + `index.html`.
+
+## 3. Navigasi dan Halaman
+
+Navigasi dikendalikan oleh `activeNav` (bukan router framework eksternal). Halaman utama:
+
+- Overview
+- Add New Group
+- H-1 Checklist
+- Visa Tracking + Visa Detail
+- Invoice
+- Raudhah Reminder
+- User Management
+- Master Data
+- Profile
+
+Pemilihan layar dipusatkan di `src/components/app-main-content.tsx` (lazy loaded per screen).
+
+## 4. State Management dan Sinkronisasi
+
+State global dashboard dipusatkan di hook:
+
+- `src/hooks/use-app-controller.ts`
+
+Tanggung jawab hook ini:
+
+- Menyimpan state UI (nav, query, sidebar, selection).
+- Memuat data grup dari backend.
+- Menangani save/update/delete grup dan perubahan visa/checklist.
+- Menampilkan feedback sinkronisasi sukses/gagal.
+- Menyimpan nav aktif dan access tier ke localStorage.
+
+Strategi update:
+
+- Optimistic update di UI.
+- Lalu sync ke backend.
+- Jika backend gagal:
+  - host lokal: tetap lanjut fallback lokal,
+  - host non-lokal: state bisa direfresh dari backend.
+
+## 5. Autentikasi di Frontend
+
+File inti:
+
+- `src/hooks/use-auth-backend.ts`
+- `src/shared/auth-session.ts`
+
+Mekanisme:
+
+- Login kirim `identifier`, `password`, `rememberSession` ke `/api/auth/login`.
+- Session + access token disimpan di localStorage.
+- Semua request backend menambahkan header `Authorization: Bearer <token>`.
+- Bila backend balas `401`, session dihapus otomatis.
+
+## 6. Integrasi API per Domain
+
+Hook backend utama:
+
+- `use-app-controller-backend.ts` -> endpoint grup (`/api/groups` dan turunannya).
+- `use-invoice-backend.ts` -> invoice (`/api/invoices`, `/api/invoices/clients`, `/api/health`).
+- `use-user-management-backend.ts` -> user management (`/api/auth/users`).
+- `use-master-data-backend.ts` -> master data (`/api/master-data/*`).
+- `use-saudi-city-options.ts` -> konsumsi category `saudi-city` dari master data.
+
+## 7. Runtime Config Frontend
+
+Base URL API di-resolve berurutan:
+
+1. `window.__GTT_API_BASE_URL__` (jika di-inject runtime),
+2. `http://localhost:3001/api` saat host `localhost/127.0.0.1`,
+3. fallback `/api` (same-origin).
+
+Ini memungkinkan deploy frontend dan backend:
+
+- domain yang sama (reverse proxy), atau
+- domain terpisah dengan injeksi runtime config.
+
+## 8. Command Frontend
+
+Dari root project:
+
+- `npm run dev:frontend` -> jalankan dev server frontend.
+- `npm run build:frontend` -> build frontend.
+- `npm run check --workspace frontend` -> type-check frontend.
+- `npm run test --workspace frontend` -> unit test frontend.
+- `npm run test:smoke --workspace frontend` -> smoke test frontend.
+- `npm run test:e2e --workspace frontend` -> Playwright e2e frontend.
+

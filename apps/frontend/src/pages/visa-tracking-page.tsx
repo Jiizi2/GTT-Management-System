@@ -563,7 +563,7 @@ export function VisaTrackingScreen({
                       <p className="mt-0.5 truncate text-sm font-medium text-slate-700">{row.groupName}</p>
                     </div>
 
-                    <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-700">
+                    <span className="inline-flex min-h-[28px] min-w-[68px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-700">
                       {row.pax} Pax
                     </span>
                   </div>

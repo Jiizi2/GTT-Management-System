@@ -30,7 +30,11 @@ This repo uses one codebase with branch-based separation:
   - Runs on push to `master`/`main`.
   - Builds and uploads a `production-build-<sha>.tar.gz` artifact + `.sha256`.
 
-## Suggested GitHub settings (manual step)
+- `PR Workflow Guard` (`.github/workflows/pr-workflow-guard.yml`)
+  - Runs on push to `develop`, `master`, and `main`.
+  - Fails if pushed commit is not associated with a merged PR into the target branch.
+
+## Suggested GitHub settings (manual step, best option)
 
 In repository settings:
 
@@ -38,3 +42,13 @@ In repository settings:
 2. Require pull requests before merge.
 3. Require status checks from CI workflows.
 4. Optionally require approvals for production environment deployments.
+
+## Private repo on free plan fallback
+
+If branch protection/rulesets are unavailable on your plan, rely on these guardrails:
+
+1. Enable local `.githooks/pre-push` hook.
+2. Keep `PR Workflow Guard` workflow active for server-side detection.
+3. Merge through Pull Requests as team policy.
+
+This fallback gives fast detection, but unlike branch protection it cannot hard-block the push event.

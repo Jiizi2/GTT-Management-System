@@ -9,6 +9,7 @@ import {
   NoteModal,
   ScheduleModal,
 } from "../components/group-detail-modals";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { exportGroupDetailPdf } from "./group-detail-export";
 import type {
   EditScheduleFormState,
@@ -578,11 +579,11 @@ export function GroupDetail({
     return nextDraft;
   };
   const detailKickerClassName =
-    "text-xs font-semibold uppercase tracking-[0.14em] text-brand-secondary";
+    "text-xs font-semibold uppercase tracking-[0.14em] text-on-surface-variant/80";
   const statusToneClassName =
     group.tone === "active"
       ? "border-brand-primary/30 bg-brand-primary/10 text-brand-primary"
-      : "border-slate-300 bg-slate-100 text-slate-700";
+      : "border-outline-variant/60 bg-surface-container-high text-on-surface-variant";
   const statusBadgeClassName = `inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${statusToneClassName}`;
   const displayedNextActivity = useMemo(
     () => resolveNextActivityFromItinerary(itineraryItems, group.nextActivity),
@@ -946,10 +947,10 @@ export function GroupDetail({
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-24 pt-4 sm:px-6 lg:px-8">
-      <div>
+      <div className="flex items-center gap-3">
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-sm font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-1.5 text-sm font-bold leading-none text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary"
           onClick={onBack}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -958,12 +959,14 @@ export function GroupDetail({
           <span className="sm:hidden">Back</span>
           <span className="hidden sm:inline">Back to Groups</span>
         </button>
+
+        <ThemeToggleButton className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:mr-5" />
       </div>
 
-      <header className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-surface-container-lowest p-5 shadow-sm backdrop-blur md:flex-row md:items-start md:justify-between">
+      <header className="flex flex-col gap-4 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient backdrop-blur md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Group Detail</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <h1 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">Group Detail</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
             <span className="sm:hidden">Complete itinerary for {group.name}.</span>
             <span className="hidden sm:inline">View complete itinerary and group information for {group.name}.</span>
           </p>
@@ -984,7 +987,7 @@ export function GroupDetail({
 
           <button
             type="button"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary/45 hover:text-primary sm:w-auto"
             onClick={handleExportPdf}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
@@ -998,7 +1001,7 @@ export function GroupDetail({
 
       <div className="space-y-6">
         <div className="grid gap-4 xl:grid-cols-[1.45fr_0.75fr]">
-          <section className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-5 shadow-sm">
+          <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="space-y-2 md:space-y-1">
                 <div className="flex items-start justify-between gap-3 md:hidden">
@@ -1043,25 +1046,25 @@ export function GroupDetail({
                 </div>
               </div>
 
-              <div className="hidden h-10 w-px bg-slate-200 md:block" aria-hidden="true" />
+              <div className="hidden h-10 w-px bg-outline-variant/35 md:block" aria-hidden="true" />
 
               <div className="space-y-1">
                 <span className={detailKickerClassName}>Group Name</span>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{group.name}</h3>
+                  <h3 className="text-xl font-semibold text-on-surface sm:text-2xl">{group.name}</h3>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-brand-neutral px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-high px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   groups
                 </span>
                 <span>{group.pax} Pilgrims</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-brand-neutral px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-high px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   calendar_today
                 </span>
@@ -1070,13 +1073,13 @@ export function GroupDetail({
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-5 shadow-sm">
+          <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
             <div className="flex items-start justify-between gap-3">
               <p className={detailKickerClassName}>Assigned Musyrif</p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+                  className="inline-flex items-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
                   onClick={handleCopyMusyrif}
                   aria-label={`Copy musyrif data for ${group.name}`}
                 >
@@ -1105,12 +1108,12 @@ export function GroupDetail({
                 <div className="h-14 w-14 overflow-hidden rounded-2xl ring-2 ring-brand-primary/20">
                   <img src={musyrifProfile.avatar} alt={musyrifProfile.name} className="h-full w-full object-cover" />
                 </div>
-                <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-primary" aria-hidden="true" />
+                <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-surface-container-lowest bg-brand-primary" aria-hidden="true" />
               </div>
 
               <div className="min-w-0">
-                <h3 className="truncate text-lg font-semibold text-slate-900">{musyrifProfile.name}</h3>
-                <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-600">
+                <h3 className="truncate text-lg font-semibold text-on-surface">{musyrifProfile.name}</h3>
+                <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-on-surface-variant">
                   <span className="material-symbols-outlined" aria-hidden="true">
                     call
                   </span>
@@ -1123,7 +1126,7 @@ export function GroupDetail({
 
         <div className="grid gap-4 xl:grid-cols-[1.45fr_0.75fr]">
           <div className="space-y-4">
-            <section className="relative overflow-hidden rounded-3xl border border-brand-primary/20 bg-brand-primary p-5 shadow-sm">
+            <section className="relative overflow-hidden rounded-3xl border border-brand-primary/20 bg-brand-primary p-5 shadow-ambient">
               <div className="absolute -right-3 top-0 opacity-20" aria-hidden="true">
                 <span className="material-symbols-outlined text-[6rem] text-brand-neutral">
                   {displayedNextActivity.icon}
@@ -1131,18 +1134,18 @@ export function GroupDetail({
               </div>
 
               <div className="relative z-10">
-                <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-neutral/80">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/80">
                   <span className="material-symbols-outlined" aria-hidden="true">
                     near_me
                   </span>
                   <p>Next Activity</p>
                 </div>
 
-                <h3 className="mt-2 text-[1.5rem] font-bold tracking-tight text-brand-neutral sm:text-[2rem]">
+                <h3 className="mt-2 text-[1.5rem] font-bold tracking-tight text-on-primary sm:text-[2rem]">
                   {displayedNextActivity.title}
                 </h3>
 
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-brand-neutral">
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-on-primary">
                   <div className="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary/15 bg-surface-container-lowest px-2.5 py-1 text-brand-primary shadow-sm">
                     <span className="material-symbols-outlined" aria-hidden="true">
                       event
@@ -1159,11 +1162,11 @@ export function GroupDetail({
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-5 shadow-sm">
+            <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Full Itinerary</h3>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <h3 className="text-xl font-bold tracking-tight text-on-surface sm:text-2xl">Full Itinerary</h3>
+                  <p className="mt-1 text-sm text-on-surface-variant">
                     <span className="sm:hidden">Timeline and key milestones.</span>
                     <span className="hidden sm:inline">Journey timeline and key milestones</span>
                   </p>
@@ -1193,15 +1196,15 @@ export function GroupDetail({
                     <article
                       key={`${group.code}-${index}-${item.date}`}
                       className={`rounded-2xl border bg-surface-container-lowest p-4 ${
-                        item.highlighted ? "border-brand-primary/40" : "border-slate-200"
+                        item.highlighted ? "border-brand-primary/40" : "border-outline-variant/45"
                       }`}
                     >
                       <div className="md:hidden">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="flex min-w-[74px] flex-col rounded-xl bg-slate-50 px-2.5 py-2 text-center">
+                            <div className="flex min-w-[74px] flex-col rounded-xl bg-surface-container-high/60 px-2.5 py-2 text-center">
                               <strong className="text-base font-bold leading-tight text-brand-primary">{item.date}</strong>
-                              <span className="text-[11px] font-medium text-slate-500">{item.year}</span>
+                              <span className="text-[11px] font-medium text-on-surface-variant/80">{item.year}</span>
                             </div>
 
                             <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary/12 text-brand-primary">
@@ -1214,7 +1217,7 @@ export function GroupDetail({
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-brand-primary/10 hover:text-brand-primary"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
                               aria-label={`Edit ${item.title}`}
                               onClick={() => handleOpenEditModal(index)}
                             >
@@ -1224,7 +1227,7 @@ export function GroupDetail({
                             </button>
                             <button
                               type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
                               aria-label={`Delete ${item.title}`}
                               onClick={() => handleOpenDeleteModal(index)}
                             >
@@ -1236,10 +1239,10 @@ export function GroupDetail({
                         </div>
 
                         <div className="mt-3 min-w-0">
-                          <h4 className="text-[1.2rem] font-semibold leading-tight text-slate-900">{activityHeading}</h4>
-                          <p className="mt-1 text-sm text-slate-700">{compactSummary}</p>
+                          <h4 className="text-[1.2rem] font-semibold leading-tight text-on-surface">{activityHeading}</h4>
+                          <p className="mt-1 text-sm text-on-surface-variant">{compactSummary}</p>
                           {supportMeta ? (
-                            <span className="mt-1 block text-xs leading-relaxed text-slate-600">{supportMeta}</span>
+                            <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{supportMeta}</span>
                           ) : null}
                         </div>
                       </div>
@@ -1247,7 +1250,7 @@ export function GroupDetail({
                       <div className="hidden gap-3 md:grid md:grid-cols-[78px_42px_1fr_auto] md:items-center">
                         <div className="flex flex-col px-1 text-center">
                           <strong className="text-lg font-bold leading-tight text-brand-primary">{item.date}</strong>
-                          <span className="text-[11px] font-medium text-slate-500">{item.year}</span>
+                          <span className="text-[11px] font-medium text-on-surface-variant/80">{item.year}</span>
                         </div>
 
                         <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/12 text-brand-primary">
@@ -1257,17 +1260,17 @@ export function GroupDetail({
                         </div>
 
                         <div className="min-w-0">
-                          <h4 className="text-[1.18rem] font-semibold leading-tight text-slate-900">{activityHeading}</h4>
-                          <p className="mt-1 text-sm text-slate-700">{compactSummary}</p>
+                          <h4 className="text-[1.18rem] font-semibold leading-tight text-on-surface">{activityHeading}</h4>
+                          <p className="mt-1 text-sm text-on-surface-variant">{compactSummary}</p>
                           {supportMeta ? (
-                            <span className="mt-1 block text-xs leading-relaxed text-slate-600">{supportMeta}</span>
+                            <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{supportMeta}</span>
                           ) : null}
                         </div>
 
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-brand-primary/10 hover:text-brand-primary"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
                             aria-label={`Edit ${item.title}`}
                             onClick={() => handleOpenEditModal(index)}
                           >
@@ -1277,7 +1280,7 @@ export function GroupDetail({
                           </button>
                           <button
                             type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
                             aria-label={`Delete ${item.title}`}
                             onClick={() => handleOpenDeleteModal(index)}
                           >
@@ -1306,7 +1309,7 @@ export function GroupDetail({
           </div>
 
           <aside>
-            <section className="rounded-3xl border border-brand-tertiary/25 bg-brand-tertiary/[0.08] p-5 shadow-sm xl:sticky xl:top-24">
+            <section className="rounded-3xl border border-brand-tertiary/25 bg-brand-tertiary/[0.08] p-5 shadow-ambient xl:sticky xl:top-24">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-brand-tertiary" aria-hidden="true">
                   sticky_note_2
@@ -1322,7 +1325,7 @@ export function GroupDetail({
                   >
                     <span className="mr-2 inline-block h-2 w-2 rounded-full bg-brand-tertiary" aria-hidden="true" />
                     <div className="inline">
-                      <p className="inline text-sm text-slate-700">{note.text}</p>
+                      <p className="inline text-sm text-on-surface-variant">{note.text}</p>
                       {note.pinned ? <span className="ml-2 inline-flex rounded-lg border border-brand-tertiary/30 bg-brand-tertiary/20 px-2 py-0.5 text-[11px] font-bold leading-none text-brand-tertiary">Pinned</span> : null}
                     </div>
                   </li>
@@ -1341,7 +1344,7 @@ export function GroupDetail({
           </aside>
         </div>
 
-        <footer className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 text-center text-xs font-medium text-slate-500">
+        <footer className="rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-3 text-center text-xs font-medium text-on-surface-variant/80">
           <p>
             <span className="sm:hidden">GTT Operations Desk</span>
             <span className="hidden sm:inline">Ghaniya Tour and Travel Management System | GTT Operations Desk</span>

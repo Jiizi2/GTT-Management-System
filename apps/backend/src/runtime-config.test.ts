@@ -22,7 +22,7 @@ function testValidPrismaRuntimeConfig(): void {
   const config = resolveRuntimeConfig({
     PORT: "3100",
     DATA_SOURCE: "PRISMA",
-    DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public",
+    DATABASE_URL: "postgresql://postgres:postgres@localhost:6543/gtt_ops?schema=public",
     NODE_ENV: "development",
   });
 
@@ -86,7 +86,7 @@ function testProductionRequiresPrismaDataSource(): void {
       resolveRuntimeConfig({
         PORT: "3001",
         DATA_SOURCE: "memory",
-        DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public",
+        DATABASE_URL: "postgresql://postgres:postgres@localhost:6543/gtt_ops?schema=public",
         NODE_ENV: "production",
       }),
     /DATA_SOURCE must be prisma in production/,

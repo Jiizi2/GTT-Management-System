@@ -337,7 +337,7 @@ export function ProfileScreen({
 
       <section className="overflow-hidden rounded-3xl border border-outline-variant/35 bg-surface-container-lowest shadow-ambient">
         <div className="flex flex-col gap-8 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between lg:p-9">
-          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:gap-6 sm:text-left">
             <div className="shrink-0">
               <div className="inline-flex h-24 w-24 items-center justify-center rounded-2xl bg-surface-container-low text-primary shadow-ambient sm:h-28 sm:w-28">
                 <span
@@ -350,7 +350,7 @@ export function ProfileScreen({
             </div>
 
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
                 <h2 className="font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl">
                   {profileData.fullName}
                 </h2>
@@ -359,21 +359,21 @@ export function ProfileScreen({
                 </span>
               </div>
 
-              <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-on-surface-variant">
+              <p className="mt-2 inline-flex items-center justify-center gap-1.5 text-sm font-medium text-on-surface-variant sm:justify-start">
                 <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">
                   verified
                 </span>
                 {currentRoleTitleLabel}
               </p>
 
-              <div className="mt-4 grid gap-2.5 text-sm font-medium text-on-surface-variant sm:grid-cols-2 sm:gap-4">
-                <span className="flex min-w-0 items-start gap-2">
+              <div className="mt-4 grid gap-2.5 justify-items-center text-sm font-medium text-on-surface-variant sm:grid-cols-2 sm:justify-items-start sm:gap-4">
+                <span className="flex min-w-0 items-start justify-center gap-2 sm:justify-start">
                   <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">
                     mail
                   </span>
                   <span className="min-w-0 break-all leading-relaxed">{profileData.email}</span>
                 </span>
-                <span className="flex min-w-0 items-start gap-2">
+                <span className="flex min-w-0 items-start justify-center gap-2 sm:justify-start">
                   <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">
                     call
                   </span>

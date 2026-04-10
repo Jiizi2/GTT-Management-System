@@ -103,7 +103,7 @@ export function MobileQuickActionsSheet({
         onClick={onClose}
       >
         <section
-          className="flex w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-outline-variant/70 bg-surface-container-lowest shadow-float"
+          className="flex max-h-[calc(100dvh-0.75rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-outline-variant/70 bg-surface-container-lowest shadow-float"
           role="dialog"
           aria-modal="true"
           aria-labelledby="mobile-quick-actions-title"
@@ -138,7 +138,7 @@ export function MobileQuickActionsSheet({
             </div>
           </div>
 
-          <div className="space-y-3 overflow-y-auto px-5 pb-5 pt-4">
+          <div className="min-h-0 space-y-3 overflow-y-auto px-5 pb-5 pt-4">
             {visibleQuickActions.map((action) => {
               const isCurrent = activeNav === action.id;
 
