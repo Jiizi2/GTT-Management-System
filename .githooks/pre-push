@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Block direct pushes to protected branches so changes flow through PRs.
+while read local_ref local_sha remote_ref remote_sha
+do
+  case "$remote_ref" in
+    refs/heads/master|refs/heads/main)
+      echo "Push langsung ke ${remote_ref#refs/heads/} diblokir."
+      echo "Buat branch fitur (mis. codex/nama-perubahan) lalu buka Pull Request."
+      exit 1
+      ;;
+  esac
+done
+
+exit 0
