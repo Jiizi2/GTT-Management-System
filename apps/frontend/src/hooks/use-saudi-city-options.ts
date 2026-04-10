@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  fetchMasterDataOptionsFromBackend,
-  type MasterDataOption,
-} from "./use-master-data-backend";
+import { useEffect, useMemo } from "react";
+import { type MasterDataOption } from "./use-master-data-backend";
+import { useMasterDataOptionsQuery } from "./use-master-data-query";
 import { registerSaudiCityOptions } from "../shared/app-domain";
 
 function mapOptionsToCityList(options: MasterDataOption[]): string[] {
@@ -28,44 +26,17 @@ export function useSaudiCityOptions(defaultOptions: readonly string[]): string[]
       ),
     [defaultOptions],
   );
-  const [cityOptions, setCityOptions] = useState<string[]>(normalizedDefaultOptions);
+  const saudiCityOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "saudi-city",
+  });
+  const cityOptions = useMemo(() => {
+    const resolved = mapOptionsToCityList(saudiCityOptionsQuery.data ?? []);
+    return resolved.length > 0 ? resolved : normalizedDefaultOptions;
+  }, [normalizedDefaultOptions, saudiCityOptionsQuery.data]);
 
   useEffect(() => {
-    registerSaudiCityOptions(normalizedDefaultOptions);
-  }, [normalizedDefaultOptions]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    void fetchMasterDataOptionsFromBackend({
-      categoryKey: "saudi-city",
-      signal: controller.signal,
-    })
-      .then((options) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        const resolved = mapOptionsToCityList(options);
-        if (resolved.length === 0) {
-          return;
-        }
-
-        setCityOptions(resolved);
-        registerSaudiCityOptions(resolved);
-      })
-      .catch(() => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setCityOptions(normalizedDefaultOptions);
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [normalizedDefaultOptions]);
+    registerSaudiCityOptions(cityOptions);
+  }, [cityOptions]);
 
   return cityOptions;
 }

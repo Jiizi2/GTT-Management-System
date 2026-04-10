@@ -16,7 +16,7 @@ import {
   fetchInvoicesFromBackend,
   updateInvoiceInBackend,
 } from "../hooks/use-invoice-backend";
-import { fetchMasterDataOptionsFromBackend } from "../hooks/use-master-data-backend";
+import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { exportInvoicePdf } from "./invoice-export";
 
 const INVOICE_PAGE_SIZE = 8;
@@ -1611,16 +1611,37 @@ export function InvoiceScreen({
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
   const [invoiceClients, setInvoiceClients] = useState<InvoiceClientOption[]>([]);
-  const [issuingOfficeOptions, setIssuingOfficeOptions] = useState<SelectOption[]>(
-    defaultIssuingOfficeOptions,
+  const issuingOfficeOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "invoice-issuing-office",
+  });
+  const invoiceStatusOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "invoice-status",
+  });
+  const bankDisbursementOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "bank-disbursement",
+  });
+  const invoiceClientNameOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "invoice-client-name",
+  });
+  const issuingOfficeOptions = useMemo(() => {
+    const resolved = mapMasterDataToSelectOptions(issuingOfficeOptionsQuery.data ?? []).map((option) => ({
+      value: option.label,
+      label: option.label,
+    }));
+    return resolved.length > 0 ? resolved : defaultIssuingOfficeOptions;
+  }, [issuingOfficeOptionsQuery.data]);
+  const invoiceStatusOptions = useMemo(() => {
+    const resolved = mapMasterDataToInvoiceStatusOptions(invoiceStatusOptionsQuery.data ?? []);
+    return resolved.length > 0 ? resolved : defaultInvoiceStatusOptions;
+  }, [invoiceStatusOptionsQuery.data]);
+  const bankDisbursementOptions = useMemo(() => {
+    const resolved = mapMasterDataToSelectOptions(bankDisbursementOptionsQuery.data ?? []);
+    return resolved.length > 0 ? resolved : defaultBankDisbursementOptions;
+  }, [bankDisbursementOptionsQuery.data]);
+  const manualClientNameSuggestions = useMemo(
+    () => mapMasterDataToClientSuggestions(invoiceClientNameOptionsQuery.data ?? []),
+    [invoiceClientNameOptionsQuery.data],
   );
-  const [invoiceStatusOptions, setInvoiceStatusOptions] = useState<InvoiceStatusOption[]>(
-    defaultInvoiceStatusOptions,
-  );
-  const [bankDisbursementOptions, setBankDisbursementOptions] = useState<SelectOption[]>(
-    defaultBankDisbursementOptions,
-  );
-  const [manualClientNameSuggestions, setManualClientNameSuggestions] = useState<string[]>([]);
   const [isInvoiceBackendAvailable, setIsInvoiceBackendAvailable] = useState(false);
   const [isInvoiceDataLoading, setIsInvoiceDataLoading] = useState(true);
   const [listFeedback, setListFeedback] = useState<string | null>(null);
@@ -1633,59 +1654,16 @@ export function InvoiceScreen({
       fetchInvoiceBackendDataSource({ signal: controller.signal }),
       fetchInvoiceClientsFromBackend({ signal: controller.signal }),
       fetchInvoicesFromBackend({ signal: controller.signal }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "invoice-issuing-office",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "invoice-status",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "bank-disbursement",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "invoice-client-name",
-        signal: controller.signal,
-      }),
     ])
       .then(
         ([
           invoiceDataSource,
           clientRows,
           invoiceRowsResponse,
-          issuingOfficeRows,
-          invoiceStatusRows,
-          bankDisbursementRows,
-          invoiceClientNameRows,
         ]) => {
         if (controller.signal.aborted) {
           return;
         }
-
-        const nextIssuingOfficeOptions = mapMasterDataToSelectOptions(issuingOfficeRows).map(
-          (option) => ({
-            value: option.label,
-            label: option.label,
-          }),
-        );
-        const nextInvoiceStatusOptions = mapMasterDataToInvoiceStatusOptions(invoiceStatusRows);
-        const nextBankDisbursementOptions = mapMasterDataToSelectOptions(bankDisbursementRows);
-        const nextManualClientSuggestions = mapMasterDataToClientSuggestions(invoiceClientNameRows);
-
-        setIssuingOfficeOptions(
-          nextIssuingOfficeOptions.length > 0 ? nextIssuingOfficeOptions : defaultIssuingOfficeOptions,
-        );
-        setInvoiceStatusOptions(
-          nextInvoiceStatusOptions.length > 0 ? nextInvoiceStatusOptions : defaultInvoiceStatusOptions,
-        );
-        setBankDisbursementOptions(
-          nextBankDisbursementOptions.length > 0
-            ? nextBankDisbursementOptions
-            : defaultBankDisbursementOptions,
-        );
-        setManualClientNameSuggestions(nextManualClientSuggestions);
 
         if (invoiceDataSource !== "prisma") {
           setInvoiceClients([]);
@@ -1715,10 +1693,6 @@ export function InvoiceScreen({
 
         setInvoiceClients([]);
         setInvoiceRows([]);
-        setIssuingOfficeOptions(defaultIssuingOfficeOptions);
-        setInvoiceStatusOptions(defaultInvoiceStatusOptions);
-        setBankDisbursementOptions(defaultBankDisbursementOptions);
-        setManualClientNameSuggestions([]);
         setIsInvoiceBackendAvailable(false);
         setListFeedback(
           "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.",

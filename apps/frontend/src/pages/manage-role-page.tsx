@@ -1,18 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
-  createManagedUserInBackend,
-  deleteManagedUserInBackend,
-  fetchManagedUsersFromBackend,
-  updateManagedUserInBackend,
-  type BackendManagedUser,
-} from "../hooks/use-user-management-backend";
-import {
-  fetchMasterDataOptionsFromBackend,
   type MasterDataOption,
 } from "../hooks/use-master-data-backend";
+import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
+import {
+  useCreateManagedUserMutation,
+  useDeleteManagedUserMutation,
+  useManagedUsersQuery,
+  useUpdateManagedUserMutation,
+} from "../hooks/use-user-management-query";
+import type { BackendManagedUser } from "../hooks/use-user-management-backend";
 
 type RoleId = BackendManagedUser["roleId"];
 
@@ -32,18 +35,6 @@ type UserRoleOption = {
 
 type UserAccount = {
   id: string;
-  name: string;
-  email: string;
-  roleId: RoleId;
-};
-
-type NewUserFormState = {
-  name: string;
-  email: string;
-  roleId: RoleId;
-};
-
-type EditUserFormState = {
   name: string;
   email: string;
   roleId: RoleId;
@@ -88,6 +79,25 @@ const roleIdSet = new Set<RoleId>([
   "customer-support",
 ]);
 
+const roleIdSchema = z.enum([
+  "super-admin",
+  "admin",
+  "finance-manager",
+  "customer-support",
+]);
+
+const managedUserFormSchema = z.object({
+  name: z.string().trim().min(1, "Nama wajib diisi."),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email wajib diisi.")
+    .email("Format email tidak valid. Contoh: user@ghaniyatravel.com."),
+  roleId: roleIdSchema,
+});
+
+type ManagedUserFormValues = z.infer<typeof managedUserFormSchema>;
+
 const defaultUserRoleOptions: UserRoleOption[] = defaultRoleCatalog
   .filter((role): role is RoleCatalogItem & { id: RoleId } => roleIdSet.has(role.id as RoleId))
   .map((role, index) => ({
@@ -96,20 +106,6 @@ const defaultUserRoleOptions: UserRoleOption[] = defaultRoleCatalog
     description: role.description,
     sortOrder: index + 1,
   }));
-
-const initialUsers: UserAccount[] = [];
-
-const defaultNewUserForm: NewUserFormState = {
-  name: "",
-  email: "",
-  roleId: defaultUserRoleOptions[0]?.id ?? "admin",
-};
-
-const defaultEditUserForm: EditUserFormState = {
-  name: "",
-  email: "",
-  roleId: defaultUserRoleOptions[0]?.id ?? "admin",
-};
 
 function UserManagementModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") {
@@ -133,10 +129,6 @@ function resolveRoleToneClass(roleId: string): string {
   }
 
   return "bg-surface-container-high text-on-surface";
-}
-
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function isRoleId(value: string): value is RoleId {
@@ -215,18 +207,32 @@ function extractErrorMessage(error: unknown, fallbackMessage: string): string {
 }
 
 export function UserManagementScreen() {
-  const [users, setUsers] = useState<UserAccount[]>(initialUsers);
-  const [userRoleOptions, setUserRoleOptions] = useState<UserRoleOption[]>(defaultUserRoleOptions);
-  const [roleCatalogItems, setRoleCatalogItems] = useState<RoleCatalogItem[]>(defaultRoleCatalog);
-  const [newUserForm, setNewUserForm] = useState<NewUserFormState>(defaultNewUserForm);
-  const [editUserForm, setEditUserForm] = useState<EditUserFormState>(defaultEditUserForm);
+  const managedUsersQuery = useManagedUsersQuery();
+  const userRoleOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "user-role",
+  });
+  const roleCatalogQuery = useMasterDataOptionsQuery({
+    categoryKey: "role-catalog",
+  });
+  const createManagedUserMutation = useCreateManagedUserMutation();
+  const updateManagedUserMutation = useUpdateManagedUserMutation();
+  const deleteManagedUserMutation = useDeleteManagedUserMutation();
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [deleteTargetUser, setDeleteTargetUser] = useState<UserAccount | null>(null);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
+
+  const users = useMemo(
+    () => (managedUsersQuery.data ?? []).map((user) => mapBackendUserToLocal(user)),
+    [managedUsersQuery.data],
+  );
+  const userRoleOptions = useMemo(
+    () => mapUserRoleOptionsFromMasterData(userRoleOptionsQuery.data ?? []),
+    [userRoleOptionsQuery.data],
+  );
+  const roleCatalogItems = useMemo(
+    () => mapRoleCatalogFromMasterData(roleCatalogQuery.data ?? []),
+    [roleCatalogQuery.data],
+  );
 
   const roleCatalogById = useMemo(
     () => new Map(roleCatalogItems.map((role) => [role.id, role] as const)),
@@ -238,86 +244,69 @@ export function UserManagementScreen() {
     [users],
   );
   const hasActiveRoleOptions = userRoleOptions.length > 0;
+  const defaultRoleId = userRoleOptions[0]?.id ?? "admin";
+
+  const createForm = useForm<ManagedUserFormValues>({
+    resolver: zodResolver(managedUserFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      roleId: defaultRoleId,
+    },
+  });
+  const editForm = useForm<ManagedUserFormValues>({
+    resolver: zodResolver(managedUserFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      roleId: defaultRoleId,
+    },
+  });
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (!notice) {
+      return undefined;
+    }
 
-    void Promise.all([
-      fetchManagedUsersFromBackend({ signal: controller.signal }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "user-role",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "role-catalog",
-        signal: controller.signal,
-      }),
-    ])
-      .then(([backendUsers, userRoleOptionsRows, roleCatalogRows]) => {
-        const nextUserRoleOptions = mapUserRoleOptionsFromMasterData(userRoleOptionsRows);
-        const nextRoleCatalogItems = mapRoleCatalogFromMasterData(roleCatalogRows);
-
-        setUserRoleOptions(nextUserRoleOptions);
-        setRoleCatalogItems(nextRoleCatalogItems);
-        setNewUserForm((current) => {
-          if (nextUserRoleOptions.some((role) => role.id === current.roleId)) {
-            return current;
-          }
-
-          return {
-            ...current,
-            roleId: nextUserRoleOptions[0]?.id ?? "admin",
-          };
-        });
-        setEditUserForm((current) => {
-          if (nextUserRoleOptions.some((role) => role.id === current.roleId)) {
-            return current;
-          }
-
-          return {
-            ...current,
-            roleId: nextUserRoleOptions[0]?.id ?? "admin",
-          };
-        });
-
-        if (backendUsers.length > 0) {
-          setUsers(backendUsers.map((user) => mapBackendUserToLocal(user)));
-        } else {
-          setUsers([]);
-        }
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setUserRoleOptions(defaultUserRoleOptions);
-        setRoleCatalogItems(defaultRoleCatalog);
-        setNotice({
-          tone: "error",
-          message: extractErrorMessage(
-            error,
-            "Gagal memuat daftar user dari backend.",
-          ),
-        });
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsLoadingUsers(false);
-        }
-      });
+    const timeoutId = window.setTimeout(() => {
+      setNotice((current) => (current ? null : current));
+    }, 3200);
 
     return () => {
-      controller.abort();
+      window.clearTimeout(timeoutId);
     };
-  }, []);
+  }, [notice]);
+
+  useEffect(() => {
+    const currentRoleId = createForm.getValues("roleId");
+    if (userRoleOptions.some((role) => role.id === currentRoleId)) {
+      return;
+    }
+
+    createForm.setValue("roleId", defaultRoleId);
+  }, [createForm, defaultRoleId, userRoleOptions]);
+
+  useEffect(() => {
+    if (!editingUser) {
+      editForm.reset({
+        name: "",
+        email: "",
+        roleId: defaultRoleId,
+      });
+      return;
+    }
+
+    editForm.reset({
+      name: editingUser.name,
+      email: editingUser.email,
+      roleId: userRoleOptions.some((role) => role.id === editingUser.roleId)
+        ? editingUser.roleId
+        : defaultRoleId,
+    });
+  }, [defaultRoleId, editForm, editingUser, userRoleOptions]);
 
   const closeEditModal = () => {
     setEditingUser(null);
-    setEditUserForm({
-      ...defaultEditUserForm,
-      roleId: userRoleOptions[0]?.id ?? "admin",
-    });
   };
 
   const closeDeleteModal = () => {
@@ -327,13 +316,6 @@ export function UserManagementScreen() {
   const openEditModal = (user: UserAccount) => {
     setDeleteTargetUser(null);
     setEditingUser(user);
-    setEditUserForm({
-      name: user.name,
-      email: user.email,
-      roleId: userRoleOptions.some((role) => role.id === user.roleId)
-        ? user.roleId
-        : (userRoleOptions[0]?.id ?? "admin"),
-    });
   };
 
   const openDeleteModal = (user: UserAccount) => {
@@ -359,9 +341,31 @@ export function UserManagementScreen() {
     };
   }, [deleteTargetUser, editingUser]);
 
-  const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isCreateSubmitting) {
+  useEffect(() => {
+    if (!managedUsersQuery.error) {
+      return;
+    }
+
+    setNotice({
+      tone: "error",
+      message: extractErrorMessage(managedUsersQuery.error, "Gagal memuat daftar user dari backend."),
+    });
+  }, [managedUsersQuery.error]);
+
+  useEffect(() => {
+    if (!userRoleOptionsQuery.error && !roleCatalogQuery.error) {
+      return;
+    }
+
+    setNotice({
+      tone: "error",
+      message:
+        "Sebagian master data role gagal dimuat. Halaman memakai fallback default sampai backend kembali tersedia.",
+    });
+  }, [roleCatalogQuery.error, userRoleOptionsQuery.error]);
+
+  const handleCreateUser = async (values: ManagedUserFormValues) => {
+    if (createManagedUserMutation.isPending) {
       return;
     }
 
@@ -373,25 +377,8 @@ export function UserManagementScreen() {
       return;
     }
 
-    const normalizedName = newUserForm.name.trim();
-    const normalizedEmail = newUserForm.email.trim().toLowerCase();
-
-    if (!normalizedName || !normalizedEmail) {
-      setNotice({
-        tone: "error",
-        message: "Nama dan email wajib diisi sebelum membuat user baru.",
-      });
-      return;
-    }
-
-    if (!isValidEmail(normalizedEmail)) {
-      setNotice({
-        tone: "error",
-        message: "Format email tidak valid. Contoh: user@ghaniyatravel.com.",
-      });
-      return;
-    }
-
+    const normalizedName = values.name.trim();
+    const normalizedEmail = values.email.trim().toLowerCase();
     const isDuplicateEmail = users.some((user) => user.email.trim().toLowerCase() === normalizedEmail);
 
     if (isDuplicateEmail) {
@@ -402,18 +389,16 @@ export function UserManagementScreen() {
       return;
     }
 
-    setIsCreateSubmitting(true);
     try {
-      const createdFromBackend = await createManagedUserInBackend({
+      await createManagedUserMutation.mutateAsync({
         name: normalizedName,
         email: normalizedEmail,
-        roleId: newUserForm.roleId,
+        roleId: values.roleId,
       });
-
-      setUsers((current) => [mapBackendUserToLocal(createdFromBackend), ...current]);
-      setNewUserForm({
-        ...defaultNewUserForm,
-        roleId: userRoleOptions[0]?.id ?? "admin",
+      createForm.reset({
+        name: "",
+        email: "",
+        roleId: defaultRoleId,
       });
       setNotice({
         tone: "success",
@@ -427,15 +412,11 @@ export function UserManagementScreen() {
           "User baru gagal dibuat di backend.",
         ),
       });
-    } finally {
-      setIsCreateSubmitting(false);
     }
   };
 
-  const handleSubmitEditUser = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!editingUser || isEditSubmitting) {
+  const handleSubmitEditUser = async (values: ManagedUserFormValues) => {
+    if (!editingUser || updateManagedUserMutation.isPending) {
       return;
     }
 
@@ -447,25 +428,8 @@ export function UserManagementScreen() {
       return;
     }
 
-    const normalizedName = editUserForm.name.trim();
-    const normalizedEmail = editUserForm.email.trim().toLowerCase();
-
-    if (!normalizedName || !normalizedEmail) {
-      setNotice({
-        tone: "error",
-        message: "Nama dan email wajib diisi sebelum menyimpan perubahan user.",
-      });
-      return;
-    }
-
-    if (!isValidEmail(normalizedEmail)) {
-      setNotice({
-        tone: "error",
-        message: "Format email tidak valid. Contoh: user@ghaniyatravel.com.",
-      });
-      return;
-    }
-
+    const normalizedName = values.name.trim();
+    const normalizedEmail = values.email.trim().toLowerCase();
     const isDuplicateEmail = users.some(
       (user) => user.id !== editingUser.id && user.email.trim().toLowerCase() === normalizedEmail,
     );
@@ -478,19 +442,15 @@ export function UserManagementScreen() {
       return;
     }
 
-    setIsEditSubmitting(true);
     try {
-      const updatedFromBackend = await updateManagedUserInBackend(editingUser.id, {
-        name: normalizedName,
-        email: normalizedEmail,
-        roleId: editUserForm.roleId,
+      const updatedFromBackend = await updateManagedUserMutation.mutateAsync({
+        userId: editingUser.id,
+        payload: {
+          name: normalizedName,
+          email: normalizedEmail,
+          roleId: values.roleId,
+        },
       });
-
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === updatedFromBackend.id ? mapBackendUserToLocal(updatedFromBackend) : user,
-        ),
-      );
 
       const selectedRoleLabel = roleCatalogById.get(updatedFromBackend.roleId)?.label ?? "Role";
       setNotice({
@@ -506,21 +466,17 @@ export function UserManagementScreen() {
           "Perubahan user gagal disimpan ke backend.",
         ),
       });
-    } finally {
-      setIsEditSubmitting(false);
     }
   };
 
   const handleConfirmDeleteUser = async () => {
     const targetUser = deleteTargetUser;
-    if (!targetUser || isDeleteSubmitting) {
+    if (!targetUser || deleteManagedUserMutation.isPending) {
       return;
     }
 
-    setIsDeleteSubmitting(true);
     try {
-      await deleteManagedUserInBackend(targetUser.id);
-      setUsers((current) => current.filter((user) => user.id !== targetUser.id));
+      await deleteManagedUserMutation.mutateAsync(targetUser.id);
       setNotice({
         tone: "success",
         message: `User ${targetUser.name} berhasil dihapus.`,
@@ -534,8 +490,6 @@ export function UserManagementScreen() {
           "Penghapusan user gagal di backend.",
         ),
       });
-    } finally {
-      setIsDeleteSubmitting(false);
     }
   };
 
@@ -579,55 +533,72 @@ export function UserManagementScreen() {
                   Create User
                 </h2>
                 <span className="text-xs font-semibold text-on-surface-variant">
-                  Total user: {isLoadingUsers ? "..." : users.length}
+                  Total user: {managedUsersQuery.isLoading ? "..." : users.length}
                 </span>
               </div>
 
-              <form className="mt-5 grid gap-3 lg:grid-cols-[1.1fr_1.1fr_0.8fr_auto]" onSubmit={handleCreateUser}>
-                <input
-                  className="serene-input"
-                  value={newUserForm.name}
-                  onChange={(event) =>
-                    setNewUserForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  placeholder="Nama lengkap"
-                  aria-label="Nama lengkap user baru"
-                />
-                <input
-                  className="serene-input"
-                  value={newUserForm.email}
-                  onChange={(event) =>
-                    setNewUserForm((current) => ({ ...current, email: event.target.value }))
-                  }
-                  placeholder="email@ghaniyatravel.com"
-                  type="email"
-                  aria-label="Email user baru"
-                />
-                <SereneSelect
-                  className="serene-select"
-                  value={newUserForm.roleId}
-                  onChange={(event) =>
-                    setNewUserForm((current) => ({ ...current, roleId: event.target.value as RoleId }))
-                  }
-                  aria-label="Role user baru"
-                  disabled={!hasActiveRoleOptions}
-                >
-                  {hasActiveRoleOptions ? (
-                    userRoleOptions.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.label}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="admin">Belum ada role aktif</option>
-                  )}
-                </SereneSelect>
+              <form
+                className="mt-5 grid gap-3 lg:grid-cols-[1.1fr_1.1fr_0.8fr_auto]"
+                onSubmit={createForm.handleSubmit((values) => void handleCreateUser(values))}
+              >
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("name")}
+                    placeholder="Nama lengkap"
+                    aria-label="Nama lengkap user baru"
+                  />
+                  {createForm.formState.errors.name ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.name.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("email")}
+                    placeholder="email@ghaniyatravel.com"
+                    type="email"
+                    aria-label="Email user baru"
+                  />
+                  {createForm.formState.errors.email ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.email.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-1">
+                  <Controller
+                    name="roleId"
+                    control={createForm.control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select"
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        aria-label="Role user baru"
+                        disabled={!hasActiveRoleOptions}
+                      >
+                        {hasActiveRoleOptions ? (
+                          userRoleOptions.map((role) => (
+                            <option key={role.id} value={role.id}>
+                              {role.label}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="admin">Belum ada role aktif</option>
+                        )}
+                      </SereneSelect>
+                    )}
+                  />
+                </div>
                 <button
                   type="submit"
                   className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4"
-                  disabled={isCreateSubmitting || !hasActiveRoleOptions}
+                  disabled={createManagedUserMutation.isPending || !hasActiveRoleOptions}
                 >
-                  {isCreateSubmitting ? "Menyimpan..." : "Tambah User"}
+                  {createManagedUserMutation.isPending ? "Menyimpan..." : "Tambah User"}
                 </button>
               </form>
               {!hasActiveRoleOptions ? (
@@ -650,7 +621,7 @@ export function UserManagementScreen() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-outline-variant/35 bg-surface-container-low">
-                {isLoadingUsers ? (
+                {managedUsersQuery.isLoading ? (
                   <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
                     Memuat data user dari backend...
                   </div>
@@ -796,7 +767,10 @@ export function UserManagementScreen() {
                 Perbarui nama, email, dan role untuk user ini.
               </p>
 
-              <form className="mt-5 grid gap-3" onSubmit={handleSubmitEditUser}>
+              <form
+                className="mt-5 grid gap-3"
+                onSubmit={editForm.handleSubmit((values) => void handleSubmitEditUser(values))}
+              >
                 <div className="grid gap-1.5">
                   <label className="text-xs font-semibold text-on-surface-variant" htmlFor="edit-user-name">
                     Nama Lengkap
@@ -804,13 +778,15 @@ export function UserManagementScreen() {
                   <input
                     id="edit-user-name"
                     className="serene-input"
-                    value={editUserForm.name}
-                    onChange={(event) =>
-                      setEditUserForm((current) => ({ ...current, name: event.target.value }))
-                    }
+                    {...editForm.register("name")}
                     placeholder="Nama lengkap"
                     autoFocus
                   />
+                  {editForm.formState.errors.name ? (
+                    <p className="text-xs font-semibold text-error">
+                      {editForm.formState.errors.name.message}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-1.5">
@@ -820,38 +796,44 @@ export function UserManagementScreen() {
                   <input
                     id="edit-user-email"
                     className="serene-input"
-                    value={editUserForm.email}
-                    onChange={(event) =>
-                      setEditUserForm((current) => ({ ...current, email: event.target.value }))
-                    }
+                    {...editForm.register("email")}
                     placeholder="email@ghaniyatravel.com"
                     type="email"
                   />
+                  {editForm.formState.errors.email ? (
+                    <p className="text-xs font-semibold text-error">
+                      {editForm.formState.errors.email.message}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-1.5">
                   <label className="text-xs font-semibold text-on-surface-variant" htmlFor="edit-user-role">
                     Role
                   </label>
-                  <SereneSelect
-                    id="edit-user-role"
-                    className="serene-select"
-                    value={editUserForm.roleId}
-                    onChange={(event) =>
-                      setEditUserForm((current) => ({ ...current, roleId: event.target.value as RoleId }))
-                    }
-                    disabled={!hasActiveRoleOptions}
-                  >
-                    {hasActiveRoleOptions ? (
-                      userRoleOptions.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.label}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="admin">Belum ada role aktif</option>
+                  <Controller
+                    name="roleId"
+                    control={editForm.control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        id="edit-user-role"
+                        className="serene-select"
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        disabled={!hasActiveRoleOptions}
+                      >
+                        {hasActiveRoleOptions ? (
+                          userRoleOptions.map((role) => (
+                            <option key={role.id} value={role.id}>
+                              {role.label}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="admin">Belum ada role aktif</option>
+                        )}
+                      </SereneSelect>
                     )}
-                  </SereneSelect>
+                  />
                 </div>
                 {!hasActiveRoleOptions ? (
                   <p className="text-xs font-semibold text-error">
@@ -864,16 +846,16 @@ export function UserManagementScreen() {
                     type="button"
                     className="serene-btn-secondary"
                     onClick={closeEditModal}
-                    disabled={isEditSubmitting}
+                    disabled={updateManagedUserMutation.isPending}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     className="serene-btn-primary"
-                    disabled={isEditSubmitting || !hasActiveRoleOptions}
+                    disabled={updateManagedUserMutation.isPending || !hasActiveRoleOptions}
                   >
-                    {isEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                    {updateManagedUserMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
                   </button>
                 </div>
               </form>
@@ -914,7 +896,7 @@ export function UserManagementScreen() {
                   type="button"
                   className="serene-btn-secondary"
                   onClick={closeDeleteModal}
-                  disabled={isDeleteSubmitting}
+                  disabled={deleteManagedUserMutation.isPending}
                 >
                   Cancel
                 </button>
@@ -922,12 +904,12 @@ export function UserManagementScreen() {
                   type="button"
                   className="inline-flex items-center justify-center gap-1.5 rounded-md bg-error-container px-4 py-2 text-sm font-semibold text-on-error-container transition hover:brightness-95"
                   onClick={handleConfirmDeleteUser}
-                  disabled={isDeleteSubmitting}
+                  disabled={deleteManagedUserMutation.isPending}
                 >
                   <span className="material-symbols-outlined text-base" aria-hidden="true">
                     delete
                   </span>
-                  {isDeleteSubmitting ? "Menghapus..." : "Ya, Hapus"}
+                  {deleteManagedUserMutation.isPending ? "Menghapus..." : "Ya, Hapus"}
                 </button>
               </div>
             </section>

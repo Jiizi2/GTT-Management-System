@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
-  createMasterDataOptionInBackend,
-  fetchMasterDataCategoriesFromBackend,
-  fetchMasterDataOptionsFromBackend,
-  type MasterDataCategory,
-  type MasterDataCategoryKey,
-  type MasterDataOption,
-  updateMasterDataOptionInBackend,
+  useCreateMasterDataOptionMutation,
+  useMasterDataCategoriesQuery,
+  useMasterDataOptionsQuery,
+  useUpdateMasterDataOptionMutation,
+} from "../hooks/use-master-data-query";
+import type {
+  MasterDataCategoryKey,
+  MasterDataOption,
 } from "../hooks/use-master-data-backend";
 
 type NoticeState = {
@@ -15,7 +19,7 @@ type NoticeState = {
   message: string;
 };
 
-type MasterDataFormState = {
+type MasterDataOptionFormValues = {
   value: string;
   label: string;
   description: string;
@@ -37,7 +41,7 @@ type CategoryFormConfig = {
   showMetadata: boolean;
 };
 
-const EMPTY_FORM: MasterDataFormState = {
+const EMPTY_FORM: MasterDataOptionFormValues = {
   value: "",
   label: "",
   description: "",
@@ -103,7 +107,7 @@ const CATEGORY_FORM_CONFIG: Record<MasterDataCategoryKey, CategoryFormConfig> = 
     descriptionLabel: "Deskripsi Role",
     descriptionPlaceholder: "contoh: fokus pada invoice dan payment status",
     metadataLabel: "Metadata JSON (Permissions)",
-    metadataPlaceholder: '{"permissions":["MANAGE_INVOICES","VIEW_PAYMENT_STATUS"]}',
+    metadataPlaceholder: "{\"permissions\":[\"MANAGE_INVOICES\",\"VIEW_PAYMENT_STATUS\"]}",
     metadataHint: "Gunakan array string pada key `permissions`.",
     showMetadata: true,
   },
@@ -134,6 +138,26 @@ const CATEGORY_FORM_CONFIG: Record<MasterDataCategoryKey, CategoryFormConfig> = 
   },
 };
 
+const masterDataOptionFormSchema = z.object({
+  value: z.string(),
+  label: z.string().trim().min(1, "Label option wajib diisi."),
+  description: z.string(),
+  isActive: z.boolean(),
+  metadataJson: z.string().superRefine((value, context) => {
+    try {
+      parseMetadataJson(value);
+    } catch (error: unknown) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          error instanceof Error && error.message.trim()
+            ? error.message.trim()
+            : "Metadata JSON tidak valid.",
+      });
+    }
+  }),
+});
+
 function readErrorMessage(error: unknown, fallbackMessage: string): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message.trim();
@@ -156,7 +180,7 @@ function parseMetadataJson(value: string): Record<string, unknown> | undefined {
   return parsed as Record<string, unknown>;
 }
 
-function createFormFromOption(option: MasterDataOption): MasterDataFormState {
+function createFormFromOption(option: MasterDataOption): MasterDataOptionFormValues {
   return {
     value: option.value,
     label: option.label,
@@ -174,25 +198,167 @@ function getStatusButtonClassName(isActive: boolean): string {
   }`;
 }
 
+function MasterDataOptionForm({
+  config,
+  initialValues,
+  resetToken,
+  submitLabel,
+  isSubmitting,
+  onSubmit,
+  onCancel,
+}: {
+  config: CategoryFormConfig;
+  initialValues: MasterDataOptionFormValues;
+  resetToken: number | string;
+  submitLabel: string;
+  isSubmitting: boolean;
+  onSubmit: (values: MasterDataOptionFormValues) => void | Promise<void>;
+  onCancel?: () => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<MasterDataOptionFormValues>({
+    resolver: zodResolver(masterDataOptionFormSchema),
+    defaultValues: initialValues,
+  });
+
+  useEffect(() => {
+    reset(initialValues);
+  }, [initialValues, reset, resetToken]);
+
+  return (
+    <form
+      className="grid gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4"
+      onSubmit={handleSubmit((values) => void onSubmit(values))}
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+            {config.valueLabel}
+          </span>
+          <input
+            className="serene-input"
+            {...register("value")}
+            placeholder={config.valuePlaceholder}
+          />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+            {config.labelLabel}
+          </span>
+          <input
+            className="serene-input"
+            {...register("label")}
+            placeholder={config.labelPlaceholder}
+          />
+          {errors.label ? (
+            <p className="text-xs font-semibold text-error">{errors.label.message}</p>
+          ) : null}
+        </label>
+      </div>
+
+      {config.valueHint ? (
+        <p className="rounded-md border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
+          {config.valueHint}
+        </p>
+      ) : null}
+
+      <label className="grid gap-1">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+          {config.descriptionLabel}
+        </span>
+        <input
+          className="serene-input"
+          {...register("description")}
+          placeholder={config.descriptionPlaceholder}
+        />
+      </label>
+
+      <p className="text-xs text-on-surface-variant">Urutan tampil ditentukan otomatis oleh sistem.</p>
+
+      {config.showMetadata ? (
+        <label className="grid gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+            {config.metadataLabel}
+          </span>
+          <textarea
+            className="serene-textarea"
+            rows={3}
+            {...register("metadataJson")}
+            placeholder={config.metadataPlaceholder}
+          />
+          {errors.metadataJson ? (
+            <p className="text-xs font-semibold text-error">{errors.metadataJson.message}</p>
+          ) : null}
+          {config.metadataHint ? (
+            <p className="text-xs text-on-surface-variant">{config.metadataHint}</p>
+          ) : null}
+        </label>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-outline-variant/55"
+            {...register("isActive")}
+          />
+          Aktif
+        </label>
+
+        <div className="flex items-center gap-2">
+          {onCancel ? (
+            <button
+              type="button"
+              className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs"
+              onClick={onCancel}
+            >
+              Batal
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Menyimpan..." : submitLabel}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
 export function MasterDataScreen() {
-  const [categories, setCategories] = useState<MasterDataCategory[]>([]);
+  const categoriesQuery = useMasterDataCategoriesQuery();
   const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryKey | null>(null);
-  const [options, setOptions] = useState<MasterDataOption[]>([]);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [notice, setNotice] = useState<NoticeState | null>(null);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
-  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [creatingForm, setCreatingForm] = useState<MasterDataFormState>(EMPTY_FORM);
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
-  const [editingForm, setEditingForm] = useState<MasterDataFormState>(EMPTY_FORM);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [createFormResetToken, setCreateFormResetToken] = useState(0);
+  const createMutation = useCreateMasterDataOptionMutation();
+  const updateMutation = useUpdateMasterDataOptionMutation();
 
   const sortedCategories = useMemo(
-    () => [...categories].sort((left, right) => left.label.localeCompare(right.label)),
-    [categories],
+    () =>
+      [...(categoriesQuery.data ?? [])].sort((left, right) => left.label.localeCompare(right.label)),
+    [categoriesQuery.data],
   );
+
+  useEffect(() => {
+    setActiveCategoryKey((current) => {
+      if (current && sortedCategories.some((category) => category.key === current)) {
+        return current;
+      }
+
+      return sortedCategories[0]?.key ?? null;
+    });
+  }, [sortedCategories]);
 
   const activeCategory =
     activeCategoryKey !== null
@@ -201,98 +367,30 @@ export function MasterDataScreen() {
   const activeCategoryFormConfig =
     activeCategoryKey !== null ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
 
-  const refreshCategories = async (signal?: AbortSignal) => {
-    const fetched = await fetchMasterDataCategoriesFromBackend({ signal });
-    setCategories(fetched);
-    setActiveCategoryKey((current) => {
-      if (current && fetched.some((category) => category.key === current)) {
-        return current;
-      }
-
-      return fetched[0]?.key ?? null;
-    });
-  };
-
-  const refreshOptions = async ({
-    categoryKey,
-    includeInactiveOptions,
-    signal,
-  }: {
-    categoryKey: MasterDataCategoryKey;
-    includeInactiveOptions: boolean;
-    signal?: AbortSignal;
-  }) => {
-    setIsLoadingOptions(true);
-    try {
-      const fetched = await fetchMasterDataOptionsFromBackend({
-        categoryKey,
-        includeInactive: includeInactiveOptions,
-        signal,
-      });
-      setOptions(fetched);
-    } finally {
-      if (!signal?.aborted) {
-        setIsLoadingOptions(false);
-      }
-    }
-  };
+  const optionsQuery = useMasterDataOptionsQuery({
+    categoryKey: activeCategoryKey ?? "invoice-issuing-office",
+    includeInactive,
+    enabled: activeCategoryKey !== null,
+  });
+  const options = optionsQuery.data ?? [];
+  const editingOption = useMemo(
+    () => options.find((option) => option.id === editingOptionId) ?? null,
+    [editingOptionId, options],
+  );
+  const editingInitialValues = useMemo(
+    () => (editingOption ? createFormFromOption(editingOption) : EMPTY_FORM),
+    [editingOption],
+  );
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    setIsLoadingCategories(true);
-    void refreshCategories(controller.signal)
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setCategories([]);
-        setActiveCategoryKey(null);
-        setNotice({
-          tone: "error",
-          message: readErrorMessage(error, "Gagal memuat kategori master data dari backend."),
-        });
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsLoadingCategories(false);
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    const categoryKey = activeCategoryKey;
-    if (!categoryKey) {
-      setOptions([]);
+    if (!editingOptionId) {
       return;
     }
 
-    const controller = new AbortController();
-    void refreshOptions({
-      categoryKey,
-      includeInactiveOptions: includeInactive,
-      signal: controller.signal,
-    }).catch((error: unknown) => {
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      setOptions([]);
-      setNotice({
-        tone: "error",
-        message: readErrorMessage(error, "Gagal memuat option master data."),
-      });
-    });
-
-    return () => {
-      controller.abort();
-    };
-  }, [activeCategoryKey, includeInactive]);
+    if (!editingOption) {
+      setEditingOptionId(null);
+    }
+  }, [editingOption, editingOptionId]);
 
   useEffect(() => {
     if (!notice) {
@@ -308,101 +406,103 @@ export function MasterDataScreen() {
     };
   }, [notice]);
 
-  const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const categoryKey = activeCategoryKey;
-    if (!categoryKey || isCreating) {
+  useEffect(() => {
+    if (!categoriesQuery.error) {
       return;
     }
 
-    const label = creatingForm.label.trim();
-    if (!label) {
-      setNotice({ tone: "error", message: "Label option wajib diisi." });
+    setNotice({
+      tone: "error",
+      message: readErrorMessage(
+        categoriesQuery.error,
+        "Gagal memuat kategori master data dari backend.",
+      ),
+    });
+  }, [categoriesQuery.error]);
+
+  useEffect(() => {
+    if (!optionsQuery.error) {
       return;
     }
 
-    setIsCreating(true);
+    setNotice({
+      tone: "error",
+      message: readErrorMessage(optionsQuery.error, "Gagal memuat option master data."),
+    });
+  }, [optionsQuery.error]);
+
+  const handleSelectCategory = (categoryKey: MasterDataCategoryKey) => {
+    setActiveCategoryKey(categoryKey);
+    setIsCreateOpen(false);
+    setEditingOptionId(null);
+    setCreateFormResetToken((current) => current + 1);
+  };
+
+  const handleCreateSubmit = async (values: MasterDataOptionFormValues) => {
+    if (!activeCategoryKey) {
+      return;
+    }
+
     try {
-      const metadata = parseMetadataJson(creatingForm.metadataJson);
-      await createMasterDataOptionInBackend({
-        categoryKey,
-        value: creatingForm.value.trim() || undefined,
-        label,
-        description: creatingForm.description.trim() || undefined,
-        isActive: creatingForm.isActive,
-        metadata,
+      await createMutation.mutateAsync({
+        categoryKey: activeCategoryKey,
+        value: values.value.trim() || undefined,
+        label: values.label.trim(),
+        description: values.description.trim() || undefined,
+        isActive: values.isActive,
+        metadata: parseMetadataJson(values.metadataJson),
       });
-
-      await refreshOptions({ categoryKey, includeInactiveOptions: includeInactive });
-      await refreshCategories();
-      setCreatingForm(EMPTY_FORM);
+      setCreateFormResetToken((current) => current + 1);
       setIsCreateOpen(false);
-      setNotice({ tone: "success", message: "Option master data berhasil ditambahkan." });
+      setNotice({
+        tone: "success",
+        message: "Option master data berhasil ditambahkan.",
+      });
     } catch (error: unknown) {
       setNotice({
         tone: "error",
         message: readErrorMessage(error, "Gagal menambahkan option master data."),
       });
-    } finally {
-      setIsCreating(false);
     }
   };
 
-  const handleSaveEdit = async () => {
-    const optionId = editingOptionId;
-    const categoryKey = activeCategoryKey;
-    if (!optionId || !categoryKey || isUpdating) {
+  const handleSaveEdit = async (values: MasterDataOptionFormValues) => {
+    if (!editingOptionId) {
       return;
     }
 
-    const label = editingForm.label.trim();
-    if (!label) {
-      setNotice({ tone: "error", message: "Label option wajib diisi." });
-      return;
-    }
-
-    setIsUpdating(true);
     try {
-      const metadata = parseMetadataJson(editingForm.metadataJson);
-      await updateMasterDataOptionInBackend(optionId, {
-        value: editingForm.value.trim(),
-        label,
-        description: editingForm.description,
-        isActive: editingForm.isActive,
-        metadata,
+      await updateMutation.mutateAsync({
+        optionId: editingOptionId,
+        payload: {
+          value: values.value.trim(),
+          label: values.label.trim(),
+          description: values.description.trim() || undefined,
+          isActive: values.isActive,
+          metadata: parseMetadataJson(values.metadataJson),
+        },
       });
-
-      await refreshOptions({ categoryKey, includeInactiveOptions: includeInactive });
-      await refreshCategories();
       setEditingOptionId(null);
-      setEditingForm(EMPTY_FORM);
-      setNotice({ tone: "success", message: "Option master data berhasil diperbarui." });
+      setNotice({
+        tone: "success",
+        message: "Option master data berhasil diperbarui.",
+      });
     } catch (error: unknown) {
       setNotice({
         tone: "error",
         message: readErrorMessage(error, "Gagal memperbarui option master data."),
       });
-    } finally {
-      setIsUpdating(false);
     }
   };
 
   const handleToggleActive = async (option: MasterDataOption) => {
-    if (!activeCategoryKey || isUpdating) {
-      return;
-    }
-
-    setIsUpdating(true);
     try {
-      await updateMasterDataOptionInBackend(option.id, {
-        isActive: !option.isActive,
+      await updateMutation.mutateAsync({
+        optionId: option.id,
+        payload: {
+          isActive: !option.isActive,
+        },
       });
-      await refreshOptions({
-        categoryKey: activeCategoryKey,
-        includeInactiveOptions: includeInactive,
-      });
-      await refreshCategories();
       setNotice({
         tone: "success",
         message: `Option ${option.label} ${option.isActive ? "dinonaktifkan" : "diaktifkan"}.`,
@@ -412,8 +512,6 @@ export function MasterDataScreen() {
         tone: "error",
         message: readErrorMessage(error, "Gagal mengubah status option."),
       });
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -458,7 +556,7 @@ export function MasterDataScreen() {
               </h2>
               <p className="mt-1 text-xs text-on-surface-variant">Pilih kategori master data.</p>
             </div>
-            {isLoadingCategories ? (
+            {categoriesQuery.isLoading ? (
               <span className="text-xs font-semibold text-on-surface-variant">Loading...</span>
             ) : null}
           </div>
@@ -475,12 +573,7 @@ export function MasterDataScreen() {
                       ? "border-primary/40 bg-primary/10"
                       : "border-transparent hover:border-outline-variant/35 hover:bg-surface-container-low"
                   }`}
-                  onClick={() => {
-                    setActiveCategoryKey(category.key);
-                    setCreatingForm(EMPTY_FORM);
-                    setEditingOptionId(null);
-                    setEditingForm(EMPTY_FORM);
-                  }}
+                  onClick={() => handleSelectCategory(category.key)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -532,7 +625,7 @@ export function MasterDataScreen() {
                 className="serene-btn-primary min-h-[38px] w-full px-3 py-1.5 text-xs sm:w-auto sm:px-4"
                 onClick={() => {
                   setIsCreateOpen((current) => !current);
-                  setCreatingForm(EMPTY_FORM);
+                  setCreateFormResetToken((current) => current + 1);
                 }}
                 disabled={!activeCategoryKey}
               >
@@ -541,102 +634,21 @@ export function MasterDataScreen() {
             </div>
           </div>
 
-          {isCreateOpen && activeCategoryKey && activeCategoryFormConfig ? (
-            <form
-              className="mx-4 mt-4 grid gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 sm:mx-5"
-              onSubmit={handleCreateSubmit}
-            >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                    {activeCategoryFormConfig.valueLabel}
-                  </span>
-                  <input
-                    className="serene-input"
-                    value={creatingForm.value}
-                    onChange={(event) =>
-                      setCreatingForm((current) => ({ ...current, value: event.target.value }))
-                    }
-                    placeholder={activeCategoryFormConfig.valuePlaceholder}
-                  />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                    {activeCategoryFormConfig.labelLabel}
-                  </span>
-                  <input
-                    className="serene-input"
-                    value={creatingForm.label}
-                    onChange={(event) =>
-                      setCreatingForm((current) => ({ ...current, label: event.target.value }))
-                    }
-                    placeholder={activeCategoryFormConfig.labelPlaceholder}
-                  />
-                </label>
-              </div>
-              {activeCategoryFormConfig.valueHint ? (
-                <p className="rounded-md border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
-                  {activeCategoryFormConfig.valueHint}
-                </p>
-              ) : null}
-              <label className="grid gap-1">
-                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                  {activeCategoryFormConfig.descriptionLabel}
-                </span>
-                <input
-                  className="serene-input"
-                  value={creatingForm.description}
-                  onChange={(event) =>
-                    setCreatingForm((current) => ({ ...current, description: event.target.value }))
-                  }
-                  placeholder={activeCategoryFormConfig.descriptionPlaceholder}
-                />
-              </label>
-              <p className="text-xs text-on-surface-variant">
-                Urutan tampil ditentukan otomatis oleh sistem.
-              </p>
-              {activeCategoryFormConfig.showMetadata ? (
-                <label className="grid gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                    {activeCategoryFormConfig.metadataLabel}
-                  </span>
-                  <textarea
-                    className="serene-textarea"
-                    rows={3}
-                    value={creatingForm.metadataJson}
-                    onChange={(event) =>
-                      setCreatingForm((current) => ({ ...current, metadataJson: event.target.value }))
-                    }
-                    placeholder={activeCategoryFormConfig.metadataPlaceholder}
-                  />
-                  {activeCategoryFormConfig.metadataHint ? (
-                    <p className="text-xs text-on-surface-variant">
-                      {activeCategoryFormConfig.metadataHint}
-                    </p>
-                  ) : null}
-                </label>
-              ) : null}
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-outline-variant/55"
-                  checked={creatingForm.isActive}
-                  onChange={(event) =>
-                    setCreatingForm((current) => ({ ...current, isActive: event.target.checked }))
-                  }
-                />
-                Aktif
-              </label>
-              <div className="flex justify-end">
-                <button type="submit" className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs" disabled={isCreating}>
-                  {isCreating ? "Menyimpan..." : "Simpan Option"}
-                </button>
-              </div>
-            </form>
+          {isCreateOpen && activeCategoryFormConfig ? (
+            <div className="mx-4 mt-4 sm:mx-5">
+              <MasterDataOptionForm
+                config={activeCategoryFormConfig}
+                initialValues={EMPTY_FORM}
+                resetToken={`${activeCategoryKey ?? "none"}-${createFormResetToken}`}
+                submitLabel="Simpan Option"
+                isSubmitting={createMutation.isPending}
+                onSubmit={handleCreateSubmit}
+              />
+            </div>
           ) : null}
 
           <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
-            {isLoadingOptions ? (
+            {optionsQuery.isLoading ? (
               <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
                 Memuat option...
               </div>
@@ -654,10 +666,14 @@ export function MasterDataScreen() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="break-all font-mono text-[11px] text-on-surface-variant">{option.value}</p>
+                          <p className="break-all font-mono text-[11px] text-on-surface-variant">
+                            {option.value}
+                          </p>
                           <p className="mt-1 text-sm font-semibold text-on-surface">{option.label}</p>
                           {option.description ? (
-                            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{option.description}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                              {option.description}
+                            </p>
                           ) : null}
                           <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
                             Sort {option.sortOrder}
@@ -668,7 +684,7 @@ export function MasterDataScreen() {
                           type="button"
                           className={`${getStatusButtonClassName(option.isActive)} shrink-0`}
                           onClick={() => void handleToggleActive(option)}
-                          disabled={isUpdating}
+                          disabled={updateMutation.isPending}
                         >
                           {option.isActive ? "Active" : "Inactive"}
                         </button>
@@ -678,10 +694,7 @@ export function MasterDataScreen() {
                         <button
                           type="button"
                           className="inline-flex min-h-[34px] items-center rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-primary/45 hover:text-primary"
-                          onClick={() => {
-                            setEditingOptionId(option.id);
-                            setEditingForm(createFormFromOption(option));
-                          }}
+                          onClick={() => setEditingOptionId(option.id)}
                         >
                           Edit
                         </button>
@@ -719,46 +732,43 @@ export function MasterDataScreen() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/20">
-                      {options.map((option) => {
-                        return (
-                          <tr key={option.id} className="align-middle transition hover:bg-primary/5">
-                            <td className="break-all px-4 py-3 font-mono text-[11px] text-on-surface-variant">
-                              {option.value}
-                            </td>
-                            <td className="px-4 py-3">
-                              <p className="font-semibold text-on-surface">{option.label}</p>
-                              {option.description ? (
-                                <p className="mt-0.5 text-xs text-on-surface-variant">{option.description}</p>
-                              ) : null}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-on-surface-variant">
-                              {option.sortOrder}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3">
-                              <button
-                                type="button"
-                                className={getStatusButtonClassName(option.isActive)}
-                                onClick={() => void handleToggleActive(option)}
-                                disabled={isUpdating}
-                              >
-                                {option.isActive ? "Active" : "Inactive"}
-                              </button>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3">
-                              <button
-                                type="button"
-                                className="inline-flex min-h-[34px] items-center rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-primary/45 hover:text-primary"
-                                onClick={() => {
-                                  setEditingOptionId(option.id);
-                                  setEditingForm(createFormFromOption(option));
-                                }}
-                              >
-                                Edit
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {options.map((option) => (
+                        <tr key={option.id} className="align-middle transition hover:bg-primary/5">
+                          <td className="break-all px-4 py-3 font-mono text-[11px] text-on-surface-variant">
+                            {option.value}
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-on-surface">{option.label}</p>
+                            {option.description ? (
+                              <p className="mt-0.5 text-xs text-on-surface-variant">
+                                {option.description}
+                              </p>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-on-surface-variant">
+                            {option.sortOrder}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <button
+                              type="button"
+                              className={getStatusButtonClassName(option.isActive)}
+                              onClick={() => void handleToggleActive(option)}
+                              disabled={updateMutation.isPending}
+                            >
+                              {option.isActive ? "Active" : "Inactive"}
+                            </button>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <button
+                              type="button"
+                              className="inline-flex min-h-[34px] items-center rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-primary/45 hover:text-primary"
+                              onClick={() => setEditingOptionId(option.id)}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -771,104 +781,17 @@ export function MasterDataScreen() {
               <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-on-surface-variant">
                 Edit Option
               </h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                    {activeCategoryFormConfig.valueLabel}
-                  </span>
-                  <input
-                    className="serene-input"
-                    value={editingForm.value}
-                    onChange={(event) =>
-                      setEditingForm((current) => ({ ...current, value: event.target.value }))
-                    }
-                    placeholder={activeCategoryFormConfig.valuePlaceholder}
-                  />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                    {activeCategoryFormConfig.labelLabel}
-                  </span>
-                  <input
-                    className="serene-input"
-                    value={editingForm.label}
-                    onChange={(event) =>
-                      setEditingForm((current) => ({ ...current, label: event.target.value }))
-                    }
-                    placeholder={activeCategoryFormConfig.labelPlaceholder}
-                  />
-                </label>
-              </div>
-              <label className="mt-3 grid gap-1">
-                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                  {activeCategoryFormConfig.descriptionLabel}
-                </span>
-                <input
-                  className="serene-input"
-                  value={editingForm.description}
-                  onChange={(event) =>
-                    setEditingForm((current) => ({ ...current, description: event.target.value }))
-                  }
-                  placeholder={activeCategoryFormConfig.descriptionPlaceholder}
-                />
-              </label>
-              <p className="mt-3 text-xs text-on-surface-variant">
-                Urutan tampil ditentukan otomatis oleh sistem.
-              </p>
-              {activeCategoryFormConfig.showMetadata ? (
-                <label className="mt-3 grid gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                    {activeCategoryFormConfig.metadataLabel}
-                  </span>
-                  <textarea
-                    className="serene-textarea"
-                    rows={3}
-                    value={editingForm.metadataJson}
-                    onChange={(event) =>
-                      setEditingForm((current) => ({ ...current, metadataJson: event.target.value }))
-                    }
-                    placeholder={activeCategoryFormConfig.metadataPlaceholder}
-                  />
-                  {activeCategoryFormConfig.metadataHint ? (
-                    <p className="text-xs text-on-surface-variant">
-                      {activeCategoryFormConfig.metadataHint}
-                    </p>
-                  ) : null}
-                </label>
-              ) : null}
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-outline-variant/55"
-                    checked={editingForm.isActive}
-                    onChange={(event) =>
-                      setEditingForm((current) => ({ ...current, isActive: event.target.checked }))
-                    }
-                  />
-                  Aktif
-                </label>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs"
-                    onClick={() => {
-                      setEditingOptionId(null);
-                      setEditingForm(EMPTY_FORM);
-                    }}
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs"
-                    onClick={() => void handleSaveEdit()}
-                    disabled={isUpdating}
-                  >
-                    {isUpdating ? "Menyimpan..." : "Simpan Perubahan"}
-                  </button>
-                </div>
+              <div className="mt-3">
+                <MasterDataOptionForm
+                  config={activeCategoryFormConfig}
+                  initialValues={editingInitialValues}
+                  resetToken={editingOptionId}
+                  submitLabel="Simpan Perubahan"
+                  isSubmitting={updateMutation.isPending}
+                  onSubmit={handleSaveEdit}
+                  onCancel={() => setEditingOptionId(null)}
+                />
               </div>
             </section>
           ) : null}
