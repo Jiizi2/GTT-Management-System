@@ -1,4 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable, Optional } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { resolveConfiguredNumber } from "../config/app-config";
+import { resolveClientIp } from "../http-origin";
 
 type LoginRateLimitBucket = {
   failedAttemptTimestamps: number[];
@@ -30,96 +33,20 @@ const DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 8;
 const DEFAULT_LOGIN_RATE_LIMIT_LOCK_MS = 5 * 60_000;
 
-function parsePositiveInteger(
-  rawValue: string | undefined,
-  fallbackValue: number,
-  minValue: number,
-): number {
-  const normalized = rawValue?.trim() ?? "";
-  if (!/^\d+$/.test(normalized)) {
-    return fallbackValue;
-  }
-
-  const parsed = Number.parseInt(normalized, 10);
-  if (!Number.isFinite(parsed) || parsed < minValue) {
-    return fallbackValue;
-  }
-
-  return parsed;
-}
-
 function resolveWindowMs(): number {
-  return parsePositiveInteger(
-    process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_MS,
-    DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS,
-    1_000,
-  );
+  return DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MS;
 }
 
 function resolveMaxAttempts(): number {
-  return parsePositiveInteger(
-    process.env.AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
-    DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
-    1,
-  );
+  return DEFAULT_LOGIN_RATE_LIMIT_MAX_ATTEMPTS;
 }
 
 function resolveLockMs(): number {
-  return parsePositiveInteger(
-    process.env.AUTH_LOGIN_RATE_LIMIT_LOCK_MS,
-    DEFAULT_LOGIN_RATE_LIMIT_LOCK_MS,
-    1_000,
-  );
+  return DEFAULT_LOGIN_RATE_LIMIT_LOCK_MS;
 }
 
 function normalizeIdentifier(value: string): string {
   return value.trim().toLowerCase() || "unknown";
-}
-
-function readHeaderValue(headers: Record<string, unknown> | undefined, key: string): string {
-  const rawValue = headers?.[key] ?? headers?.[key.toLowerCase()];
-  if (Array.isArray(rawValue)) {
-    return rawValue[0]?.trim() ?? "";
-  }
-
-  if (typeof rawValue === "string") {
-    return rawValue.trim();
-  }
-
-  return "";
-}
-
-function normalizeIpCandidate(value: string | null | undefined): string {
-  const normalized = (value ?? "").trim();
-  if (!normalized) {
-    return "";
-  }
-
-  const normalizedWithoutPort = normalized.replace(/^\[?([a-fA-F0-9:.]+)\]?(:\d+)?$/, "$1");
-  return normalizedWithoutPort.toLowerCase();
-}
-
-function resolveClientIp(request: LoginRequestLike): string {
-  const forwardedHeader = readHeaderValue(request.headers, "x-forwarded-for");
-  const forwardedIp = forwardedHeader
-    .split(",")
-    .map((segment) => normalizeIpCandidate(segment))
-    .find((segment) => segment.length > 0);
-  if (forwardedIp) {
-    return forwardedIp;
-  }
-
-  const directIp = normalizeIpCandidate(request.ip);
-  if (directIp) {
-    return directIp;
-  }
-
-  const socketIp = normalizeIpCandidate(request.socket?.remoteAddress);
-  if (socketIp) {
-    return socketIp;
-  }
-
-  return "unknown";
 }
 
 @Injectable()
@@ -134,10 +61,38 @@ export class AuthLoginRateLimiter {
     @Optional()
     @Inject("AUTH_LOGIN_RATE_LIMITER_OPTIONS")
     options?: Partial<LoginRateLimiterOptions>,
+    @Optional() private readonly configService?: ConfigService,
   ) {
-    this.windowMs = options?.windowMs ?? resolveWindowMs();
-    this.maxAttempts = options?.maxAttempts ?? resolveMaxAttempts();
-    this.lockMs = options?.lockMs ?? resolveLockMs();
+    this.windowMs =
+      options?.windowMs ??
+      Math.max(
+        1_000,
+        resolveConfiguredNumber(
+          this.configService,
+          "AUTH_LOGIN_RATE_LIMIT_WINDOW_MS",
+          resolveWindowMs(),
+        ),
+      );
+    this.maxAttempts =
+      options?.maxAttempts ??
+      Math.max(
+        1,
+        resolveConfiguredNumber(
+          this.configService,
+          "AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS",
+          resolveMaxAttempts(),
+        ),
+      );
+    this.lockMs =
+      options?.lockMs ??
+      Math.max(
+        1_000,
+        resolveConfiguredNumber(
+          this.configService,
+          "AUTH_LOGIN_RATE_LIMIT_LOCK_MS",
+          resolveLockMs(),
+        ),
+      );
     this.now = options?.now ?? (() => Date.now());
   }
 

@@ -5,11 +5,18 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { AuthUserRole, Prisma } from "@prisma/client";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+  resolveConfiguredBoolean,
+  resolveConfiguredDataSource,
+  resolveConfiguredNodeEnv,
+  resolveConfiguredString,
+} from "../config/app-config";
 import { PrismaService } from "../prisma/prisma.service";
 import {
-  createDefaultAuthUserStorageRecords,
+  createDefaultAuthUserStorageRecordsWithOverrides,
   mapManagedRoleToPrismaRole,
   mapPrismaRoleToAccessTier,
   mapPrismaRoleToManagedRole,
@@ -104,9 +111,9 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
   };
 }
 
-function resolveAuthSecret(): string {
-  const configured = process.env.AUTH_SECRET?.trim();
-  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+function resolveAuthSecret(configService?: ConfigService): string {
+  const configured = resolveConfiguredString(configService, "AUTH_SECRET");
+  const nodeEnv = resolveConfiguredNodeEnv(configService);
 
   if (configured) {
     if (nodeEnv === "production" && configured.length < MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH) {
@@ -129,10 +136,10 @@ function resolveAuthSecret(): string {
   return DEFAULT_AUTH_SECRET;
 }
 
-function resolveShouldBootstrapPrismaAuthUsers(): boolean {
-  const configured = process.env.AUTH_BOOTSTRAP_DEFAULT_USERS?.trim().toLowerCase();
-  if (configured === "true") {
-    const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+function resolveShouldBootstrapPrismaAuthUsers(configService?: ConfigService): boolean {
+  const configured = resolveConfiguredBoolean(configService, "AUTH_BOOTSTRAP_DEFAULT_USERS");
+  if (configured === true) {
+    const nodeEnv = resolveConfiguredNodeEnv(configService);
     if (nodeEnv === "production") {
       throw new Error("AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production.");
     }
@@ -140,15 +147,15 @@ function resolveShouldBootstrapPrismaAuthUsers(): boolean {
     return true;
   }
 
-  if (configured === "false") {
+  if (configured === false) {
     return false;
   }
 
-  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+  const nodeEnv = resolveConfiguredNodeEnv(configService);
   return nodeEnv !== "production";
 }
 
-function createDefaultDevAccounts(): AuthDevAccount[] {
+function createDefaultDevAccounts(configService?: ConfigService): AuthDevAccount[] {
   return [
     {
       id: "dev-super-admin",
@@ -156,7 +163,9 @@ function createDefaultDevAccounts(): AuthDevAccount[] {
       username: "dev.superadmin",
       email: "superadmin.dev@ghaniya.local",
       accessTier: "super-admin",
-      password: process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026",
+      password:
+        resolveConfiguredString(configService, "DEV_AUTH_SUPERADMIN_PASSWORD") ||
+        "DevSuperAdmin#2026",
     },
     {
       id: "dev-admin",
@@ -164,7 +173,8 @@ function createDefaultDevAccounts(): AuthDevAccount[] {
       username: "dev.admin",
       email: "admin.dev@ghaniya.local",
       accessTier: "admin",
-      password: process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026",
+      password:
+        resolveConfiguredString(configService, "DEV_AUTH_ADMIN_PASSWORD") || "DevAdmin#2026",
     },
   ];
 }
@@ -209,16 +219,21 @@ function normalizeUsernameCandidate(value: string): string {
 
 @Injectable()
 export class AuthService {
-  private readonly authSecret = resolveAuthSecret();
+  private readonly authSecret: string;
   private readonly dataSource: "memory" | "prisma";
-  private readonly shouldBootstrapPrismaAuthUsers = resolveShouldBootstrapPrismaAuthUsers();
-  private readonly accounts = createDefaultDevAccounts();
+  private readonly shouldBootstrapPrismaAuthUsers: boolean;
+  private readonly accounts: AuthDevAccount[];
   private readonly managedUsers = createDefaultManagedUsers();
   private prismaBootstrapPromise: Promise<void> | null = null;
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {
-    const configuredSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
-    this.dataSource = configuredSource === "prisma" ? "prisma" : "memory";
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly configService?: ConfigService,
+  ) {
+    this.authSecret = resolveAuthSecret(this.configService);
+    this.dataSource = resolveConfiguredDataSource(this.configService);
+    this.shouldBootstrapPrismaAuthUsers = resolveShouldBootstrapPrismaAuthUsers(this.configService);
+    this.accounts = createDefaultDevAccounts(this.configService);
   }
 
   async login(payload: LoginDto): Promise<AuthLoginResponse> {
@@ -778,7 +793,10 @@ export class AuthService {
   }
 
   private async bootstrapPrismaAuthUsers(): Promise<void> {
-    const defaultUsers = createDefaultAuthUserStorageRecords();
+    const defaultUsers = createDefaultAuthUserStorageRecordsWithOverrides({
+      superAdminPassword: resolveConfiguredString(this.configService, "DEV_AUTH_SUPERADMIN_PASSWORD"),
+      adminPassword: resolveConfiguredString(this.configService, "DEV_AUTH_ADMIN_PASSWORD"),
+    });
 
     for (const defaultUser of defaultUsers) {
       const existingByUsername = await this.prisma.authUser.findUnique({

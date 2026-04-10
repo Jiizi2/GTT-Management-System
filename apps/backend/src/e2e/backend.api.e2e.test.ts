@@ -2,7 +2,6 @@ import "reflect-metadata";
 import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { AppModule } from "../app.module";
 
 type StartedServer = {
   baseUrl: string;
@@ -48,6 +47,7 @@ async function startBackendServer(): Promise<StartedServer> {
   let app: INestApplication | null = null;
 
   try {
+    const { AppModule } = await import("../app.module.js");
     app = await NestFactory.create(AppModule, { cors: true, logger: false });
     app.setGlobalPrefix("api");
     app.useGlobalPipes(

@@ -5,6 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import {
   isOriginAllowed,
@@ -13,6 +14,7 @@ import {
   resolveRequestOrigin,
   resolveRequestSourceOrigin,
 } from "../http-origin";
+import { resolveConfiguredString } from "../config/app-config";
 import { extractAuthCookieToken } from "./auth-cookie";
 import { AuthService } from "./auth.service";
 import { IS_PUBLIC_ROUTE_KEY } from "./auth.public";
@@ -32,12 +34,15 @@ type GuardHeaders = {
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  private readonly allowedOrigins = resolveCorsOrigins(process.env.CORS_ORIGINS);
+  private readonly allowedOrigins: string[];
 
   constructor(
     private readonly reflector: Reflector,
     private readonly authService: AuthService,
-  ) {}
+    private readonly configService?: ConfigService,
+  ) {
+    this.allowedOrigins = resolveCorsOrigins(resolveConfiguredString(this.configService, "CORS_ORIGINS"));
+  }
 
   canActivate(context: ExecutionContext): boolean {
     const isPublicRoute = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_ROUTE_KEY, [

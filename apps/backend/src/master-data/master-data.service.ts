@@ -6,7 +6,9 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
+import { resolveConfiguredDataSource } from "../config/app-config";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   DEFAULT_MASTER_DATA_OPTIONS,
@@ -157,9 +159,11 @@ export class MasterDataService {
   private prismaSeedPromise: Promise<void> | null = null;
   private prismaReadFallbackReason: "missing-table" | "missing-client" | null = null;
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {
-    const configuredSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
-    this.dataSource = configuredSource === "prisma" ? "prisma" : "memory";
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly configService?: ConfigService,
+  ) {
+    this.dataSource = resolveConfiguredDataSource(this.configService);
   }
 
   async listCategories(): Promise<MasterDataCategorySummary[]> {

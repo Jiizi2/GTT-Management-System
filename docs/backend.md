@@ -6,8 +6,11 @@ Dokumen ini menjelaskan arsitektur backend, mode data, endpoint API, dan operasi
 
 - Lokasi: `apps/backend`
 - Framework: NestJS 11 (TypeScript)
+- Konfigurasi: `@nestjs/config` + `joi`
 - ORM: Prisma
 - Database: PostgreSQL (untuk mode `prisma`)
+- Security middleware: `helmet`
+- Global rate limiting: `@nestjs/throttler`
 - Prefix API global: `/api`
 
 ## 2. Modul Backend
@@ -59,6 +62,7 @@ Variabel penting:
 - `CORS_ORIGINS`
 - `AUTH_COOKIE_DOMAIN` (opsional; default host-only cookie)
 - login rate limit env (`AUTH_LOGIN_RATE_LIMIT_*`)
+- global throttle env (`THROTTLE_DEFAULT_*`)
 
 Aturan khusus:
 
@@ -86,6 +90,7 @@ Aturan khusus:
 ## Health
 
 - `GET /api/health` (public)
+  - route ini melewati global throttling agar aman untuk health probe
 
 ## Auth
 

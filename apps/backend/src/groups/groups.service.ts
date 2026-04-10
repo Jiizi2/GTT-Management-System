@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   AgreementApprovalStatus,
   AgreementCity,
@@ -11,6 +12,7 @@ import {
   VisaStatus,
 } from "@prisma/client";
 import { CreateGroupDto } from "./dto/create-group.dto";
+import { resolveConfiguredDataSource } from "../config/app-config";
 import { PrismaService } from "../prisma/prisma.service";
 import { UpdateGroupDto } from "./dto/update-group.dto";
 import {
@@ -419,9 +421,11 @@ export class GroupsService {
   private readonly memoryGroups: MemoryGroupRecord[] = createDefaultMemoryGroups();
   private readonly auditLogs: MemoryAuditLog[] = [];
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {
-    const configuredSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
-    this.dataSource = configuredSource === "prisma" ? "prisma" : "memory";
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly configService?: ConfigService,
+  ) {
+    this.dataSource = resolveConfiguredDataSource(this.configService);
   }
 
   async findAll(

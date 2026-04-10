@@ -53,6 +53,7 @@
 
 ## Runtime Validation
 
+- Runtime env sekarang dimuat via `@nestjs/config` dan divalidasi terpusat dengan `joi`.
 - `PORT` must be a numeric value between `1` and `65535`.
 - `DATA_SOURCE` must be either `memory` or `prisma`.
 - `DATA_SOURCE=prisma` is mandatory in production (`NODE_ENV=production`).
@@ -61,9 +62,20 @@
 - `AUTH_BOOTSTRAP_DEFAULT_USERS` controls auto-creation of default auth users on startup in Prisma mode.
   - Defaults to `true` outside production.
   - Defaults to `false` in production.
+- Global API throttling is controlled by:
+  - `THROTTLE_DEFAULT_TTL_MS`
+  - `THROTTLE_DEFAULT_LIMIT`
+  - `THROTTLE_DEFAULT_BLOCK_MS`
 - Development login password defaults can be overridden by:
   - `DEV_AUTH_SUPERADMIN_PASSWORD`
   - `DEV_AUTH_ADMIN_PASSWORD`
+
+## Security Defaults
+
+- `helmet` is enabled globally for HTTP security headers.
+- `Permissions-Policy` is set explicitly for camera, geolocation, and microphone restrictions.
+- `@nestjs/throttler` is enabled globally for API-wide rate limiting.
+- `/api/health` skips global throttling to stay friendly for liveness/readiness probes.
 
 ## Development Login Accounts
 

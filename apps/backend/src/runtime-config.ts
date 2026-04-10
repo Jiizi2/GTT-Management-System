@@ -7,7 +7,7 @@ export type RuntimeConfig = {
 
 const DEFAULT_PORT = 3001;
 
-function resolvePort(rawPort: string | undefined): number {
+export function resolvePort(rawPort: string | undefined): number {
   const normalizedPort = rawPort?.trim() ?? "";
   if (!normalizedPort) {
     return DEFAULT_PORT;
@@ -25,7 +25,7 @@ function resolvePort(rawPort: string | undefined): number {
   return parsedPort;
 }
 
-function resolveDataSource(rawDataSource: string | undefined): RuntimeDataSource {
+export function resolveDataSource(rawDataSource: string | undefined): RuntimeDataSource {
   const normalizedDataSource = (rawDataSource ?? "memory").trim().toLowerCase();
   if (!normalizedDataSource) {
     return "memory";

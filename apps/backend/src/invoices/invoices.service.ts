@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { InvoiceStatus, Prisma } from "@prisma/client";
+import { resolveConfiguredDataSource } from "../config/app-config";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
@@ -246,9 +248,11 @@ export class InvoicesService {
   ];
   private readonly memoryInvoices: MemoryInvoice[] = [];
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {
-    const configuredSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
-    this.dataSource = configuredSource === "prisma" ? "prisma" : "memory";
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly configService?: ConfigService,
+  ) {
+    this.dataSource = resolveConfiguredDataSource(this.configService);
   }
 
   async listClients(): Promise<InvoiceClientListItem[]> {

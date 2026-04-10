@@ -1,10 +1,12 @@
-import "dotenv/config";
 import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import helmet from "helmet";
+import type { RuntimeDataSource } from "./runtime-config";
 import { AppModule } from "./app.module";
 import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
-import { resolveRuntimeConfig, resolveStartupErrorMessage } from "./runtime-config";
+import { resolveStartupErrorMessage } from "./runtime-config";
 
 type CorsOriginCallback = (error: Error | null, allow?: boolean) => void;
 type HeaderResponse = {
@@ -13,12 +15,26 @@ type HeaderResponse = {
 type NextHandler = () => void;
 
 async function bootstrap(): Promise<void> {
-  const { port, dataSource } = resolveRuntimeConfig(process.env);
-  const corsOrigins = resolveCorsOrigins(process.env.CORS_ORIGINS);
-  const corsSummary = `${corsOrigins.length} origins`;
   const app = await NestFactory.create(AppModule, {
     logger: ["error", "warn", "log"],
   });
+  const configService = app.get(ConfigService);
+  const port = configService.getOrThrow<number>("PORT");
+  const dataSource = configService.getOrThrow<RuntimeDataSource>("DATA_SOURCE");
+  const corsOrigins = resolveCorsOrigins(configService.get<string>("CORS_ORIGINS"));
+  const corsSummary = `${corsOrigins.length} origins`;
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginOpenerPolicy: { policy: "same-origin" },
+      crossOriginResourcePolicy: { policy: "same-origin" },
+      permittedCrossDomainPolicies: { permittedPolicies: "none" },
+      referrerPolicy: { policy: "no-referrer" },
+      xFrameOptions: { action: "deny" },
+    }),
+  );
+
   const httpServer = app.getHttpAdapter().getInstance() as {
     disable?: (name: string) => void;
   };
@@ -44,13 +60,7 @@ async function bootstrap(): Promise<void> {
   });
 
   app.use((_: unknown, response: HeaderResponse, next: NextHandler) => {
-    response.setHeader("Referrer-Policy", "no-referrer");
-    response.setHeader("X-Content-Type-Options", "nosniff");
-    response.setHeader("X-Frame-Options", "DENY");
     response.setHeader("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
-    response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-    response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-    response.setHeader("X-Permitted-Cross-Domain-Policies", "none");
     next();
   });
 

@@ -7,6 +7,14 @@ type HeaderCarrier = {
   };
 };
 
+type ClientIpCarrier = {
+  headers?: Record<string, unknown>;
+  ip?: string;
+  socket?: {
+    remoteAddress?: string | null;
+  };
+};
+
 const DEFAULT_CORS_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -35,6 +43,39 @@ export function readHeaderValue(
   }
 
   return "";
+}
+
+function normalizeIpCandidate(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const normalizedWithoutPort = normalized.replace(/^\[?([a-fA-F0-9:.]+)\]?(:\d+)?$/, "$1");
+  return normalizedWithoutPort.toLowerCase();
+}
+
+export function resolveClientIp(request: ClientIpCarrier): string {
+  const forwardedHeader = readHeaderValue(request.headers, "x-forwarded-for");
+  const forwardedIp = forwardedHeader
+    .split(",")
+    .map((segment) => normalizeIpCandidate(segment))
+    .find((segment) => segment.length > 0);
+  if (forwardedIp) {
+    return forwardedIp;
+  }
+
+  const directIp = normalizeIpCandidate(request.ip);
+  if (directIp) {
+    return directIp;
+  }
+
+  const socketIp = normalizeIpCandidate(request.socket?.remoteAddress);
+  if (socketIp) {
+    return socketIp;
+  }
+
+  return "unknown";
 }
 
 export function normalizeOrigin(value: string | null | undefined): string | null {

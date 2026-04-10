@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { APP_GUARD, Reflector } from "@nestjs/core";
 import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
@@ -12,9 +13,12 @@ import { AuthService } from "./auth.service";
     AuthService,
     {
       provide: APP_GUARD,
-      useFactory: (reflector: Reflector, authService: AuthService) =>
-        new AuthGuard(reflector, authService),
-      inject: [Reflector, AuthService],
+      useFactory: (
+        reflector: Reflector,
+        authService: AuthService,
+        configService: ConfigService,
+      ) => new AuthGuard(reflector, authService, configService),
+      inject: [Reflector, AuthService, ConfigService],
     },
   ],
   exports: [AuthService],
