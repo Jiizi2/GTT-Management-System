@@ -42,6 +42,11 @@ const groupEditModalSchema = z.object({
   name: z.string().trim().min(1, "Group name tidak boleh kosong."),
 });
 
+const noteModalSchema = z.object({
+  text: z.string().trim().min(1, "Operational note wajib diisi.").max(2000, "Maksimal 2000 karakter."),
+  pinned: z.boolean(),
+});
+
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") {
     return null;
@@ -1283,18 +1288,28 @@ export function EditScheduleModal({
 }
 
 export function NoteModal({
-  form,
-  isSaveDisabled,
-  onChange,
   onClose,
   onSave,
 }: {
-  form: NoteFormState;
-  isSaveDisabled: boolean;
-  onChange: <Key extends keyof NoteFormState>(field: Key, value: NoteFormState[Key]) => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (values: NoteFormState) => void | Promise<void>;
 }) {
+  const {
+    register,
+    watch,
+    setValue,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<NoteFormState>({
+    resolver: zodResolver(noteModalSchema),
+    defaultValues: {
+      text: "",
+      pinned: false,
+    },
+  });
+  const noteText = watch("text");
+  const pinned = watch("pinned");
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
@@ -1331,11 +1346,13 @@ export function NoteModal({
                   className={modalTextareaClassName}
                   rows={8}
                   maxLength={2000}
-                  value={form.text}
-                  onChange={(event) => onChange("text", event.target.value)}
                   placeholder="Write your operational note here..."
+                  {...register("text")}
                 />
-                <div className="text-xs text-slate-500">{form.text.length}/2000</div>
+                <div className="text-xs text-slate-500">{noteText.length}/2000</div>
+                {errors.text ? (
+                  <p className="text-xs font-semibold text-error">{errors.text.message}</p>
+                ) : null}
               </div>
             </label>
 
@@ -1350,8 +1367,8 @@ export function NoteModal({
               <button
                 type="button"
                 className="inline-flex items-center gap-3"
-                onClick={() => onChange("pinned", !form.pinned)}
-                aria-pressed={form.pinned}
+                onClick={() => setValue("pinned", !pinned, { shouldDirty: true })}
+                aria-pressed={pinned}
               >
                 <div className="inline-flex items-center gap-1.5 text-sm text-slate-600">
                   <span className="material-symbols-outlined" aria-hidden="true">
@@ -1360,10 +1377,10 @@ export function NoteModal({
                   <span>Pin to top of group feed</span>
                 </div>
 
-                <span className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${form.pinned ? "bg-primary" : "bg-slate-300"}`}>
+                <span className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${pinned ? "bg-primary" : "bg-slate-300"}`}>
                   <span
                     className={`h-5 w-5 rounded-full bg-surface-container-lowest shadow-sm transition ${
-                      form.pinned ? "translate-x-5" : "translate-x-0"
+                      pinned ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </span>
@@ -1375,8 +1392,8 @@ export function NoteModal({
             <button
               type="button"
               className="serene-btn-primary gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-              onClick={onSave}
-              disabled={isSaveDisabled}
+              onClick={() => void handleSubmit((values) => void onSave(values))()}
+              disabled={isSubmitting}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 check_circle

@@ -16,7 +16,6 @@ import type {
   GroupData,
   ItineraryItem,
   Musyrif,
-  NoteFormState,
   NoteItem,
   ScheduleFormState,
 } from "../shared/app-domain";
@@ -25,7 +24,6 @@ const {
   buildItineraryItemFromEditForm,
   buildTransferTrainSummary,
   createEditScheduleForm,
-  createInitialNoteForm,
   createInitialScheduleForm,
   createNoteItems,
   createScheduleMeta,
@@ -283,7 +281,6 @@ export function GroupDetail({
   const editSuggestedFromHotelNameRef = useRef("");
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [noteForm, setNoteForm] = useState<NoteFormState>(createInitialNoteForm);
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
   const isEditModalOpen = editingIndex !== null && editScheduleForm !== null;
@@ -314,7 +311,6 @@ export function GroupDetail({
     setEditScheduleForm(null);
     setDeletingIndex(null);
     setIsNoteModalOpen(false);
-    setNoteForm(createInitialNoteForm());
     setIsDeleteGroupModalOpen(false);
     setIsGroupEditModalOpen(false);
   }, [group.code, group.itinerary, group.name, group.notes, group.musyrif]);
@@ -423,7 +419,6 @@ export function GroupDetail({
     isEditDepartureFlightTimeMissing ||
     isEditDeparturePickupTimeMissing ||
     hasEditTransferTrainFieldsMissing;
-  const isNoteSaveDisabled = !noteForm.text.trim();
   const showScheduleFridayCityTourWarning = shouldShowFridayCityTourWarning(
     scheduleForm.category,
     scheduleForm.date,
@@ -614,13 +609,6 @@ export function GroupDetail({
     );
   };
 
-  const handleNoteFieldChange = <Key extends keyof NoteFormState>(
-    field: Key,
-    value: NoteFormState[Key],
-  ) => {
-    setNoteForm((current) => ({ ...current, [field]: value }));
-  };
-
   const handleOpenScheduleModal = () => {
     scheduleSuggestedHotelNameRef.current = "";
     scheduleSuggestedFromHotelNameRef.current = "";
@@ -736,7 +724,6 @@ export function GroupDetail({
   };
 
   const handleOpenNoteModal = () => {
-    setNoteForm(createInitialNoteForm());
     setIsNoteModalOpen(true);
   };
 
@@ -774,18 +761,14 @@ export function GroupDetail({
     handleCloseDeleteModal();
   };
 
-  const handleSaveNote = () => {
-    if (isNoteSaveDisabled) {
-      return;
-    }
-
+  const handleSaveNote = ({ text, pinned }: { text: string; pinned: boolean }) => {
     const nextNote: NoteItem = {
       id: `${group.code}-note-${Date.now()}`,
-      text: noteForm.text.trim(),
-      pinned: noteForm.pinned,
+      text: text.trim(),
+      pinned,
     };
 
-    const nextNoteItems = noteForm.pinned ? [nextNote, ...noteItems] : [...noteItems, nextNote];
+    const nextNoteItems = pinned ? [nextNote, ...noteItems] : [...noteItems, nextNote];
     setNoteItems(nextNoteItems);
     persistGroupSnapshot({ nextNoteItems });
 
@@ -1363,9 +1346,6 @@ export function GroupDetail({
 
       {isNoteModalOpen ? (
         <NoteModal
-          form={noteForm}
-          isSaveDisabled={isNoteSaveDisabled}
-          onChange={handleNoteFieldChange}
           onClose={handleCloseNoteModal}
           onSave={handleSaveNote}
         />
