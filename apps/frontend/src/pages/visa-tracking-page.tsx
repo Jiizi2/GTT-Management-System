@@ -10,6 +10,7 @@ import type {
 import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { useThemeMode } from "../theme/theme-provider";
 import { exportVisaTrackingReportPdf } from "./visa-tracking-export";
 
 const {
@@ -24,21 +25,25 @@ const {
   VISA_PAGE_SIZE,
 } = Domain;
 
-function getFilterChipClasses(isActive: boolean): string {
+function getFilterChipClasses(isActive: boolean, isDarkMode: boolean): string {
   if (isActive) {
-    return "border-emerald-700 bg-emerald-700 text-white";
+    return isDarkMode ? "border-primary/45 bg-primary/18 text-primary" : "border-emerald-700 bg-emerald-700 text-white";
   }
 
-  return "border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:text-emerald-700";
+  return isDarkMode
+    ? "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/50 hover:text-primary"
+    : "border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:text-emerald-700";
 }
 
-function getVisaStatusClasses(status: VisaTrackingRow["visaStatus"]): string {
+function getVisaStatusClasses(status: VisaTrackingRow["visaStatus"], isDarkMode: boolean): string {
   if (status === "Issued") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode ? "border-primary/30 bg-primary/14 text-primary" : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
   if (status === "Pending") {
-    return "border-amber-200 bg-amber-100 text-amber-800";
+    return isDarkMode
+      ? "border-outline-variant/60 bg-surface-container-high text-on-surface-variant"
+      : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
   return "border-slate-300 bg-slate-100 text-slate-700";
@@ -56,21 +61,25 @@ function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Onl
   return group?.visaSetup?.busStatus === "Visa+" ? "Visa+" : "Visa Only";
 }
 
-function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval"): string {
+function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval", isDarkMode: boolean): string {
   if (status === "Approved") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode ? "border-primary/30 bg-primary/14 text-primary" : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
-  return "border-amber-200 bg-amber-100 text-amber-800";
+  return isDarkMode
+    ? "border-outline-variant/60 bg-surface-container-high text-on-surface-variant"
+    : "border-amber-200 bg-amber-100 text-amber-800";
 }
 
-function getRaudhahStatusClasses(status: GroupRaudhahStatus): string {
+function getRaudhahStatusClasses(status: GroupRaudhahStatus, isDarkMode: boolean): string {
   if (status === "After") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode ? "border-primary/30 bg-primary/14 text-primary" : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
   if (status === "Before") {
-    return "border-amber-200 bg-amber-100 text-amber-800";
+    return isDarkMode
+      ? "border-outline-variant/60 bg-surface-container-high text-on-surface-variant"
+      : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
   return "border-slate-300 bg-slate-100 text-slate-700";
@@ -204,6 +213,8 @@ export function VisaTrackingScreen({
     status: AgreementApprovalStatus,
   ) => void;
 }) {
+  const { theme } = useThemeMode();
+  const isDarkMode = theme === "dark";
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<VisaFilterId>("all");
   const [issuedMonthFilter, setIssuedMonthFilter] = useState("all");
@@ -306,6 +317,8 @@ export function VisaTrackingScreen({
   const rangeStart = filteredRows.length === 0 ? 0 : startIndex + 1;
   const rangeEnd =
     filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, startIndex + paginatedRows.length);
+  const heroLabelClassName = isDarkMode ? "text-xs font-semibold uppercase tracking-[0.2em] text-primary/85" : "text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700";
+  const summaryIconClassName = isDarkMode ? "material-symbols-outlined text-primary" : "material-symbols-outlined text-emerald-700";
 
   useEffect(() => {
     setCurrentPage(1);
@@ -330,8 +343,8 @@ export function VisaTrackingScreen({
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex w-full max-w-xl items-center gap-3">
+      <header className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label
             className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
             aria-label="Search groups"
@@ -347,41 +360,14 @@ export function VisaTrackingScreen({
               placeholder="Search groups..."
             />
           </label>
-
-          <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary sm:hidden" />
         </div>
 
-        <label className="w-full sm:ml-auto sm:w-auto sm:min-w-[15rem]" aria-label="Filter issued month">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Issued Month
-          </span>
-          <div className="relative">
-            <SereneSelect
-              className="serene-select rounded-xl bg-white pr-9 font-medium text-slate-700"
-              value={issuedMonthFilter}
-              onChange={(event) => setIssuedMonthFilter(event.target.value)}
-              showCaret={false}
-            >
-              <option value="all">All Months</option>
-              {issuedMonthOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </SereneSelect>
-            <span
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-base text-slate-500"
-              aria-hidden="true"
-            >
-              calendar_month
-            </span>
-          </div>
-        </label>
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
       </header>
 
       <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-surface-container-lowest p-5 shadow-sm backdrop-blur md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Visa Control Board</p>
+          <p className={heroLabelClassName}>Visa Control Board</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Visa Tracking</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
             <span className="sm:hidden">Monitor visa status, agreement, and payment.</span>
@@ -422,10 +408,10 @@ export function VisaTrackingScreen({
         </div>
       </section>
 
-      <section className="flex flex-wrap gap-2" aria-label="Visa tracking filters">
+      <section className="flex flex-wrap items-center gap-2" aria-label="Visa tracking filters">
         <button
           type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "all")}`}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "all", isDarkMode)}`}
           onClick={() => setActiveFilter("all")}
         >
           <span className="sm:hidden">All ({visaRows.length})</span>
@@ -433,7 +419,7 @@ export function VisaTrackingScreen({
         </button>
         <button
           type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "not-issued")}`}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "not-issued", isDarkMode)}`}
           onClick={() => setActiveFilter("not-issued")}
         >
           <span className="sm:hidden">Pending ({notIssuedCount})</span>
@@ -441,7 +427,7 @@ export function VisaTrackingScreen({
         </button>
         <button
           type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "missing-hotel")}`}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "missing-hotel", isDarkMode)}`}
           onClick={() => setActiveFilter("missing-hotel")}
         >
           <span className="sm:hidden">No Hotel ({missingHotelCount})</span>
@@ -449,17 +435,42 @@ export function VisaTrackingScreen({
         </button>
         <button
           type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "unpaid")}`}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "unpaid", isDarkMode)}`}
           onClick={() => setActiveFilter("unpaid")}
         >
           <span className="sm:hidden">Unpaid ({unpaidCount})</span>
           <span className="hidden sm:inline">Unpaid ({unpaidCount})</span>
         </button>
+
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="relative min-w-[11rem]">
+            <SereneSelect
+              className="serene-select-pill h-9 w-full pr-9"
+              value={issuedMonthFilter}
+              onChange={(event) => setIssuedMonthFilter(event.target.value)}
+              showCaret={false}
+              aria-label="Filter issued month"
+            >
+              <option value="all">All Months</option>
+              {issuedMonthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SereneSelect>
+            <span
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-base text-on-surface-variant"
+              aria-hidden="true"
+            >
+              calendar_month
+            </span>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Visa tracking summary">
-        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <span className="material-symbols-outlined text-emerald-700" aria-hidden="true">
+        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4">
+          <span className={summaryIconClassName} aria-hidden="true">
             group
           </span>
           <div>
@@ -471,8 +482,8 @@ export function VisaTrackingScreen({
           </div>
         </article>
 
-        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <span className="material-symbols-outlined text-emerald-700" aria-hidden="true">
+        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4">
+          <span className={summaryIconClassName} aria-hidden="true">
             task_alt
           </span>
           <div>
@@ -497,8 +508,8 @@ export function VisaTrackingScreen({
           </div>
         </article>
 
-        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <span className="material-symbols-outlined text-emerald-700" aria-hidden="true">
+        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4">
+          <span className={summaryIconClassName} aria-hidden="true">
             payments
           </span>
           <div>
@@ -545,7 +556,7 @@ export function VisaTrackingScreen({
               );
 
               return (
-                <article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <article key={row.id} className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900">{row.groupCode}</p>
@@ -571,6 +582,7 @@ export function VisaTrackingScreen({
                         value={toAgreementStatusSelectValue(makkahAgreementStatus)}
                         className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
                           makkahAgreementStatus,
+                          isDarkMode,
                         )}`}
                         onChange={(event) =>
                           onUpdateAgreementStatus(
@@ -599,6 +611,7 @@ export function VisaTrackingScreen({
                         value={toAgreementStatusSelectValue(madinahAgreementStatus)}
                         className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
                           madinahAgreementStatus,
+                          isDarkMode,
                         )}`}
                         onChange={(event) =>
                           onUpdateAgreementStatus(
@@ -625,6 +638,7 @@ export function VisaTrackingScreen({
                               key={`${row.id}-mobile-raudhah-${entry.key}`}
                               className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getRaudhahStatusClasses(
                                 entry.status,
+                                isDarkMode,
                               )}`}
                             >
                               <span>{entry.dateLabel}</span>
@@ -645,16 +659,19 @@ export function VisaTrackingScreen({
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-white p-2">
+                    <div className="rounded-xl bg-surface-container-lowest p-2">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
                       <span
-                        className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaStatusClasses(row.visaStatus)}`}
+                        className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaStatusClasses(
+                          row.visaStatus,
+                          isDarkMode,
+                        )}`}
                       >
                         {row.visaStatus}
                       </span>
                     </div>
 
-                    <div className="rounded-xl bg-white p-2">
+                    <div className="rounded-xl bg-surface-container-lowest p-2">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
                       <span
                         className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaTypeClasses(visaTypeLabel)}`}
@@ -666,7 +683,7 @@ export function VisaTrackingScreen({
 
                   <button
                     type="button"
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold tracking-[0.06em] text-white shadow-cta-soft transition hover:bg-primary-container"
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold tracking-[0.06em] text-on-primary shadow-cta-soft transition hover:bg-primary-container"
                     onClick={() => onOpenDetail(row)}
                   >
                     View Details
@@ -676,7 +693,7 @@ export function VisaTrackingScreen({
             })}
           </section>
 
-          <section className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm md:block" aria-label="Visa tracking table">
+          <section className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-sm md:block" aria-label="Visa tracking table">
             <div className="overflow-x-auto">
               <div className="min-w-full">
                 <div
@@ -742,6 +759,7 @@ export function VisaTrackingScreen({
                             value={toAgreementStatusSelectValue(makkahAgreementStatus)}
                             className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
                               makkahAgreementStatus,
+                              isDarkMode,
                             )}`}
                             onChange={(event) =>
                               onUpdateAgreementStatus(
@@ -769,6 +787,7 @@ export function VisaTrackingScreen({
                             value={toAgreementStatusSelectValue(madinahAgreementStatus)}
                             className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
                               madinahAgreementStatus,
+                              isDarkMode,
                             )}`}
                             onChange={(event) =>
                               onUpdateAgreementStatus(
@@ -792,6 +811,7 @@ export function VisaTrackingScreen({
                                   key={`${row.id}-desktop-raudhah-${entry.key}`}
                                   className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
                                     entry.status,
+                                    isDarkMode,
                                   )}`}
                                   title={`${entry.dateLabel} - ${entry.status}`}
                                 >
@@ -813,7 +833,10 @@ export function VisaTrackingScreen({
 
                         <div className="justify-self-center">
                           <span
-                            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaStatusClasses(row.visaStatus)}`}
+                            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaStatusClasses(
+                              row.visaStatus,
+                              isDarkMode,
+                            )}`}
                           >
                             {row.visaStatus}
                           </span>
@@ -830,7 +853,7 @@ export function VisaTrackingScreen({
                         <div className="flex justify-start">
                           <button
                             type="button"
-                            className="inline-flex items-center whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold leading-none text-white shadow-cta-soft transition hover:bg-primary-container"
+                            className="inline-flex items-center whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
                             onClick={() => onOpenDetail(row)}
                           >
                             View Details
@@ -858,5 +881,6 @@ export function VisaTrackingScreen({
     </div>
   );
 }
+
 
 

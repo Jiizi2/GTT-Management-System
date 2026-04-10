@@ -1033,7 +1033,7 @@ export function InputItineraryScreen({
 
                     <article
                       className={`rounded-2xl border p-4 shadow-sm ${
-                        itineraryCardClassMap[item.categoryKey] ?? "border-slate-200 bg-white"
+                        itineraryCardClassMap[item.categoryKey] ?? "border-slate-200 bg-surface-container-lowest"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1141,7 +1141,7 @@ export function InputItineraryScreen({
                         const isCompletedStep = !isBaseTripDraftInvalid(trip);
                         const stepToneClass =
                           activityTypeBadgeClassMap[trip.category] ??
-                          "border-slate-300 bg-white text-slate-600";
+                          "border-slate-300 bg-surface-container-lowest text-slate-600";
                         const activeStepToneClass =
                           activityTypeActiveStepClassMap[trip.category] ??
                           "border-brand-primary/40 bg-brand-primary/10 text-brand-primary";
@@ -1192,7 +1192,7 @@ export function InputItineraryScreen({
                     isTransferActivityType(item.category) && item.transferByTrain;
                   const showCityTourCityInput = isCityTourActivityType(item.category);
                   const activityCardToneClass =
-                    activityTypeCardClassMap[item.category] ?? "border-slate-200 bg-white";
+                    activityTypeCardClassMap[item.category] ?? "border-slate-200 bg-surface-container-lowest";
                   const activityBannerToneClass =
                     activityTypeBannerClassMap[item.category] ?? "border-slate-200 bg-slate-50 text-slate-700";
                   const activityTitleToneClass = activityTypeTitleClassMap[item.category] ?? "text-slate-900";
@@ -1237,7 +1237,7 @@ export function InputItineraryScreen({
                           </span>
                             {getScheduleTypeOption(item.category).cardLabel}
                           </span>
-                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
+                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
                             <input
                               className="h-3.5 w-3.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary/25"
                               type="checkbox"
@@ -2086,6 +2086,7 @@ export function InputItineraryScreen({
     </>
   );
 }
+
 
 
 

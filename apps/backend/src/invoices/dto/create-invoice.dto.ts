@@ -1,13 +1,13 @@
 import { InvoiceStatus } from "@prisma/client";
-import { IsDateString, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateIf } from "class-validator";
+import { IsDateString, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 export class CreateInvoiceDto {
-  @ValidateIf((payload: CreateInvoiceDto) => !payload.clientName)
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   clientId?: string;
 
-  @ValidateIf((payload: CreateInvoiceDto) => !payload.clientId)
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   clientName?: string;

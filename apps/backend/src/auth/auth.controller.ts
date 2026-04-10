@@ -13,6 +13,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
+import { AuthLoginRateLimiter } from "./auth-login-rate-limiter";
 import { LoginDto } from "./dto/login.dto";
 import type { AuthTokenPayload } from "./auth.types";
 import { Public } from "./auth.public";
@@ -21,13 +22,39 @@ import { UpdateManagedUserDto } from "./dto/update-managed-user.dto";
 
 @Controller("auth")
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(AuthLoginRateLimiter) private readonly authLoginRateLimiter: AuthLoginRateLimiter,
+  ) {}
 
   @Public()
   @Post("login")
   @HttpCode(200)
-  async login(@Body() payload: LoginDto) {
-    return this.authService.login(payload);
+  async login(
+    @Body() payload: LoginDto,
+    @Req()
+    request: {
+      headers?: Record<string, unknown>;
+      ip?: string;
+      socket?: {
+        remoteAddress?: string | null;
+      };
+    },
+  ) {
+    const rateLimitKeys = this.authLoginRateLimiter.resolveKeys(payload.identifier, request);
+    this.authLoginRateLimiter.assertAllowed(rateLimitKeys);
+
+    try {
+      const loginResponse = await this.authService.login(payload);
+      this.authLoginRateLimiter.registerSuccess(rateLimitKeys);
+      return loginResponse;
+    } catch (error: unknown) {
+      if (error instanceof UnauthorizedException) {
+        this.authLoginRateLimiter.registerFailure(rateLimitKeys);
+      }
+
+      throw error;
+    }
   }
 
   @Get("session")

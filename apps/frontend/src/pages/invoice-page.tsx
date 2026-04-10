@@ -6,6 +6,7 @@ import { PaginationControls } from "../components/pagination-controls";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { useThemeMode } from "../theme/theme-provider";
 import {
   createInvoiceInBackend,
   fetchInvoiceBackendDataSource,
@@ -164,36 +165,42 @@ function resolveInvoiceAmount(group: GroupData): number {
   return Math.max(0, rounded);
 }
 
-function getStatusClasses(status: InvoiceStatus): string {
+function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): string {
   if (status === "Cancelled") {
     return "border-slate-300 bg-slate-100 text-slate-700";
   }
 
   if (status === "Paid") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode
+      ? "border-primary/35 bg-primary/16 text-primary"
+      : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
   if (status === "Pending") {
-    return "border-amber-200 bg-amber-100 text-amber-800";
+    return isDarkMode
+      ? "border-secondary/35 bg-secondary/16 text-secondary"
+      : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return "border-rose-200 bg-rose-100 text-rose-700";
+  return isDarkMode
+    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
+    : "border-rose-200 bg-rose-100 text-rose-700";
 }
 
-function getAvatarToneByStatus(status: InvoiceStatus): string {
+function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean): string {
   if (status === "Cancelled") {
     return "bg-slate-200 text-slate-700";
   }
 
   if (status === "Paid") {
-    return "bg-emerald-100 text-emerald-700";
+    return isDarkMode ? "bg-primary/18 text-primary" : "bg-emerald-100 text-emerald-700";
   }
 
   if (status === "Pending") {
-    return "bg-amber-100 text-amber-700";
+    return isDarkMode ? "bg-secondary/18 text-secondary" : "bg-amber-100 text-amber-700";
   }
 
-  return "bg-rose-100 text-rose-700";
+  return isDarkMode ? "bg-tertiary/18 text-tertiary" : "bg-rose-100 text-rose-700";
 }
 
 function getStatusValue(status: InvoiceStatus): "all" | "paid" | "pending" | "overdue" | "cancelled" {
@@ -506,6 +513,8 @@ function CreateInvoiceWorkspace({
   onCreate: (invoice: InvoiceRow, action: "generated" | "draft") => void;
   onUpdate: (invoice: InvoiceRow) => void;
 }) {
+  const { theme } = useThemeMode();
+  const isDarkMode = theme === "dark";
   const isEditMode = mode === "edit";
   const resolvedInitialInvoice = isEditMode ? initialInvoice ?? null : null;
   const [issueDateIso, setIssueDateIso] = useState(
@@ -570,6 +579,9 @@ function CreateInvoiceWorkspace({
   const [isCancelConfirmationOpen, setIsCancelConfirmationOpen] = useState(false);
   const isWorkspaceBusy = isSubmitting || isSavingDraft;
   const isSubmitDisabled = isWorkspaceBusy || !isBackendAvailable;
+  const bankDisbursementHintClassName = isDarkMode
+    ? "flex items-start gap-2 rounded-lg border border-outline-variant/45 bg-surface-container-high p-2"
+    : "flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2";
   const rowCounterRef = useRef(3);
 
   useEffect(() => {
@@ -1016,7 +1028,7 @@ function CreateInvoiceWorkspace({
               ) : null}
               <button
                 type="button"
-                className={`inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-bold text-white shadow-cta-soft transition ${
+                className={`inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-bold text-on-primary shadow-cta-soft transition ${
                   isSubmitDisabled
                     ? "cursor-not-allowed bg-slate-300"
                     : "bg-primary hover:bg-primary-container"
@@ -1374,7 +1386,7 @@ function CreateInvoiceWorkspace({
                       </option>
                     ))}
                   </SereneSelect>
-                  <div className="flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2">
+                  <div className={bankDisbursementHintClassName}>
                     <span className="material-symbols-outlined mt-0.5 text-sm text-primary" aria-hidden="true">
                       info
                     </span>
@@ -1548,7 +1560,7 @@ function CreateInvoiceWorkspace({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-emerald-700 px-6 py-2 text-lg font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-emerald-700 px-6 py-2 text-lg font-bold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={handleConfirmCancelledStatus}
                     disabled={isSubmitting}
                   >
@@ -1589,6 +1601,8 @@ export function InvoiceScreen({
   groups: GroupData[];
   onOpenDetail: (groupCode: string) => void;
 }) {
+  const { theme } = useThemeMode();
+  const isDarkMode = theme === "dark";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending" | "overdue" | "cancelled">("all");
   const [dueMonthFilter, setDueMonthFilter] = useState("all");
@@ -1784,6 +1798,15 @@ export function InvoiceScreen({
     dueMonthFilter === "all"
       ? resolveDateRangeLabel(invoiceRows)
       : resolveDateRangeLabel(invoiceRows.filter((row) => row.monthKey === dueMonthFilter));
+  const paidSummaryBadgeClassName = isDarkMode
+    ? "inline-flex items-center gap-1 rounded-lg border border-primary/35 bg-primary/16 px-3 py-1 text-xs font-bold leading-none text-primary"
+    : "inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold leading-none text-emerald-700";
+  const pendingSummaryBadgeClassName = isDarkMode
+    ? "inline-flex items-center gap-1 rounded-lg border border-secondary/35 bg-secondary/16 px-3 py-1 text-xs font-bold leading-none text-secondary"
+    : "inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold leading-none text-amber-700";
+  const overdueSummaryBadgeClassName = isDarkMode
+    ? "inline-flex items-center gap-1 rounded-lg border border-tertiary/35 bg-tertiary/16 px-3 py-1 text-xs font-bold leading-none text-tertiary"
+    : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
 
   const handleViewPdf = (row: InvoiceRow) => {
     const exported = viewInvoicePdfFromRow({ row, groups });
@@ -1937,8 +1960,8 @@ export function InvoiceScreen({
         </section>
       ) : null}
 
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex w-full max-w-xl items-center gap-3">
+      <header className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label
             className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
             aria-label="Search invoices"
@@ -1955,8 +1978,9 @@ export function InvoiceScreen({
             />
           </label>
 
-          <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary sm:hidden" />
         </div>
+
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
       </header>
 
       <section className="space-y-2">
@@ -1973,7 +1997,7 @@ export function InvoiceScreen({
 
           <button
             type="button"
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-cta-soft transition ${
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition ${
               isInvoiceBackendAvailable
                 ? "bg-primary hover:bg-primary-container"
                 : "cursor-not-allowed bg-slate-300"
@@ -2054,19 +2078,19 @@ export function InvoiceScreen({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold leading-none text-emerald-700">
+            <span className={paidSummaryBadgeClassName}>
               <span className="material-symbols-outlined text-sm" aria-hidden="true">
                 task_alt
               </span>
               <span>Paid {paidCount}</span>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold leading-none text-amber-700">
+            <span className={pendingSummaryBadgeClassName}>
               <span className="material-symbols-outlined text-sm" aria-hidden="true">
                 hourglass_top
               </span>
               <span>Pending {pendingCount}</span>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700">
+            <span className={overdueSummaryBadgeClassName}>
               <span className="material-symbols-outlined text-sm" aria-hidden="true">
                 warning
               </span>
@@ -2081,18 +2105,18 @@ export function InvoiceScreen({
           </div>
         </article>
 
-        <article className="relative overflow-hidden rounded-2xl bg-primary p-5 text-white shadow-ambient">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/85">
+        <article className="relative overflow-hidden rounded-2xl bg-primary p-5 text-on-primary shadow-ambient">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/85">
             <span className="sm:hidden">Monthly Revenue</span>
             <span className="hidden sm:inline">Total Monthly Revenue</span>
           </p>
           <strong className="mt-2 block text-3xl font-extrabold leading-tight">{formatIdr(totalRevenue)}</strong>
-          <p className="mt-3 inline-flex rounded-lg bg-white/20 px-2 py-1 text-xs font-bold">{monthlyGrowthLabel}</p>
-          <p className="mt-1 text-xs text-white/85">
+          <p className="mt-3 inline-flex rounded-lg bg-surface-container-lowest/20 px-2 py-1 text-xs font-bold">{monthlyGrowthLabel}</p>
+          <p className="mt-1 text-xs text-on-primary/85">
             <span className="sm:hidden">vs last month</span>
             <span className="hidden sm:inline">vs previous month</span>
           </p>
-          <span className="material-symbols-outlined absolute -right-3 -bottom-4 text-8xl text-white/15" aria-hidden="true">
+          <span className="material-symbols-outlined absolute -right-3 -bottom-4 text-8xl text-on-primary/15" aria-hidden="true">
             pentagon
           </span>
         </article>
@@ -2127,6 +2151,7 @@ export function InvoiceScreen({
                   <span
                     className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold leading-none ${getStatusClasses(
                       row.status,
+                      isDarkMode,
                     )}`}
                   >
                     {row.status}
@@ -2137,6 +2162,7 @@ export function InvoiceScreen({
                   <div
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${getAvatarToneByStatus(
                       row.status,
+                      isDarkMode,
                     )}`}
                   >
                     {row.clientInitials}
@@ -2169,7 +2195,7 @@ export function InvoiceScreen({
                     type="button"
                     className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] shadow-cta-soft transition ${
                       row.groupCode
-                        ? "bg-primary text-white hover:bg-primary-container"
+                        ? "bg-primary text-on-primary hover:bg-primary-container"
                         : "cursor-not-allowed bg-surface-container-high text-on-surface-variant"
                     }`}
                     onClick={() => {
@@ -2245,10 +2271,8 @@ export function InvoiceScreen({
                       <div>
                         <button
                           type="button"
-                          className={`text-left font-display text-[0.95rem] font-bold transition ${
-                            row.groupCode
-                              ? "text-primary hover:underline"
-                              : "cursor-default text-on-surface-variant"
+                          className={`text-left font-display text-[0.95rem] font-bold text-primary transition ${
+                            row.groupCode ? "hover:underline" : "cursor-default"
                           }`}
                           onClick={() => {
                             if (row.groupCode) {
@@ -2280,6 +2304,7 @@ export function InvoiceScreen({
                         <span
                           className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] ${getStatusClasses(
                             row.status,
+                            isDarkMode,
                           )}`}
                         >
                           {row.status}
@@ -2334,3 +2359,4 @@ export function InvoiceScreen({
     </div>
   );
 }
+

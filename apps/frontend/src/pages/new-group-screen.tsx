@@ -2,6 +2,8 @@ import { type ReactNode, useMemo, useState } from "react";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { useThemeMode } from "../theme/theme-provider";
 import type {
   AgreementApprovalStatus,
   BusStatus,
@@ -747,6 +749,8 @@ export function AddGroupWorkspaceScreen({
   onSaveGroup: (group: GroupData) => void;
   onCancel: () => void;
 }) {
+  const { theme } = useThemeMode();
+  const isDarkMode = theme === "dark";
   const [isItineraryVisible, setIsItineraryVisible] = useState(true);
   const [identityDraft, setIdentityDraft] = useState<NewGroupItineraryDraft | null>(null);
   const [itineraryDetailDraft, setItineraryDetailDraft] = useState<NewGroupItineraryDraft | null>(null);
@@ -812,11 +816,11 @@ export function AddGroupWorkspaceScreen({
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex justify-start">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+      <div className="flex items-center gap-3">
         <button
           type="button"
-          className="serene-btn-secondary min-h-10 w-full sm:w-auto"
+          className="serene-btn-secondary min-h-10 min-w-0 flex-1 sm:flex-none sm:w-auto"
           onClick={onCancel}
         >
           <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -825,11 +829,13 @@ export function AddGroupWorkspaceScreen({
           <span className="sm:hidden">Back</span>
           <span className="hidden sm:inline">Back to Overview</span>
         </button>
+
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
       </div>
 
       <section className="serene-section p-5 sm:p-6">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700/80">
+          <p className={`text-xs font-extrabold uppercase tracking-[0.16em] ${isDarkMode ? "text-primary/85" : "text-emerald-700/80"}`}>
             Group Workspace
           </p>
           <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl lg:text-4xl">

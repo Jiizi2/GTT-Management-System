@@ -3,6 +3,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { AppMainContent } from "./components/app-main-content";
 import { MobileNav } from "./components/mobile-nav";
 import { MobileQuickActionsSheet } from "./components/mobile-quick-actions-sheet";
+import { ThemeToggleButton } from "./components/theme-toggle-button";
 import { loginWithBackend } from "./hooks/use-auth-backend";
 import { ACTIVE_NAV_STORAGE_KEY, useAppController } from "./hooks/use-app-controller";
 import { type DevelopmentLoginAccountHint, LoginScreen, type LoginCredentials } from "./pages/login-page";
@@ -55,11 +56,22 @@ function shouldExposeDevelopmentLoginHints(): boolean {
 function DashboardWorkspaceShell({ onLogout }: { onLogout: () => void }) {
   const controller = useAppController();
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
+  const shouldShowFloatingThemeToggle = !(
+    (controller.activeNav === "overview" && !controller.selectedGroup) ||
+    controller.activeNav === "checklist" ||
+    (controller.activeNav === "visa" && !controller.selectedVisaRow) ||
+    controller.activeNav === "invoice" ||
+    controller.activeNav === "raudhah-reminder" ||
+    controller.activeNav === "new-group" ||
+    controller.activeNav === "input" ||
+    (controller.activeNav === "user-management" && controller.sessionAccessTier === "super-admin") ||
+    (controller.activeNav === "master-data" && controller.sessionAccessTier === "super-admin")
+  );
   const syncFeedback = controller.syncFeedback;
   const syncFeedbackToneClassMap = {
-    success: "bg-primary text-white",
+    success: "bg-primary text-on-primary",
     error: "bg-error-container text-on-error-container",
-    info: "bg-secondary text-white",
+    info: "bg-secondary text-on-primary",
   } as const;
   const syncFeedbackIconMap = {
     success: "check_circle",
@@ -99,6 +111,12 @@ function DashboardWorkspaceShell({ onLogout }: { onLogout: () => void }) {
         onLogout={onLogout}
       />
 
+      {shouldShowFloatingThemeToggle ? (
+        <div className="pointer-events-none fixed right-6 top-4 z-[120] sm:right-8 sm:top-5 lg:right-10">
+          <ThemeToggleButton className="pointer-events-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest/90 text-on-surface-variant shadow-ambient backdrop-blur-serene transition hover:-translate-y-0.5 hover:text-primary" />
+        </div>
+      ) : null}
+
       <main
         className={`relative px-4 pb-28 pt-0 transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-8 lg:pt-0 ${
           controller.isSidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[280px]"
@@ -116,6 +134,7 @@ function DashboardWorkspaceShell({ onLogout }: { onLogout: () => void }) {
 
       <MobileQuickActionsSheet
         activeNav={controller.activeNav}
+        sessionAccessTier={controller.sessionAccessTier}
         open={isMobileActionsOpen}
         onClose={() => setIsMobileActionsOpen(false)}
         onSelectAction={(navId) => {

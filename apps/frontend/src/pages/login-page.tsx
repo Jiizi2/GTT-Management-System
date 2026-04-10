@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
 
 export type LoginCredentials = {
   identifier: string;
@@ -42,13 +43,17 @@ export function LoginScreen({
 
   return (
     <main className="flex min-h-screen bg-surface text-on-surface">
+      <div className="fixed right-6 top-4 z-[120] sm:right-8 sm:top-6">
+        <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest/90 text-on-surface-variant shadow-ambient backdrop-blur-serene transition hover:-translate-y-0.5 hover:text-primary" />
+      </div>
+
       <section className="relative hidden w-1/2 overflow-hidden border-r border-outline-variant/20 bg-surface-container-low p-12 lg:flex lg:flex-col lg:items-center lg:justify-center">
         <div className="serene-login-pattern absolute inset-0" aria-hidden="true" />
 
         <div className="relative z-10 flex max-w-md flex-col items-center space-y-8 text-center">
           <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-primary shadow-float">
             <span
-              className="material-symbols-outlined text-5xl text-white"
+              className="material-symbols-outlined text-5xl text-on-primary"
               style={{ fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24" }}
               aria-hidden="true"
             >
@@ -94,7 +99,7 @@ export function LoginScreen({
           <div className="mb-8 flex justify-center lg:hidden">
             <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary">
               <span
-                className="material-symbols-outlined text-3xl text-white"
+                className="material-symbols-outlined text-3xl text-on-primary"
                 style={{ fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24" }}
                 aria-hidden="true"
               >
@@ -214,7 +219,7 @@ export function LoginScreen({
                 type="submit"
                 disabled={isSubmitting}
                 aria-label={isSubmitting ? "Signing in" : "Login to Dashboard"}
-                className="flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-container active:scale-[0.99] disabled:opacity-70"
+                className="flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-on-primary shadow-sm transition-all hover:bg-primary-container active:scale-[0.99] disabled:opacity-70"
               >
                 <span>{isSubmitting ? "Signing In..." : "Login"}</span>
               </button>
@@ -269,3 +274,4 @@ export function LoginScreen({
     </main>
   );
 }
+

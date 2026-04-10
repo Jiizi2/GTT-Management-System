@@ -307,7 +307,7 @@ export function SereneSelect({
         ? createPortal(
             <div
               ref={menuRef}
-              className="z-[260] overflow-auto rounded-2xl border border-slate-200 bg-surface-container-lowest p-1.5 shadow-float"
+              className="z-[260] overflow-auto rounded-2xl bg-surface-container-lowest p-1.5 shadow-float backdrop-blur-serene"
               role="listbox"
               style={menuStyle}
               aria-label={ariaLabel}

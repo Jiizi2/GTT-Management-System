@@ -2,11 +2,13 @@ import { Module } from "@nestjs/common";
 import { APP_GUARD, Reflector } from "@nestjs/core";
 import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
+import { AuthLoginRateLimiter } from "./auth-login-rate-limiter";
 import { AuthService } from "./auth.service";
 
 @Module({
   controllers: [AuthController],
   providers: [
+    AuthLoginRateLimiter,
     AuthService,
     {
       provide: APP_GUARD,

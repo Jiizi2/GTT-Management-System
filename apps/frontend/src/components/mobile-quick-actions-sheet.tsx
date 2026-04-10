@@ -1,12 +1,14 @@
 import { createPortal } from "react-dom";
 import { useEffect, type ReactNode } from "react";
 import type { NavId } from "../shared/app-domain";
+import type { SessionAccessTier } from "../shared/app-domain";
 
 type QuickAction = {
   id: NavId;
   label: string;
   description: string;
   icon: string;
+  requiresSuperAdmin?: boolean;
 };
 
 const quickActions: QuickAction[] = [
@@ -17,16 +19,30 @@ const quickActions: QuickAction[] = [
     icon: "add_circle",
   },
   {
-    id: "invoice",
-    label: "Invoice",
-    description: "Halaman invoice masih disiapkan.",
-    icon: "request_quote",
-  },
-  {
     id: "raudhah-reminder",
     label: "Raudhah Reminder",
     description: "Buka daftar reminder Raudhah dan template copy cepat.",
     icon: "notifications_active",
+  },
+  {
+    id: "invoice",
+    label: "Invoice List",
+    description: "Kelola daftar invoice dan status pembayarannya.",
+    icon: "request_quote",
+  },
+  {
+    id: "master-data",
+    label: "Master Data",
+    description: "Atur referensi data utama untuk seluruh modul.",
+    icon: "dataset",
+    requiresSuperAdmin: true,
+  },
+  {
+    id: "user-management",
+    label: "User Management",
+    description: "Kelola akun dan role pengguna dashboard.",
+    icon: "admin_panel_settings",
+    requiresSuperAdmin: true,
   },
 ];
 
@@ -40,15 +56,21 @@ function ModalPortal({ children }: { children: ReactNode }) {
 
 export function MobileQuickActionsSheet({
   activeNav,
+  sessionAccessTier,
   open,
   onClose,
   onSelectAction,
 }: {
   activeNav: NavId;
+  sessionAccessTier: SessionAccessTier;
   open: boolean;
   onClose: () => void;
   onSelectAction: (navId: NavId) => void;
 }) {
+  const visibleQuickActions = quickActions.filter(
+    (action) => !action.requiresSuperAdmin || sessionAccessTier === "super-admin",
+  );
+
   useEffect(() => {
     if (!open || typeof document === "undefined") {
       return undefined;
@@ -77,7 +99,7 @@ export function MobileQuickActionsSheet({
   return (
     <ModalPortal>
       <div
-        className="serene-modal-overlay z-[100] flex items-end justify-center px-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-[2px]"
+        className="serene-modal-overlay z-[100] flex items-end justify-center px-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3"
         onClick={onClose}
       >
         <section
@@ -93,13 +115,13 @@ export function MobileQuickActionsSheet({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary/80">
-                  Quick Actions
+                  Tools
                 </p>
                 <h2 id="mobile-quick-actions-title" className="mt-1 text-2xl font-bold tracking-tight text-on-surface">
-                  Choose an action
+                  Pilih Halaman Tools
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                  Buka flow yang sering dipakai tanpa memenuhi bottom bar.
+                  Akses cepat ke menu operasional dari tombol tengah.
                 </p>
               </div>
 
@@ -117,7 +139,7 @@ export function MobileQuickActionsSheet({
           </div>
 
           <div className="space-y-3 overflow-y-auto px-5 pb-5 pt-4">
-            {quickActions.map((action) => {
+            {visibleQuickActions.map((action) => {
               const isCurrent = activeNav === action.id;
 
               return (
@@ -140,6 +162,11 @@ export function MobileQuickActionsSheet({
                   <span className="min-w-0 flex-1 pt-0.5">
                     <span className="flex items-center gap-2">
                       <span className="block text-sm font-bold text-on-surface">{action.label}</span>
+                      {action.requiresSuperAdmin ? (
+                        <span className="inline-flex rounded-lg border border-primary/20 bg-primary-fixed px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.16em] text-primary">
+                          Admin
+                        </span>
+                      ) : null}
                       {isCurrent ? (
                         <span className="inline-flex rounded-lg border border-primary/20 bg-primary-fixed px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.16em] text-primary">
                           Current

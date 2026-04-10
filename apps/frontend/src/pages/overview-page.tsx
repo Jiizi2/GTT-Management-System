@@ -10,14 +10,14 @@ const { OVERVIEW_PAGE_SIZE } = Domain;
 
 function getStatToneClasses(tone: "primary" | "secondary" | "tertiary"): string {
   if (tone === "primary") {
-    return "bg-primary text-white shadow-ambient";
+    return "bg-primary text-on-primary shadow-ambient";
   }
 
   if (tone === "secondary") {
-    return "bg-secondary text-white shadow-ambient";
+    return "bg-secondary text-on-primary shadow-ambient";
   }
 
-  return "bg-tertiary text-white shadow-ambient";
+  return "bg-tertiary text-on-primary shadow-ambient";
 }
 
 export function OverviewScreen({
@@ -82,7 +82,8 @@ export function OverviewScreen({
           />
         </label>
 
-        <ThemeToggleButton className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary" />
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+
       </header>
 
       <section className="space-y-2 pt-2">
@@ -183,7 +184,7 @@ export function OverviewScreen({
             type="button"
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-bold leading-none transition ${
                 isActiveOnly
-                  ? "bg-primary text-white shadow-cta-soft"
+                  ? "bg-primary text-on-primary shadow-cta-soft"
                   : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
               }`}
             onClick={() => onToggleActiveOnly(!isActiveOnly)}
@@ -244,4 +245,5 @@ export function OverviewScreen({
     </div>
   );
 }
+
 

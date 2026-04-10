@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
   createMasterDataOptionInBackend,
   fetchMasterDataCategoriesFromBackend,
@@ -410,13 +411,17 @@ export function MasterDataScreen() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      <header className="space-y-2">
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
-          Master Data
-        </h1>
-        <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
-          Kelola opsi dropdown untuk invoice, user management, dan kota Saudi tanpa ubah kode.
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="space-y-2">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
+            Master Data
+          </h1>
+          <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+            Kelola opsi dropdown untuk invoice, user management, dan kota Saudi tanpa ubah kode.
+          </p>
+        </div>
+
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5 sm:self-auto" />
       </header>
 
       {notice ? (
