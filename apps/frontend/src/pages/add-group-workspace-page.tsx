@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "../components/date-time-pickers";
@@ -220,6 +220,21 @@ const manualScheduleFormSchema = z
 
 type ManualScheduleFormValues = z.infer<typeof manualScheduleFormSchema>;
 
+const baseTripDraftSchema = manualScheduleFormSchema.extend({
+  hotelName: z.string().optional(),
+  fromHotelName: z.string().optional(),
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  isEnabled: z.boolean(),
+});
+
+const baseTripFormSchema = z.object({
+  trips: z.array(baseTripDraftSchema),
+});
+
+type BaseTripFormValues = z.infer<typeof baseTripFormSchema>;
+
 export function InputItineraryScreen({
   onSaveGroup,
   hideHeader = false,
@@ -280,9 +295,27 @@ export function InputItineraryScreen({
     mode: "onChange",
     defaultValues: createInitialInputItineraryForm(),
   });
+  const {
+    control: baseTripControl,
+    watch: watchBaseTrips,
+    getValues: getBaseTripValues,
+    setValue: setBaseTripValue,
+    reset: resetBaseTripForm,
+  } = useForm<BaseTripFormValues>({
+    resolver: zodResolver(baseTripFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      trips: [],
+    },
+  });
+  const { replace: replaceBaseTripFields } = useFieldArray({
+    control: baseTripControl,
+    name: "trips",
+    keyName: "fieldKey",
+  });
   const [itineraryItems, setItineraryItems] = useState<InputItineraryItem[]>([]);
   const form = watchSchedule();
-  const [baseTripDrafts, setBaseTripDrafts] = useState<BaseTripDraft[]>([]);
+  const baseTripDrafts = watchBaseTrips("trips") ?? [];
   const [baseTripStepIndex, setBaseTripStepIndex] = useState(0);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isScheduleFormVisible, setIsScheduleFormVisible] = useState(false);
@@ -500,6 +533,24 @@ export function InputItineraryScreen({
     return nextDrafts;
   };
 
+  const replaceBaseTripDrafts = (drafts: BaseTripDraft[]) => {
+    replaceBaseTripFields(drafts);
+  };
+
+  const updateBaseTripDraftAtIndex = (
+    tripIndex: number,
+    updater: (draft: BaseTripDraft) => BaseTripDraft,
+  ) => {
+    const currentTrips = getBaseTripValues("trips");
+    const nextTrips = currentTrips.map((trip, index) =>
+      index === tripIndex ? applyHotelAutofillForBaseTrip(updater(trip)) : trip,
+    );
+    setBaseTripValue("trips", nextTrips, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
   const applyManualScheduleDraft = (
     draft: ManualScheduleFormValues,
     options?: {
@@ -569,7 +620,7 @@ export function InputItineraryScreen({
       effectiveEndDate,
       itineraryPrefill,
     );
-    setBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
+    replaceBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(true);
     setInitializedScheduleSeed(schedulePrefillSeed);
@@ -592,7 +643,7 @@ export function InputItineraryScreen({
 
   const handleCloseBaseTripForm = () => {
     baseTripSuggestedHotelByIdRef.current = {};
-    setBaseTripDrafts([]);
+    resetBaseTripForm({ trips: [] });
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(false);
   };
@@ -630,20 +681,14 @@ export function InputItineraryScreen({
   };
 
   const handleBaseTripChange = <Key extends keyof InputItineraryFormState>(
-    tripId: string,
+    tripIndex: number,
     field: Key,
     value: InputItineraryFormState[Key],
   ) => {
-    setBaseTripDrafts((current) =>
-      current.map((trip) => {
-        if (trip.id !== tripId) {
-          return trip;
-        }
-
-        const draft = { ...trip, [field]: value } as BaseTripDraft;
-        return applyHotelAutofillForBaseTrip(draft);
-      }),
-    );
+    updateBaseTripDraftAtIndex(tripIndex, (trip) => ({
+      ...trip,
+      [field]: value,
+    }));
   };
 
   const handleEditItem = (item: InputItineraryItem) => {
@@ -816,7 +861,7 @@ export function InputItineraryScreen({
       effectiveEndDate,
       itineraryPrefill,
     );
-    setBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
+    replaceBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(true);
     setInitializedScheduleSeed(schedulePrefillSeed);
@@ -829,6 +874,7 @@ export function InputItineraryScreen({
     isScheduleOnlyMode,
     itineraryItems.length,
     itineraryPrefill,
+    replaceBaseTripFields,
     schedulePrefillSeed,
   ]);
 
@@ -1494,11 +1540,10 @@ export function InputItineraryScreen({
                               type="checkbox"
                               checked={item.isEnabled}
                               onChange={(event) =>
-                                setBaseTripDrafts((current) =>
-                                  current.map((trip) =>
-                                    trip.id === item.id ? { ...trip, isEnabled: event.target.checked } : trip,
-                                  ),
-                                )
+                                updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
+                                  ...trip,
+                                  isEnabled: event.target.checked,
+                                }))
                               }
                               disabled={!isGroupReadyForItinerary}
                             />
@@ -1513,7 +1558,7 @@ export function InputItineraryScreen({
                           <DatePickerInput
                             inputClassName={inputClassName}
                             value={item.date}
-                            onChange={(nextValue) => handleBaseTripChange(item.id, "date", nextValue)}
+                            onChange={(nextValue) => handleBaseTripChange(currentBaseTripStepIndex, "date", nextValue)}
                             disabled={!isGroupReadyForItinerary || !item.isEnabled}
                           />
                         </label>
@@ -1525,7 +1570,7 @@ export function InputItineraryScreen({
                               inputClassName={inputClassName}
                               value={item.time}
                               onChange={(nextValue) =>
-                                handleBaseTripChange(item.id, "time", nextValue)
+                                handleBaseTripChange(currentBaseTripStepIndex, "time", nextValue)
                               }
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1540,7 +1585,7 @@ export function InputItineraryScreen({
                               type="text"
                               value={item.flightNumber}
                               onChange={(event) =>
-                                handleBaseTripChange(item.id, "flightNumber", event.target.value)
+                                handleBaseTripChange(currentBaseTripStepIndex, "flightNumber", event.target.value)
                               }
                               placeholder="e.g. SV-827"
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
@@ -1556,7 +1601,7 @@ export function InputItineraryScreen({
                               type="text"
                               value={item.hotelName ?? ""}
                               onChange={(event) =>
-                                handleBaseTripChange(item.id, "hotelName", event.target.value)
+                                handleBaseTripChange(currentBaseTripStepIndex, "hotelName", event.target.value)
                               }
                               placeholder="e.g. Swissotel Al Maqam"
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
@@ -1571,7 +1616,7 @@ export function InputItineraryScreen({
                               inputClassName={inputClassName}
                               value={item.hotelPickupRequestTime}
                               onChange={(nextValue) =>
-                                handleBaseTripChange(item.id, "hotelPickupRequestTime", nextValue)
+                                handleBaseTripChange(currentBaseTripStepIndex, "hotelPickupRequestTime", nextValue)
                               }
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1592,7 +1637,7 @@ export function InputItineraryScreen({
                                 className={`${selectClassName} pl-11`}
                                 value={item.cityTourCity}
                                 onChange={(event) =>
-                                  handleBaseTripChange(item.id, "cityTourCity", event.target.value)
+                                  handleBaseTripChange(currentBaseTripStepIndex, "cityTourCity", event.target.value)
                                 }
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               >
@@ -1625,23 +1670,17 @@ export function InputItineraryScreen({
                                 type="checkbox"
                                 checked={item.transferByTrain}
                                 onChange={(event) =>
-                                  setBaseTripDrafts((current) =>
-                                    current.map((trip) =>
-                                      trip.id === item.id
-                                        ? applyHotelAutofillForBaseTrip({
-                                            ...trip,
-                                            transferByTrain: event.target.checked,
-                                            requiresBus: event.target.checked ? true : trip.requiresBus,
-                                            trainDepartureTime: event.target.checked
-                                              ? trip.trainDepartureTime
-                                              : "",
-                                            destinationPickupTime: event.target.checked
-                                              ? trip.destinationPickupTime
-                                              : "",
-                                          })
-                                        : trip,
-                                    ),
-                                  )
+                                  updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
+                                    ...trip,
+                                    transferByTrain: event.target.checked,
+                                    requiresBus: event.target.checked ? true : trip.requiresBus,
+                                    trainDepartureTime: event.target.checked
+                                      ? trip.trainDepartureTime
+                                      : "",
+                                    destinationPickupTime: event.target.checked
+                                      ? trip.destinationPickupTime
+                                      : "",
+                                  }))
                                 }
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               />
@@ -1663,7 +1702,7 @@ export function InputItineraryScreen({
                               <SereneSelect
                                 className={`${selectClassName} pl-11`}
                                 value={item.from}
-                                onChange={(event) => handleBaseTripChange(item.id, "from", event.target.value)}
+                                onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)}
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               >
                                 <option value="">Select city in Saudi</option>
@@ -1679,7 +1718,7 @@ export function InputItineraryScreen({
                               className={inputClassName}
                               type="text"
                               value={item.from}
-                              onChange={(event) => handleBaseTripChange(item.id, "from", event.target.value)}
+                              onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)}
                               placeholder={routeFieldConfigForItem.fromPlaceholder}
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1699,7 +1738,7 @@ export function InputItineraryScreen({
                               <SereneSelect
                                 className={`${selectClassName} pl-11`}
                                 value={item.to}
-                                onChange={(event) => handleBaseTripChange(item.id, "to", event.target.value)}
+                                onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)}
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               >
                                 <option value="">Select city in Saudi</option>
@@ -1715,7 +1754,7 @@ export function InputItineraryScreen({
                               className={inputClassName}
                               type="text"
                               value={item.to}
-                              onChange={(event) => handleBaseTripChange(item.id, "to", event.target.value)}
+                              onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)}
                               placeholder={routeFieldConfigForItem.toPlaceholder}
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1739,7 +1778,7 @@ export function InputItineraryScreen({
                                   inputClassName={inputClassName}
                                   value={item.trainDepartureTime}
                                   onChange={(nextValue) =>
-                                    handleBaseTripChange(item.id, "trainDepartureTime", nextValue)
+                                    handleBaseTripChange(currentBaseTripStepIndex, "trainDepartureTime", nextValue)
                                   }
                                   disabled={!isGroupReadyForItinerary || !item.isEnabled}
                                 />
@@ -1751,7 +1790,7 @@ export function InputItineraryScreen({
                                   inputClassName={inputClassName}
                                   value={item.destinationPickupTime}
                                   onChange={(nextValue) =>
-                                    handleBaseTripChange(item.id, "destinationPickupTime", nextValue)
+                                    handleBaseTripChange(currentBaseTripStepIndex, "destinationPickupTime", nextValue)
                                   }
                                   disabled={!isGroupReadyForItinerary || !item.isEnabled}
                                 />
@@ -1778,7 +1817,7 @@ export function InputItineraryScreen({
                             type="checkbox"
                             checked={showTransferTrainInputs ? true : item.requiresBus}
                             onChange={(event) =>
-                              handleBaseTripChange(item.id, "requiresBus", event.target.checked)
+                              handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
                             }
                             disabled={!isGroupReadyForItinerary || showTransferTrainInputs || !item.isEnabled}
                           />
@@ -1796,7 +1835,7 @@ export function InputItineraryScreen({
                             rows={2}
                             value={item.notes}
                             onChange={(event) =>
-                              handleBaseTripChange(item.id, "notes", event.target.value)
+                              handleBaseTripChange(currentBaseTripStepIndex, "notes", event.target.value)
                             }
                             placeholder="Enter special instructions or details..."
                             disabled={!isGroupReadyForItinerary || !item.isEnabled}
