@@ -16,7 +16,6 @@ import type {
   GroupData,
   ItineraryItem,
   Musyrif,
-  MusyrifFormState,
   NoteFormState,
   NoteItem,
   ScheduleFormState,
@@ -272,10 +271,6 @@ export function GroupDetail({
   const [noteItems, setNoteItems] = useState<NoteItem[]>(() => createNoteItems(group.notes, group.code));
   const [musyrifProfile, setMusyrifProfile] = useState<Musyrif>(group.musyrif);
   const [isMusyrifModalOpen, setIsMusyrifModalOpen] = useState(false);
-  const [musyrifForm, setMusyrifForm] = useState<MusyrifFormState>({
-    name: group.musyrif.name,
-    phone: group.musyrif.phone,
-  });
   const [isMusyrifCopied, setIsMusyrifCopied] = useState(false);
   const musyrifCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -291,10 +286,6 @@ export function GroupDetail({
   const [noteForm, setNoteForm] = useState<NoteFormState>(createInitialNoteForm);
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
-  const [groupCodeDraft, setGroupCodeDraft] = useState(group.code);
-  const [groupNameDraft, setGroupNameDraft] = useState(group.name);
-  const [groupCodeError, setGroupCodeError] = useState("");
-  const [groupNameError, setGroupNameError] = useState("");
   const isEditModalOpen = editingIndex !== null && editScheduleForm !== null;
   const deletingItem = deletingIndex !== null ? itineraryItems[deletingIndex] ?? null : null;
   const isDeleteModalOpen = deletingItem !== null;
@@ -315,10 +306,6 @@ export function GroupDetail({
     setItineraryItems(sortItineraryByNearestDate(group.itinerary));
     setNoteItems(createNoteItems(group.notes, group.code));
     setMusyrifProfile(group.musyrif);
-    setMusyrifForm({
-      name: group.musyrif.name,
-      phone: group.musyrif.phone,
-    });
     setIsMusyrifCopied(false);
     setIsMusyrifModalOpen(false);
     setIsScheduleModalOpen(false);
@@ -330,10 +317,6 @@ export function GroupDetail({
     setNoteForm(createInitialNoteForm());
     setIsDeleteGroupModalOpen(false);
     setIsGroupEditModalOpen(false);
-    setGroupCodeDraft(group.code);
-    setGroupNameDraft(group.name);
-    setGroupCodeError("");
-    setGroupNameError("");
   }, [group.code, group.itinerary, group.name, group.notes, group.musyrif]);
 
   useEffect(() => {
@@ -441,7 +424,6 @@ export function GroupDetail({
     isEditDeparturePickupTimeMissing ||
     hasEditTransferTrainFieldsMissing;
   const isNoteSaveDisabled = !noteForm.text.trim();
-  const isMusyrifSaveDisabled = !musyrifForm.name.trim() || !musyrifForm.phone.trim();
   const showScheduleFridayCityTourWarning = shouldShowFridayCityTourWarning(
     scheduleForm.category,
     scheduleForm.date,
@@ -639,13 +621,6 @@ export function GroupDetail({
     setNoteForm((current) => ({ ...current, [field]: value }));
   };
 
-  const handleMusyrifFieldChange = <Key extends keyof MusyrifFormState>(
-    field: Key,
-    value: MusyrifFormState[Key],
-  ) => {
-    setMusyrifForm((current) => ({ ...current, [field]: value }));
-  };
-
   const handleOpenScheduleModal = () => {
     scheduleSuggestedHotelNameRef.current = "";
     scheduleSuggestedFromHotelNameRef.current = "";
@@ -818,10 +793,6 @@ export function GroupDetail({
   };
 
   const handleOpenMusyrifModal = () => {
-    setMusyrifForm({
-      name: musyrifProfile.name,
-      phone: musyrifProfile.phone,
-    });
     setIsMusyrifModalOpen(true);
   };
 
@@ -843,63 +814,42 @@ export function GroupDetail({
   };
 
   const handleOpenGroupEditModal = () => {
-    setGroupCodeDraft(group.code);
-    setGroupNameDraft(group.name);
-    setGroupCodeError("");
-    setGroupNameError("");
     setIsGroupEditModalOpen(true);
   };
 
   const handleCloseGroupEditModal = () => {
     setIsGroupEditModalOpen(false);
-    setGroupCodeDraft(group.code);
-    setGroupNameDraft(group.name);
-    setGroupCodeError("");
-    setGroupNameError("");
   };
 
-  const handleSaveGroupEdit = () => {
-    const nextGroupCode = groupCodeDraft.trim().toUpperCase();
-    const nextGroupName = groupNameDraft.trim();
+  const handleSaveGroupEdit = ({
+    code: nextGroupCode,
+    name: nextGroupName,
+  }: {
+    code: string;
+    name: string;
+  }): { ok: true } | { ok: false; message: string } => {
     const normalizedCurrentGroupCode = group.code.trim().toUpperCase();
     const normalizedCurrentGroupName = group.name.trim();
 
-    setGroupCodeError("");
-    setGroupNameError("");
-
-    if (!nextGroupCode) {
-      setGroupCodeError("Group number tidak boleh kosong.");
-      return;
-    }
-
-    if (!nextGroupName) {
-      setGroupNameError("Group name tidak boleh kosong.");
-      return;
-    }
-
     if (nextGroupCode === normalizedCurrentGroupCode && nextGroupName === normalizedCurrentGroupName) {
       setIsGroupEditModalOpen(false);
-      return;
+      return { ok: true };
     }
 
     const result = persistGroupSnapshot({ nextGroupCode, nextGroupName });
     if (!result.ok) {
-      setGroupCodeError(result.message);
-      return;
+      return result;
     }
 
     setIsGroupEditModalOpen(false);
+    return { ok: true };
   };
 
-  const handleSaveMusyrif = () => {
-    if (isMusyrifSaveDisabled) {
-      return;
-    }
-
+  const handleSaveMusyrif = ({ name, phone }: { name: string; phone: string }) => {
     const nextMusyrif: Musyrif = {
       ...musyrifProfile,
-      name: musyrifForm.name.trim(),
-      phone: musyrifForm.phone.trim(),
+      name: name.trim(),
+      phone: phone.trim(),
     };
     setMusyrifProfile(nextMusyrif);
     persistGroupSnapshot({ nextMusyrif });
@@ -1365,9 +1315,10 @@ export function GroupDetail({
 
       {isMusyrifModalOpen ? (
         <MusyrifModal
-          form={musyrifForm}
-          isSaveDisabled={isMusyrifSaveDisabled}
-          onChange={handleMusyrifFieldChange}
+          initialValues={{
+            name: musyrifProfile.name,
+            phone: musyrifProfile.phone,
+          }}
           onClose={handleCloseMusyrifModal}
           onSave={handleSaveMusyrif}
         />
@@ -1405,23 +1356,6 @@ export function GroupDetail({
         <GroupEditModal
           groupCode={group.code}
           groupName={group.name}
-          codeDraft={groupCodeDraft}
-          nameDraft={groupNameDraft}
-          codeError={groupCodeError}
-          nameError={groupNameError}
-          isSaveDisabled={!groupCodeDraft.trim() || !groupNameDraft.trim()}
-          onCodeChange={(value) => {
-            setGroupCodeDraft(value);
-            if (groupCodeError) {
-              setGroupCodeError("");
-            }
-          }}
-          onNameChange={(value) => {
-            setGroupNameDraft(value);
-            if (groupNameError) {
-              setGroupNameError("");
-            }
-          }}
           onClose={handleCloseGroupEditModal}
           onSave={handleSaveGroupEdit}
         />

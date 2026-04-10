@@ -1,4 +1,7 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { type ReactNode, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
@@ -32,6 +35,37 @@ const {
 type HotelCity = "makkah" | "madinah";
 type InvoiceTone = "paid" | "pending" | "overdue" | "cancelled";
 type VisaServiceOption = "Visa Only" | BusStatus;
+
+const visaStatusSchema = z.enum(["Draft", "Pending", "Issued"]);
+const visaServiceOptionSchema = z.enum(["Visa Only", "Visa+"]);
+const paymentStatusSchema = z.enum(["Paid", "Unpaid"]);
+
+function createNewGroupScreenSchema(requireGroupInformation: boolean) {
+  return z.object({
+    groupNumber: requireGroupInformation
+      ? z.string().trim().min(1, "Group number wajib diisi.")
+      : z.string(),
+    groupName: requireGroupInformation
+      ? z.string().trim().min(1, "Group name wajib diisi.")
+      : z.string(),
+    totalPax: requireGroupInformation
+      ? z
+          .string()
+          .trim()
+          .min(1, "Total pax wajib diisi.")
+          .refine((value) => {
+            const parsed = Number.parseInt(value, 10);
+            return Number.isFinite(parsed) && parsed > 0;
+          }, "Total pax harus lebih dari 0.")
+      : z.string(),
+    visaStatus: visaStatusSchema,
+    syarikahName: z.string(),
+    busStatus: visaServiceOptionSchema,
+    paymentStatus: paymentStatusSchema,
+  });
+}
+
+type NewGroupScreenFormValues = z.infer<ReturnType<typeof createNewGroupScreenSchema>>;
 
 function toCityLabel(city: HotelCity): string {
   return city === "makkah" ? "Makkah" : "Madinah";
@@ -138,13 +172,29 @@ export function NewGroupScreen({
   requireItineraryBeforeSave?: boolean;
   onItineraryPrefillChange?: (prefill: ItineraryPrefill | null) => void;
 }) {
-  const [groupNumber, setGroupNumber] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [totalPax, setTotalPax] = useState("");
-  const [visaStatus, setVisaStatus] = useState<VisaStatus>("Draft");
-  const [syarikahName, setSyarikahName] = useState("");
-  const [busStatus, setBusStatus] = useState<VisaServiceOption>("Visa Only");
-  const [paymentStatus, setPaymentStatus] = useState<"Paid" | "Unpaid">("Unpaid");
+  const formSchema = useMemo(
+    () => createNewGroupScreenSchema(!hideGroupInformation),
+    [hideGroupInformation],
+  );
+  const {
+    register,
+    control,
+    watch,
+    setValue,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<NewGroupScreenFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      groupNumber: "",
+      groupName: "",
+      totalPax: "",
+      visaStatus: "Draft",
+      syarikahName: "",
+      busStatus: "Visa Only",
+      paymentStatus: "Unpaid",
+    },
+  });
   const [makkahHotels, setMakkahHotels] = useState<NewGroupAgreementFormState[]>([
     createNewGroupAgreementForm("makkah"),
   ]);
@@ -158,6 +208,13 @@ export function NewGroupScreen({
   const itineraryGroupCode = itineraryDraft?.groupCode?.trim().toUpperCase() ?? "";
   const itineraryGroupName = itineraryDraft?.groupName?.trim() ?? "";
   const itineraryPax = itineraryDraft?.pax;
+  const groupNumber = watch("groupNumber");
+  const groupName = watch("groupName");
+  const totalPax = watch("totalPax");
+  const visaStatus = watch("visaStatus");
+  const syarikahName = watch("syarikahName");
+  const busStatus = watch("busStatus");
+  const paymentStatus = watch("paymentStatus");
   const fallbackPax = Number.parseInt(totalPax, 10);
   const safePax =
     Number.isFinite(itineraryPax) && (itineraryPax ?? 0) > 0
@@ -230,7 +287,7 @@ export function NewGroupScreen({
     onItineraryPrefillChange(buildAgreementItineraryPrefill(makkahHotels, madinahHotels));
   };
 
-  const handleSave = () => {
+  const handleSave = (values: NewGroupScreenFormValues) => {
     if (isSaveDisabled || !hasValidPax) {
       return;
     }
@@ -240,10 +297,10 @@ export function NewGroupScreen({
         resolvedGroupCode,
         resolvedGroupName,
         safePax,
-        visaStatus,
-        syarikahName,
-        busStatus: busStatus === "Visa+" ? "Visa+" : undefined,
-        paymentStatus,
+        visaStatus: values.visaStatus,
+        syarikahName: values.syarikahName,
+        busStatus: values.busStatus === "Visa+" ? "Visa+" : undefined,
+        paymentStatus: values.paymentStatus,
         makkahHotels,
         madinahHotels,
         raudhahDates,
@@ -476,10 +533,7 @@ export function NewGroupScreen({
 
       <form
         className="space-y-6"
-        onSubmit={(event) => {
-          event.preventDefault();
-          handleSave();
-        }}
+        onSubmit={handleSubmit(handleSave)}
       >
         {itinerarySectionTop ? <div className="space-y-4">{itinerarySectionTop}</div> : null}
 
@@ -493,10 +547,12 @@ export function NewGroupScreen({
                   <input
                     className={controlClassName}
                     type="text"
-                    value={groupNumber}
-                    onChange={(event) => setGroupNumber(event.target.value)}
+                    {...register("groupNumber")}
                     placeholder="e.g. 901794508"
                   />
+                  {errors.groupNumber ? (
+                    <p className="text-xs font-semibold text-error">{errors.groupNumber.message}</p>
+                  ) : null}
                 </label>
                 <label className={fieldClassName}>
                   <span>Total Pax</span>
@@ -504,20 +560,24 @@ export function NewGroupScreen({
                     className={controlClassName}
                     type="number"
                     min={1}
-                    value={totalPax}
-                    onChange={(event) => setTotalPax(event.target.value)}
+                    {...register("totalPax")}
                     placeholder="45"
                   />
+                  {errors.totalPax ? (
+                    <p className="text-xs font-semibold text-error">{errors.totalPax.message}</p>
+                  ) : null}
                 </label>
                 <label className={`${fieldClassName} md:col-span-2`}>
                   <span>Group Name</span>
                   <input
                     className={controlClassName}
                     type="text"
-                    value={groupName}
-                    onChange={(event) => setGroupName(event.target.value)}
+                    {...register("groupName")}
                     placeholder="e.g. FEB 25 - Group 3"
                   />
+                  {errors.groupName ? (
+                    <p className="text-xs font-semibold text-error">{errors.groupName.message}</p>
+                  ) : null}
                 </label>
               </div>
             </section>
@@ -533,15 +593,21 @@ export function NewGroupScreen({
                     className={`${toneDotClassName} ${getInvoiceToneDotClasses(getVisaStatusTone(visaStatus))}`}
                     aria-hidden="true"
                   />
-                  <SereneSelect
-                    className={getToneSelectClassName(getVisaStatusTone(visaStatus))}
-                    value={visaStatus}
-                    onChange={(event) => setVisaStatus(event.target.value as VisaStatus)}
-                  >
-                    <option value="Draft">Draft</option>
-                    <option value="Pending">On Process</option>
-                    <option value="Issued">Issued</option>
-                  </SereneSelect>
+                  <Controller
+                    name="visaStatus"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className={getToneSelectClassName(getVisaStatusTone(field.value))}
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Pending">On Process</option>
+                        <option value="Issued">Issued</option>
+                      </SereneSelect>
+                    )}
+                  />
                 </div>
               </label>
               <label className={fieldClassName}>
@@ -549,8 +615,7 @@ export function NewGroupScreen({
                 <input
                   className={controlClassName}
                   type="text"
-                  value={syarikahName}
-                  onChange={(event) => setSyarikahName(event.target.value)}
+                  {...register("syarikahName")}
                   placeholder="Enter syarikah name"
                 />
               </label>
@@ -561,14 +626,20 @@ export function NewGroupScreen({
                     className={`${toneDotClassName} ${getInvoiceToneDotClasses(getBusStatusTone(busStatus))}`}
                     aria-hidden="true"
                   />
-                  <SereneSelect
-                    className={getToneSelectClassName(getBusStatusTone(busStatus))}
-                    value={busStatus}
-                    onChange={(event) => setBusStatus(event.target.value as VisaServiceOption)}
-                  >
-                    <option value="Visa Only">Visa Only</option>
-                    <option value="Visa+">Visa+</option>
-                  </SereneSelect>
+                  <Controller
+                    name="busStatus"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className={getToneSelectClassName(getBusStatusTone(field.value))}
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      >
+                        <option value="Visa Only">Visa Only</option>
+                        <option value="Visa+">Visa+</option>
+                      </SereneSelect>
+                    )}
+                  />
                 </div>
               </label>
               <div className={`${fieldClassName} justify-end`}>
@@ -682,7 +753,7 @@ export function NewGroupScreen({
                     ? `${getInvoiceToneClasses(getPaymentStatusTone("Unpaid"))} shadow-sm`
                     : "border-transparent text-on-surface-variant hover:border-slate-200 hover:bg-surface-container-lowest"
                 }`}
-                onClick={() => setPaymentStatus("Unpaid")}
+                onClick={() => setValue("paymentStatus", "Unpaid", { shouldDirty: true })}
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
                   hourglass_top
@@ -696,7 +767,7 @@ export function NewGroupScreen({
                     ? `${getInvoiceToneClasses(getPaymentStatusTone("Paid"))} shadow-sm`
                     : "border-transparent text-on-surface-variant hover:border-slate-200 hover:bg-surface-container-lowest"
                 }`}
-                onClick={() => setPaymentStatus("Paid")}
+                onClick={() => setValue("paymentStatus", "Paid", { shouldDirty: true })}
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
                   task_alt
