@@ -23,6 +23,14 @@ const syarikahModalSchema = z.object({
   value: z.string().trim().min(1, "Syarikah wajib diisi."),
 });
 
+const visaStatusModalSchema = z.object({
+  value: z.enum(["Draft", "Pending", "Issued"]),
+});
+
+const paymentStatusModalSchema = z.object({
+  value: z.enum(["Paid", "Unpaid", "Partial"]),
+});
+
 const hotelModalSchema = z
   .object({
     hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
@@ -162,36 +170,54 @@ function SaveFooter({
 }
 
 export function VisaStatusModal({
-  value,
-  onChange,
+  initialValue,
   onClose,
   onSave,
 }: {
-  value: VisaStatus;
-  onChange: (nextValue: VisaStatus) => void;
+  initialValue: VisaStatus;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (nextValue: VisaStatus) => void | Promise<void>;
 }) {
+  const { control, handleSubmit, formState: { isSubmitting } } = useForm<{ value: VisaStatus }>({
+    resolver: zodResolver(visaStatusModalSchema),
+    defaultValues: {
+      value: initialValue,
+    },
+  });
+
   return (
     <ModalShell
       title="Edit Visa Status"
       description="Update the visa approval status for this group."
       icon="verified_user"
       onClose={onClose}
-      footer={<SaveFooter onClose={onClose} onSave={onSave} saveLabel="Save Changes" />}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() => void handleSubmit(({ value }) => void onSave(value))()}
+          saveLabel="Save Changes"
+          isSaving={isSubmitting}
+        />
+      }
     >
       <label className={modalFieldClassName}>
         <span>Visa Status</span>
         <div className="relative">
-          <SereneSelect
-            className={modalSelectClassName}
-            value={value}
-            onChange={(event) => onChange(event.target.value as VisaStatus)}
-          >
-            <option value="Draft">Draft</option>
-            <option value="Pending">Pending</option>
-            <option value="Issued">Issued</option>
-          </SereneSelect>
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <SereneSelect
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+              >
+                <option value="Draft">Draft</option>
+                <option value="Pending">Pending</option>
+                <option value="Issued">Issued</option>
+              </SereneSelect>
+            )}
+          />
         </div>
       </label>
     </ModalShell>
@@ -199,36 +225,54 @@ export function VisaStatusModal({
 }
 
 export function PaymentStatusModal({
-  value,
-  onChange,
+  initialValue,
   onClose,
   onSave,
 }: {
-  value: VisaPaymentStatus;
-  onChange: (nextValue: VisaPaymentStatus) => void;
+  initialValue: VisaPaymentStatus;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (nextValue: VisaPaymentStatus) => void | Promise<void>;
 }) {
+  const { control, handleSubmit, formState: { isSubmitting } } = useForm<{ value: VisaPaymentStatus }>({
+    resolver: zodResolver(paymentStatusModalSchema),
+    defaultValues: {
+      value: initialValue,
+    },
+  });
+
   return (
     <ModalShell
       title="Edit Payment Status"
       description="Update the payment progress for this group."
       icon="payments"
       onClose={onClose}
-      footer={<SaveFooter onClose={onClose} onSave={onSave} saveLabel="Save Changes" />}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() => void handleSubmit(({ value }) => void onSave(value))()}
+          saveLabel="Save Changes"
+          isSaving={isSubmitting}
+        />
+      }
     >
       <label className={modalFieldClassName}>
         <span>Payment Status</span>
         <div className="relative">
-          <SereneSelect
-            className={modalSelectClassName}
-            value={value}
-            onChange={(event) => onChange(event.target.value as VisaPaymentStatus)}
-          >
-            <option value="Paid">Paid</option>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Partial">Partial</option>
-          </SereneSelect>
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <SereneSelect
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+              >
+                <option value="Paid">Paid</option>
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partial">Partial</option>
+              </SereneSelect>
+            )}
+          />
         </div>
       </label>
     </ModalShell>
