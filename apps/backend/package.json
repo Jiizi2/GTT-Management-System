@@ -9,7 +9,7 @@
     "predev": "node scripts/release-dev-port.js",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "check": "tsc --noEmit -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json --tsBuildInfoFile tsconfig.check.tsbuildinfo",
     "test:unit": "npm run build && node dist/auth/auth.service.test.js && node dist/auth/auth.service.prisma.test.js && node dist/auth/auth.guard.test.js && node dist/auth/auth-login-rate-limiter.test.js && node dist/invoices/invoices.service.test.js && node dist/groups/groups.service.test.js && node dist/groups/groups.service.edge.test.js && node dist/groups/groups.service.prisma-visa.test.js && node dist/groups/groups.service.prisma-itinerary-raudhah.test.js && node dist/groups/groups.service.prisma-crud.test.js && node dist/groups/groups.service.prisma-list-checklist.test.js && node dist/groups/groups.memory-group-payload.test.js && node dist/groups/groups.prisma-write-builders.test.js && node dist/prisma/prisma.service.test.js && node dist/runtime-config.test.js",
     "test:integration": "npm run db:deploy && npm run build && node dist/e2e/backend.prisma.integration.test.js && node dist/e2e/backend.prisma.groups.integration.test.js",
     "test:api": "npm run build && node dist/groups/groups.service.test.js && node dist/groups/groups.prisma-write-builders.test.js && node dist/runtime-config.test.js && node dist/e2e/backend.api.e2e.test.js",
