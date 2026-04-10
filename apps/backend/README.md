@@ -16,12 +16,20 @@
    - `npm run db:migrate --workspace backend`
 7. Seed sample data:
    - `npm run db:seed --workspace backend`
-   - By default this is non-destructive and only seeds when the database is empty.
+   - By default this is non-destructive and only seeds missing defaults (including auth users).
    - To reset and reseed explicitly:
      - macOS/Linux: `SEED_RESET=true npm run db:seed --workspace backend`
      - PowerShell: `$env:SEED_RESET="true"; npm run db:seed --workspace backend`
 8. Start backend:
    - `npm run dev:backend`
+
+## Production Env Template
+
+- Use `env.production.example` as production reference.
+- Recommended flow:
+  1. Copy `env.production.example` to `.env` on production host.
+  2. Set real `DATABASE_URL`, `AUTH_SECRET`, and `CORS_ORIGINS`.
+  3. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
 
 ## Quick Start (Fallback: Memory Mode)
 
@@ -37,15 +45,22 @@
 
 - Unit tests (fast, mostly memory/in-process):
   - `npm run test:unit --workspace backend`
+- Default `npm run test --workspace backend` is now unit-test focused.
 - Prisma integration test (real database required):
   - `npm run test:integration --workspace backend`
+- API e2e test (memory mode):
+  - `npm run test:api --workspace backend`
 
 ## Runtime Validation
 
 - `PORT` must be a numeric value between `1` and `65535`.
 - `DATA_SOURCE` must be either `memory` or `prisma`.
+- `DATA_SOURCE=prisma` is mandatory in production (`NODE_ENV=production`).
 - `DATABASE_URL` is required when `DATA_SOURCE=prisma`.
-- `AUTH_SECRET` should be set to a private random value.
+- `AUTH_SECRET` is required in production and should be a private random value.
+- `AUTH_BOOTSTRAP_DEFAULT_USERS` controls auto-creation of default auth users on startup in Prisma mode.
+  - Defaults to `true` outside production.
+  - Defaults to `false` in production.
 - Development login password defaults can be overridden by:
   - `DEV_AUTH_SUPERADMIN_PASSWORD`
   - `DEV_AUTH_ADMIN_PASSWORD`
@@ -61,6 +76,7 @@
 - Identifier bisa pakai username atau email:
   - `superadmin.dev@ghaniya.local`
   - `admin.dev@ghaniya.local`
+- Akun default ini disimpan di tabel `AuthUser` (via seed atau bootstrap auth di Prisma mode).
 
 ## API Base URL
 
@@ -71,6 +87,10 @@
 - `GET /api/health`
 - `POST /api/auth/login`
 - `GET /api/auth/session`
+- `GET /api/auth/users`
+- `POST /api/auth/users`
+- `PATCH /api/auth/users/:userId`
+- `DELETE /api/auth/users/:userId`
 - `GET /api/groups`
   - supports optional query param: `GET /api/groups?q=majestic`
 - `GET /api/groups/:idOrCode`

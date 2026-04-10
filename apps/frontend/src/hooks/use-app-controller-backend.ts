@@ -67,6 +67,8 @@ type BackendCreateGroupPayload = {
     isoDate?: string;
     time?: string;
     flightNumber?: string;
+    hotelName?: string;
+    fromHotelName?: string;
     fromLocation?: string;
     toLocation?: string;
     cityTourCity?: string;
@@ -167,6 +169,8 @@ type BackendGroupRecord = {
     isoDate?: string | Date | null;
     time?: string | null;
     flightNumber?: string | null;
+    hotelName?: string | null;
+    fromHotelName?: string | null;
     fromLocation?: string | null;
     toLocation?: string | null;
     cityTourCity?: string | null;
@@ -429,6 +433,8 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       isoDate: item.isoDate?.trim(),
       time: normalizeStoredTimeLabel(item.time?.trim() ?? "") || undefined,
       flightNumber: item.flightNumber?.trim(),
+      hotelName: item.hotelName?.trim(),
+      fromHotelName: item.fromHotelName?.trim(),
       fromLocation: item.from?.trim(),
       toLocation: item.to?.trim(),
       cityTourCity: item.cityTourCity?.trim(),
@@ -745,6 +751,35 @@ function mapBackendChecklistStatus(value: string | undefined): ChecklistAssignme
   return value?.trim().toUpperCase() === "ASSIGNED" ? "Assigned" : "Not Complete";
 }
 
+function inferHotelNameFromItineraryRecord(record: {
+  category?: string;
+  categoryKey?: string | null;
+  hotelName?: string | null;
+  fromLocation?: string | null;
+  toLocation?: string | null;
+}): string {
+  const explicitHotelName = readString(record.hotelName ?? "", "");
+  if (explicitHotelName) {
+    return explicitHotelName;
+  }
+
+  const normalizedCategoryKey = readString(record.categoryKey ?? "", "").toLowerCase();
+  const normalizedCategory = readString(record.category ?? "", "").toLowerCase();
+  const resolvedCategoryKey = normalizedCategoryKey || normalizedCategory;
+  const fromLocation = readString(record.fromLocation ?? "", "");
+  const toLocation = readString(record.toLocation ?? "", "");
+
+  if (resolvedCategoryKey.includes("departure") || resolvedCategoryKey.includes("city-tour")) {
+    return /hotel/i.test(fromLocation) ? fromLocation : "";
+  }
+
+  if (resolvedCategoryKey.includes("arrival") || resolvedCategoryKey.includes("transfer")) {
+    return /hotel/i.test(toLocation) ? toLocation : "";
+  }
+
+  return "";
+}
+
 function resolveBusStatusFromNotes(
   notes: string[],
 ): GroupVisaSetup["busStatus"] {
@@ -840,6 +875,8 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
           isoDate: isoDate ?? undefined,
           time: normalizeStoredTimeLabel(readString(item.time ?? "", "")),
           flightNumber: readString(item.flightNumber ?? "", ""),
+          hotelName: inferHotelNameFromItineraryRecord(item) || undefined,
+          fromHotelName: readString(item.fromHotelName ?? "", "") || undefined,
           from: readString(item.fromLocation ?? "", ""),
           to: readString(item.toLocation ?? "", ""),
           cityTourCity: readString(item.cityTourCity ?? "", ""),

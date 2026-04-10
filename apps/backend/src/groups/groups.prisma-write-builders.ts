@@ -77,6 +77,8 @@ function buildItineraryCreate(itinerary: CreateGroupDto["itinerary"]) {
       isoDate: item.isoDate ? toUtcMidnight(item.isoDate) : null,
       time: item.time?.trim() || null,
       flightNumber: item.flightNumber?.trim() || null,
+      hotelName: item.hotelName?.trim() || null,
+      fromHotelName: item.fromHotelName?.trim() || null,
       fromLocation: item.fromLocation?.trim() || null,
       toLocation: item.toLocation?.trim() || null,
       cityTourCity: item.cityTourCity?.trim() || null,

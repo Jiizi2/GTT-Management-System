@@ -406,6 +406,10 @@ export function ScheduleModal({
   onSave: () => void;
 }) {
   const showFlightNumberField = isFlightActivityType(form.category);
+  const showPrimaryHotelNameField =
+    form.category === "arrival" || form.category === "transfer" || form.category === "departure";
+  const showTransferHotelFields = isTransferActivityType(form.category);
+  const showSingleHotelNameField = showPrimaryHotelNameField && !showTransferHotelFields;
   const showDeparturePickupField = form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
   const showCityTourCityField = isCityTourActivityType(form.category);
@@ -496,6 +500,7 @@ export function ScheduleModal({
                       }
 
                       if (!isTransferActivityType(nextCategory)) {
+                        onChange("fromHotelName", "");
                         onChange("transferByTrain", false);
                         onChange("trainDepartureTime", "");
                         onChange("destinationPickupTime", "");
@@ -540,17 +545,6 @@ export function ScheduleModal({
                   value={form.flightNumber}
                   onChange={(event) => onChange("flightNumber", event.target.value)}
                   placeholder="e.g. SV-827"
-                />
-              </label>
-            ) : null}
-
-            {showDeparturePickupField ? (
-              <label className={modalFieldClassName}>
-                <span>Hotel Pickup Request Time</span>
-                <TimePickerInput
-                  inputClassName={modalInputClassName}
-                  value={form.hotelPickupRequestTime}
-                  onChange={(nextValue) => onChange("hotelPickupRequestTime", nextValue)}
                 />
               </label>
             ) : null}
@@ -643,6 +637,60 @@ export function ScheduleModal({
 
             {routeFieldConfig.helperText ? (
               <p className={`${modalWideClassName} text-xs text-slate-600`}>{routeFieldConfig.helperText}</p>
+            ) : null}
+
+            {showSingleHotelNameField ? (
+              <label className={modalFieldClassName}>
+                <span>Hotel Name</span>
+                <input
+                  className={modalInputClassName}
+                  type="text"
+                  value={form.hotelName}
+                  onChange={(event) => onChange("hotelName", event.target.value)}
+                  placeholder={
+                    form.category === "arrival"
+                      ? "e.g. Swissotel Al Maqam"
+                      : "e.g. Pullman Zamzam Madinah"
+                  }
+                />
+              </label>
+            ) : null}
+
+            {showTransferHotelFields ? (
+              <>
+                <label className={modalFieldClassName}>
+                  <span>Hotel 1 (From City)</span>
+                  <input
+                    className={modalInputClassName}
+                    type="text"
+                    value={form.fromHotelName}
+                    onChange={(event) => onChange("fromHotelName", event.target.value)}
+                    placeholder="e.g. Swissotel Al Maqam"
+                  />
+                </label>
+
+                <label className={modalFieldClassName}>
+                  <span>Hotel 2 (To City)</span>
+                  <input
+                    className={modalInputClassName}
+                    type="text"
+                    value={form.hotelName}
+                    onChange={(event) => onChange("hotelName", event.target.value)}
+                    placeholder="e.g. Pullman Zamzam Madinah"
+                  />
+                </label>
+              </>
+            ) : null}
+
+            {showDeparturePickupField ? (
+              <label className={modalFieldClassName}>
+                <span>Hotel Pickup Request Time</span>
+                <TimePickerInput
+                  inputClassName={modalInputClassName}
+                  value={form.hotelPickupRequestTime}
+                  onChange={(nextValue) => onChange("hotelPickupRequestTime", nextValue)}
+                />
+              </label>
             ) : null}
 
             {isTransferActivityType(form.category) ? (
@@ -799,6 +847,10 @@ export function EditScheduleModal({
   onSave: () => void;
 }) {
   const showFlightNumberField = isFlightActivityType(form.category);
+  const showPrimaryHotelNameField =
+    form.category === "arrival" || form.category === "transfer" || form.category === "departure";
+  const showTransferHotelFields = isTransferActivityType(form.category);
+  const showSingleHotelNameField = showPrimaryHotelNameField && !showTransferHotelFields;
   const showDeparturePickupField = form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
   const showCityTourCityField = isCityTourActivityType(form.category);
@@ -873,6 +925,7 @@ export function EditScheduleModal({
                     }
 
                     if (!isTransferActivityType(option.value)) {
+                      onChange("fromHotelName", "");
                       onChange("transferByTrain", false);
                       onChange("trainDepartureTime", "");
                       onChange("destinationPickupTime", "");
@@ -918,17 +971,6 @@ export function EditScheduleModal({
                   value={form.flightNumber}
                   onChange={(event) => onChange("flightNumber", event.target.value)}
                   placeholder="e.g. SV-821"
-                />
-              </label>
-            ) : null}
-
-            {showDeparturePickupField ? (
-              <label className={modalFieldClassName}>
-                <span>Hotel Pickup Request Time</span>
-                <TimePickerInput
-                  inputClassName={modalInputClassName}
-                  value={form.hotelPickupRequestTime}
-                  onChange={(nextValue) => onChange("hotelPickupRequestTime", nextValue)}
                 />
               </label>
             ) : null}
@@ -1034,6 +1076,62 @@ export function EditScheduleModal({
           {routeFieldConfig.helperText ? (
             <p className="text-xs text-slate-600">{routeFieldConfig.helperText}</p>
           ) : null}
+
+          <div className={modalGridClassName}>
+            {showSingleHotelNameField ? (
+              <label className={modalFieldClassName}>
+                <span>Hotel Name</span>
+                <input
+                  className={modalInputClassName}
+                  type="text"
+                  value={form.hotelName}
+                  onChange={(event) => onChange("hotelName", event.target.value)}
+                  placeholder={
+                    form.category === "arrival"
+                      ? "e.g. Swissotel Al Maqam"
+                      : "e.g. Pullman Zamzam Madinah"
+                  }
+                />
+              </label>
+            ) : null}
+
+            {showTransferHotelFields ? (
+              <>
+                <label className={modalFieldClassName}>
+                  <span>Hotel 1 (From City)</span>
+                  <input
+                    className={modalInputClassName}
+                    type="text"
+                    value={form.fromHotelName}
+                    onChange={(event) => onChange("fromHotelName", event.target.value)}
+                    placeholder="e.g. Swissotel Al Maqam"
+                  />
+                </label>
+
+                <label className={modalFieldClassName}>
+                  <span>Hotel 2 (To City)</span>
+                  <input
+                    className={modalInputClassName}
+                    type="text"
+                    value={form.hotelName}
+                    onChange={(event) => onChange("hotelName", event.target.value)}
+                    placeholder="e.g. Pullman Zamzam Madinah"
+                  />
+                </label>
+              </>
+            ) : null}
+
+            {showDeparturePickupField ? (
+              <label className={modalFieldClassName}>
+                <span>Hotel Pickup Request Time</span>
+                <TimePickerInput
+                  inputClassName={modalInputClassName}
+                  value={form.hotelPickupRequestTime}
+                  onChange={(nextValue) => onChange("hotelPickupRequestTime", nextValue)}
+                />
+              </label>
+            ) : null}
+          </div>
 
           {isTransferActivityType(form.category) ? (
             <>

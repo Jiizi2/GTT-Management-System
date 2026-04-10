@@ -9,10 +9,12 @@ import {
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
+import { createDefaultAuthUserStorageRecords } from "../src/auth/auth-default-users";
 
 const prisma = new PrismaClient();
 
 async function resetData(): Promise<void> {
+  await prisma.authUser.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.invoiceClient.deleteMany();
   await prisma.checklistDriver.deleteMany();
@@ -26,6 +28,50 @@ async function resetData(): Promise<void> {
   await prisma.nextActivity.deleteMany();
   await prisma.musyrif.deleteMany();
   await prisma.group.deleteMany();
+}
+
+async function seedAuthUsers(): Promise<void> {
+  const defaultUsers = createDefaultAuthUserStorageRecords();
+  if (defaultUsers.length === 0) {
+    return;
+  }
+
+  const usernames = defaultUsers.map((user) => user.username);
+  const emails = defaultUsers.map((user) => user.email);
+  const existingUsers = await prisma.authUser.findMany({
+    where: {
+      OR: [
+        { username: { in: usernames } },
+        { email: { in: emails } },
+      ],
+    },
+    select: {
+      username: true,
+      email: true,
+    },
+  });
+  const existingUsernames = new Set(existingUsers.map((user) => user.username));
+  const existingEmails = new Set(existingUsers.map((user) => user.email));
+
+  const createdUsernames: string[] = [];
+  for (const user of defaultUsers) {
+    if (existingUsernames.has(user.username) || existingEmails.has(user.email)) {
+      continue;
+    }
+
+    await prisma.authUser.create({
+      data: user,
+    });
+    existingUsernames.add(user.username);
+    existingEmails.add(user.email);
+    createdUsernames.push(user.username);
+  }
+
+  if (createdUsernames.length > 0) {
+    console.log(`Seeded auth users: ${createdUsernames.join(", ")}`);
+  } else {
+    console.log("Auth user seed skipped: default users already exist.");
+  }
 }
 
 function addUtcDays(baseDate: Date, dayOffset: number): Date {
@@ -1182,6 +1228,7 @@ async function main(): Promise<void> {
     console.log("SEED_RESET is not enabled. Existing data will be preserved.");
   }
 
+  await seedAuthUsers();
   await seedGroups({ resetDataFirst });
   await seedInvoiceClients({ resetDataFirst });
   await seedInvoices({ resetDataFirst });

@@ -41,10 +41,15 @@ function resolveDataSource(rawDataSource: string | undefined): RuntimeDataSource
 }
 
 export function resolveRuntimeConfig(
-  env: { PORT?: string; DATA_SOURCE?: string; DATABASE_URL?: string },
+  env: { PORT?: string; DATA_SOURCE?: string; DATABASE_URL?: string; NODE_ENV?: string },
 ): RuntimeConfig {
   const dataSource = resolveDataSource(env.DATA_SOURCE);
   const port = resolvePort(env.PORT);
+  const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
+
+  if (nodeEnv === "production" && dataSource !== "prisma") {
+    throw new Error("DATA_SOURCE must be prisma in production.");
+  }
 
   if (dataSource === "prisma" && !env.DATABASE_URL?.trim()) {
     throw new Error("DATABASE_URL is required when DATA_SOURCE=prisma.");

@@ -75,6 +75,8 @@ export type ItineraryItem = {
   isoDate?: string;
   time?: string;
   flightNumber?: string;
+  hotelName?: string;
+  fromHotelName?: string;
   from?: string;
   to?: string;
   cityTourCity?: string;
@@ -156,6 +158,8 @@ export type ScheduleFormState = {
   date: string;
   time: string;
   flightNumber: string;
+  hotelName: string;
+  fromHotelName: string;
   from: string;
   to: string;
   cityTourCity: string;
@@ -172,6 +176,8 @@ export type EditScheduleFormState = {
   time: string;
   category: string;
   flightNumber: string;
+  hotelName: string;
+  fromHotelName: string;
   from: string;
   to: string;
   cityTourCity: string;
@@ -311,6 +317,8 @@ export type InputItineraryItem = {
   time: string;
   category: string;
   categoryKey: string;
+  hotelName?: string;
+  fromHotelName?: string;
   from: string;
   to: string;
   cityTourCity: string;
@@ -328,6 +336,8 @@ export type InputItineraryFormState = {
   date: string;
   time: string;
   category: string;
+  hotelName?: string;
+  fromHotelName?: string;
   from: string;
   to: string;
   cityTourCity: string;
@@ -359,6 +369,7 @@ export type NewGroupItineraryDraft = {
 
 export type ItineraryPrefillTrip = {
   date?: string;
+  hotelName?: string;
   from?: string;
   to?: string;
   cityTourCity?: string;
@@ -369,6 +380,10 @@ export type ItineraryPrefillTrip = {
 export type ItineraryPrefill = {
   startDate?: string;
   endDate?: string;
+  cityHotelNames?: {
+    makkah?: string;
+    madinah?: string;
+  };
   trips?: Partial<Record<string, ItineraryPrefillTrip>>;
 };
 
@@ -1331,6 +1346,8 @@ export function createInitialInputItineraryForm(): InputItineraryFormState {
     date: "",
     time: "",
     category: scheduleTypeOptions[1].value,
+    hotelName: "",
+    fromHotelName: "",
     from: "",
     to: "",
     cityTourCity: "",
@@ -1379,6 +1396,8 @@ export function createInitialScheduleForm(): ScheduleFormState {
     date: "",
     time: "",
     flightNumber: "",
+    hotelName: "",
+    fromHotelName: "",
     from: "",
     to: "",
     cityTourCity: "",
@@ -1613,6 +1632,8 @@ export function createScheduleMeta({
   category,
   time,
   flightNumber,
+  hotelName,
+  fromHotelName,
   hotelPickupRequestTime,
   from,
   to,
@@ -1623,6 +1644,8 @@ export function createScheduleMeta({
   category?: string;
   time: string;
   flightNumber?: string;
+  hotelName?: string;
+  fromHotelName?: string;
   hotelPickupRequestTime?: string;
   from?: string;
   to?: string;
@@ -1637,6 +1660,21 @@ export function createScheduleMeta({
       ? formatRouteSummary(category ?? "", trimmedFrom, trimmedTo, cityTourCity)
       : [trimmedFrom, trimmedTo].filter(Boolean).join(" -> ");
   const trimmedFlightNumber = flightNumber?.trim() ?? "";
+  const trimmedHotelName = hotelName?.trim() ?? "";
+  const trimmedFromHotelName = fromHotelName?.trim() ?? "";
+  const normalizedCategory = category?.trim().toLowerCase() ?? "";
+  const hotelNameSummary =
+    normalizedCategory === "transfer"
+      ? trimmedFromHotelName && trimmedHotelName
+        ? `Hotel ${trimmedFromHotelName} -> ${trimmedHotelName}`
+        : trimmedHotelName
+          ? `Hotel ${trimmedHotelName}`
+          : trimmedFromHotelName
+            ? `Hotel ${trimmedFromHotelName}`
+            : ""
+      : trimmedHotelName
+        ? `Hotel ${trimmedHotelName}`
+        : "";
   const trimmedHotelPickupRequestTime = hotelPickupRequestTime?.trim() ?? "";
   const hotelPickupRequestSummary = trimmedHotelPickupRequestTime
     ? `Hotel pickup request ${formatScheduleTime(trimmedHotelPickupRequestTime)}`
@@ -1649,6 +1687,7 @@ export function createScheduleMeta({
   return [
     formatScheduleTime(time),
     trimmedFlightNumber,
+    hotelNameSummary,
     hotelPickupRequestSummary,
     route,
     trimmedTransferTrainSummary,
@@ -1666,6 +1705,24 @@ export function detectCityFromText(rawValue: string): string {
 
   const foundCity = saudiCityOptions.find((city) => normalized.includes(city.toLowerCase()));
   return foundCity ?? "";
+}
+
+export function normalizeAgreementCityKey(rawValue: string): "makkah" | "madinah" | "" {
+  const detectedCity = detectCityFromText(rawValue);
+  if (!detectedCity) {
+    return "";
+  }
+
+  const normalizedCity = detectedCity.trim().toLowerCase();
+  if (normalizedCity === "makkah") {
+    return "makkah";
+  }
+
+  if (normalizedCity === "madinah") {
+    return "madinah";
+  }
+
+  return "";
 }
 
 export function normalizeSaudiCityValue(rawValue: string): string {
@@ -1711,6 +1768,8 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
     time: parsedTime,
     category,
     flightNumber: item.flightNumber ?? "",
+    hotelName: item.hotelName ?? "",
+    fromHotelName: category === "transfer" ? item.fromHotelName ?? "" : "",
     from: fromValue,
     to: toValue,
     cityTourCity: category === "city-tour" ? inferCityTourCity(item) : "",
@@ -1735,6 +1794,15 @@ export function buildItineraryItemFromEditForm(
       ? formatRouteSummary(form.category, form.from, form.to, nextCityTourCity)
       : currentItem.title;
   const nextFlightNumber = isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
+  const shouldPersistHotelName =
+    form.category === "arrival" ||
+    form.category === "transfer" ||
+    form.category === "city-tour" ||
+    form.category === "departure";
+  const nextHotelName = shouldPersistHotelName ? form.hotelName?.trim() ?? "" : "";
+  const nextFromHotelName = isTransferActivityType(form.category)
+    ? form.fromHotelName?.trim() ?? ""
+    : "";
   const nextHotelPickupRequestTime = isDepartureActivityType(form.category)
     ? form.hotelPickupRequestTime.trim()
     : "";
@@ -1752,6 +1820,8 @@ export function buildItineraryItemFromEditForm(
       category: form.category,
       time: scheduleTime,
       flightNumber: nextFlightNumber,
+      hotelName: nextHotelName,
+      fromHotelName: nextFromHotelName,
       hotelPickupRequestTime: nextHotelPickupRequestTime,
       from: form.from,
       to: form.to,
@@ -1764,6 +1834,8 @@ export function buildItineraryItemFromEditForm(
     isoDate: form.date,
     time: scheduleTime,
     flightNumber: nextFlightNumber,
+    hotelName: nextHotelName,
+    fromHotelName: nextFromHotelName,
     from: form.from.trim(),
     to: form.to.trim(),
     cityTourCity: nextCityTourCity,
@@ -1896,6 +1968,8 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
     const pickupTime = item.destinationPickupTime.trim() || departureTime;
     const trimmedFrom = item.from.trim();
     const trimmedTo = item.to.trim();
+    const trimmedHotelName = item.hotelName?.trim() ?? "";
+    const trimmedFromHotelName = item.fromHotelName?.trim() ?? "";
     const trimmedNotes = item.notes.trim();
 
     return [
@@ -1905,6 +1979,8 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
         time: departureTime,
         category: getTransferTrainSegmentCategory("train-departure"),
         categoryKey: transferCategoryKey,
+        hotelName: trimmedHotelName,
+        fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
@@ -1923,6 +1999,8 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
         time: pickupTime,
         category: getTransferTrainSegmentCategory("station-pickup"),
         categoryKey: transferCategoryKey,
+        hotelName: trimmedHotelName,
+        fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
@@ -1956,6 +2034,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
     const transferIcon = "airport_shuttle";
     const trimmedFrom = item.from?.trim() ?? "";
     const trimmedTo = item.to?.trim() ?? "";
+    const trimmedHotelName = item.hotelName?.trim() ?? "";
+    const trimmedFromHotelName = item.fromHotelName?.trim() ?? "";
     const trimmedNotes = item.notes?.trim() ?? "";
     const routeTitle =
       trimmedFrom && trimmedTo
@@ -1972,6 +2052,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         meta: createScheduleMeta({
           category: "transfer",
           time: departureTime,
+          hotelName: trimmedHotelName,
+          fromHotelName: trimmedFromHotelName,
           from: trimmedFrom,
           to: trimmedTo,
           note: trimmedNotes,
@@ -1981,6 +2063,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         isoDate: isoDate ?? item.isoDate,
         time: departureTime,
         flightNumber: "",
+        hotelName: trimmedHotelName,
+        fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
@@ -2000,6 +2084,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         meta: createScheduleMeta({
           category: "transfer",
           time: pickupTime,
+          hotelName: trimmedHotelName,
+          fromHotelName: trimmedFromHotelName,
           from: trimmedFrom,
           to: trimmedTo,
         }),
@@ -2009,6 +2095,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         isoDate: isoDate ?? item.isoDate,
         time: pickupTime,
         flightNumber: "",
+        hotelName: trimmedHotelName,
+        fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",

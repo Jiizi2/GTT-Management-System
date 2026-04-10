@@ -1,10 +1,22 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { AuthUserRole, Prisma } from "@prisma/client";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { PrismaService } from "../prisma/prisma.service";
+import {
+  createDefaultAuthUserStorageRecords,
+  mapManagedRoleToPrismaRole,
+  mapPrismaRoleToAccessTier,
+  mapPrismaRoleToManagedRole,
+  normalizeAuthEmail,
+  normalizeAuthIdentifier,
+} from "./auth-default-users";
+import { verifyAuthPassword } from "./auth-password";
 import { LoginDto } from "./dto/login.dto";
 import {
   type AuthLoginResponse,
@@ -41,26 +53,12 @@ function decodeBase64UrlJson(value: string): unknown {
   return JSON.parse(decoded) as unknown;
 }
 
-function safeCompareText(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left, "utf8");
-  const rightBuffer = Buffer.from(right, "utf8");
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function normalizeIdentifier(value: string): string {
-  return value.trim().toLowerCase();
-}
-
 function normalizeManagedUserName(value: string): string {
   return value.trim();
 }
 
 function normalizeManagedUserEmail(value: string): string {
-  return value.trim().toLowerCase();
+  return normalizeAuthEmail(value);
 }
 
 function toPositiveInteger(value: unknown): number | null {
@@ -108,7 +106,26 @@ function resolveAuthSecret(): string {
     return configured;
   }
 
+  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+  if (nodeEnv === "production") {
+    throw new Error("AUTH_SECRET is required in production.");
+  }
+
   return "gtt-dev-auth-secret-please-change-in-production";
+}
+
+function resolveShouldBootstrapPrismaAuthUsers(): boolean {
+  const configured = process.env.AUTH_BOOTSTRAP_DEFAULT_USERS?.trim().toLowerCase();
+  if (configured === "true") {
+    return true;
+  }
+
+  if (configured === "false") {
+    return false;
+  }
+
+  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+  return nodeEnv !== "production";
 }
 
 function createDefaultDevAccounts(): AuthDevAccount[] {
@@ -159,56 +176,38 @@ function createDefaultManagedUsers(): AuthManagedUserRecord[] {
   ];
 }
 
+function normalizeUsernameCandidate(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, ".")
+    .replace(/[._-]{2,}/g, ".")
+    .replace(/^[._-]+|[._-]+$/g, "");
+
+  return normalized || "user";
+}
+
 @Injectable()
 export class AuthService {
   private readonly authSecret = resolveAuthSecret();
+  private readonly dataSource: "memory" | "prisma";
+  private readonly shouldBootstrapPrismaAuthUsers = resolveShouldBootstrapPrismaAuthUsers();
   private readonly accounts = createDefaultDevAccounts();
   private readonly managedUsers = createDefaultManagedUsers();
+  private prismaBootstrapPromise: Promise<void> | null = null;
 
-  login(payload: LoginDto): AuthLoginResponse {
-    const identifier = normalizeIdentifier(payload.identifier);
-    const password = payload.password;
-    const rememberSession = Boolean(payload.rememberSession);
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {
+    const configuredSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
+    this.dataSource = configuredSource === "prisma" ? "prisma" : "memory";
+  }
 
-    const account = this.accounts.find((entry) => {
-      return (
-        normalizeIdentifier(entry.username) === identifier ||
-        normalizeIdentifier(entry.email) === identifier
-      );
-    });
-
-    if (!account || !safeCompareText(account.password, password)) {
-      throw new UnauthorizedException("Invalid username/email or password.");
+  async login(payload: LoginDto): Promise<AuthLoginResponse> {
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaAuthUsersSeeded();
+      return this.loginWithPrisma(payload);
     }
 
-    const tokenLifetimeSeconds = rememberSession
-      ? REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS
-      : ACCESS_TOKEN_LIFETIME_SECONDS;
-    const expiresAtEpochSeconds = Math.floor(Date.now() / 1000) + tokenLifetimeSeconds;
-    const tokenPayload: AuthTokenPayload = {
-      id: account.id,
-      name: account.name,
-      username: account.username,
-      email: account.email,
-      accessTier: account.accessTier,
-      exp: expiresAtEpochSeconds,
-    };
-
-    const accessToken = this.signToken(tokenPayload);
-
-    return {
-      accessToken,
-      tokenType: TOKEN_TYPE,
-      expiresAt: new Date(expiresAtEpochSeconds * 1000).toISOString(),
-      rememberSession,
-      user: {
-        id: account.id,
-        name: account.name,
-        username: account.username,
-        email: account.email,
-        accessTier: account.accessTier,
-      },
-    };
+    return this.loginWithMemory(payload);
   }
 
   verifyAccessToken(token: string): AuthTokenPayload {
@@ -256,13 +255,293 @@ export class AuthService {
     return tokenPayload;
   }
 
-  listManagedUsers(): AuthManagedUser[] {
+  async listManagedUsers(): Promise<AuthManagedUser[]> {
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaAuthUsersSeeded();
+      return this.listManagedUsersWithPrisma();
+    }
+
+    return this.listManagedUsersFromMemory();
+  }
+
+  async createManagedUser(payload: {
+    name: string;
+    email: string;
+    roleId: AuthManagedUserRole;
+  }): Promise<AuthManagedUser> {
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaAuthUsersSeeded();
+      return this.createManagedUserWithPrisma(payload);
+    }
+
+    return this.createManagedUserInMemory(payload);
+  }
+
+  async updateManagedUser(
+    userId: string,
+    payload: { name: string; email: string; roleId: AuthManagedUserRole },
+  ): Promise<AuthManagedUser> {
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaAuthUsersSeeded();
+      return this.updateManagedUserWithPrisma(userId, payload);
+    }
+
+    return this.updateManagedUserInMemory(userId, payload);
+  }
+
+  async deleteManagedUser(userId: string): Promise<void> {
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaAuthUsersSeeded();
+      await this.deleteManagedUserWithPrisma(userId);
+      return;
+    }
+
+    this.deleteManagedUserInMemory(userId);
+  }
+
+  private signToken(payload: AuthTokenPayload): string {
+    const encodedHeader = base64UrlEncodeJson(HEADER_TEMPLATE);
+    const encodedPayload = base64UrlEncodeJson(payload);
+    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+    const signature = this.createSignature(unsignedToken);
+    return `${unsignedToken}.${signature}`;
+  }
+
+  private createSignature(unsignedToken: string): string {
+    return createHmac("sha256", this.authSecret)
+      .update(unsignedToken, "utf8")
+      .digest("base64url");
+  }
+
+  private toManagedUser(user: AuthManagedUserRecord): AuthManagedUser {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      roleId: user.roleId,
+      updatedAt: new Date(user.updatedAtEpochMs).toISOString(),
+    };
+  }
+
+  private toManagedUserFromPrisma(user: {
+    id: string;
+    name: string;
+    email: string;
+    role: AuthUserRole;
+    updatedAt: Date;
+  }): AuthManagedUser {
+    return {
+      id: user.id,
+      name: user.name,
+      email: normalizeManagedUserEmail(user.email),
+      roleId: mapPrismaRoleToManagedRole(user.role),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+  }
+
+  private buildLoginResponse({
+    account,
+    rememberSession,
+  }: {
+    account: AuthSessionUser;
+    rememberSession: boolean;
+  }): AuthLoginResponse {
+    const tokenLifetimeSeconds = rememberSession
+      ? REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS
+      : ACCESS_TOKEN_LIFETIME_SECONDS;
+    const expiresAtEpochSeconds = Math.floor(Date.now() / 1000) + tokenLifetimeSeconds;
+    const tokenPayload: AuthTokenPayload = {
+      ...account,
+      exp: expiresAtEpochSeconds,
+    };
+    const accessToken = this.signToken(tokenPayload);
+
+    return {
+      accessToken,
+      tokenType: TOKEN_TYPE,
+      expiresAt: new Date(expiresAtEpochSeconds * 1000).toISOString(),
+      rememberSession,
+      user: account,
+    };
+  }
+
+  private loginWithMemory(payload: LoginDto): AuthLoginResponse {
+    const identifier = normalizeAuthIdentifier(payload.identifier);
+    const password = payload.password;
+    const rememberSession = Boolean(payload.rememberSession);
+
+    const account = this.accounts.find((entry) => {
+      return (
+        normalizeAuthIdentifier(entry.username) === identifier ||
+        normalizeAuthIdentifier(entry.email) === identifier
+      );
+    });
+
+    if (!account || account.password !== password) {
+      throw new UnauthorizedException("Invalid username/email or password.");
+    }
+
+    return this.buildLoginResponse({
+      account: {
+        id: account.id,
+        name: account.name,
+        username: account.username,
+        email: account.email,
+        accessTier: account.accessTier,
+      },
+      rememberSession,
+    });
+  }
+
+  private async loginWithPrisma(payload: LoginDto): Promise<AuthLoginResponse> {
+    const identifier = normalizeAuthIdentifier(payload.identifier);
+    const password = payload.password;
+    const rememberSession = Boolean(payload.rememberSession);
+
+    const account = await this.prisma.authUser.findFirst({
+      where: {
+        isActive: true,
+        OR: [{ username: identifier }, { email: identifier }],
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        role: true,
+        passwordHash: true,
+      },
+    });
+
+    if (!account?.passwordHash || !verifyAuthPassword(password, account.passwordHash)) {
+      throw new UnauthorizedException("Invalid username/email or password.");
+    }
+
+    const accessTier = mapPrismaRoleToAccessTier(account.role);
+    if (!accessTier) {
+      throw new UnauthorizedException("Account is not allowed to access dashboard login.");
+    }
+
+    return this.buildLoginResponse({
+      account: {
+        id: account.id,
+        name: account.name,
+        username: account.username,
+        email: account.email,
+        accessTier,
+      },
+      rememberSession,
+    });
+  }
+
+  private listManagedUsersFromMemory(): AuthManagedUser[] {
     return this.managedUsers
       .map((user) => this.toManagedUser(user))
       .sort((left, right) => left.name.localeCompare(right.name));
   }
 
-  updateManagedUser(
+  private async listManagedUsersWithPrisma(): Promise<AuthManagedUser[]> {
+    const users = await this.prisma.authUser.findMany({
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        updatedAt: true,
+      },
+    });
+
+    return users.map((user) => this.toManagedUserFromPrisma(user));
+  }
+
+  private createManagedUserInMemory(payload: {
+    name: string;
+    email: string;
+    roleId: AuthManagedUserRole;
+  }): AuthManagedUser {
+    const normalizedName = normalizeManagedUserName(payload.name);
+    const normalizedEmail = normalizeManagedUserEmail(payload.email);
+    if (!normalizedName || !normalizedEmail) {
+      throw new ConflictException("Name and email are required.");
+    }
+
+    const duplicateEmailOwner = this.managedUsers.find(
+      (entry) => normalizeManagedUserEmail(entry.email) === normalizedEmail,
+    );
+    if (duplicateEmailOwner) {
+      throw new ConflictException(`Email '${normalizedEmail}' is already used by another user.`);
+    }
+
+    const nextUser: AuthManagedUserRecord = {
+      id: `usr-${Date.now().toString(36)}`,
+      name: normalizedName,
+      email: normalizedEmail,
+      roleId: payload.roleId,
+      updatedAtEpochMs: Date.now(),
+    };
+    this.managedUsers.unshift(nextUser);
+
+    return this.toManagedUser(nextUser);
+  }
+
+  private async createManagedUserWithPrisma(payload: {
+    name: string;
+    email: string;
+    roleId: AuthManagedUserRole;
+  }): Promise<AuthManagedUser> {
+    const normalizedName = normalizeManagedUserName(payload.name);
+    const normalizedEmail = normalizeManagedUserEmail(payload.email);
+    if (!normalizedName || !normalizedEmail) {
+      throw new ConflictException("Name and email are required.");
+    }
+
+    const duplicateEmailOwner = await this.prisma.authUser.findUnique({
+      where: {
+        email: normalizedEmail,
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (duplicateEmailOwner) {
+      throw new ConflictException(`Email '${normalizedEmail}' is already used by another user.`);
+    }
+
+    const username = await this.allocateUsername(normalizedEmail);
+    try {
+      const created = await this.prisma.authUser.create({
+        data: {
+          name: normalizedName,
+          email: normalizedEmail,
+          username,
+          role: mapManagedRoleToPrismaRole(payload.roleId),
+          passwordHash: null,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          updatedAt: true,
+        },
+      });
+
+      return this.toManagedUserFromPrisma(created);
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Username/email already exists.");
+      }
+
+      throw error;
+    }
+  }
+
+  private updateManagedUserInMemory(
     userId: string,
     payload: { name: string; email: string; roleId: AuthManagedUserRole },
   ): AuthManagedUser {
@@ -298,27 +577,216 @@ export class AuthService {
     return this.toManagedUser(updated);
   }
 
-  private signToken(payload: AuthTokenPayload): string {
-    const encodedHeader = base64UrlEncodeJson(HEADER_TEMPLATE);
-    const encodedPayload = base64UrlEncodeJson(payload);
-    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-    const signature = this.createSignature(unsignedToken);
-    return `${unsignedToken}.${signature}`;
+  private async updateManagedUserWithPrisma(
+    userId: string,
+    payload: { name: string; email: string; roleId: AuthManagedUserRole },
+  ): Promise<AuthManagedUser> {
+    const normalizedUserId = userId.trim();
+    const normalizedName = normalizeManagedUserName(payload.name);
+    const normalizedEmail = normalizeManagedUserEmail(payload.email);
+    if (!normalizedName || !normalizedEmail) {
+      throw new ConflictException("Name and email are required.");
+    }
+
+    const currentUser = await this.prisma.authUser.findUnique({
+      where: { id: normalizedUserId },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+    if (!currentUser) {
+      throw new NotFoundException(`User '${userId}' not found.`);
+    }
+
+    const duplicateEmailOwner = await this.prisma.authUser.findFirst({
+      where: {
+        email: normalizedEmail,
+        id: {
+          not: normalizedUserId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (duplicateEmailOwner) {
+      throw new ConflictException(`Email '${normalizedEmail}' is already used by another user.`);
+    }
+
+    const nextRole = mapManagedRoleToPrismaRole(payload.roleId);
+    await this.assertSuperAdminWillRemain({
+      currentRole: currentUser.role,
+      nextRole,
+      deleting: false,
+    });
+
+    const updated = await this.prisma.authUser.update({
+      where: {
+        id: normalizedUserId,
+      },
+      data: {
+        name: normalizedName,
+        email: normalizedEmail,
+        role: nextRole,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        updatedAt: true,
+      },
+    });
+
+    return this.toManagedUserFromPrisma(updated);
   }
 
-  private createSignature(unsignedToken: string): string {
-    return createHmac("sha256", this.authSecret)
-      .update(unsignedToken, "utf8")
-      .digest("base64url");
+  private deleteManagedUserInMemory(userId: string): void {
+    const normalizedUserId = userId.trim();
+    const targetIndex = this.managedUsers.findIndex((user) => user.id === normalizedUserId);
+    if (targetIndex === -1) {
+      throw new NotFoundException(`User '${userId}' not found.`);
+    }
+
+    const target = this.managedUsers[targetIndex];
+    if (target.roleId === "super-admin") {
+      const totalSuperAdmin = this.managedUsers.filter((entry) => entry.roleId === "super-admin").length;
+      if (totalSuperAdmin <= 1) {
+        throw new ConflictException("At least one Super Admin must remain.");
+      }
+    }
+
+    this.managedUsers.splice(targetIndex, 1);
   }
 
-  private toManagedUser(user: AuthManagedUserRecord): AuthManagedUser {
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      roleId: user.roleId,
-      updatedAt: new Date(user.updatedAtEpochMs).toISOString(),
-    };
+  private async deleteManagedUserWithPrisma(userId: string): Promise<void> {
+    const normalizedUserId = userId.trim();
+    const currentUser = await this.prisma.authUser.findUnique({
+      where: { id: normalizedUserId },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+    if (!currentUser) {
+      throw new NotFoundException(`User '${userId}' not found.`);
+    }
+
+    await this.assertSuperAdminWillRemain({
+      currentRole: currentUser.role,
+      nextRole: currentUser.role,
+      deleting: true,
+    });
+
+    await this.prisma.authUser.delete({
+      where: {
+        id: normalizedUserId,
+      },
+    });
+  }
+
+  private async assertSuperAdminWillRemain(args: {
+    currentRole: AuthUserRole;
+    nextRole: AuthUserRole;
+    deleting: boolean;
+  }): Promise<void> {
+    if (args.currentRole !== "SUPER_ADMIN") {
+      return;
+    }
+
+    const demotingSuperAdmin = !args.deleting && args.nextRole !== "SUPER_ADMIN";
+    if (!args.deleting && !demotingSuperAdmin) {
+      return;
+    }
+
+    const totalSuperAdmin = await this.prisma.authUser.count({
+      where: {
+        role: "SUPER_ADMIN",
+        isActive: true,
+      },
+    });
+    if (totalSuperAdmin <= 1) {
+      throw new ConflictException("At least one Super Admin must remain.");
+    }
+  }
+
+  private async allocateUsername(normalizedEmail: string): Promise<string> {
+    const [emailLocalPart] = normalizedEmail.split("@");
+    const baseUsername = normalizeUsernameCandidate(emailLocalPart || "user");
+    let candidate = baseUsername;
+    let suffix = 1;
+
+    while (true) {
+      const existing = await this.prisma.authUser.findUnique({
+        where: {
+          username: candidate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+
+      candidate = `${baseUsername}.${suffix}`;
+      suffix += 1;
+      if (suffix > 1000) {
+        throw new ConflictException("Unable to allocate a unique username.");
+      }
+    }
+  }
+
+  private async ensurePrismaAuthUsersSeeded(): Promise<void> {
+    if (this.dataSource !== "prisma" || !this.shouldBootstrapPrismaAuthUsers) {
+      return;
+    }
+
+    if (!this.prismaBootstrapPromise) {
+      this.prismaBootstrapPromise = this.bootstrapPrismaAuthUsers();
+    }
+
+    try {
+      await this.prismaBootstrapPromise;
+    } catch (error: unknown) {
+      this.prismaBootstrapPromise = null;
+      throw error;
+    }
+  }
+
+  private async bootstrapPrismaAuthUsers(): Promise<void> {
+    const defaultUsers = createDefaultAuthUserStorageRecords();
+
+    for (const defaultUser of defaultUsers) {
+      const existingByUsername = await this.prisma.authUser.findUnique({
+        where: {
+          username: defaultUser.username,
+        },
+        select: {
+          id: true,
+        },
+      });
+      if (existingByUsername) {
+        continue;
+      }
+
+      const existingByEmail = await this.prisma.authUser.findUnique({
+        where: {
+          email: defaultUser.email,
+        },
+        select: {
+          id: true,
+        },
+      });
+      if (existingByEmail) {
+        continue;
+      }
+
+      await this.prisma.authUser.create({
+        data: defaultUser,
+      });
+    }
   }
 }

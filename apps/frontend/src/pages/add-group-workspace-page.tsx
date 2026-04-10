@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "../components/date-time-pickers";
@@ -51,6 +51,7 @@ const {
   isIsoDateValue,
   isTransferActivityType,
   musyrifAvatar,
+  normalizeAgreementCityKey,
   normalizeSaudiCityValue,
   resolveGroupToneByItinerary,
   resolveTotalBusCount,
@@ -100,6 +101,8 @@ export function InputItineraryScreen({
   const [isScheduleFormVisible, setIsScheduleFormVisible] = useState(false);
   const [isBaseTripFormVisible, setIsBaseTripFormVisible] = useState(false);
   const [initializedScheduleSeed, setInitializedScheduleSeed] = useState<string | null>(null);
+  const manualFormSuggestedHotelNameRef = useRef("");
+  const baseTripSuggestedHotelByIdRef = useRef<Record<string, string>>({});
   const {
     isIdentityOnlyMode,
     isScheduleOnlyMode,
@@ -134,6 +137,7 @@ export function InputItineraryScreen({
     isTotalBusBelowMinimum,
     isGroupReadyForItinerary,
     showFlightNumberField,
+    showHotelNameField,
     showTransferTrainFields,
     showDeparturePickupField,
     showCityTourCityField,
@@ -168,11 +172,146 @@ export function InputItineraryScreen({
   const itineraryPrefillSeed = JSON.stringify(itineraryPrefill ?? {});
   const schedulePrefillSeed = `${effectiveStartDate}|${effectiveEndDate}|${itineraryPrefillSeed}`;
 
+  const cityHotelNames = useMemo(() => {
+    const initialMap: { makkah?: string; madinah?: string } = {};
+    const directMap = itineraryPrefill?.cityHotelNames;
+    if (directMap?.makkah?.trim()) {
+      initialMap.makkah = directMap.makkah.trim();
+    }
+    if (directMap?.madinah?.trim()) {
+      initialMap.madinah = directMap.madinah.trim();
+    }
+
+    for (const trip of Object.values(itineraryPrefill?.trips ?? {})) {
+      if (!trip) {
+        continue;
+      }
+
+      const tripHotelName = trip?.hotelName?.trim() ?? "";
+      if (!tripHotelName) {
+        continue;
+      }
+
+      const cityCandidate = trip.cityTourCity?.trim() || trip.to?.trim() || trip.from?.trim() || "";
+      const cityKey = normalizeAgreementCityKey(cityCandidate);
+      if (cityKey && !initialMap[cityKey]) {
+        initialMap[cityKey] = tripHotelName;
+      }
+    }
+
+    return initialMap;
+  }, [itineraryPrefill]);
+
+  const resolveHotelNameByCity = (cityInput: string): string => {
+    const cityKey = normalizeAgreementCityKey(cityInput);
+    if (!cityKey) {
+      return "";
+    }
+
+    return cityHotelNames[cityKey]?.trim() ?? "";
+  };
+
+  const resolveSuggestedHotelName = (draft: {
+    category: string;
+    from: string;
+    to: string;
+    cityTourCity: string;
+  }): string => {
+    if (draft.category === "departure") {
+      return resolveHotelNameByCity(draft.from);
+    }
+
+    if (draft.category === "arrival" || draft.category === "transfer") {
+      return resolveHotelNameByCity(draft.to);
+    }
+
+    if (draft.category === "city-tour") {
+      return resolveHotelNameByCity(draft.cityTourCity);
+    }
+
+    return "";
+  };
+
+  const applyHotelAutofill = <FormShape extends {
+    category: string;
+    from: string;
+    to: string;
+    cityTourCity: string;
+    hotelName?: string;
+  }>(
+    draft: FormShape,
+    previousSuggestedHotelName = "",
+  ): {
+    nextDraft: FormShape;
+    suggestedHotelName: string;
+  } => {
+    const suggestedHotelName = resolveSuggestedHotelName(draft).trim();
+    const currentHotelName = draft.hotelName?.trim() ?? "";
+    const shouldRefreshHotelName =
+      !currentHotelName ||
+      (!!previousSuggestedHotelName && currentHotelName === previousSuggestedHotelName);
+    const nextDraft = {
+      ...draft,
+      hotelName: shouldRefreshHotelName ? suggestedHotelName : currentHotelName,
+    } as FormShape;
+    const normalizedFrom = nextDraft.from.trim().toLowerCase();
+    const isPlainCityMeetingPoint =
+      normalizedFrom === "makkah" || normalizedFrom === "madinah";
+
+    if (
+      isCityTourActivityType(nextDraft.category) &&
+      suggestedHotelName &&
+      (!nextDraft.from.trim() || isPlainCityMeetingPoint)
+    ) {
+      nextDraft.from = suggestedHotelName;
+    }
+
+    return {
+      nextDraft,
+      suggestedHotelName,
+    };
+  };
+
+  const applyHotelAutofillForManualForm = (
+    draft: InputItineraryFormState,
+  ): InputItineraryFormState => {
+    const { nextDraft, suggestedHotelName } = applyHotelAutofill(
+      draft,
+      manualFormSuggestedHotelNameRef.current,
+    );
+    manualFormSuggestedHotelNameRef.current = suggestedHotelName;
+    return nextDraft;
+  };
+
+  const applyHotelAutofillForBaseTrip = (draft: BaseTripDraft): BaseTripDraft => {
+    const previousSuggestedHotelName = baseTripSuggestedHotelByIdRef.current[draft.id] ?? "";
+    const { nextDraft, suggestedHotelName } = applyHotelAutofill(
+      draft,
+      previousSuggestedHotelName,
+    );
+    baseTripSuggestedHotelByIdRef.current[draft.id] = suggestedHotelName;
+    return nextDraft;
+  };
+
+  const seedBaseTripHotelSuggestions = (drafts: BaseTripDraft[]): BaseTripDraft[] => {
+    const nextSuggestedById: Record<string, string> = {};
+    const nextDrafts = drafts.map((draft) => {
+      const { nextDraft, suggestedHotelName } = applyHotelAutofill(draft);
+      nextSuggestedById[draft.id] = suggestedHotelName;
+      return nextDraft;
+    });
+    baseTripSuggestedHotelByIdRef.current = nextSuggestedById;
+    return nextDrafts;
+  };
+
   const handleFormChange = <Key extends keyof InputItineraryFormState>(
     field: Key,
     value: InputItineraryFormState[Key],
   ) => {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const draft = { ...current, [field]: value };
+      return applyHotelAutofillForManualForm(draft);
+    });
   };
 
   const handlePaxCountChange = (value: string) => {
@@ -194,6 +333,7 @@ export function InputItineraryScreen({
   };
 
   const handleResetForm = () => {
+    manualFormSuggestedHotelNameRef.current = "";
     setForm(createInitialInputItineraryForm());
     setEditingItemId(null);
   };
@@ -205,7 +345,12 @@ export function InputItineraryScreen({
 
     setIsScheduleFormVisible(false);
     setEditingItemId(null);
-    setBaseTripDrafts(createBaseTripDrafts(effectiveStartDate, effectiveEndDate, itineraryPrefill));
+    const nextBaseTripDrafts = createBaseTripDrafts(
+      effectiveStartDate,
+      effectiveEndDate,
+      itineraryPrefill,
+    );
+    setBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(true);
     setInitializedScheduleSeed(schedulePrefillSeed);
@@ -227,6 +372,7 @@ export function InputItineraryScreen({
   };
 
   const handleCloseBaseTripForm = () => {
+    baseTripSuggestedHotelByIdRef.current = {};
     setBaseTripDrafts([]);
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(false);
@@ -270,7 +416,14 @@ export function InputItineraryScreen({
     value: InputItineraryFormState[Key],
   ) => {
     setBaseTripDrafts((current) =>
-      current.map((trip) => (trip.id === tripId ? { ...trip, [field]: value } : trip)),
+      current.map((trip) => {
+        if (trip.id !== tripId) {
+          return trip;
+        }
+
+        const draft = { ...trip, [field]: value } as BaseTripDraft;
+        return applyHotelAutofillForBaseTrip(draft);
+      }),
     );
   };
 
@@ -281,6 +434,7 @@ export function InputItineraryScreen({
 
     setIsBaseTripFormVisible(false);
     setEditingItemId(item.id);
+    manualFormSuggestedHotelNameRef.current = "";
     const nextCategory = item.categoryKey;
     const nextFrom = shouldUseSaudiCityDropdown(nextCategory, "from")
       ? normalizeSaudiCityValue(item.from)
@@ -288,10 +442,11 @@ export function InputItineraryScreen({
     const nextTo = shouldUseSaudiCityDropdown(nextCategory, "to")
       ? normalizeSaudiCityValue(item.to)
       : item.to;
-    setForm({
+    setForm(applyHotelAutofillForManualForm({
       date: item.date,
       time: item.time,
       category: nextCategory,
+      hotelName: item.hotelName ?? "",
       from: nextFrom,
       to: nextTo,
       cityTourCity: item.cityTourCity ?? "",
@@ -302,7 +457,7 @@ export function InputItineraryScreen({
       trainDepartureTime: item.trainDepartureTime,
       destinationPickupTime: item.destinationPickupTime,
       hotelPickupRequestTime: item.hotelPickupRequestTime,
-    });
+    }));
     setIsScheduleFormVisible(true);
   };
 
@@ -325,6 +480,11 @@ export function InputItineraryScreen({
 
     const typeOption = getScheduleTypeOption(form.category);
     const nextFlightNumber = showFlightNumberField ? form.flightNumber.trim() : "";
+    const isHotelNameRequired =
+      form.category === "arrival" || form.category === "transfer" || form.category === "departure";
+    const nextHotelName = isHotelNameRequired
+      ? form.hotelName?.trim() || resolveSuggestedHotelName(form)
+      : "";
     const nextHotelPickupRequestTime =
       form.category === "departure" ? form.hotelPickupRequestTime.trim() : "";
     const isTransferByTrain = isTransferActivityType(form.category) && form.transferByTrain;
@@ -335,6 +495,7 @@ export function InputItineraryScreen({
       time: scheduleTime,
       category: typeOption.cardLabel,
       categoryKey: typeOption.value,
+      hotelName: nextHotelName,
       from: form.from.trim(),
       to: form.to.trim(),
       cityTourCity: showCityTourCityField ? form.cityTourCity.trim() : "",
@@ -376,6 +537,11 @@ export function InputItineraryScreen({
       const typeOption = getScheduleTypeOption(item.category);
       const isTransferByTrain = isTransferActivityType(item.category) && item.transferByTrain;
       const scheduleTime = isTransferByTrain ? item.trainDepartureTime : item.time;
+      const isHotelNameRequired =
+        item.category === "arrival" || item.category === "transfer" || item.category === "departure";
+      const nextHotelName = isHotelNameRequired
+        ? item.hotelName?.trim() || resolveSuggestedHotelName(item)
+        : "";
       const hotelPickupRequestTime =
         item.category === "departure" ? item.hotelPickupRequestTime.trim() : "";
 
@@ -385,6 +551,7 @@ export function InputItineraryScreen({
         time: scheduleTime,
         category: typeOption.cardLabel,
         categoryKey: typeOption.value,
+        hotelName: nextHotelName,
         from: item.from.trim(),
         to: item.to.trim(),
         cityTourCity: isCityTourActivityType(item.category) ? item.cityTourCity.trim() : "",
@@ -424,7 +591,12 @@ export function InputItineraryScreen({
       return;
     }
 
-    setBaseTripDrafts(createBaseTripDrafts(effectiveStartDate, effectiveEndDate, itineraryPrefill));
+    const nextBaseTripDrafts = createBaseTripDrafts(
+      effectiveStartDate,
+      effectiveEndDate,
+      itineraryPrefill,
+    );
+    setBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(true);
     setInitializedScheduleSeed(schedulePrefillSeed);
@@ -1010,6 +1182,10 @@ export function InputItineraryScreen({
 
                 {(activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
                   const showFlightNumberInput = isFlightActivityType(item.category);
+                  const showHotelNameInput =
+                    item.category === "arrival" ||
+                    item.category === "transfer" ||
+                    item.category === "departure";
                   const showDeparturePickupRequestInput = item.category === "departure";
                   const showTransferTrainInputs =
                     isTransferActivityType(item.category) && item.transferByTrain;
@@ -1120,6 +1296,22 @@ export function InputItineraryScreen({
                           </label>
                         ) : null}
 
+                        {showHotelNameInput ? (
+                          <label className={wideFieldClassName}>
+                            <span>Hotel Name</span>
+                            <input
+                              className={inputClassName}
+                              type="text"
+                              value={item.hotelName ?? ""}
+                              onChange={(event) =>
+                                handleBaseTripChange(item.id, "hotelName", event.target.value)
+                              }
+                              placeholder="e.g. Swissotel Al Maqam"
+                              disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                            />
+                          </label>
+                        ) : null}
+
                         {showDeparturePickupRequestInput ? (
                           <label className={wideFieldClassName}>
                             <span>Hotel Pickup Request Time</span>
@@ -1184,7 +1376,7 @@ export function InputItineraryScreen({
                                   setBaseTripDrafts((current) =>
                                     current.map((trip) =>
                                       trip.id === item.id
-                                        ? {
+                                        ? applyHotelAutofillForBaseTrip({
                                             ...trip,
                                             transferByTrain: event.target.checked,
                                             requiresBus: event.target.checked ? true : trip.requiresBus,
@@ -1194,7 +1386,7 @@ export function InputItineraryScreen({
                                             destinationPickupTime: event.target.checked
                                               ? trip.destinationPickupTime
                                               : "",
-                                          }
+                                          })
                                         : trip,
                                     ),
                                   )
@@ -1536,8 +1728,7 @@ export function InputItineraryScreen({
                             const nextTo = shouldUseSaudiCityDropdown(nextCategory, "to")
                               ? normalizeSaudiCityValue(current.to)
                               : current.to;
-
-                            return {
+                            const nextDraft: InputItineraryFormState = {
                               ...current,
                               category: nextCategory,
                               from: nextFrom,
@@ -1557,6 +1748,8 @@ export function InputItineraryScreen({
                                 ? current.destinationPickupTime
                                 : "",
                             };
+
+                            return applyHotelAutofillForManualForm(nextDraft);
                           })
                         }
                         disabled={!isGroupReadyForItinerary}
@@ -1601,6 +1794,20 @@ export function InputItineraryScreen({
                       value={form.flightNumber}
                       onChange={(event) => handleFormChange("flightNumber", event.target.value)}
                       placeholder="e.g. SV-827"
+                      disabled={!isGroupReadyForItinerary}
+                    />
+                  </label>
+                ) : null}
+
+                {showHotelNameField ? (
+                  <label className={wideFieldClassName}>
+                    <span>Hotel Name</span>
+                    <input
+                      className={inputClassName}
+                      type="text"
+                      value={form.hotelName ?? ""}
+                      onChange={(event) => handleFormChange("hotelName", event.target.value)}
+                      placeholder="e.g. Pullman Zamzam Madinah"
                       disabled={!isGroupReadyForItinerary}
                     />
                   </label>
@@ -1674,17 +1881,19 @@ export function InputItineraryScreen({
                         type="checkbox"
                         checked={form.transferByTrain}
                         onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            transferByTrain: event.target.checked,
-                            requiresBus: event.target.checked ? true : current.requiresBus,
-                            trainDepartureTime: event.target.checked
-                              ? current.trainDepartureTime
-                              : "",
-                            destinationPickupTime: event.target.checked
-                              ? current.destinationPickupTime
-                              : "",
-                          }))
+                          setForm((current) =>
+                            applyHotelAutofillForManualForm({
+                              ...current,
+                              transferByTrain: event.target.checked,
+                              requiresBus: event.target.checked ? true : current.requiresBus,
+                              trainDepartureTime: event.target.checked
+                                ? current.trainDepartureTime
+                                : "",
+                              destinationPickupTime: event.target.checked
+                                ? current.destinationPickupTime
+                                : "",
+                            }),
+                          )
                         }
                         disabled={!isGroupReadyForItinerary}
                       />

@@ -52,6 +52,28 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum AuthUserRole {
+  SUPER_ADMIN
+  ADMIN
+  FINANCE_MANAGER
+  CUSTOMER_SUPPORT
+}
+
+model AuthUser {
+  id           String       @id @default(cuid())
+  name         String
+  username     String       @unique
+  email        String       @unique
+  role         AuthUserRole @default(ADMIN)
+  passwordHash String?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([role])
+  @@index([isActive])
+}
+
 model Group {
   id                 String                @id @default(cuid())
   code               String                @unique
@@ -167,6 +189,8 @@ model ItineraryItem {
   isoDate               DateTime?
   time                  String?
   flightNumber          String?
+  hotelName             String?
+  fromHotelName         String?
   fromLocation          String?
   toLocation            String?
   cityTourCity          String?

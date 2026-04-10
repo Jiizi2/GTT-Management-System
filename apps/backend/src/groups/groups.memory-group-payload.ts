@@ -100,6 +100,8 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
       isoDate: item.isoDate,
       time: item.time?.trim() || undefined,
       flightNumber: item.flightNumber?.trim() || undefined,
+      hotelName: item.hotelName?.trim() || undefined,
+      fromHotelName: item.fromHotelName?.trim() || undefined,
       fromLocation: item.fromLocation?.trim() || undefined,
       toLocation: item.toLocation?.trim() || undefined,
       cityTourCity: item.cityTourCity?.trim() || undefined,

@@ -6,6 +6,7 @@ const {
   formatScheduleTime,
   inferCategoryKey,
   inferCityTourCity,
+  normalizeAgreementCityKey,
   parseDisplayDateToIso,
   parseTimeForInput,
   resolveTotalBusCount,
@@ -55,15 +56,45 @@ function formatItineraryCompactSummary(item: ItineraryItem, categoryKey: string)
   return trimmedTitle || "Activity detail pending";
 }
 
-function formatItinerarySupportDetail(item: ItineraryItem, categoryKey: string): string {
+function formatItinerarySupportDetail(
+  item: ItineraryItem,
+  categoryKey: string,
+  options?: {
+    fallbackHotelName?: string;
+    fallbackFromHotelName?: string;
+  },
+): string {
   const detailSegments: string[] = [];
   const flightNumber = item.flightNumber?.trim() ?? "";
+  const trimmedFrom = item.from?.trim() ?? "";
+  const trimmedTo = item.to?.trim() ?? "";
+  const inferredFromHotelName = /hotel/i.test(trimmedFrom) ? trimmedFrom : "";
+  const inferredToHotelName = /hotel/i.test(trimmedTo) ? trimmedTo : "";
+  const fallbackHotelName = options?.fallbackHotelName?.trim() ?? "";
+  const fallbackFromHotelName = options?.fallbackFromHotelName?.trim() ?? "";
+  const fromHotelName =
+    item.fromHotelName?.trim() || inferredFromHotelName || fallbackFromHotelName;
+  const hotelName =
+    item.hotelName?.trim() ||
+    (categoryKey === "transfer"
+      ? inferredToHotelName
+      : inferredFromHotelName || inferredToHotelName || fallbackHotelName);
   const stationPickupTime = item.destinationPickupTime?.trim() ?? "";
   const hotelPickupRequestTime = item.hotelPickupRequestTime?.trim() ?? "";
   const notes = item.notes?.trim() ?? "";
 
   if ((categoryKey === "arrival" || categoryKey === "departure") && flightNumber) {
     detailSegments.push(`Flight ${flightNumber}`);
+  }
+
+  if (categoryKey === "transfer" && (fromHotelName || hotelName)) {
+    if (fromHotelName && hotelName) {
+      detailSegments.push(`Hotel ${fromHotelName} -> ${hotelName}`);
+    } else {
+      detailSegments.push(`Hotel ${fromHotelName || hotelName}`);
+    }
+  } else if (hotelName) {
+    detailSegments.push(`Hotel ${hotelName}`);
   }
 
   if (item.transferByTrain && stationPickupTime) {
@@ -213,8 +244,64 @@ export function exportGroupDetailPdf({
       (returnItem ? parseDisplayDateToIso(returnItem.date, returnItem.year) : fallbackEndIso);
     const arrivalFlightNumber = arrivalItem?.flightNumber?.trim() || "-";
     const returnFlightNumber = returnItem?.flightNumber?.trim() || "-";
-    const returnHotelPickupRequestTime = returnItem?.hotelPickupRequestTime?.trim() || "-";
     const resolvedTotalBuses = resolveTotalBusCount(group.pax, group.totalBuses);
+    const cityHotelNames = {
+      makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
+      madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
+    };
+    const resolveHotelNameByCity = (cityInput: string): string => {
+      const cityKey = normalizeAgreementCityKey(cityInput);
+      if (!cityKey) {
+        return "";
+      }
+
+      return cityHotelNames[cityKey]?.trim() ?? "";
+    };
+    const resolvePdfFallbackHotels = (
+      item: ItineraryItem,
+      categoryKey: string,
+    ): { fallbackHotelName: string; fallbackFromHotelName: string } => {
+      const fallbackFromHotelName =
+        categoryKey === "transfer" ? resolveHotelNameByCity(item.from ?? "") : "";
+
+      if (categoryKey === "departure") {
+        return {
+          fallbackHotelName: resolveHotelNameByCity(item.from ?? ""),
+          fallbackFromHotelName,
+        };
+      }
+
+      if (categoryKey === "arrival" || categoryKey === "transfer") {
+        return {
+          fallbackHotelName: resolveHotelNameByCity(item.to ?? ""),
+          fallbackFromHotelName,
+        };
+      }
+
+      if (categoryKey === "city-tour") {
+        return {
+          fallbackHotelName:
+            resolveHotelNameByCity(item.cityTourCity ?? "") ||
+            resolveHotelNameByCity(item.from ?? "") ||
+            resolveHotelNameByCity(item.to ?? ""),
+          fallbackFromHotelName,
+        };
+      }
+
+      return {
+        fallbackHotelName: "",
+        fallbackFromHotelName,
+      };
+    };
+    const raudhahDateLabels = Array.from(
+      new Set(
+        (group.visaSetup?.raudhahAppointments ?? [])
+          .map((appointment) => formatLongDate(appointment.dateIso?.trim() ?? ""))
+          .filter((value) => value && value !== "-"),
+      ),
+    );
+    const raudhahDateSummary =
+      raudhahDateLabels.length > 0 ? raudhahDateLabels.join(" | ") : "NOT SET";
 
     const itineraryTimelineRows = sortedItinerary
       .map((item, index) => {
@@ -258,7 +345,11 @@ export function exportGroupDetailPdf({
             : item.category;
         const activityHeading = formatItineraryActivityHeading(item, categoryKey, item.category);
         const compactSummary = formatItineraryCompactSummary(item, categoryKey);
-        const detailText = formatItinerarySupportDetail(item, categoryKey);
+        const detailText = formatItinerarySupportDetail(
+          item,
+          categoryKey,
+          resolvePdfFallbackHotels(item, categoryKey),
+        );
         const timeSource = item.transferByTrain
           ? item.trainDepartureTime || item.time || ""
           : item.time || "";
@@ -767,6 +858,32 @@ export function exportGroupDetailPdf({
         font-weight: 600;
         line-height: 1.55;
       }
+      .guideline-raudhah {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(191, 202, 186, 0.65);
+        background: rgba(245, 243, 239, 0.65);
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .guideline-raudhah .material-symbols-outlined {
+        color: var(--primary);
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .guideline-raudhah p {
+        margin: 0;
+        color: var(--on-surface);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.55;
+      }
+      .guideline-raudhah strong {
+        color: var(--on-surface);
+        font-weight: 800;
+      }
       .doc-footer {
         margin-top: 20px;
         padding-top: 14px;
@@ -865,7 +982,6 @@ export function exportGroupDetailPdf({
         </div>
         <div class="doc-title">
           <h1>Package Info</h1>
-          <p>Operational v.4.0</p>
         </div>
       </header>
 
@@ -885,8 +1001,8 @@ export function exportGroupDetailPdf({
             </div>
             <div class="meta-right">
               <span class="small-label">Pax Count</span>
-              <div class="meta-value meta-value--pax">${group.pax} <span>Travelers</span></div>
-              <div class="meta-sub">${resolvedTotalBuses} Bus | ${escapeHtml(group.packageName)}</div>
+              <div class="meta-value meta-value--pax">${group.pax}</div>
+              <div class="meta-sub">${resolvedTotalBuses} Bus</div>
             </div>
           </div>
         </article>
@@ -909,14 +1025,6 @@ export function exportGroupDetailPdf({
               <span class="period-label">Flight Out</span>
               <span class="period-value">${escapeHtml(returnFlightNumber)}</span>
             </div>
-            <div class="period-row">
-              <span class="period-label">Hotel Pickup</span>
-              <span class="period-value">${escapeHtml(
-                returnHotelPickupRequestTime === "-"
-                  ? "-"
-                  : formatScheduleTime(returnHotelPickupRequestTime),
-              )}</span>
-            </div>
           </div>
         </article>
       </section>
@@ -937,6 +1045,10 @@ export function exportGroupDetailPdf({
         <h3>Crucial Operational Guidelines</h3>
         <div class="guideline-grid">
           ${noteRows}
+        </div>
+        <div class="guideline-raudhah">
+          <span class="material-symbols-outlined">event_available</span>
+          <p><strong>Raudhah Dates:</strong> ${escapeHtml(raudhahDateSummary)}</p>
         </div>
       </section>
 

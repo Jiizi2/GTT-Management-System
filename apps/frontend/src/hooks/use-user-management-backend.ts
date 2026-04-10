@@ -155,6 +155,35 @@ export async function fetchManagedUsersFromBackend({
     .filter((item): item is BackendManagedUser => item !== null);
 }
 
+export async function createManagedUserInBackend(
+  payload: UpdateManagedUserPayload,
+): Promise<BackendManagedUser> {
+  const apiBaseUrl = resolveBackendApiBaseUrl();
+  const response = await fetchBackend(`${apiBaseUrl}/auth/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      roleId: payload.roleId,
+    }),
+  });
+  const responsePayload = await parseResponseJson(response);
+
+  if (!response.ok) {
+    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+  }
+
+  const managedUser = mapManagedUser(responsePayload);
+  if (!managedUser) {
+    throw new Error("User create response is invalid.");
+  }
+
+  return managedUser;
+}
+
 export async function updateManagedUserInBackend(
   userId: string,
   payload: UpdateManagedUserPayload,
@@ -183,4 +212,16 @@ export async function updateManagedUserInBackend(
   }
 
   return managedUser;
+}
+
+export async function deleteManagedUserInBackend(userId: string): Promise<void> {
+  const apiBaseUrl = resolveBackendApiBaseUrl();
+  const response = await fetchBackend(`${apiBaseUrl}/auth/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+  const responsePayload = await parseResponseJson(response);
+
+  if (!response.ok) {
+    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+  }
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -15,6 +16,7 @@ import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import type { AuthTokenPayload } from "./auth.types";
 import { Public } from "./auth.public";
+import { CreateManagedUserDto } from "./dto/create-managed-user.dto";
 import { UpdateManagedUserDto } from "./dto/update-managed-user.dto";
 
 @Controller("auth")
@@ -24,7 +26,7 @@ export class AuthController {
   @Public()
   @Post("login")
   @HttpCode(200)
-  login(@Body() payload: LoginDto) {
+  async login(@Body() payload: LoginDto) {
     return this.authService.login(payload);
   }
 
@@ -53,7 +55,7 @@ export class AuthController {
   }
 
   @Get("users")
-  listManagedUsers(
+  async listManagedUsers(
     @Req()
     request: {
       authUser?: AuthTokenPayload;
@@ -68,8 +70,30 @@ export class AuthController {
     return this.authService.listManagedUsers();
   }
 
+  @Post("users")
+  @HttpCode(201)
+  async createManagedUser(
+    @Body() payload: CreateManagedUserDto,
+    @Req()
+    request: {
+      authUser?: AuthTokenPayload;
+    },
+  ) {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new UnauthorizedException("Session is not available.");
+    }
+
+    this.assertSuperAdminAccess(authUser);
+    return this.authService.createManagedUser({
+      name: payload.name,
+      email: payload.email,
+      roleId: payload.roleId,
+    });
+  }
+
   @Patch("users/:userId")
-  updateManagedUser(
+  async updateManagedUser(
     @Param("userId") userId: string,
     @Body() payload: UpdateManagedUserDto,
     @Req()
@@ -88,6 +112,24 @@ export class AuthController {
       email: payload.email,
       roleId: payload.roleId,
     });
+  }
+
+  @Delete("users/:userId")
+  @HttpCode(204)
+  async deleteManagedUser(
+    @Param("userId") userId: string,
+    @Req()
+    request: {
+      authUser?: AuthTokenPayload;
+    },
+  ) {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new UnauthorizedException("Session is not available.");
+    }
+
+    this.assertSuperAdminAccess(authUser);
+    await this.authService.deleteManagedUser(userId);
   }
 
   private assertSuperAdminAccess(authUser: AuthTokenPayload): void {

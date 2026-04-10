@@ -182,31 +182,40 @@ export function buildAgreementItineraryPrefill(
   return {
     startDate: suggestedStart || undefined,
     endDate: suggestedEnd || undefined,
+    cityHotelNames: {
+      makkah: makkahHotelName,
+      madinah: madinahHotelName,
+    },
     trips: {
       "base-arrival": {
         date: makkahStart || suggestedStart || undefined,
+        hotelName: makkahHotelName,
         from: "Jeddah Airport",
         to: makkahHotelName,
       },
       "base-city-tour-first": {
         date: makkahStart ? shiftIsoDate(makkahStart, 1) : undefined,
+        hotelName: makkahHotelName,
         from: makkahHotelName,
         to: "Masjidil Haram",
         cityTourCity: "Makkah",
       },
       "base-transfer": {
         date: madinahStart || undefined,
+        hotelName: madinahHotelName,
         from: makkahHotelName,
         to: madinahHotelName,
       },
       "base-city-tour-second": {
         date: madinahStart ? shiftIsoDate(madinahStart, 1) : undefined,
+        hotelName: madinahHotelName,
         from: madinahHotelName,
         to: "Masjid Nabawi",
         cityTourCity: "Madinah",
       },
       "base-departure": {
         date: madinahEnd || suggestedEnd || undefined,
+        hotelName: madinahHotelName,
         from: madinahHotelName,
         to: "Madinah Airport",
         hotelPickupRequestTime: "17:00",
@@ -321,6 +330,7 @@ export function buildNewGroupPayload({
     title,
     meta,
     icon,
+    hotelName,
     from,
     to,
     highlighted,
@@ -338,6 +348,7 @@ export function buildNewGroupPayload({
     to: string;
     highlighted?: boolean;
     requiresBus?: boolean;
+    hotelName?: string;
     hotelPickupRequestTime?: string;
   }): ItineraryItem => {
     const formattedDate = formatScheduleDate(isoDate);
@@ -353,6 +364,7 @@ export function buildNewGroupPayload({
       highlighted,
       isoDate,
       time,
+      hotelName,
       from,
       to,
       requiresBus,
@@ -369,6 +381,7 @@ export function buildNewGroupPayload({
       title: "Arrival and transfer to Makkah hotel",
       meta: `${formatScheduleTime("10:00")} | ${firstMakkahHotel?.hotelName ?? "Makkah Hotel"}`,
       icon: "flight_land",
+      hotelName: firstMakkahHotel?.hotelName ?? "Makkah Hotel",
       from: "JED Airport",
       to: firstMakkahHotel?.hotelName ?? "Makkah",
       highlighted: true,
@@ -382,6 +395,7 @@ export function buildNewGroupPayload({
       title: "Transfer from Makkah to Madinah",
       meta: `${formatScheduleTime("08:00")} | Route 40`,
       icon: "airport_shuttle",
+      hotelName: firstMadinahHotel?.hotelName ?? "Madinah Hotel",
       from: firstMakkahHotel?.hotelName ?? "Makkah",
       to: firstMadinahHotel?.hotelName ?? "Madinah",
       requiresBus: true,
@@ -394,6 +408,7 @@ export function buildNewGroupPayload({
       title: "Departure to airport",
       meta: `${formatScheduleTime("20:00")} | Final departure | Hotel pickup request ${formatScheduleTime("17:00")}`,
       icon: "flight_takeoff",
+      hotelName: firstMadinahHotel?.hotelName ?? "Madinah Hotel",
       from: firstMadinahHotel?.hotelName ?? "Madinah",
       to: "MED Airport",
       requiresBus: true,

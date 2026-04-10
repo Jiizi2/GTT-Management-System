@@ -1,15 +1,63 @@
 import assert from "node:assert/strict";
 import {
+  buildChecklistActivityLabel,
   buildChecklistItemsFromGroups,
+  buildItineraryItemFromEditForm,
+  buildTransferTrainSummary,
   buildVisaTrackingRowsFromGroups,
+  createDummyOverviewGroups,
+  createEditScheduleForm,
+  createEmptyChecklistDraft,
+  createEmptyChecklistDriverProfile,
+  createInitialInputItineraryForm,
+  createInitialNoteForm,
+  createInitialScheduleForm,
+  createNewGroupAgreementForm,
+  createNewGroupRaudhahForm,
+  createNoteItems,
+  createScheduleMeta,
+  detectCityFromText,
+  escapeHtml,
   expandInputTransferTrainItems,
+  expandTransferTrainItineraryItems,
+  formatAprilDisplayDate,
+  formatAprilIsoDate,
+  formatChecklistCopyDate,
   formatRouteSummary,
+  formatScheduleDate,
+  formatScheduleTime,
   getChecklistRangeDates,
+  getChecklistDayLabel,
   getLocalIsoDateWithOffset,
+  getMinimumBusCountForPax,
   getRouteFieldConfigByCategory,
+  getScheduleTypeOption,
+  getStatusByTone,
+  getTransferTrainSegmentCategory,
+  getItineraryIsoDate,
+  hasIncompleteTransferTrainFields,
+  includesKnownKeyword,
+  inferCategoryKey,
+  inferCityTourCity,
+  isCityTourActivityType,
+  isDepartureActivityType,
+  isFlightActivityType,
+  isFridayDate,
+  isTransferActivityType,
+  normalizeGroupStatus,
+  normalizeSaudiCityValue,
+  overviewDummySeeds,
+  parseDisplayDateToIso,
+  parseTimeForInput,
+  resolveGroupToneByItinerary,
+  resolveTotalBusCount,
   resolveValidRaudhahAppointments,
+  scrollToTop,
+  shouldShowFridayCityTourWarning,
+  sortInputItineraryItems,
   type GroupData,
   type InputItineraryItem,
+  type ItineraryItem,
 } from "../shared/app-domain.js";
 
 function createBaseGroup(overrides: Partial<GroupData> = {}): GroupData {
@@ -84,6 +132,18 @@ function createBaseGroup(overrides: Partial<GroupData> = {}): GroupData {
       avatar: "https://example.com/avatar.png",
     },
     checklistAssignments: [],
+    ...overrides,
+  };
+}
+
+function createBaseItineraryItem(overrides: Partial<ItineraryItem> = {}): ItineraryItem {
+  return {
+    date: "10 Apr",
+    year: "2026",
+    category: "City Tour",
+    title: "Default itinerary item",
+    meta: "08:00 | Unit meta",
+    icon: "tour",
     ...overrides,
   };
 }
@@ -323,12 +383,462 @@ function testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime(): v
   );
 }
 
+function testOverviewAndStatusNormalizationHelpers(): void {
+  assert.equal(formatAprilIsoDate(-3), "2026-04-01");
+  assert.equal(formatAprilIsoDate(35), "2026-04-30");
+  assert.equal(formatAprilDisplayDate(-4), "1 Apr");
+  assert.equal(formatAprilDisplayDate(35), "30 Apr");
+  assert.equal(getStatusByTone("active"), "Active");
+  assert.equal(getStatusByTone("inactive"), "In Active");
+  assert.equal(includesKnownKeyword("Bus route to Makkah", ["makkah"]), true);
+  assert.equal(includesKnownKeyword("Bus route to Doha", ["makkah"]), false);
+  assert.equal(resolveGroupToneByItinerary([]), "inactive");
+  assert.equal(
+    resolveGroupToneByItinerary([
+      createBaseItineraryItem({
+        category: "Arrival",
+        title: "Landing at Jeddah and heading to Makkah",
+        from: "Jeddah",
+        to: "Makkah",
+        icon: "flight_land",
+      }),
+    ]),
+    "active",
+  );
+  assert.equal(getMinimumBusCountForPax(0), 1);
+  assert.equal(getMinimumBusCountForPax(120), 3);
+  assert.equal(resolveTotalBusCount(120, 1), 3);
+  assert.equal(resolveTotalBusCount(120, 4.9), 4);
+
+  const dummyGroups = createDummyOverviewGroups();
+  assert.equal(dummyGroups.length, overviewDummySeeds.length);
+  assert.equal(dummyGroups.every((group) => group.itinerary.length === 3), true);
+  assert.equal(dummyGroups.every((group) => (group.totalBuses ?? 0) >= 1), true);
+
+  const normalized = normalizeGroupStatus(
+    createBaseGroup({
+      code: "UNIT-NORMALIZE",
+      status: "Unknown",
+      tone: "inactive",
+      pax: 120,
+      totalBuses: 1,
+      arrivalDate: "invalid",
+      returnDate: "invalid",
+      itinerary: [
+        createBaseItineraryItem({
+          category: "Transfer",
+          categoryKey: "transfer",
+          date: "10 Apr",
+          year: "2026",
+          from: "Makkah",
+          to: "Madinah",
+          icon: "airport_shuttle",
+          transferByTrain: true,
+          trainDepartureTime: "08:30",
+          destinationPickupTime: "10:00",
+        }),
+      ],
+    }),
+  );
+
+  assert.equal(normalized.arrivalDate, "2026-04-10");
+  assert.equal(normalized.returnDate, "2026-04-10");
+  assert.equal(normalized.itinerary.length, 2);
+  assert.equal(normalized.tone, "active");
+  assert.equal(normalized.status, "Active");
+  assert.equal(normalized.totalBuses, 3);
+}
+
+function testFormFactoryAndCategoryHelpers(): void {
+  const initialInputForm = createInitialInputItineraryForm();
+  assert.equal(initialInputForm.category, "city-tour");
+  assert.equal(initialInputForm.requiresBus, true);
+  assert.equal(initialInputForm.transferByTrain, false);
+
+  const agreementForm = createNewGroupAgreementForm("makkah");
+  assert.equal(agreementForm.id.startsWith("makkah-"), true);
+  assert.equal(agreementForm.status, "Waiting for Approval");
+  assert.equal(agreementForm.pax, "");
+
+  const raudhahForm = createNewGroupRaudhahForm();
+  assert.equal(raudhahForm.id.startsWith("raudhah-"), true);
+  assert.equal(raudhahForm.status, "Free");
+  assert.equal(raudhahForm.tasrehPrinted, false);
+
+  const sorted = sortInputItineraryItems([
+    {
+      id: "item-2",
+      date: "2026-04-12",
+      time: "10:00",
+      category: "Transfer",
+      categoryKey: "transfer",
+      from: "Makkah",
+      to: "Madinah",
+      cityTourCity: "",
+      flightNumber: "",
+      requiresBus: true,
+      notes: "",
+      icon: "airport_shuttle",
+      transferByTrain: false,
+      trainDepartureTime: "",
+      destinationPickupTime: "",
+      hotelPickupRequestTime: "",
+    },
+    {
+      id: "item-1",
+      date: "2026-04-11",
+      time: "09:00",
+      category: "Arrival",
+      categoryKey: "arrival",
+      from: "Jeddah",
+      to: "Makkah",
+      cityTourCity: "",
+      flightNumber: "",
+      requiresBus: true,
+      notes: "",
+      icon: "flight_land",
+      transferByTrain: false,
+      trainDepartureTime: "",
+      destinationPickupTime: "",
+      hotelPickupRequestTime: "",
+    },
+  ]);
+  assert.equal(sorted[0].id, "item-1");
+
+  const scheduleForm = createInitialScheduleForm();
+  assert.equal(scheduleForm.category, "city-tour");
+  assert.equal(scheduleForm.highlighted, false);
+  assert.equal(scheduleForm.transferByTrain, false);
+
+  assert.deepEqual(createInitialNoteForm(), { text: "", pinned: false });
+  assert.deepEqual(createEmptyChecklistDriverProfile(), { name: "", phone: "", plateNumber: "" });
+  assert.deepEqual(createEmptyChecklistDraft(), { name: "", phone: "", plateNumber: "" });
+  assert.deepEqual(createNoteItems(["Alpha", "Beta"], "UNIT"), [
+    { id: "UNIT-note-0", text: "Alpha", pinned: false },
+    { id: "UNIT-note-1", text: "Beta", pinned: false },
+  ]);
+
+  assert.equal(getScheduleTypeOption("arrival").icon, "flight_land");
+  assert.equal(getScheduleTypeOption("unknown").value, "city-tour");
+  assert.equal(isFlightActivityType("arrival"), true);
+  assert.equal(isFlightActivityType("city-tour"), false);
+  assert.equal(isTransferActivityType("TRANSFER"), true);
+  assert.equal(isCityTourActivityType("CITY-TOUR"), true);
+  assert.equal(isDepartureActivityType("departure"), true);
+
+  assert.equal(
+    hasIncompleteTransferTrainFields({
+      category: "arrival",
+      transferByTrain: true,
+      trainDepartureTime: "",
+      destinationPickupTime: "",
+    }),
+    false,
+  );
+  assert.equal(
+    hasIncompleteTransferTrainFields({
+      category: "transfer",
+      transferByTrain: true,
+      trainDepartureTime: "",
+      destinationPickupTime: "10:00",
+    }),
+    true,
+  );
+  assert.equal(
+    hasIncompleteTransferTrainFields({
+      category: "transfer",
+      transferByTrain: true,
+      trainDepartureTime: "08:00",
+      destinationPickupTime: "10:00",
+    }),
+    false,
+  );
+  assert.equal(
+    buildTransferTrainSummary({
+      category: "transfer",
+      transferByTrain: true,
+      trainDepartureTime: "8:00",
+      destinationPickupTime: "10:00",
+    }),
+    "HHR Transfer | Train departure: 08:00 | Station pickup: 10:00",
+  );
+  assert.equal(
+    buildTransferTrainSummary({
+      category: "arrival",
+      transferByTrain: true,
+      trainDepartureTime: "08:00",
+      destinationPickupTime: "09:00",
+    }),
+    "",
+  );
+  assert.equal(getTransferTrainSegmentCategory("train-departure"), "Transfer - Train Departure");
+  assert.equal(getTransferTrainSegmentCategory("station-pickup"), "Transfer - Arrival Station Pickup");
+
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ categoryKey: "departure" })), "departure");
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Arrival Flight" })), "arrival");
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Umrah City Tour" })), "city-tour");
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Hotel Transfer" })), "transfer");
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Flight Departure" })), "departure");
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "flight_land" })), "arrival");
+  assert.equal(
+    inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "airport_shuttle" })),
+    "transfer",
+  );
+  assert.equal(
+    inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "flight_takeoff" })),
+    "departure",
+  );
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "help" })), "city-tour");
+}
+
+function testScheduleEditingAndCityInferenceHelpers(): void {
+  assert.deepEqual(formatScheduleDate("2026-13-09"), { date: "9 Jan", year: "2026" });
+  assert.equal(formatScheduleTime(""), "TBD");
+  assert.equal(formatScheduleTime("7:05 PM"), "19:05");
+  assert.equal(formatScheduleTime("24:61"), "24:61");
+  assert.equal(formatScheduleTime("7:07"), "07:07");
+  assert.equal(parseDisplayDateToIso("1 Apr", "2026"), "2026-04-01");
+  assert.equal(parseDisplayDateToIso("1 Xxx", "2026"), "");
+  assert.equal(parseDisplayDateToIso("", "2026"), "");
+  assert.equal(parseTimeForInput(""), "");
+  assert.equal(parseTimeForInput("07:30"), "07:30");
+  assert.equal(parseTimeForInput("7:30 PM"), "19:30");
+  assert.equal(parseTimeForInput("12:05 AM"), "00:05");
+  assert.equal(parseTimeForInput("invalid"), "");
+
+  const detailMeta = createScheduleMeta({
+    category: "departure",
+    time: "19:00",
+    flightNumber: " SV-810 ",
+    hotelPickupRequestTime: "17:30",
+    from: "Madinah",
+    to: "MED Airport",
+    note: "This note is intentionally very long to trigger note truncation behavior in metadata.",
+  });
+  assert.equal(detailMeta.includes("19:00"), true);
+  assert.equal(detailMeta.includes("SV-810"), true);
+  assert.equal(detailMeta.includes("Hotel pickup request 17:30"), true);
+  assert.equal(detailMeta.includes("Depart from Madinah to MED Airport"), true);
+  assert.equal(detailMeta.includes("..."), true);
+  assert.equal(
+    createScheduleMeta({
+      time: " ",
+      from: "",
+      to: "",
+    }),
+    "Schedule details pending confirmation",
+  );
+
+  assert.equal(detectCityFromText("Hotel in Makkah"), "Makkah");
+  assert.equal(detectCityFromText(""), "");
+  assert.equal(normalizeSaudiCityValue(" madinah "), "Madinah");
+  assert.equal(normalizeSaudiCityValue("Unknown"), "");
+  assert.equal(inferCityTourCity(createBaseItineraryItem({ cityTourCity: " Makkah " })), "Makkah");
+  assert.equal(
+    inferCityTourCity(
+      createBaseItineraryItem({
+        cityTourCity: "",
+        from: "",
+        to: "",
+        title: "City tour in Madinah heritage area",
+        notes: "",
+      }),
+    ),
+    "Madinah",
+  );
+
+  const transferItem = createBaseItineraryItem({
+    category: "Transfer",
+    categoryKey: "transfer",
+    date: "10 Apr",
+    year: "2026",
+    time: undefined,
+    meta: "08:15 | Train transfer",
+    from: "makkah",
+    to: "madinah",
+    transferByTrain: true,
+    destinationPickupTime: "10:00",
+    notes: "Transfer note",
+    icon: "airport_shuttle",
+  });
+  const transferEdit = createEditScheduleForm(transferItem);
+  assert.equal(transferEdit.date, "2026-04-10");
+  assert.equal(transferEdit.time, "08:15");
+  assert.equal(transferEdit.from, "Makkah");
+  assert.equal(transferEdit.to, "Madinah");
+  assert.equal(transferEdit.transferByTrain, true);
+  assert.equal(transferEdit.trainDepartureTime, "08:15");
+
+  const departureItem = createBaseItineraryItem({
+    category: "Departure",
+    categoryKey: "departure",
+    date: "11 Apr",
+    year: "2026",
+    isoDate: "2026-04-11",
+    time: "21:00",
+    meta: "21:00 | Flight",
+    from: "Madinah",
+    to: "MED Airport",
+    hotelPickupRequestTime: "18:30",
+    requiresBus: true,
+    icon: "flight_takeoff",
+  });
+  const departureEdit = createEditScheduleForm(departureItem);
+  assert.equal(departureEdit.hotelPickupRequestTime, "18:30");
+
+  const updatedTransfer = buildItineraryItemFromEditForm(transferItem, {
+    ...transferEdit,
+    date: "2026-04-10",
+    time: "08:15",
+    from: "Makkah",
+    to: "Madinah",
+    cityTourCity: "",
+    notes: "Transfer note from form",
+    transferByTrain: true,
+    trainDepartureTime: "08:20",
+    destinationPickupTime: "09:40",
+    requiresBus: false,
+    hotelName: "Madinah Hotel",
+    hotelPickupRequestTime: "",
+    category: "transfer",
+    flightNumber: "",
+  });
+  assert.equal(updatedTransfer.categoryKey, "transfer");
+  assert.equal(updatedTransfer.transferByTrain, true);
+  assert.equal(updatedTransfer.requiresBus, true);
+  assert.equal(updatedTransfer.time, "08:20");
+  assert.equal(updatedTransfer.destinationPickupTime, "09:40");
+  assert.equal(updatedTransfer.meta.includes("HHR Transfer"), true);
+  assert.equal(updatedTransfer.meta.includes("Transfer from Makkah to Madinah"), true);
+
+  assert.equal(isFridayDate("2026-04-10"), true);
+  assert.equal(isFridayDate(""), false);
+  assert.equal(shouldShowFridayCityTourWarning("city-tour", "2026-04-10"), true);
+  assert.equal(shouldShowFridayCityTourWarning("transfer", "2026-04-10"), false);
+}
+
+function testDisplayChecklistAndScrollHelpers(): void {
+  const expandedPlain = expandTransferTrainItineraryItems([
+    createBaseItineraryItem({
+      category: "Arrival",
+      categoryKey: "arrival",
+      isoDate: "2026-04-12",
+      time: "07:00",
+      icon: "flight_land",
+      from: "Jeddah",
+      to: "Makkah",
+    }),
+  ]);
+  assert.equal(expandedPlain.length, 1);
+
+  const expandedTrain = expandTransferTrainItineraryItems([
+    createBaseItineraryItem({
+      category: "Transfer",
+      categoryKey: "transfer",
+      date: "12 Apr",
+      year: "2026",
+      title: "Transfer from Makkah to Madinah",
+      meta: "08:00 | train",
+      icon: "airport_shuttle",
+      from: "Makkah",
+      to: "Madinah",
+      transferByTrain: true,
+      trainDepartureTime: "08:30",
+      destinationPickupTime: "10:10",
+      notes: "Fast route",
+    }),
+  ]);
+  assert.equal(expandedTrain.length, 2);
+  assert.equal(expandedTrain[0].category, "Transfer - Train Departure");
+  assert.equal(expandedTrain[1].category, "Transfer - Arrival Station Pickup");
+  assert.equal(expandedTrain[1].notes, "");
+
+  assert.equal(escapeHtml("<b>'x' & \"y\"</b>"), "&lt;b&gt;&#39;x&#39; &amp; &quot;y&quot;&lt;/b&gt;");
+  assert.equal(getChecklistDayLabel(""), "-");
+  assert.equal(getChecklistDayLabel("bad-date"), "bad-date");
+  assert.equal(getChecklistDayLabel("2026-04-10").includes("2026"), true);
+  assert.equal(formatChecklistCopyDate(""), "-");
+  assert.equal(formatChecklistCopyDate("bad-date"), "BAD-DATE");
+  assert.equal(formatChecklistCopyDate("2026-04-10").includes("APR"), true);
+  assert.equal(
+    getItineraryIsoDate(createBaseItineraryItem({ isoDate: "2026-04-20" })),
+    "2026-04-20",
+  );
+  assert.equal(
+    getItineraryIsoDate(createBaseItineraryItem({ isoDate: undefined, date: "2 Apr", year: "2026" })),
+    "2026-04-02",
+  );
+  assert.equal(buildChecklistActivityLabel(createBaseItineraryItem({ category: "Departure" }), "departure"), "Departure");
+  assert.equal(
+    buildChecklistActivityLabel(
+      createBaseItineraryItem({
+        category: "City Tour",
+        cityTourCity: "",
+      }),
+      "city-tour",
+    ),
+    "City Tour",
+  );
+  assert.equal(
+    buildChecklistActivityLabel(
+      createBaseItineraryItem({
+        category: "City Tour",
+        from: "Makkah Hotel",
+        to: "Jabal Rahmah",
+        cityTourCity: "",
+      }),
+      "city-tour",
+    ),
+    "City Tour Makkah",
+  );
+  assert.equal(
+    buildChecklistActivityLabel(
+      createBaseItineraryItem({
+        category: "City Tour Makkah",
+        cityTourCity: "Makkah",
+      }),
+      "city-tour",
+    ),
+    "City Tour Makkah",
+  );
+
+  const globalWithWindow = globalThis as unknown as {
+    window?: { scrollTo: (options: { top: number; behavior: string }) => void };
+  };
+  const originalWindow = globalWithWindow.window;
+  let scrollPayload: { top: number; behavior: string } | null = null;
+  globalWithWindow.window = {
+    scrollTo: (options) => {
+      scrollPayload = options;
+    },
+  };
+
+  try {
+    scrollToTop();
+  } finally {
+    if (originalWindow) {
+      globalWithWindow.window = originalWindow;
+    } else {
+      delete globalWithWindow.window;
+    }
+  }
+
+  assert.deepEqual(scrollPayload, {
+    top: 0,
+    behavior: "smooth",
+  });
+}
+
 async function main(): Promise<void> {
   await runCase("app-domain raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
   await runCase("app-domain route helper behavior", testRouteHelpersForCategorySpecificBehavior);
   await runCase("app-domain transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
   await runCase("app-domain visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
   await runCase("app-domain checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
+  await runCase("app-domain overview/status helpers", testOverviewAndStatusNormalizationHelpers);
+  await runCase("app-domain form/category helpers", testFormFactoryAndCategoryHelpers);
+  await runCase("app-domain schedule editing helpers", testScheduleEditingAndCityInferenceHelpers);
+  await runCase("app-domain display/checklist/scroll helpers", testDisplayChecklistAndScrollHelpers);
 }
 
 void main().catch((error: unknown) => {

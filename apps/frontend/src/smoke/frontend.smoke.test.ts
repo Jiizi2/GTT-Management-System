@@ -738,6 +738,7 @@ async function testInputValidationHelpers(): Promise<void> {
     date: "2026-09-01",
     time: "08:00",
     category: "arrival",
+    hotelName: "Makkah Hotel",
     from: "JED Airport",
     to: "Makkah Hotel",
     cityTourCity: "",

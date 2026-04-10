@@ -40,6 +40,7 @@ const {
   isCityTourActivityType,
   isFlightActivityType,
   isTransferActivityType,
+  normalizeAgreementCityKey,
   parseTimeForInput,
   shouldShowFridayCityTourWarning,
 } = Domain;
@@ -194,6 +195,16 @@ function formatItinerarySupportMeta(item: ItineraryItem, categoryKey: string): s
   const detailSegments: string[] = [];
   const primaryTime = (item.transferByTrain ? item.trainDepartureTime : item.time)?.trim() ?? "";
   const flightNumber = item.flightNumber?.trim() ?? "";
+  const trimmedFrom = item.from?.trim() ?? "";
+  const trimmedTo = item.to?.trim() ?? "";
+  const inferredFromHotelName = /hotel/i.test(trimmedFrom) ? trimmedFrom : "";
+  const inferredToHotelName = /hotel/i.test(trimmedTo) ? trimmedTo : "";
+  const fromHotelName = item.fromHotelName?.trim() || inferredFromHotelName;
+  const hotelName =
+    item.hotelName?.trim() ||
+    (categoryKey === "transfer"
+      ? inferredToHotelName
+      : inferredFromHotelName || inferredToHotelName);
   const stationPickupTime = item.destinationPickupTime?.trim() ?? "";
   const hotelPickupRequestTime = item.hotelPickupRequestTime?.trim() ?? "";
   const notes = item.notes?.trim() ?? "";
@@ -204,6 +215,19 @@ function formatItinerarySupportMeta(item: ItineraryItem, categoryKey: string): s
 
   if ((categoryKey === "arrival" || categoryKey === "departure") && flightNumber) {
     detailSegments.push(`Flight ${flightNumber}`);
+  }
+
+  if (categoryKey === "transfer" && (fromHotelName || hotelName)) {
+    if (fromHotelName && hotelName) {
+      detailSegments.push(`Hotel ${fromHotelName} -> ${hotelName}`);
+    } else {
+      detailSegments.push(`Hotel ${fromHotelName || hotelName}`);
+    }
+  } else if (
+    (categoryKey === "arrival" || categoryKey === "city-tour" || categoryKey === "departure") &&
+    hotelName
+  ) {
+    detailSegments.push(`Hotel ${hotelName}`);
   }
 
   if (categoryKey === "departure" && hotelPickupRequestTime) {
@@ -257,6 +281,10 @@ export function GroupDetail({
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(createInitialScheduleForm);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editScheduleForm, setEditScheduleForm] = useState<EditScheduleFormState | null>(null);
+  const scheduleSuggestedHotelNameRef = useRef("");
+  const scheduleSuggestedFromHotelNameRef = useRef("");
+  const editSuggestedHotelNameRef = useRef("");
+  const editSuggestedFromHotelNameRef = useRef("");
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteForm, setNoteForm] = useState<NoteFormState>(createInitialNoteForm);
@@ -279,6 +307,10 @@ export function GroupDetail({
     isGroupEditModalOpen;
 
   useEffect(() => {
+    scheduleSuggestedHotelNameRef.current = "";
+    scheduleSuggestedFromHotelNameRef.current = "";
+    editSuggestedHotelNameRef.current = "";
+    editSuggestedFromHotelNameRef.current = "";
     setItineraryItems(sortItineraryByNearestDate(group.itinerary));
     setNoteItems(createNoteItems(group.notes, group.code));
     setMusyrifProfile(group.musyrif);
@@ -289,7 +321,7 @@ export function GroupDetail({
     setIsMusyrifCopied(false);
     setIsMusyrifModalOpen(false);
     setIsScheduleModalOpen(false);
-    setScheduleForm(createInitialScheduleForm());
+    setScheduleForm(applyScheduleHotelAutofill(createInitialScheduleForm()));
     setEditingIndex(null);
     setEditScheduleForm(null);
     setDeletingIndex(null);
@@ -340,6 +372,13 @@ export function GroupDetail({
 
   const isScheduleFlightNumberMissing =
     isFlightActivityType(scheduleForm.category) && !scheduleForm.flightNumber.trim();
+  const isScheduleHotelNameMissing =
+    (scheduleForm.category === "arrival" ||
+      scheduleForm.category === "transfer" ||
+      scheduleForm.category === "departure") &&
+    !scheduleForm.hotelName.trim();
+  const isScheduleFromHotelNameMissing =
+    scheduleForm.category === "transfer" && !scheduleForm.fromHotelName.trim();
   const isScheduleDeparturePickupTimeMissing =
     scheduleForm.category === "departure" && !scheduleForm.hotelPickupRequestTime.trim();
   const isSchedulePrimaryTimeMissing =
@@ -355,6 +394,8 @@ export function GroupDetail({
     !scheduleForm.from.trim() ||
     !scheduleForm.to.trim() ||
     isScheduleFlightNumberMissing ||
+    isScheduleHotelNameMissing ||
+    isScheduleFromHotelNameMissing ||
     isScheduleDeparturePickupTimeMissing ||
     isScheduleCityTourCityMissing ||
     hasScheduleTransferTrainFieldsMissing;
@@ -365,6 +406,16 @@ export function GroupDetail({
     !!editScheduleForm &&
     isCityTourActivityType(editScheduleForm.category) &&
     !editScheduleForm.cityTourCity.trim();
+  const isEditHotelNameMissing =
+    !!editScheduleForm &&
+    (editScheduleForm.category === "arrival" ||
+      editScheduleForm.category === "transfer" ||
+      editScheduleForm.category === "departure") &&
+    !editScheduleForm.hotelName.trim();
+  const isEditFromHotelNameMissing =
+    !!editScheduleForm &&
+    editScheduleForm.category === "transfer" &&
+    !editScheduleForm.fromHotelName.trim();
   const isEditDeparturePickupTimeMissing =
     !!editScheduleForm &&
     editScheduleForm.category === "departure" &&
@@ -378,6 +429,8 @@ export function GroupDetail({
     !editScheduleForm?.from.trim() ||
     !editScheduleForm?.to.trim() ||
     isEditCityTourCityMissing ||
+    isEditHotelNameMissing ||
+    isEditFromHotelNameMissing ||
     !!(
       editScheduleForm &&
       isFlightActivityType(editScheduleForm.category) &&
@@ -395,6 +448,135 @@ export function GroupDetail({
   const showEditFridayCityTourWarning =
     !!editScheduleForm &&
     shouldShowFridayCityTourWarning(editScheduleForm.category, editScheduleForm.date);
+  const cityHotelNames = useMemo(() => {
+    const firstMakkahHotel = group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "";
+    const firstMadinahHotel = group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "";
+    return {
+      makkah: firstMakkahHotel,
+      madinah: firstMadinahHotel,
+    };
+  }, [group.visaSetup?.makkahHotels, group.visaSetup?.madinahHotels]);
+
+  const resolveHotelNameByCity = (cityInput: string): string => {
+    const cityKey = normalizeAgreementCityKey(cityInput);
+    if (!cityKey) {
+      return "";
+    }
+
+    return cityHotelNames[cityKey]?.trim() ?? "";
+  };
+
+  const resolveSuggestedHotelName = (draft: {
+    category: string;
+    from: string;
+    to: string;
+    cityTourCity: string;
+  }): string => {
+    if (draft.category === "departure") {
+      return resolveHotelNameByCity(draft.from);
+    }
+
+    if (draft.category === "arrival" || draft.category === "transfer") {
+      return resolveHotelNameByCity(draft.to);
+    }
+
+    if (draft.category === "city-tour") {
+      return resolveHotelNameByCity(draft.cityTourCity);
+    }
+
+    return "";
+  };
+
+  const resolveSuggestedFromHotelName = (draft: {
+    category: string;
+    from: string;
+  }): string => {
+    if (draft.category !== "transfer") {
+      return "";
+    }
+
+    return resolveHotelNameByCity(draft.from);
+  };
+
+  const applyScheduleHotelAutofill = (draft: ScheduleFormState): ScheduleFormState => {
+    const suggestedHotelName = resolveSuggestedHotelName(draft).trim();
+    const suggestedFromHotelName = resolveSuggestedFromHotelName(draft).trim();
+    const previousSuggestedHotelName = scheduleSuggestedHotelNameRef.current;
+    const previousSuggestedFromHotelName = scheduleSuggestedFromHotelNameRef.current;
+    const normalizedFrom = draft.from.trim().toLowerCase();
+    const isPlainCityMeetingPoint =
+      normalizedFrom === "makkah" || normalizedFrom === "madinah";
+    const currentHotelName = draft.hotelName.trim();
+    const currentFromHotelName = draft.fromHotelName.trim();
+    const shouldRefreshHotelName =
+      !currentHotelName ||
+      (!!previousSuggestedHotelName && currentHotelName === previousSuggestedHotelName);
+    const shouldRefreshFromHotelName =
+      !currentFromHotelName ||
+      (!!previousSuggestedFromHotelName &&
+        currentFromHotelName === previousSuggestedFromHotelName);
+    const nextDraft: ScheduleFormState = {
+      ...draft,
+      hotelName: shouldRefreshHotelName ? suggestedHotelName : currentHotelName,
+      fromHotelName: isTransferActivityType(draft.category)
+        ? shouldRefreshFromHotelName
+          ? suggestedFromHotelName
+          : currentFromHotelName
+        : "",
+    };
+
+    if (
+      isCityTourActivityType(nextDraft.category) &&
+      suggestedHotelName &&
+      (!nextDraft.from.trim() || isPlainCityMeetingPoint)
+    ) {
+      nextDraft.from = suggestedHotelName;
+    }
+
+    scheduleSuggestedHotelNameRef.current = suggestedHotelName;
+    scheduleSuggestedFromHotelNameRef.current = suggestedFromHotelName;
+    return nextDraft;
+  };
+
+  const applyEditHotelAutofill = (draft: EditScheduleFormState): EditScheduleFormState => {
+    const suggestedHotelName = resolveSuggestedHotelName(draft).trim();
+    const suggestedFromHotelName = resolveSuggestedFromHotelName(draft).trim();
+    const previousSuggestedHotelName = editSuggestedHotelNameRef.current;
+    const previousSuggestedFromHotelName = editSuggestedFromHotelNameRef.current;
+    const normalizedFrom = draft.from.trim().toLowerCase();
+    const isPlainCityMeetingPoint =
+      normalizedFrom === "makkah" || normalizedFrom === "madinah";
+    const currentHotelName = draft.hotelName.trim();
+    const currentFromHotelName = draft.fromHotelName.trim();
+    const shouldRefreshHotelName =
+      !currentHotelName ||
+      (!!previousSuggestedHotelName && currentHotelName === previousSuggestedHotelName);
+    const shouldRefreshFromHotelName =
+      !currentFromHotelName ||
+      (!!previousSuggestedFromHotelName &&
+        currentFromHotelName === previousSuggestedFromHotelName);
+    const nextDraft: EditScheduleFormState = {
+      ...draft,
+      hotelName: shouldRefreshHotelName ? suggestedHotelName : currentHotelName,
+      fromHotelName: isTransferActivityType(draft.category)
+        ? shouldRefreshFromHotelName
+          ? suggestedFromHotelName
+          : currentFromHotelName
+        : "",
+    };
+
+    if (
+      isCityTourActivityType(nextDraft.category) &&
+      suggestedHotelName &&
+      (!nextDraft.from.trim() || isPlainCityMeetingPoint)
+    ) {
+      nextDraft.from = suggestedHotelName;
+    }
+
+    editSuggestedHotelNameRef.current = suggestedHotelName;
+    editSuggestedFromHotelNameRef.current = suggestedFromHotelName;
+    return nextDraft;
+  };
   const detailKickerClassName =
     "text-xs font-semibold uppercase tracking-[0.14em] text-brand-secondary";
   const statusToneClassName =
@@ -437,14 +619,16 @@ export function GroupDetail({
     field: Key,
     value: ScheduleFormState[Key],
   ) => {
-    setScheduleForm((current) => ({ ...current, [field]: value }));
+    setScheduleForm((current) => applyScheduleHotelAutofill({ ...current, [field]: value }));
   };
 
   const handleEditFieldChange = <Key extends keyof EditScheduleFormState>(
     field: Key,
     value: EditScheduleFormState[Key],
   ) => {
-    setEditScheduleForm((current) => (current ? { ...current, [field]: value } : current));
+    setEditScheduleForm((current) =>
+      current ? applyEditHotelAutofill({ ...current, [field]: value }) : current,
+    );
   };
 
   const handleNoteFieldChange = <Key extends keyof NoteFormState>(
@@ -462,7 +646,9 @@ export function GroupDetail({
   };
 
   const handleOpenScheduleModal = () => {
-    setScheduleForm(createInitialScheduleForm());
+    scheduleSuggestedHotelNameRef.current = "";
+    scheduleSuggestedFromHotelNameRef.current = "";
+    setScheduleForm(applyScheduleHotelAutofill(createInitialScheduleForm()));
     setIsScheduleModalOpen(true);
   };
 
@@ -479,6 +665,18 @@ export function GroupDetail({
     const formattedDate = formatScheduleDate(scheduleForm.date);
     const nextFlightNumber = isFlightActivityType(scheduleForm.category)
       ? scheduleForm.flightNumber.trim()
+      : "";
+    const shouldPersistHotelName =
+      scheduleForm.category === "arrival" ||
+      scheduleForm.category === "transfer" ||
+      scheduleForm.category === "city-tour" ||
+      scheduleForm.category === "departure";
+    const isTransferCategory = isTransferActivityType(scheduleForm.category);
+    const nextHotelName = shouldPersistHotelName
+      ? scheduleForm.hotelName.trim() || resolveSuggestedHotelName(scheduleForm)
+      : "";
+    const nextFromHotelName = isTransferCategory
+      ? scheduleForm.fromHotelName.trim() || resolveSuggestedFromHotelName(scheduleForm)
       : "";
     const nextHotelPickupRequestTime =
       scheduleForm.category === "departure" ? scheduleForm.hotelPickupRequestTime.trim() : "";
@@ -504,6 +702,8 @@ export function GroupDetail({
         category: scheduleForm.category,
         time: scheduleTime,
         flightNumber: nextFlightNumber,
+        hotelName: nextHotelName,
+        fromHotelName: nextFromHotelName,
         hotelPickupRequestTime: nextHotelPickupRequestTime,
         from: scheduleForm.from,
         to: scheduleForm.to,
@@ -517,6 +717,8 @@ export function GroupDetail({
       isoDate: scheduleForm.date,
       time: scheduleTime,
       flightNumber: nextFlightNumber,
+      hotelName: nextHotelName,
+      fromHotelName: nextFromHotelName,
       from: scheduleForm.from.trim(),
       to: scheduleForm.to.trim(),
       cityTourCity: nextCityTourCity,
@@ -537,11 +739,15 @@ export function GroupDetail({
 
   const handleOpenEditModal = (index: number) => {
     setEditingIndex(index);
-    setEditScheduleForm(createEditScheduleForm(itineraryItems[index]));
+    editSuggestedHotelNameRef.current = "";
+    editSuggestedFromHotelNameRef.current = "";
+    setEditScheduleForm(applyEditHotelAutofill(createEditScheduleForm(itineraryItems[index])));
   };
 
   const handleCloseEditModal = () => {
     setEditingIndex(null);
+    editSuggestedHotelNameRef.current = "";
+    editSuggestedFromHotelNameRef.current = "";
     setEditScheduleForm(null);
   };
 

@@ -266,6 +266,15 @@ function formatPeakTripDayLabel(isoDate: string): string {
   });
 }
 
+function isLocalDevelopmentHost(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const hostname = window.location.hostname.trim().toLowerCase();
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
 export function useAppController(): AppController {
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
   const [sessionAccessTier] = useState<SessionAccessTier>(() => loadPersistedSessionAccessTier());
@@ -280,6 +289,7 @@ export function useAppController(): AppController {
   const deferredQuery = useDeferredValue(query);
   const normalizedQuery = deferredQuery.trim().toLowerCase();
   const groupRecordsRef = useRef(groupRecords);
+  const allowLocalFallback = isLocalDevelopmentHost();
 
   useEffect(() => {
     groupRecordsRef.current = groupRecords;
@@ -294,6 +304,20 @@ export function useAppController(): AppController {
       tone,
       message,
     });
+  };
+
+  const syncGroupsFromBackendOrClear = () => {
+    void fetchGroupsFromBackend()
+      .then((backendGroups) => {
+        setGroupRecords(backendGroups);
+      })
+      .catch((error: unknown) => {
+        setGroupRecords([]);
+        setRemoteSearchMatches(null);
+        setSelectedGroupCode(null);
+        setSelectedVisaRow(null);
+        console.warn("Failed to restore group state from backend.", error);
+      });
   };
 
   const runBackendSync = ({
@@ -314,8 +338,14 @@ export function useAppController(): AppController {
         }
       })
       .catch((error: unknown) => {
+        if (!allowLocalFallback) {
+          syncGroupsFromBackendOrClear();
+        }
+
         showSyncFeedback("error", failureMessage);
-        console.warn(failureMessage, error);
+        if (allowLocalFallback) {
+          console.warn(failureMessage, error);
+        }
       });
   };
 
@@ -345,11 +375,23 @@ export function useAppController(): AppController {
           return;
         }
 
+        if (allowLocalFallback) {
+          showSyncFeedback(
+            "info",
+            "Mode lokal aktif. Backend belum terhubung, data disimpan sementara di browser.",
+          );
+          console.warn("Backend group fetch skipped. App will continue with local state.", error);
+          return;
+        }
+
+        setGroupRecords([]);
+        setRemoteSearchMatches(null);
+        setSelectedGroupCode(null);
+        setSelectedVisaRow(null);
         showSyncFeedback(
-          "info",
-          "Mode lokal aktif. Backend belum terhubung, data disimpan sementara di browser.",
+          "error",
+          "Backend tidak terhubung. Data tidak bisa dimuat dari database.",
         );
-        console.warn("Backend group fetch skipped. App will continue with local state.", error);
       });
 
     return () => {
@@ -377,16 +419,18 @@ export function useAppController(): AppController {
         }
 
         setRemoteSearchMatches(null);
-        console.warn(
-          "Backend search skipped. Using local search filter as fallback.",
-          error,
-        );
+        if (allowLocalFallback) {
+          console.warn(
+            "Backend search skipped. Using local search filter as fallback.",
+            error,
+          );
+        }
       });
 
     return () => {
       controller.abort();
     };
-  }, [normalizedQuery]);
+  }, [allowLocalFallback, normalizedQuery]);
 
   const groupRecordsByCode = useMemo(
     () =>

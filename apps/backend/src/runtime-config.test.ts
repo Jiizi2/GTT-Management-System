@@ -11,6 +11,7 @@ function testDefaultRuntimeConfig(): void {
     PORT: undefined,
     DATA_SOURCE: undefined,
     DATABASE_URL: undefined,
+    NODE_ENV: undefined,
   });
 
   assert.equal(config.port, 3001);
@@ -22,6 +23,7 @@ function testValidPrismaRuntimeConfig(): void {
     PORT: "3100",
     DATA_SOURCE: "PRISMA",
     DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public",
+    NODE_ENV: "development",
   });
 
   assert.equal(config.port, 3100);
@@ -35,6 +37,7 @@ function testInvalidPortValidation(): void {
         PORT: "abc",
         DATA_SOURCE: "memory",
         DATABASE_URL: undefined,
+        NODE_ENV: undefined,
       }),
     /Invalid PORT value/,
   );
@@ -45,6 +48,7 @@ function testInvalidPortValidation(): void {
         PORT: "0",
         DATA_SOURCE: "memory",
         DATABASE_URL: undefined,
+        NODE_ENV: undefined,
       }),
     /Invalid PORT value/,
   );
@@ -57,6 +61,7 @@ function testInvalidDataSourceValidation(): void {
         PORT: "3001",
         DATA_SOURCE: "sqlite",
         DATABASE_URL: undefined,
+        NODE_ENV: undefined,
       }),
     /Invalid DATA_SOURCE value/,
   );
@@ -69,8 +74,22 @@ function testMissingDatabaseUrlForPrismaValidation(): void {
         PORT: "3001",
         DATA_SOURCE: "prisma",
         DATABASE_URL: "   ",
+        NODE_ENV: undefined,
       }),
     /DATABASE_URL is required when DATA_SOURCE=prisma/,
+  );
+}
+
+function testProductionRequiresPrismaDataSource(): void {
+  assert.throws(
+    () =>
+      resolveRuntimeConfig({
+        PORT: "3001",
+        DATA_SOURCE: "memory",
+        DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public",
+        NODE_ENV: "production",
+      }),
+    /DATA_SOURCE must be prisma in production/,
   );
 }
 
@@ -93,6 +112,7 @@ async function main(): Promise<void> {
   await runCase("runtime config invalid port", testInvalidPortValidation);
   await runCase("runtime config invalid datasource", testInvalidDataSourceValidation);
   await runCase("runtime config missing prisma url", testMissingDatabaseUrlForPrismaValidation);
+  await runCase("runtime config production requires prisma", testProductionRequiresPrismaDataSource);
   await runCase("runtime config startup error message", testResolveStartupErrorMessage);
 }
 

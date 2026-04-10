@@ -9,8 +9,9 @@
     "build:js": "esbuild src/index.tsx --bundle --format=esm --platform=browser --target=es2022 --jsx=automatic --splitting --minify --outdir=dist --entry-names=index --chunk-names=chunks/[name]-[hash]",
     "dev": "node scripts/dev.mjs",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test:unit": "tsc -p tsconfig.unit.json && node --experimental-specifier-resolution=node dist-unit/unit/auth-session.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/use-auth-backend.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/app-domain.unit.test.js",
-    "test": "tsc -p tsconfig.smoke.json && node dist-smoke/smoke/frontend.smoke.test.js",
+    "test:unit": "tsc -p tsconfig.unit.json && node --experimental-specifier-resolution=node dist-unit/unit/auth-session.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/use-auth-backend.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/app-domain.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/visa-domain.unit.test.js",
+    "test:smoke": "tsc -p tsconfig.smoke.json && node dist-smoke/smoke/frontend.smoke.test.js",
+    "test": "npm run test:unit",
     "test:e2e": "playwright test"
   },
   "dependencies": {

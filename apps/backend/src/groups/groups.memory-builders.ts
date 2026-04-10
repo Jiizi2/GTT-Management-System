@@ -45,6 +45,8 @@ export function buildMemoryItineraryItem(
     isoDate: payload.isoDate,
     time: payload.time?.trim() || undefined,
     flightNumber: payload.flightNumber?.trim() || undefined,
+    hotelName: payload.hotelName?.trim() || undefined,
+    fromHotelName: payload.fromHotelName?.trim() || undefined,
     fromLocation: payload.fromLocation?.trim() || undefined,
     toLocation: payload.toLocation?.trim() || undefined,
     cityTourCity: payload.cityTourCity?.trim() || undefined,

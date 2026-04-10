@@ -51,8 +51,23 @@ function toShortLabel(value: string, maxLength = 26): string {
 function buildCompactTripLabel(item: GroupData["itinerary"][number]): string {
   const categoryKey = inferCategoryKey(item);
   const typeLabel = getScheduleTypeOption(categoryKey).cardLabel;
+  const origin = item.from?.trim() ?? "";
   const destination = item.to?.trim() ?? "";
   const cityTourCity = item.cityTourCity?.trim() ?? "";
+
+  if (categoryKey === "arrival") {
+    if (origin && destination) {
+      return toShortLabel(`${typeLabel} ${origin} -> ${destination}`);
+    }
+
+    if (destination) {
+      return toShortLabel(`${typeLabel} ${destination}`);
+    }
+
+    if (origin) {
+      return toShortLabel(`${typeLabel} ${origin}`);
+    }
+  }
 
   if (categoryKey === "city-tour" && cityTourCity) {
     return toShortLabel(`${typeLabel} ${cityTourCity}`);

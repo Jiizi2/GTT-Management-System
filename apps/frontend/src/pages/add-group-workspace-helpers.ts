@@ -17,6 +17,7 @@ import {
   isCityTourActivityType,
   isFlightActivityType,
   isTransferActivityType,
+  normalizeAgreementCityKey,
   shiftIsoDate,
 } from "../shared/app-domain.js";
 
@@ -53,6 +54,7 @@ export type InputItineraryValidationState = {
   isGroupInformationComplete: boolean;
   isGroupReadyForItinerary: boolean;
   showFlightNumberField: boolean;
+  showHotelNameField: boolean;
   showTransferTrainFields: boolean;
   showDeparturePickupField: boolean;
   showCityTourCityField: boolean;
@@ -137,6 +139,65 @@ function clampDateRange(isoDate: string, startDate: string, endDate: string): st
   return isoDate;
 }
 
+function resolveCityHotelNameFromPrefill(
+  prefill: ItineraryPrefill | null | undefined,
+  cityInput: string,
+): string {
+  const cityKey = normalizeAgreementCityKey(cityInput);
+  if (!cityKey) {
+    return "";
+  }
+
+  const mappedHotelName = prefill?.cityHotelNames?.[cityKey]?.trim() ?? "";
+  return mappedHotelName;
+}
+
+function resolveHotelNameFromRouteValues(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    const trimmed = value?.trim() ?? "";
+    if (!trimmed) {
+      continue;
+    }
+
+    if (/hotel/i.test(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  return "";
+}
+
+function resolveTripHotelName(
+  category: string,
+  from: string,
+  to: string,
+  cityTourCity: string,
+  prefill: ItineraryPrefill | null | undefined,
+): string {
+  if (category === "city-tour") {
+    return (
+      resolveCityHotelNameFromPrefill(prefill, cityTourCity) ||
+      resolveHotelNameFromRouteValues(from, to)
+    );
+  }
+
+  if (category === "departure") {
+    return (
+      resolveCityHotelNameFromPrefill(prefill, from) ||
+      resolveHotelNameFromRouteValues(from, to)
+    );
+  }
+
+  if (category === "arrival" || category === "transfer") {
+    return (
+      resolveCityHotelNameFromPrefill(prefill, to) ||
+      resolveHotelNameFromRouteValues(to, from)
+    );
+  }
+
+  return resolveHotelNameFromRouteValues(from, to);
+}
+
 export function createBaseTripDrafts(
   startDate: string,
   endDate: string,
@@ -163,6 +224,12 @@ export function createBaseTripDrafts(
       : "";
 
     const prefillTrip = prefill?.trips?.[blueprint.id];
+    const nextFrom = prefillTrip?.from?.trim() || blueprint.from;
+    const nextTo = prefillTrip?.to?.trim() || blueprint.to;
+    const nextCityTourCity = prefillTrip?.cityTourCity?.trim() || blueprint.cityTourCity;
+    const nextHotelName =
+      prefillTrip?.hotelName?.trim() ||
+      resolveTripHotelName(blueprint.category, nextFrom, nextTo, nextCityTourCity, prefill);
 
     return {
       id: blueprint.id,
@@ -172,9 +239,10 @@ export function createBaseTripDrafts(
       date: prefillTrip?.date?.trim() || initialDate,
       time: "",
       category: blueprint.category,
-      from: prefillTrip?.from?.trim() || blueprint.from,
-      to: prefillTrip?.to?.trim() || blueprint.to,
-      cityTourCity: prefillTrip?.cityTourCity?.trim() || blueprint.cityTourCity,
+      hotelName: nextHotelName,
+      from: nextFrom,
+      to: nextTo,
+      cityTourCity: nextCityTourCity,
       flightNumber: prefillTrip?.flightNumber?.trim() || blueprint.flightNumber,
       requiresBus: true,
       notes: "",
@@ -294,10 +362,13 @@ export function buildInputItineraryValidationState({
     isGroupInformationComplete && !hasInvalidDateRange && !isTotalBusBelowMinimum;
 
   const showFlightNumberField = isFlightActivityType(form.category);
+  const showHotelNameField =
+    form.category === "arrival" || form.category === "transfer" || form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
   const showDeparturePickupField = form.category === "departure";
   const showCityTourCityField = isCityTourActivityType(form.category);
   const isFlightNumberMissing = showFlightNumberField && !form.flightNumber.trim();
+  const isHotelNameMissing = showHotelNameField && !(form.hotelName?.trim() ?? "");
   const isDepartureFlightTimeMissing = form.category === "departure" && !form.time.trim();
   const isDeparturePickupTimeMissing = showDeparturePickupField && !form.hotelPickupRequestTime.trim();
   const isCityTourCityMissing = showCityTourCityField && !form.cityTourCity.trim();
@@ -308,6 +379,7 @@ export function buildInputItineraryValidationState({
     !form.from.trim() ||
     !form.to.trim() ||
     isFlightNumberMissing ||
+    isHotelNameMissing ||
     isDepartureFlightTimeMissing ||
     isDeparturePickupTimeMissing ||
     isCityTourCityMissing ||
@@ -323,6 +395,7 @@ export function buildInputItineraryValidationState({
     isGroupInformationComplete,
     isGroupReadyForItinerary,
     showFlightNumberField,
+    showHotelNameField,
     showTransferTrainFields,
     showDeparturePickupField,
     showCityTourCityField,
@@ -348,6 +421,9 @@ export function isBaseTripDraftInvalid(item: BaseTripDraft): boolean {
   }
 
   const isFlightNumberRequired = isFlightActivityType(item.category) && !item.flightNumber.trim();
+  const isHotelNameRequired =
+    item.category === "arrival" || item.category === "transfer" || item.category === "departure";
+  const isHotelNameMissing = isHotelNameRequired && !(item.hotelName?.trim() ?? "");
   const isDepartureFlightTimeRequired = item.category === "departure" && !item.time.trim();
   const isDeparturePickupTimeRequired = item.category === "departure" && !item.hotelPickupRequestTime.trim();
   const isCityTourCityRequired = isCityTourActivityType(item.category) && !item.cityTourCity.trim();
@@ -357,6 +433,7 @@ export function isBaseTripDraftInvalid(item: BaseTripDraft): boolean {
     !item.from.trim() ||
     !item.to.trim() ||
     isFlightNumberRequired ||
+    isHotelNameMissing ||
     isDepartureFlightTimeRequired ||
     isDeparturePickupTimeRequired ||
     isCityTourCityRequired ||
@@ -368,9 +445,11 @@ export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]):
   return sortedItems.map((item, index) => {
     const formattedDate = formatScheduleDate(item.date);
     const transferTrainSummary = buildTransferTrainSummary(item);
+    const normalizedHotelName = item.hotelName?.trim() ?? "";
     const metaSegments = [
       formatScheduleTime(item.time),
       item.flightNumber ? `Flight ${item.flightNumber}` : "",
+      normalizedHotelName ? `Hotel ${normalizedHotelName}` : "",
       item.hotelPickupRequestTime
         ? `Hotel pickup request ${formatScheduleTime(item.hotelPickupRequestTime)}`
         : "",
@@ -391,6 +470,7 @@ export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]):
       isoDate: item.date,
       time: item.time,
       flightNumber: item.flightNumber,
+      hotelName: normalizedHotelName || undefined,
       from: item.from,
       to: item.to,
       cityTourCity: item.cityTourCity,

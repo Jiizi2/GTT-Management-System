@@ -53,6 +53,14 @@ export class UpsertGroupItineraryItemDto {
 
   @IsOptional()
   @IsString()
+  hotelName?: string;
+
+  @IsOptional()
+  @IsString()
+  fromHotelName?: string;
+
+  @IsOptional()
+  @IsString()
   fromLocation?: string;
 
   @IsOptional()

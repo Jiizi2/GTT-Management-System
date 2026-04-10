@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { SereneSelect } from "../components/serene-select";
 import {
+  createManagedUserInBackend,
+  deleteManagedUserInBackend,
   fetchManagedUsersFromBackend,
   updateManagedUserInBackend,
   type BackendManagedUser,
@@ -67,26 +69,7 @@ const roleCatalog: RoleCatalogItem[] = [
   },
 ];
 
-const initialUsers: UserAccount[] = [
-  {
-    id: "usr-1",
-    name: "Operator Admin",
-    email: "operator.admin@ghaniyatravel.com",
-    roleId: "admin",
-  },
-  {
-    id: "usr-2",
-    name: "Mila Finance",
-    email: "mila.finance@ghaniyatravel.com",
-    roleId: "finance-manager",
-  },
-  {
-    id: "usr-3",
-    name: "Hadi Support",
-    email: "hadi.support@ghaniyatravel.com",
-    roleId: "customer-support",
-  },
-];
+const initialUsers: UserAccount[] = [];
 
 const defaultNewUserForm: NewUserFormState = {
   name: "",
@@ -153,7 +136,9 @@ export function UserManagementScreen() {
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [deleteTargetUser, setDeleteTargetUser] = useState<UserAccount | null>(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
 
   const roleCatalogById = useMemo(
     () => new Map(roleCatalog.map((role) => [role.id, role] as const)),
@@ -242,8 +227,11 @@ export function UserManagementScreen() {
     };
   }, [deleteTargetUser, editingUser]);
 
-  const handleCreateUser = (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isCreateSubmitting) {
+      return;
+    }
 
     const normalizedName = newUserForm.name.trim();
     const normalizedEmail = newUserForm.email.trim().toLowerCase();
@@ -274,19 +262,31 @@ export function UserManagementScreen() {
       return;
     }
 
-    const nextUser: UserAccount = {
-      id: `usr-${Date.now().toString(36)}`,
-      name: normalizedName,
-      email: normalizedEmail,
-      roleId: newUserForm.roleId,
-    };
+    setIsCreateSubmitting(true);
+    try {
+      const createdFromBackend = await createManagedUserInBackend({
+        name: normalizedName,
+        email: normalizedEmail,
+        roleId: newUserForm.roleId,
+      });
 
-    setUsers((current) => [nextUser, ...current]);
-    setNewUserForm(defaultNewUserForm);
-    setNotice({
-      tone: "success",
-      message: `User ${normalizedName} berhasil ditambahkan.`,
-    });
+      setUsers((current) => [mapBackendUserToLocal(createdFromBackend), ...current]);
+      setNewUserForm(defaultNewUserForm);
+      setNotice({
+        tone: "success",
+        message: `User ${normalizedName} berhasil ditambahkan.`,
+      });
+    } catch (error: unknown) {
+      setNotice({
+        tone: "error",
+        message: extractErrorMessage(
+          error,
+          "User baru gagal dibuat di backend.",
+        ),
+      });
+    } finally {
+      setIsCreateSubmitting(false);
+    }
   };
 
   const handleSubmitEditUser = async (event: FormEvent<HTMLFormElement>) => {
@@ -360,18 +360,32 @@ export function UserManagementScreen() {
     }
   };
 
-  const handleConfirmDeleteUser = () => {
-    if (!deleteTargetUser) {
+  const handleConfirmDeleteUser = async () => {
+    const targetUser = deleteTargetUser;
+    if (!targetUser || isDeleteSubmitting) {
       return;
     }
 
-    const deletedName = deleteTargetUser.name;
-    setUsers((current) => current.filter((user) => user.id !== deleteTargetUser.id));
-    setNotice({
-      tone: "success",
-      message: `User ${deletedName} berhasil dihapus.`,
-    });
-    closeDeleteModal();
+    setIsDeleteSubmitting(true);
+    try {
+      await deleteManagedUserInBackend(targetUser.id);
+      setUsers((current) => current.filter((user) => user.id !== targetUser.id));
+      setNotice({
+        tone: "success",
+        message: `User ${targetUser.name} berhasil dihapus.`,
+      });
+      closeDeleteModal();
+    } catch (error: unknown) {
+      setNotice({
+        tone: "error",
+        message: extractErrorMessage(
+          error,
+          "Penghapusan user gagal di backend.",
+        ),
+      });
+    } finally {
+      setIsDeleteSubmitting(false);
+    }
   };
 
   return (
@@ -449,8 +463,12 @@ export function UserManagementScreen() {
                     </option>
                   ))}
                 </SereneSelect>
-                <button type="submit" className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4">
-                  Tambah User
+                <button
+                  type="submit"
+                  className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4"
+                  disabled={isCreateSubmitting}
+                >
+                  {isCreateSubmitting ? "Menyimpan..." : "Tambah User"}
                 </button>
               </form>
             </div>
@@ -709,18 +727,24 @@ export function UserManagementScreen() {
               </p>
 
               <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button type="button" className="serene-btn-secondary" onClick={closeDeleteModal}>
+                <button
+                  type="button"
+                  className="serene-btn-secondary"
+                  onClick={closeDeleteModal}
+                  disabled={isDeleteSubmitting}
+                >
                   Cancel
                 </button>
                 <button
                   type="button"
                   className="inline-flex items-center justify-center gap-1.5 rounded-md bg-error-container px-4 py-2 text-sm font-semibold text-on-error-container transition hover:brightness-95"
                   onClick={handleConfirmDeleteUser}
+                  disabled={isDeleteSubmitting}
                 >
                   <span className="material-symbols-outlined text-base" aria-hidden="true">
                     delete
                   </span>
-                  Ya, Hapus
+                  {isDeleteSubmitting ? "Menghapus..." : "Ya, Hapus"}
                 </button>
               </div>
             </section>
