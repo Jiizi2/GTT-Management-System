@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace backend
+
       - name: Verify before packaging
         run: npm run verify
 
