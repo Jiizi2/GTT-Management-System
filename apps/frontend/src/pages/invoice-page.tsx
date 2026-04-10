@@ -8,14 +8,14 @@ import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useThemeMode } from "../theme/theme-provider";
 import {
-  createInvoiceInBackend,
-  fetchInvoiceBackendDataSource,
   type BackendInvoiceClient,
   type BackendInvoiceRow,
-  fetchInvoiceClientsFromBackend,
-  fetchInvoicesFromBackend,
-  updateInvoiceInBackend,
 } from "../hooks/use-invoice-backend";
+import {
+  useCreateInvoiceMutation,
+  useInvoiceDashboardQuery,
+  useUpdateInvoiceMutation,
+} from "../hooks/use-invoice-query";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { exportInvoicePdf } from "./invoice-export";
 
@@ -515,6 +515,8 @@ function CreateInvoiceWorkspace({
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
+  const createInvoiceMutation = useCreateInvoiceMutation();
+  const updateInvoiceMutation = useUpdateInvoiceMutation();
   const isEditMode = mode === "edit";
   const resolvedInitialInvoice = isEditMode ? initialInvoice ?? null : null;
   const [issueDateIso, setIssueDateIso] = useState(
@@ -759,7 +761,7 @@ function CreateInvoiceWorkspace({
 
     setIsSavingDraft(true);
     try {
-      const savedInvoice = await createInvoiceInBackend({
+      const savedInvoice = await createInvoiceMutation.mutateAsync({
         clientId: isManualClientSelected ? undefined : selectedClient?.id,
         clientName: isManualClientSelected ? normalizedManualClientName : undefined,
         groupCode: linkedGroupCode || undefined,
@@ -853,17 +855,20 @@ function CreateInvoiceWorkspace({
     setIsSubmitting(true);
     try {
       const savedInvoice = isEditMode && resolvedInitialInvoice
-        ? await updateInvoiceInBackend(resolvedInitialInvoice.id, {
-            clientId: isManualClientSelected ? undefined : selectedClient?.id,
-            clientName: isManualClientSelected ? normalizedManualClientName : undefined,
-            groupCode: linkedGroupCode ?? "",
-            issuedDateIso: issueDateIso,
-            dueDateIso,
-            amount: totalPayable,
-            status: invoiceStatus,
-            notes,
+        ? await updateInvoiceMutation.mutateAsync({
+            invoiceId: resolvedInitialInvoice.id,
+            payload: {
+              clientId: isManualClientSelected ? undefined : selectedClient?.id,
+              clientName: isManualClientSelected ? normalizedManualClientName : undefined,
+              groupCode: linkedGroupCode ?? "",
+              issuedDateIso: issueDateIso,
+              dueDateIso,
+              amount: totalPayable,
+              status: invoiceStatus,
+              notes,
+            },
           })
-        : await createInvoiceInBackend({
+        : await createInvoiceMutation.mutateAsync({
             clientId: isManualClientSelected ? undefined : selectedClient?.id,
             clientName: isManualClientSelected ? normalizedManualClientName : undefined,
             groupCode: linkedGroupCode || undefined,
@@ -1609,8 +1614,8 @@ export function InvoiceScreen({
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
-  const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
-  const [invoiceClients, setInvoiceClients] = useState<InvoiceClientOption[]>([]);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const invoiceDashboardQuery = useInvoiceDashboardQuery();
   const issuingOfficeOptionsQuery = useMasterDataOptionsQuery({
     categoryKey: "invoice-issuing-office",
   });
@@ -1642,73 +1647,32 @@ export function InvoiceScreen({
     () => mapMasterDataToClientSuggestions(invoiceClientNameOptionsQuery.data ?? []),
     [invoiceClientNameOptionsQuery.data],
   );
-  const [isInvoiceBackendAvailable, setIsInvoiceBackendAvailable] = useState(false);
-  const [isInvoiceDataLoading, setIsInvoiceDataLoading] = useState(true);
-  const [listFeedback, setListFeedback] = useState<string | null>(null);
+  const isInvoiceBackendAvailable = invoiceDashboardQuery.data?.dataSource === "prisma";
+  const isInvoiceDataLoading = invoiceDashboardQuery.isLoading;
+  const invoiceClients = useMemo<InvoiceClientOption[]>(
+    () => (isInvoiceBackendAvailable ? invoiceDashboardQuery.data?.clients ?? [] : []),
+    [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
+  );
+  const invoiceRows = useMemo<InvoiceRow[]>(
+    () => (isInvoiceBackendAvailable ? invoiceDashboardQuery.data?.rows ?? [] : []),
+    [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
+  );
+  const systemFeedback = useMemo(() => {
+    if (invoiceDashboardQuery.error) {
+      return "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.";
+    }
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setIsInvoiceDataLoading(true);
+    if (invoiceDashboardQuery.data?.dataSource && invoiceDashboardQuery.data.dataSource !== "prisma") {
+      return "Backend invoice terhubung tetapi masih DATA_SOURCE=memory. Ubah ke DATA_SOURCE=prisma agar Save Draft dan Generate Invoice tersimpan ke database.";
+    }
 
-    void Promise.all([
-      fetchInvoiceBackendDataSource({ signal: controller.signal }),
-      fetchInvoiceClientsFromBackend({ signal: controller.signal }),
-      fetchInvoicesFromBackend({ signal: controller.signal }),
-    ])
-      .then(
-        ([
-          invoiceDataSource,
-          clientRows,
-          invoiceRowsResponse,
-        ]) => {
-        if (controller.signal.aborted) {
-          return;
-        }
+    if (isInvoiceBackendAvailable && invoiceClients.length === 0) {
+      return "Backend invoice terhubung, tetapi daftar client invoice masih kosong. Jalankan seed database lalu refresh halaman.";
+    }
 
-        if (invoiceDataSource !== "prisma") {
-          setInvoiceClients([]);
-          setInvoiceRows([]);
-          setIsInvoiceBackendAvailable(false);
-          setListFeedback(
-            "Backend invoice terhubung tetapi masih DATA_SOURCE=memory. Ubah ke DATA_SOURCE=prisma agar Save Draft dan Generate Invoice tersimpan ke database.",
-          );
-          return;
-        }
-
-        const sortedClients = [...clientRows].sort((left, right) => left.sortOrder - right.sortOrder);
-        setInvoiceClients(sortedClients);
-        setInvoiceRows(sortInvoiceRows(invoiceRowsResponse));
-        setIsInvoiceBackendAvailable(true);
-        setListFeedback(
-          sortedClients.length === 0
-            ? "Backend invoice terhubung, tetapi daftar client invoice masih kosong. Jalankan seed database lalu refresh halaman."
-            : null,
-        );
-        },
-      )
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setInvoiceClients([]);
-        setInvoiceRows([]);
-        setIsInvoiceBackendAvailable(false);
-        setListFeedback(
-          "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.",
-        );
-        console.warn("Invoice backend fetch failed. Invoice generation is disabled.", error);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsInvoiceDataLoading(false);
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+    return null;
+  }, [invoiceClients.length, invoiceDashboardQuery.data, invoiceDashboardQuery.error, isInvoiceBackendAvailable]);
+  const visibleFeedback = actionFeedback ?? systemFeedback;
 
   const normalizedQuery = query.trim().toLowerCase();
   const searchedRows = invoiceRows.filter((row) => {
@@ -1785,13 +1749,13 @@ export function InvoiceScreen({
   const handleViewPdf = (row: InvoiceRow) => {
     const exported = viewInvoicePdfFromRow({ row, groups });
     if (!exported) {
-      setListFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+      setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
     }
   };
 
   const handleOpenEditInvoice = (row: InvoiceRow) => {
     if (!isInvoiceBackendAvailable) {
-      setListFeedback("Backend invoice/database belum terhubung. Edit invoice dinonaktifkan.");
+      setActionFeedback("Backend invoice/database belum terhubung. Edit invoice dinonaktifkan.");
       return;
     }
 
@@ -1800,18 +1764,18 @@ export function InvoiceScreen({
   };
 
   useEffect(() => {
-    if (!listFeedback) {
+    if (!actionFeedback) {
       return undefined;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setListFeedback((current) => (current ? null : current));
+      setActionFeedback((current) => (current ? null : current));
     }, 2400);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [listFeedback]);
+  }, [actionFeedback]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1847,15 +1811,8 @@ export function InvoiceScreen({
         existingInvoiceNumbers={invoiceRows.map((row) => row.invoiceNumber)}
         onBack={() => setWorkspaceMode("list")}
         onCreate={(invoice, action) => {
-          setInvoiceRows((current) => {
-            const normalizedCreatedNumber = invoice.invoiceNumber.trim().toUpperCase();
-            const nextRows = current.filter(
-              (entry) => entry.invoiceNumber.trim().toUpperCase() !== normalizedCreatedNumber,
-            );
-            return sortInvoiceRows([invoice, ...nextRows]);
-          });
           setWorkspaceMode("list");
-          setListFeedback(
+          setActionFeedback(
             action === "draft"
               ? `Draft invoice ${invoice.invoiceNumber} saved to database.`
               : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
@@ -1894,14 +1851,9 @@ export function InvoiceScreen({
           // no-op on edit mode
         }}
         onUpdate={(invoice) => {
-          setInvoiceRows((current) =>
-            sortInvoiceRows(
-              current.map((entry) => (entry.id === invoice.id ? invoice : entry)),
-            ),
-          );
           setWorkspaceMode("list");
           setEditingInvoice(null);
-          setListFeedback(`Invoice ${invoice.invoiceNumber} berhasil diupdate.`);
+          setActionFeedback(`Invoice ${invoice.invoiceNumber} berhasil diupdate.`);
         }}
       />
     );
@@ -1909,7 +1861,7 @@ export function InvoiceScreen({
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      {listFeedback ? (
+      {visibleFeedback ? (
         <section
           className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-ambient"
           role="status"
@@ -1918,7 +1870,7 @@ export function InvoiceScreen({
           <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
             check_circle
           </span>
-          <p className="text-sm font-semibold">{listFeedback}</p>
+          <p className="text-sm font-semibold">{visibleFeedback}</p>
         </section>
       ) : null}
       {isInvoiceDataLoading ? (

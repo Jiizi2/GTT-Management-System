@@ -21,3 +21,8 @@ export const userManagementQueryKeys = {
   all: ["user-management"] as const,
   users: ["user-management", "users"] as const,
 };
+
+export const invoiceQueryKeys = {
+  all: ["invoices"] as const,
+  dashboard: ["invoices", "dashboard"] as const,
+};
