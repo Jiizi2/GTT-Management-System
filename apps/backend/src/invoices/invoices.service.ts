@@ -218,6 +218,10 @@ function resolveNextClientSortOrder<T extends { sortOrder: number }>(clients: T[
   return nextSortOrder;
 }
 
+function getTrimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 @Injectable()
 export class InvoicesService {
   private readonly dataSource: "memory" | "prisma";
@@ -280,7 +284,7 @@ export class InvoicesService {
   }
 
   private resolveClientForCreateInMemory(payload: CreateInvoiceDto): MemoryInvoiceClient {
-    const requestedClientId = payload.clientId?.trim();
+    const requestedClientId = getTrimmedString(payload.clientId);
     if (requestedClientId) {
       const matchedClient = this.memoryInvoiceClients.find((entry) => entry.id === requestedClientId);
       if (!matchedClient) {
@@ -290,7 +294,7 @@ export class InvoicesService {
       return matchedClient;
     }
 
-    const requestedClientName = payload.clientName?.trim();
+    const requestedClientName = getTrimmedString(payload.clientName);
     if (!requestedClientName) {
       throw new BadRequestException("Either clientId or clientName is required.");
     }
@@ -315,7 +319,7 @@ export class InvoicesService {
   private async resolveClientForCreateWithPrisma(
     payload: CreateInvoiceDto,
   ): Promise<ResolvedPrismaInvoiceClient> {
-    const requestedClientId = payload.clientId?.trim();
+    const requestedClientId = getTrimmedString(payload.clientId);
     if (requestedClientId) {
       const matchedClient = await this.prisma.invoiceClient.findUnique({
         where: {
@@ -337,7 +341,7 @@ export class InvoicesService {
       };
     }
 
-    const requestedClientName = payload.clientName?.trim();
+    const requestedClientName = getTrimmedString(payload.clientName);
     if (!requestedClientName) {
       throw new BadRequestException("Either clientId or clientName is required.");
     }
@@ -445,7 +449,7 @@ export class InvoicesService {
     const existingInvoiceNumbers = this.memoryInvoices.map((entry) => entry.invoiceNumber);
     const invoiceNumber = buildInvoiceNumber(invoiceYear, this.resolveNextSerial(existingInvoiceNumbers));
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? InvoiceStatus.PENDING, dueDateIso);
-    const normalizedGroupCode = payload.groupCode?.trim().toUpperCase();
+    const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
 
     const createdInvoice: MemoryInvoice = {
       id: randomUUID(),
@@ -457,7 +461,7 @@ export class InvoicesService {
       dueDateIso,
       amount: normalizeAmountByStatus(payload.amount, effectiveStatus),
       status: effectiveStatus,
-      notes: payload.notes?.trim() || undefined,
+      notes: getTrimmedString(payload.notes) || undefined,
     };
 
     this.memoryInvoices.unshift(createdInvoice);
@@ -471,8 +475,8 @@ export class InvoicesService {
     }
 
     const currentInvoice = this.memoryInvoices[invoiceIndex];
-    const requestedClientId = payload.clientId?.trim();
-    const requestedClientName = payload.clientName?.trim();
+    const requestedClientId = getTrimmedString(payload.clientId);
+    const requestedClientName = getTrimmedString(payload.clientName);
     let resolvedClient: MemoryInvoiceClient | undefined;
 
     if (requestedClientId) {
@@ -615,7 +619,7 @@ export class InvoicesService {
     const issuedDateIso = normalizeIsoDate(payload.issuedDate, "issuedDate");
     const dueDateIso = normalizeIsoDate(payload.dueDate, "dueDate");
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
-    const requestedGroupCode = payload.groupCode?.trim().toUpperCase();
+    const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
     let resolvedGroupId: string | null = client.groupId ?? null;
     if (requestedGroupCode) {
       const matchedGroup = await this.prisma.group.findUnique({
@@ -649,7 +653,7 @@ export class InvoicesService {
             dueDate: createUtcDateFromIso(dueDateIso),
             amount: roundedAmount,
             status: effectiveStatus,
-            notes: payload.notes?.trim() || null,
+            notes: getTrimmedString(payload.notes) || null,
           },
           include: {
             client: true,
@@ -710,8 +714,8 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice '${id}' not found.`);
     }
 
-    const requestedClientId = payload.clientId?.trim();
-    const requestedClientName = payload.clientName?.trim();
+    const requestedClientId = getTrimmedString(payload.clientId);
+    const requestedClientName = getTrimmedString(payload.clientName);
     const hasClientChangeRequest = Boolean(requestedClientId || requestedClientName);
     let resolvedClientId = existingInvoice.clientId;
     let resolvedClientGroupId: string | null = null;

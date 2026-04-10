@@ -61,7 +61,7 @@ export function PaginationControls({
             type="button"
             className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition ${
               currentPage === pageNumber
-                ? "bg-primary text-white shadow-cta-soft"
+                ? "bg-primary text-on-primary shadow-cta-soft"
                 : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
             }`}
             onClick={() => onPageChange(pageNumber)}

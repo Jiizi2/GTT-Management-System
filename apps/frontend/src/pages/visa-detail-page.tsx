@@ -676,7 +676,7 @@ export function VisaTrackingDetailScreen({
         <div className="flex items-center gap-2 self-start">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
             disabled
             title="Export PDF is coming soon."
           >
@@ -690,7 +690,7 @@ export function VisaTrackingDetailScreen({
       </section>
 
       <section className="grid gap-3 md:grid-cols-3" aria-label="Quick status">
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Status</p>
             <div className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(visaTone)}`}>
@@ -710,7 +710,7 @@ export function VisaTrackingDetailScreen({
           </button>
         </article>
 
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Status</p>
             <div className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(paymentTone)}`}>
@@ -730,7 +730,7 @@ export function VisaTrackingDetailScreen({
           </button>
         </article>
 
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               <span className="sm:hidden">Raudhah</span>
@@ -755,7 +755,7 @@ export function VisaTrackingDetailScreen({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <article className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2">
               <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
@@ -766,7 +766,7 @@ export function VisaTrackingDetailScreen({
 
             <button
               type="button"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
               onClick={() => openAddHotelInline("makkah")}
             >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -812,7 +812,7 @@ export function VisaTrackingDetailScreen({
 
                   <div className="serene-accordion-content">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
+                      <div className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
                         <span className="material-symbols-outlined text-base" aria-hidden="true">
                           group
                         </span>
@@ -934,14 +934,14 @@ export function VisaTrackingDetailScreen({
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+                  className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
                   onClick={cancelAddHotelInline}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
                   onClick={saveAddHotelInline}
                   disabled={isAddingHotelDraftSaveDisabled}
                 >
@@ -967,7 +967,7 @@ export function VisaTrackingDetailScreen({
           </div>
         </article>
 
-        <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <article className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2">
               <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
@@ -978,7 +978,7 @@ export function VisaTrackingDetailScreen({
 
             <button
               type="button"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
               onClick={() => openAddHotelInline("madinah")}
             >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -1024,7 +1024,7 @@ export function VisaTrackingDetailScreen({
 
                   <div className="serene-accordion-content">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
+                      <div className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
                         <span className="material-symbols-outlined text-base" aria-hidden="true">
                           group
                         </span>
@@ -1146,14 +1146,14 @@ export function VisaTrackingDetailScreen({
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+                  className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
                   onClick={cancelAddHotelInline}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
                   onClick={saveAddHotelInline}
                   disabled={isAddingHotelDraftSaveDisabled}
                 >
@@ -1192,7 +1192,7 @@ export function VisaTrackingDetailScreen({
 
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
               onClick={handleCopyRaudhahReminder}
               aria-label={`Copy Raudhah reminder template for ${row.groupCode}`}
             >
@@ -1244,7 +1244,7 @@ export function VisaTrackingDetailScreen({
             </button>
             <button
               type="button"
-              className="inline-flex rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold leading-none text-slate-700 transition hover:border-slate-400"
+              className="inline-flex rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-bold leading-none text-slate-700 transition hover:border-slate-400"
               onClick={() => setIsClearRaudhahConfirmOpen(true)}
             >
               Clear
@@ -1252,7 +1252,7 @@ export function VisaTrackingDetailScreen({
           </div>
         </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
               business
@@ -1279,7 +1279,7 @@ export function VisaTrackingDetailScreen({
           </button>
         </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
               payments
@@ -1302,7 +1302,7 @@ export function VisaTrackingDetailScreen({
 
           <button
             type="button"
-            className="mt-4 inline-flex rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-bold leading-none text-white transition hover:bg-primary-container"
+            className="mt-4 inline-flex rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-bold leading-none text-on-primary transition hover:bg-primary-container"
             onClick={() => {
               const nextStatus = paymentStatus === "Paid" ? "Unpaid" : "Paid";
               setPaymentStatus(nextStatus);
@@ -1417,7 +1417,7 @@ export function VisaTrackingDetailScreen({
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700"
                 onClick={clearRaudhah}
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -1432,6 +1432,7 @@ export function VisaTrackingDetailScreen({
     </div>
   );
 }
+
 
 
 

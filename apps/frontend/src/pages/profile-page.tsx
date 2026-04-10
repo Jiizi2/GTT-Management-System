@@ -354,7 +354,7 @@ export function ProfileScreen({
                 <h2 className="font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl">
                   {profileData.fullName}
                 </h2>
-                <span className="inline-flex rounded-full bg-primary px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                <span className="inline-flex rounded-full bg-primary px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-on-primary">
                   {roleBadgeLabel}
                 </span>
               </div>
@@ -712,3 +712,4 @@ export function ProfileScreen({
     </div>
   );
 }
+

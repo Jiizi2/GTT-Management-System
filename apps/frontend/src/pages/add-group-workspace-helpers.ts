@@ -167,6 +167,19 @@ function resolveHotelNameFromRouteValues(...values: Array<string | undefined>): 
   return "";
 }
 
+function resolveFallbackCityHotelName(cityInput: string): string {
+  const cityKey = normalizeAgreementCityKey(cityInput);
+  if (cityKey === "makkah") {
+    return "Makkah Hotel";
+  }
+
+  if (cityKey === "madinah") {
+    return "Madinah Hotel";
+  }
+
+  return "";
+}
+
 function resolveTripHotelName(
   category: string,
   from: string,
@@ -177,21 +190,24 @@ function resolveTripHotelName(
   if (category === "city-tour") {
     return (
       resolveCityHotelNameFromPrefill(prefill, cityTourCity) ||
-      resolveHotelNameFromRouteValues(from, to)
+      resolveHotelNameFromRouteValues(from, to) ||
+      resolveFallbackCityHotelName(cityTourCity)
     );
   }
 
   if (category === "departure") {
     return (
       resolveCityHotelNameFromPrefill(prefill, from) ||
-      resolveHotelNameFromRouteValues(from, to)
+      resolveHotelNameFromRouteValues(from, to) ||
+      resolveFallbackCityHotelName(from)
     );
   }
 
   if (category === "arrival" || category === "transfer") {
     return (
       resolveCityHotelNameFromPrefill(prefill, to) ||
-      resolveHotelNameFromRouteValues(to, from)
+      resolveHotelNameFromRouteValues(to, from) ||
+      resolveFallbackCityHotelName(to)
     );
   }
 

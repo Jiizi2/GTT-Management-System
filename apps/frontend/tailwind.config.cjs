@@ -5,10 +5,19 @@ module.exports = {
     extend: {
       colors: {
         white: "rgb(var(--color-white) / <alpha-value>)",
+        background: {
+          DEFAULT: "rgb(var(--color-background) / <alpha-value>)",
+          deep: "rgb(var(--color-background-deep) / <alpha-value>)",
+        },
         primary: "rgb(var(--color-primary) / <alpha-value>)",
         "primary-container": "rgb(var(--color-primary-container) / <alpha-value>)",
+        "on-primary": "rgb(var(--color-on-primary) / <alpha-value>)",
         secondary: "rgb(var(--color-secondary) / <alpha-value>)",
         tertiary: "rgb(var(--color-tertiary) / <alpha-value>)",
+        text: {
+          primary: "rgb(var(--color-text-primary) / <alpha-value>)",
+          secondary: "rgb(var(--color-text-secondary) / <alpha-value>)",
+        },
         surface: {
           DEFAULT: "rgb(var(--color-surface) / <alpha-value>)",
           container: {
@@ -108,7 +117,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ["var(--serene-font-family)", "Inter", "sans-serif"],
         display: ["Manrope", "sans-serif"],
         brand: ["Sora", "sans-serif"],
       },
@@ -122,7 +131,7 @@ module.exports = {
         "cta-soft": "var(--serene-shadow-cta-soft)",
       },
       backdropBlur: {
-        serene: "14px",
+        serene: "12px",
       },
     },
   },

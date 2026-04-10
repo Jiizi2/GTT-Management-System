@@ -794,10 +794,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     return (
       <article
         key={item.id}
-        className="overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-white shadow-sm"
+        className="overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-surface-container-lowest shadow-sm"
       >
         <div className="grid gap-0 lg:grid-cols-[0.78fr_1.22fr]">
-          <div className="border-b border-dashed border-black/45 bg-white p-5 lg:border-b-0 lg:border-r">
+          <div className="border-b border-dashed border-black/45 bg-surface-container-lowest p-5 lg:border-b-0 lg:border-r">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Group No</p>
@@ -824,7 +824,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Activity</p>
               <h4 className="text-lg font-bold leading-snug text-slate-900">{item.activity}</h4>
               <p className="truncate text-sm font-semibold text-slate-900">{item.groupName}</p>
-              <span className="inline-flex items-center rounded-md border border-slate-900/20 bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-900">
+              <span className="inline-flex items-center rounded-md border border-slate-900/20 bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-900">
                 {serviceType}
               </span>
             </div>
@@ -845,9 +845,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             </div>
           </div>
 
-          <div className="space-y-4 bg-white p-5">
+          <div className="checklist-need-attention-body space-y-4 p-5">
             {isExternalTransport ? (
-              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="checklist-need-attention-warning flex items-start gap-2 rounded-xl px-3 py-2 text-xs">
                 <span className="material-symbols-outlined text-sm" aria-hidden="true">
                   warning
                 </span>
@@ -857,12 +857,12 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </div>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant/90">
                 Assign Transport (Driver {assignedProgressCount}/{requiredDriverCount})
               </span>
 
               {isMultiDriver ? (
-                <span className="inline-flex rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-rose-700">
+                <span className="checklist-need-attention-required inline-flex rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em]">
                   {requiredDriverCount} Buses Required
                 </span>
               ) : null}
@@ -870,7 +870,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Driver Name</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Driver Name</span>
                 <input
                   type="text"
                   className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
@@ -883,7 +883,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Phone</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Phone</span>
                 <input
                   type="tel"
                   className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
@@ -896,7 +896,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Plate</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Plate</span>
                 <input
                   type="text"
                   className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
@@ -912,7 +912,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-extrabold uppercase tracking-[0.12em] text-white transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-45"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-extrabold uppercase tracking-[0.12em] text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-45"
                 onClick={() => handleConfirmDriver(item.id)}
                 disabled={isConfirmDisabled}
               >
@@ -927,10 +927,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </button>
 
               <div
-                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold leading-none ${
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold leading-none ${
                   isComplete
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-rose-200 bg-rose-50 text-rose-700"
+                    ? "checklist-need-attention-status-complete"
+                    : "checklist-need-attention-status-pending"
                 }`}
                 role="status"
                 aria-live="polite"
@@ -950,10 +950,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
       <section
-        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        className="flex items-center gap-3"
         aria-label="Search checklist items"
       >
-        <div className="flex w-full max-w-xl items-center gap-3">
+        <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label
             className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
           >
@@ -969,8 +969,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             />
           </label>
 
-          <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary sm:hidden" />
         </div>
+
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
 
       </section>
 
@@ -1251,7 +1252,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700"
                   onClick={() => {
                     void handleConfirmCancelAssignment();
                   }}
@@ -1269,6 +1270,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     </div>
   );
 }
+
 
 
 

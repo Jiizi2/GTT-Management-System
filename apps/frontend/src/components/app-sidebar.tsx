@@ -76,7 +76,7 @@ export function AppSidebar({
   return (
     <>
       <aside
-        className={`fixed inset-y-0 left-0 z-10 hidden flex-col border-r border-outline-variant/40 bg-surface-container-low pb-7 pt-4 transition-[width,padding] duration-200 lg:flex ${
+        className={`fixed inset-y-0 left-0 z-10 hidden flex-col bg-surface-container-low pb-7 pt-4 shadow-ambient transition-[width,padding] duration-200 lg:flex ${
           isCollapsed ? "w-[104px] px-3.5" : "w-[280px] pl-6 pr-5"
         }`}
       >
@@ -123,7 +123,7 @@ export function AppSidebar({
                 isCollapsed ? "h-14 w-14 justify-center px-0" : "px-4 py-3.5"
               } ${
                 activeNav === item.id
-                  ? "bg-surface-container-lowest text-primary shadow-[0_18px_40px_-28px_rgba(27,28,26,0.35)]"
+                  ? "bg-surface-container-lowest text-primary shadow-ambient"
                   : "text-on-surface-variant hover:translate-x-1 hover:bg-surface-container-lowest hover:text-primary"
               }`}
               onClick={() => onNavigate(item.id)}
@@ -148,7 +148,7 @@ export function AppSidebar({
                 isCollapsed ? "h-14 w-14 justify-center px-0" : "px-4 py-3.5"
               } ${
                 activeNav === item.id
-                  ? "bg-surface-container-lowest text-primary shadow-[0_18px_40px_-28px_rgba(27,28,26,0.35)]"
+                  ? "bg-surface-container-lowest text-primary shadow-ambient"
                   : "text-on-surface-variant hover:translate-x-1 hover:bg-surface-container-lowest hover:text-primary"
               }`}
               onClick={() => onNavigate(item.id)}
@@ -167,7 +167,7 @@ export function AppSidebar({
         <div className={`mt-auto grid gap-3 ${isCollapsed ? "justify-items-center" : ""}`}>
           <button
             type="button"
-            className={`inline-flex min-h-12 items-center justify-center gap-2 bg-primary text-[0.82rem] font-extrabold uppercase tracking-[0.08em] text-white shadow-cta-soft transition hover:-translate-y-0.5 hover:bg-primary-container ${
+            className={`serene-btn-primary min-h-12 text-[0.82rem] font-extrabold uppercase tracking-[0.08em] ${
               isCollapsed ? "h-14 w-14 rounded-[18px] p-0" : "w-full rounded-md px-4"
             } ${activeNav === "new-group" ? "ring-2 ring-primary/20 ring-offset-2 ring-offset-transparent" : ""}`}
             onClick={onOpenNewGroup}
@@ -181,7 +181,7 @@ export function AppSidebar({
           </button>
         </div>
 
-        <div className={`mt-4 border-t border-surface-container-high/70 pt-3 ${isCollapsed ? "px-0" : ""}`}>
+        <div className={`mt-4 pt-3 ${isCollapsed ? "px-0" : ""}`}>
           <button
             type="button"
             className={`group flex items-center gap-3 rounded-[1rem] transition ${
@@ -195,7 +195,7 @@ export function AppSidebar({
             title={isCollapsed ? sidebarAccountItem.label : undefined}
             aria-label="Open Profile"
           >
-            <div className="h-10 w-10 overflow-hidden rounded-full bg-surface-container-high ring-1 ring-slate-200/80">
+            <div className="h-10 w-10 overflow-hidden rounded-full bg-surface-container-high">
               <img src={operatorAvatar} alt="Operator Admin" className="h-full w-full object-cover" />
             </div>
 

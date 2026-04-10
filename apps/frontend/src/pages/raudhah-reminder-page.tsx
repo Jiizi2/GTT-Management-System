@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Domain from "../shared/app-domain";
 import type { GroupData, GroupRaudhahStatus, VisaTrackingRow } from "../shared/app-domain";
+import { useThemeMode } from "../theme/theme-provider";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 
 const {
@@ -88,7 +89,19 @@ const reminderSectionConfig: Record<ReminderSlot, ReminderSectionConfig> = {
 
 const MAX_H7_UPCOMING_TARGET_DAYS = 12;
 
-function getSectionBadgeAccentClass(slot: ReminderSlot): string {
+function getSectionBadgeAccentClass(slot: ReminderSlot, isDarkMode: boolean): string {
+  if (isDarkMode) {
+    if (slot === "h2") {
+      return "border border-tertiary/40 bg-tertiary/30 text-white";
+    }
+
+    if (slot === "h7") {
+      return "border border-primary/40 bg-primary/30 text-white";
+    }
+
+    return "border border-secondary/40 bg-secondary/28 text-white";
+  }
+
   if (slot === "h2") {
     return "border border-rose-700/30 bg-rose-600 text-white";
   }
@@ -100,7 +113,19 @@ function getSectionBadgeAccentClass(slot: ReminderSlot): string {
   return "border border-sky-700/30 bg-sky-600 text-white";
 }
 
-function getSectionDividerAccentClass(slot: ReminderSlot): string {
+function getSectionDividerAccentClass(slot: ReminderSlot, isDarkMode: boolean): string {
+  if (isDarkMode) {
+    if (slot === "h2") {
+      return "bg-tertiary/35";
+    }
+
+    if (slot === "h7") {
+      return "bg-primary/35";
+    }
+
+    return "bg-secondary/35";
+  }
+
   if (slot === "h2") {
     return "bg-rose-200";
   }
@@ -389,7 +414,14 @@ function formatReminderCardStatusLabel(summary: { open: number; upcoming: number
   return `${summary.upcoming} Upcoming`;
 }
 
-function getReminderCardStatusClass(summary: { open: number; upcoming: number; notPrinted: number }): string {
+function getReminderCardStatusClass(
+  summary: { open: number; upcoming: number; notPrinted: number },
+  isDarkMode: boolean,
+): string {
+  if (isDarkMode) {
+    return "text-white";
+  }
+
   if (summary.open > 0) {
     return "text-rose-700";
   }
@@ -417,6 +449,7 @@ function ReminderSection({
   slot,
   items,
   copiedItemId,
+  isDarkMode,
   onCopyTemplate,
   onOpenVisaDetail,
   onSetRaudhahTasrehPrinted,
@@ -424,6 +457,7 @@ function ReminderSection({
   slot: ReminderSlot;
   items: ReminderItem[];
   copiedItemId: string | null;
+  isDarkMode: boolean;
   onCopyTemplate: (item: ReminderItem) => Promise<void>;
   onOpenVisaDetail: (groupCode: string) => void;
   onSetRaudhahTasrehPrinted: (
@@ -455,6 +489,7 @@ function ReminderSection({
           <div
             className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] ${getSectionBadgeAccentClass(
               slot,
+              isDarkMode,
             )}`}
           >
             <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -462,7 +497,7 @@ function ReminderSection({
             </span>
             <span>{config.title}</span>
           </div>
-          <span className={`h-px flex-1 ${getSectionDividerAccentClass(slot)}`} aria-hidden="true" />
+          <span className={`h-px flex-1 ${getSectionDividerAccentClass(slot, isDarkMode)}`} aria-hidden="true" />
           <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/80">
             {config.subtitle}
           </span>
@@ -498,7 +533,7 @@ function ReminderSection({
                   <div className="flex items-start justify-between gap-2">
                     <strong className="text-lg font-extrabold tracking-wide text-slate-800">{item.groupCode}</strong>
                     <span
-                      className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${getReminderCardStatusClass(cardSummary)}`}
+                      className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${getReminderCardStatusClass(cardSummary, isDarkMode)}`}
                     >
                       {formatReminderCardStatusLabel(cardSummary)}
                     </span>
@@ -564,7 +599,7 @@ function ReminderSection({
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-white/70 p-3">
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-surface-container-lowest/70 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">Tasreh Print</p>
                     </div>
@@ -643,7 +678,7 @@ function ReminderSection({
           onClick={() => setPendingTasrehAction(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <h3 className="text-lg font-extrabold text-slate-900">Konfirmasi Status Tasreh</h3>
@@ -691,6 +726,8 @@ export function RaudhahReminderScreen({
     tasrehPrinted: boolean,
   ) => void;
 }) {
+  const { theme } = useThemeMode();
+  const isDarkMode = theme === "dark";
   const [query, setQuery] = useState("");
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -946,10 +983,55 @@ export function RaudhahReminderScreen({
     onOpenVisaDetail(visaRow);
   };
 
+  const heroSectionClassName = isDarkMode
+    ? "serene-section flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+    : "flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-surface-container-lowest p-5 shadow-sm md:flex-row md:items-end md:justify-between";
+  const heroLabelClassName = isDarkMode ? "text-primary/85" : "text-emerald-700";
+  const heroTitleClassName = isDarkMode
+    ? "mt-2 text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl"
+    : "mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl";
+  const heroDescriptionClassName = isDarkMode
+    ? "mt-2 max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base"
+    : "mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base";
+  const syncedChipClassName = isDarkMode
+    ? "inline-flex items-center gap-2 self-start rounded-xl border border-primary/30 bg-primary/12 px-3 py-2 text-xs font-semibold text-on-surface"
+    : "inline-flex items-center gap-2 self-start rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800";
+  const syncedChipIconClassName = isDarkMode ? "text-base text-primary" : "text-base text-emerald-700";
+  const openSummaryCardClassName = isDarkMode
+    ? "relative overflow-hidden rounded-2xl border border-tertiary/35 bg-tertiary/16 p-5 shadow-sm"
+    : "relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/55 p-5 shadow-sm";
+  const openSummaryLabelClassName = isDarkMode
+    ? "text-[11px] font-bold uppercase tracking-[0.14em] text-white"
+    : "text-[11px] font-bold uppercase tracking-[0.14em] text-rose-700";
+  const openSummaryValueClassName = isDarkMode
+    ? "mt-2 block text-4xl font-extrabold leading-none text-white"
+    : "mt-2 block text-4xl font-extrabold leading-none text-rose-800";
+  const openSummaryDescClassName = isDarkMode
+    ? "mt-2 text-xs font-semibold text-white"
+    : "mt-2 text-xs font-semibold text-rose-700";
+  const openSummaryIconClassName = isDarkMode
+    ? "material-symbols-outlined absolute right-5 top-5 text-3xl text-white/90"
+    : "material-symbols-outlined absolute right-5 top-5 text-3xl text-rose-600/90";
+  const upcomingSummaryCardClassName = isDarkMode
+    ? "relative overflow-hidden rounded-2xl border border-primary/35 bg-primary/16 p-5 shadow-sm"
+    : "relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/55 p-5 shadow-sm";
+  const upcomingSummaryLabelClassName = isDarkMode
+    ? "text-[11px] font-bold uppercase tracking-[0.14em] text-white"
+    : "text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700";
+  const upcomingSummaryValueClassName = isDarkMode
+    ? "mt-2 block text-4xl font-extrabold leading-none text-white"
+    : "mt-2 block text-4xl font-extrabold leading-none text-emerald-800";
+  const upcomingSummaryDescClassName = isDarkMode
+    ? "mt-2 text-xs font-semibold text-white"
+    : "mt-2 text-xs font-semibold text-emerald-700";
+  const upcomingSummaryIconClassName = isDarkMode
+    ? "material-symbols-outlined absolute right-5 top-5 text-3xl text-white/90"
+    : "material-symbols-outlined absolute right-5 top-5 text-3xl text-emerald-700/90";
+
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex w-full max-w-xl items-center gap-3">
+      <header className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label
             className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
             aria-label="Search reminder groups"
@@ -966,34 +1048,37 @@ export function RaudhahReminderScreen({
             />
           </label>
 
-          <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary sm:hidden" />
         </div>
 
-        {hasQuery ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-primary transition hover:text-primary/90 sm:ml-auto"
-            onClick={() => setQuery("")}
-          >
-            Clear search
-          </button>
-        ) : null}
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:mr-5">
+          {hasQuery ? (
+            <button
+              type="button"
+              className="whitespace-nowrap text-sm font-semibold text-primary transition hover:text-primary/90"
+              onClick={() => setQuery("")}
+            >
+              Clear search
+            </button>
+          ) : null}
+
+          <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary" />
+        </div>
       </header>
 
-      <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-surface-container-lowest p-5 shadow-sm md:flex-row md:items-end md:justify-between">
+      <section className={heroSectionClassName}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Global Operations</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabelClassName}`}>Global Operations</p>
+          <h1 className={heroTitleClassName}>
             Raudhah Booking Slots
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
+          <p className={heroDescriptionClassName}>
             Booking Nusuk untuk target tanggal yang sama hanya dibuka pada 2 momen: H-7 dan H-2.
             Board ini memantau kedua slot tersebut per target date.
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-2 self-start rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-          <span className="material-symbols-outlined text-base text-emerald-700" aria-hidden="true">
+        <div className={syncedChipClassName}>
+          <span className={`material-symbols-outlined ${syncedChipIconClassName}`} aria-hidden="true">
             schedule
           </span>
           <span>Last synced: {syncedAtLabel}</span>
@@ -1001,24 +1086,24 @@ export function RaudhahReminderScreen({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2" aria-label="Booking slot summary">
-        <article className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/55 p-5 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-rose-700">Open Today</p>
-          <strong className="mt-2 block text-4xl font-extrabold leading-none text-rose-800">
+        <article className={openSummaryCardClassName}>
+          <p className={openSummaryLabelClassName}>Open Today</p>
+          <strong className={openSummaryValueClassName}>
             {String(slotStatusSummary.open).padStart(2, "0")} Slots
           </strong>
-          <p className="mt-2 text-xs font-semibold text-rose-700">Aksi booking Nusuk hari ini</p>
-          <span className="material-symbols-outlined absolute right-5 top-5 text-3xl text-rose-600/90" aria-hidden="true">
+          <p className={openSummaryDescClassName}>Aksi booking Nusuk hari ini</p>
+          <span className={openSummaryIconClassName} aria-hidden="true">
             today
           </span>
         </article>
 
-        <article className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/55 p-5 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Upcoming</p>
-          <strong className="mt-2 block text-4xl font-extrabold leading-none text-emerald-800">
+        <article className={upcomingSummaryCardClassName}>
+          <p className={upcomingSummaryLabelClassName}>Upcoming</p>
+          <strong className={upcomingSummaryValueClassName}>
             {String(slotStatusSummary.upcoming).padStart(2, "0")} Slots
           </strong>
-          <p className="mt-2 text-xs font-semibold text-emerald-700">Slot yang belum buka, masih menunggu</p>
-          <span className="material-symbols-outlined absolute right-5 top-5 text-3xl text-emerald-700/90" aria-hidden="true">
+          <p className={upcomingSummaryDescClassName}>Slot yang belum buka, masih menunggu</p>
+          <span className={upcomingSummaryIconClassName} aria-hidden="true">
             event_upcoming
           </span>
         </article>
@@ -1039,6 +1124,7 @@ export function RaudhahReminderScreen({
             slot="h2"
             items={h2Items}
             copiedItemId={copiedItemId}
+            isDarkMode={isDarkMode}
             onCopyTemplate={handleCopyTemplate}
             onOpenVisaDetail={handleOpenVisaDetail}
             onSetRaudhahTasrehPrinted={onSetRaudhahTasrehPrinted}
@@ -1048,6 +1134,7 @@ export function RaudhahReminderScreen({
             slot="h7"
             items={h7Items}
             copiedItemId={copiedItemId}
+            isDarkMode={isDarkMode}
             onCopyTemplate={handleCopyTemplate}
             onOpenVisaDetail={handleOpenVisaDetail}
             onSetRaudhahTasrehPrinted={onSetRaudhahTasrehPrinted}
@@ -1057,6 +1144,7 @@ export function RaudhahReminderScreen({
             slot="h7Upcoming"
             items={upcomingH7Items}
             copiedItemId={copiedItemId}
+            isDarkMode={isDarkMode}
             onCopyTemplate={handleCopyTemplate}
             onOpenVisaDetail={handleOpenVisaDetail}
             onSetRaudhahTasrehPrinted={onSetRaudhahTasrehPrinted}
@@ -1066,3 +1154,4 @@ export function RaudhahReminderScreen({
     </div>
   );
 }
+

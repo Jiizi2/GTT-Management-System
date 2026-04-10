@@ -684,15 +684,6 @@ export function useAppController(): AppController {
 
     if (sessionAccessTier !== "super-admin") {
       setActiveNav("overview");
-      return;
-    }
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (window.matchMedia("(max-width: 1023px)").matches) {
-      setActiveNav("overview");
     }
   }, [activeNav, sessionAccessTier]);
 
@@ -712,10 +703,6 @@ export function useAppController(): AppController {
     const normalizedNavId = navId === "input" ? "new-group" : navId;
     if (normalizedNavId === "user-management" || normalizedNavId === "master-data") {
       if (sessionAccessTier !== "super-admin") {
-        return;
-      }
-
-      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
         return;
       }
     }

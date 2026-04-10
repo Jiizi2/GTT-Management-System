@@ -949,7 +949,7 @@ export function GroupDetail({
       <div>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-sm font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
           onClick={onBack}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
@@ -984,7 +984,7 @@ export function GroupDetail({
 
           <button
             type="button"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto"
             onClick={handleExportPdf}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
@@ -998,7 +998,7 @@ export function GroupDetail({
 
       <div className="space-y-6">
         <div className="grid gap-4 xl:grid-cols-[1.45fr_0.75fr]">
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-5 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="space-y-2 md:space-y-1">
                 <div className="flex items-start justify-between gap-3 md:hidden">
@@ -1070,13 +1070,13 @@ export function GroupDetail({
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <p className={detailKickerClassName}>Assigned Musyrif</p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
                   onClick={handleCopyMusyrif}
                   aria-label={`Copy musyrif data for ${group.name}`}
                 >
@@ -1159,7 +1159,7 @@ export function GroupDetail({
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-5 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Full Itinerary</h3>
@@ -1192,7 +1192,7 @@ export function GroupDetail({
                   return (
                     <article
                       key={`${group.code}-${index}-${item.date}`}
-                      className={`rounded-2xl border bg-white p-4 ${
+                      className={`rounded-2xl border bg-surface-container-lowest p-4 ${
                         item.highlighted ? "border-brand-primary/40" : "border-slate-200"
                       }`}
                     >
@@ -1293,7 +1293,7 @@ export function GroupDetail({
 
                 <button
                   type="button"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-white px-4 py-3 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/10 md:text-base"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/10 md:text-base"
                   onClick={handleOpenScheduleModal}
                 >
                   <span className="material-symbols-outlined" aria-hidden="true">
@@ -1436,4 +1436,5 @@ export function GroupDetail({
     </div>
   );
 }
+
 

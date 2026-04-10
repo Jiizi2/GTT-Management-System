@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { SereneSelect } from "../components/serene-select";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
   createManagedUserInBackend,
   deleteManagedUserInBackend,
@@ -120,7 +121,7 @@ function UserManagementModalPortal({ children }: { children: ReactNode }) {
 
 function resolveRoleToneClass(roleId: string): string {
   if (roleId === "super-admin") {
-    return "bg-primary text-white";
+    return "bg-primary text-on-primary";
   }
 
   if (roleId === "admin") {
@@ -542,13 +543,17 @@ export function UserManagementScreen() {
     <>
       <div className="hidden lg:block">
         <div className="mx-auto max-w-7xl space-y-6 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-          <header className="space-y-2">
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
-              User Management
-            </h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
-              Kelola akun pengguna, tambah user baru, dan atur role untuk kebutuhan operasional.
-            </p>
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="space-y-2">
+              <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
+                User Management
+              </h1>
+              <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+                Kelola akun pengguna, tambah user baru, dan atur role untuk kebutuhan operasional.
+              </p>
+            </div>
+
+            <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5 sm:self-auto" />
           </header>
 
           {notice ? (
@@ -934,3 +939,4 @@ export function UserManagementScreen() {
     </>
   );
 }
+

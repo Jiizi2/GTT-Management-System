@@ -62,7 +62,7 @@ export function MusyrifModal({
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
-          className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-musyrif-title"
@@ -71,7 +71,7 @@ export function MusyrifModal({
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
             <h2 id="edit-musyrif-title" className="text-2xl font-bold tracking-tight text-slate-900">Edit Musyrif</h2>
 
-            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700" onClick={onClose} aria-label="Close edit musyrif popup">
+            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-primary hover:text-primary" onClick={onClose} aria-label="Close edit musyrif popup">
               <span className="material-symbols-outlined" aria-hidden="true">
                 close
               </span>
@@ -105,11 +105,11 @@ export function MusyrifModal({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-            <button type="button" className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45" onClick={onSave} disabled={isSaveDisabled}>
+            <button type="button" className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45" onClick={onSave} disabled={isSaveDisabled}>
               Save Changes
             </button>
 
-            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700" onClick={onClose}>
+            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary" onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -132,7 +132,7 @@ export function DeleteConfirmModal({
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
-          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-itinerary-title"
@@ -147,7 +147,7 @@ export function DeleteConfirmModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-primary hover:text-primary"
               onClick={onClose}
               aria-label="Close delete confirmation popup"
             >
@@ -183,14 +183,14 @@ export function DeleteConfirmModal({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-            <button type="button" className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700" onClick={onConfirm}>
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700" onClick={onConfirm}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 delete
               </span>
               <span>Delete Itinerary</span>
             </button>
 
-            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700" onClick={onClose}>
+            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary" onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -215,7 +215,7 @@ export function DeleteGroupModal({
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
-          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-group-title"
@@ -230,7 +230,7 @@ export function DeleteGroupModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
               aria-label="Close delete group confirmation popup"
             >
@@ -267,7 +267,7 @@ export function DeleteGroupModal({
               <span>Delete Group</span>
             </button>
 
-            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose}>
+            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -307,7 +307,7 @@ export function GroupEditModal({
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
           id="group-edit-modal"
-          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="group-edit-title"
@@ -322,7 +322,7 @@ export function GroupEditModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
               aria-label="Close edit group popup"
             >
@@ -370,7 +370,7 @@ export function GroupEditModal({
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
             <button
               type="button"
-              className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+              className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
               onClick={onSave}
               disabled={isSaveDisabled}
             >
@@ -379,7 +379,7 @@ export function GroupEditModal({
 
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
             >
               Cancel
@@ -423,28 +423,28 @@ export function ScheduleModal({
   const modalWarnClassName =
     "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
   const modalCheckClassName =
-    "md:col-span-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700";
+    "md:col-span-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2 text-sm font-medium text-slate-700";
   const modalTransferCardClassName = "md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 p-3";
   const modalMetaClassName =
     "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2";
   const modalToggleTrackClassName =
     "inline-flex h-6 w-11 items-center rounded-full bg-slate-300 p-0.5 transition";
   const modalToggleChipClassName =
-    "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300";
+    "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
 
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`} onClick={onClose}>
         <div
-          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="schedule-modal-title"
           onClick={(event) => event.stopPropagation()}
         >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-surface-container-lowest px-5 py-4">
           <div className="flex items-start gap-3">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
               <span className="material-symbols-outlined" aria-hidden="true">
                 edit_note
               </span>
@@ -456,7 +456,7 @@ export function ScheduleModal({
             </div>
           </div>
 
-          <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose} aria-label="Close add schedule popup">
+          <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose} aria-label="Close add schedule popup">
             <span className="material-symbols-outlined" aria-hidden="true">
               close
             </span>
@@ -474,8 +474,8 @@ export function ScheduleModal({
                     type="button"
                     className={`${modalToggleChipClassName} ${
                       form.category === option.value
-                        ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
-                        : "border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                        ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
+                        : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
                     }`}
                     onClick={() => {
                       const nextCategory = option.value;
@@ -709,7 +709,7 @@ export function ScheduleModal({
 
                 <label className={modalCheckClassName}>
                   <input
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/25"
                     type="checkbox"
                     checked={form.transferByTrain}
                     onChange={(event) => {
@@ -796,9 +796,9 @@ export function ScheduleModal({
                 <span>Highlight in itinerary</span>
               </div>
 
-              <span className={`${modalToggleTrackClassName} ${form.highlighted ? "bg-emerald-600" : "bg-slate-300"}`}>
+              <span className={`${modalToggleTrackClassName} ${form.highlighted ? "bg-primary" : "bg-slate-300"}`}>
                 <span
-                  className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                  className={`h-5 w-5 rounded-full bg-surface-container-lowest shadow-sm transition ${
                     form.highlighted ? "translate-x-5" : "translate-x-0"
                   }`}
                 />
@@ -807,10 +807,10 @@ export function ScheduleModal({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-surface-container-lowest px-5 py-4">
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+            className="serene-btn-primary gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
             onClick={onSave}
             disabled={isSaveDisabled}
           >
@@ -820,7 +820,7 @@ export function ScheduleModal({
             <span>Save Schedule</span>
           </button>
 
-          <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose}>
+          <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose}>
             Cancel
           </button>
         </div>
@@ -862,29 +862,29 @@ export function EditScheduleModal({
   const modalGridThreeClassName = "grid gap-3 md:grid-cols-3";
   const modalWideClassName = "md:col-span-2";
   const modalCheckClassName =
-    "inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700";
+    "inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2 text-sm font-medium text-slate-700";
   const modalWarnClassName =
     "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
   const modalInfoClassName =
     "flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800";
   const modalTransferCardClassName = "rounded-2xl border border-sky-200 bg-sky-50 p-3";
   const modalToggleChipClassName =
-    "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300";
+    "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
 
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`} onClick={onClose}>
         <div
-          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-schedule-title"
           onClick={(event) => event.stopPropagation()}
         >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-surface-container-lowest px-5 py-4">
           <h2 id="edit-schedule-title" className="text-2xl font-bold tracking-tight text-slate-900">Edit Schedule</h2>
 
-          <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose} aria-label="Close edit schedule popup">
+          <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose} aria-label="Close edit schedule popup">
             <span className="material-symbols-outlined" aria-hidden="true">
               close
             </span>
@@ -901,8 +901,8 @@ export function EditScheduleModal({
                   type="button"
                   className={`${modalToggleChipClassName} ${
                     form.category === option.value
-                      ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
-                      : "border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                      ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
+                      : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
                   }`}
                   onClick={() => {
                     onChange("category", option.value);
@@ -1150,7 +1150,7 @@ export function EditScheduleModal({
 
               <label className={modalCheckClassName}>
                 <input
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/25"
                   type="checkbox"
                   checked={form.transferByTrain}
                   onChange={(event) => {
@@ -1194,7 +1194,7 @@ export function EditScheduleModal({
           <div className="space-y-3">
             <label className={modalCheckClassName}>
               <input
-                className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/25"
                 type="checkbox"
                 checked={showTransferTrainFields ? true : form.requiresBus}
                 onChange={(event) => onChange("requiresBus", event.target.checked)}
@@ -1220,17 +1220,17 @@ export function EditScheduleModal({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-surface-container-lowest px-5 py-4">
           <button
             type="button"
-            className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+            className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
             onClick={onSave}
             disabled={isSaveDisabled}
           >
             Save Changes
           </button>
 
-          <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose}>
+          <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary" onClick={onClose}>
             Cancel
           </button>
         </div>
@@ -1257,7 +1257,7 @@ export function NoteModal({
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
-          className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="note-modal-title"
@@ -1265,7 +1265,7 @@ export function NoteModal({
         >
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
             <div className="flex items-center gap-2">
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   edit_note
                 </span>
@@ -1274,7 +1274,7 @@ export function NoteModal({
               <h2 id="note-modal-title" className="text-2xl font-bold tracking-tight text-slate-900">Add New Note</h2>
             </div>
 
-            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-emerald-500 hover:text-emerald-700" onClick={onClose} aria-label="Close add note popup">
+            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-primary hover:text-primary" onClick={onClose} aria-label="Close add note popup">
               <span className="material-symbols-outlined" aria-hidden="true">
                 close
               </span>
@@ -1318,9 +1318,9 @@ export function NoteModal({
                   <span>Pin to top of group feed</span>
                 </div>
 
-                <span className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${form.pinned ? "bg-emerald-600" : "bg-slate-300"}`}>
+                <span className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${form.pinned ? "bg-primary" : "bg-slate-300"}`}>
                   <span
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                    className={`h-5 w-5 rounded-full bg-surface-container-lowest shadow-sm transition ${
                       form.pinned ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
@@ -1332,7 +1332,7 @@ export function NoteModal({
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+              className="serene-btn-primary gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
               onClick={onSave}
               disabled={isSaveDisabled}
             >
@@ -1342,7 +1342,7 @@ export function NoteModal({
               <span>Save Note</span>
             </button>
 
-            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700" onClick={onClose}>
+            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary" onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -1351,6 +1351,7 @@ export function NoteModal({
     </ModalPortal>
   );
 }
+
 
 
 

@@ -179,7 +179,7 @@ function buildItineraryPreview(group: GroupData): ItineraryPreviewItem[] {
 
 function getItineraryPreviewRowClasses(state: ItineraryPreviewState): string {
   if (state === "next") {
-    return "rounded-lg border border-primary/20 bg-primary-fixed/55 px-2.5 py-1.5";
+    return "rounded-lg bg-surface-container-high px-2.5 py-1.5";
   }
 
   return "px-2.5 py-1.5";
@@ -199,7 +199,7 @@ function getItineraryPreviewTextClasses(state: ItineraryPreviewState): string {
 
 function getItineraryPreviewDotClasses(state: ItineraryPreviewState): string {
   if (state === "next") {
-    return "bg-primary shadow-[0_0_0_5px_rgba(46,125,50,0.12)]";
+    return "bg-primary shadow-sm";
   }
 
   if (state === "past") {
@@ -211,10 +211,10 @@ function getItineraryPreviewDotClasses(state: ItineraryPreviewState): string {
 
 function getStatusBadgeClasses(tone: GroupData["tone"]): string {
   if (tone === "active") {
-    return "border-primary/25 bg-primary-fixed/70 text-on-primary-fixed-variant";
+    return "bg-primary-fixed/70 text-on-primary-fixed-variant";
   }
 
-  return "border-outline-variant/55 bg-surface-container-high text-on-surface-variant";
+  return "bg-surface-container-high text-on-surface-variant";
 }
 
 function getStatusLabel(tone: GroupData["tone"]): string {
@@ -258,14 +258,14 @@ export function GroupCard({
   ];
 
   return (
-    <article className="flex h-full w-full flex-col rounded-2xl bg-surface-container-lowest px-5 py-6 shadow-ambient">
+    <article className="serene-card flex h-full w-full flex-col px-5 py-6">
       <div className="mx-1 mb-7 py-1">
         <div className="flex flex-wrap items-start gap-x-2 gap-y-2">
           <span className="min-w-0 font-display text-2xl font-extrabold tracking-tighter text-primary sm:text-3xl xl:text-4xl">
             {group.code}
           </span>
           <span
-            className={`ml-auto inline-flex shrink-0 whitespace-nowrap rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getStatusBadgeClasses(
+            className={`ml-auto inline-flex shrink-0 whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getStatusBadgeClasses(
               group.tone,
             )}`}
           >
@@ -279,7 +279,7 @@ export function GroupCard({
         {metadataBadges.map((label, index) => (
           <span
             key={`${group.code}-${index}-${label}`}
-            className={`inline-flex max-w-full items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold leading-none ${getStatusBadgeClasses(
+            className={`inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-[11px] font-bold leading-none ${getStatusBadgeClasses(
               group.tone,
             )}`}
             title={label}
@@ -325,7 +325,7 @@ export function GroupCard({
                   </p>
 
                   {previewItem.state === "next" ? (
-                    <span className="shrink-0 rounded-lg border border-primary/20 bg-primary/12 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-primary">
+                    <span className="shrink-0 rounded-lg bg-primary/16 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-primary">
                       Next
                     </span>
                   ) : null}
@@ -339,7 +339,7 @@ export function GroupCard({
       <div className="mx-1 mt-auto">
         <button
           type="button"
-          className="w-full rounded-md bg-surface-container-high py-3.5 text-sm font-bold text-on-surface transition-colors hover:bg-primary hover:text-white"
+          className="serene-btn-secondary w-full py-3.5 text-sm font-bold"
           onClick={() => onOpenDetail(group.code)}
         >
           View Detail

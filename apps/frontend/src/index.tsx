@@ -1,7 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
-import { initializeThemeMode } from "./components/theme-toggle-button";
+import { initializeThemeMode } from "./theme/theme-mode";
+import { ThemeProvider } from "./theme/theme-provider";
 
 const container = document.getElementById("app");
 
@@ -13,6 +14,8 @@ initializeThemeMode();
 
 createRoot(container).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 );
