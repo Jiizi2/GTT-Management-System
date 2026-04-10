@@ -1,5 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
@@ -66,6 +69,74 @@ const {
   createNewGroupRaudhahForm,
 } = Domain;
 
+function createIdentityFormSchema(requireIdentityFields: boolean) {
+  return z
+    .object({
+      groupNumber: requireIdentityFields
+        ? z.string().trim().min(1, "Group number wajib diisi.")
+        : z.string(),
+      groupName: requireIdentityFields
+        ? z.string().trim().min(1, "Group name wajib diisi.")
+        : z.string(),
+      packageType: requireIdentityFields
+        ? z.string().trim().min(1, "Package type wajib diisi.")
+        : z.string(),
+      paxCount: requireIdentityFields
+        ? z
+            .string()
+            .trim()
+            .min(1, "Jumlah pax wajib diisi.")
+            .refine((value) => {
+              const parsed = Number.parseInt(value, 10);
+              return Number.isFinite(parsed) && parsed > 0;
+            }, "Jumlah pax harus lebih dari 0.")
+        : z.string(),
+      totalBusRequired: requireIdentityFields
+        ? z
+            .string()
+            .trim()
+            .min(1, "Total bus wajib diisi.")
+            .refine((value) => {
+              const parsed = Number.parseInt(value, 10);
+              return Number.isFinite(parsed) && parsed > 0;
+            }, "Total bus harus lebih dari 0.")
+        : z.string(),
+      startDate: requireIdentityFields
+        ? z.string().trim().min(1, "Start date wajib diisi.")
+        : z.string(),
+      endDate: requireIdentityFields
+        ? z.string().trim().min(1, "End date wajib diisi.")
+        : z.string(),
+      musyrifName: requireIdentityFields
+        ? z.string().trim().min(1, "Nama musyrif wajib diisi.")
+        : z.string(),
+      musyrifPhone: requireIdentityFields
+        ? z.string().trim().min(1, "Nomor telepon musyrif wajib diisi.")
+        : z.string(),
+    })
+    .superRefine((values, context) => {
+      if (!requireIdentityFields) {
+        return;
+      }
+
+      if (
+        values.startDate.trim() &&
+        values.endDate.trim() &&
+        isIsoDateValue(values.startDate) &&
+        isIsoDateValue(values.endDate) &&
+        values.endDate < values.startDate
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endDate"],
+          message: "End date harus sama atau setelah start date.",
+        });
+      }
+    });
+}
+
+type IdentityFormValues = z.infer<ReturnType<typeof createIdentityFormSchema>>;
+
 export function InputItineraryScreen({
   onSaveGroup,
   hideHeader = false,
@@ -86,15 +157,32 @@ export function InputItineraryScreen({
   itineraryPrefill?: ItineraryPrefill | null;
 }) {
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
-  const [groupNumber, setGroupNumber] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [packageType, setPackageType] = useState("");
-  const [paxCount, setPaxCount] = useState("");
-  const [totalBusRequired, setTotalBusRequired] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [musyrifName, setMusyrifName] = useState("");
-  const [musyrifPhone, setMusyrifPhone] = useState("");
+  const identityFormSchema = useMemo(
+    () => createIdentityFormSchema(sectionMode !== "schedule-only"),
+    [sectionMode],
+  );
+  const {
+    register,
+    control,
+    watch,
+    getValues,
+    setValue,
+    formState: { errors: identityErrors },
+  } = useForm<IdentityFormValues>({
+    resolver: zodResolver(identityFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      groupNumber: "",
+      groupName: "",
+      packageType: "",
+      paxCount: "",
+      totalBusRequired: "",
+      startDate: "",
+      endDate: "",
+      musyrifName: "",
+      musyrifPhone: "",
+    },
+  });
   const [itineraryItems, setItineraryItems] = useState<InputItineraryItem[]>([]);
   const [form, setForm] = useState<InputItineraryFormState>(createInitialInputItineraryForm);
   const [baseTripDrafts, setBaseTripDrafts] = useState<BaseTripDraft[]>([]);
@@ -105,6 +193,15 @@ export function InputItineraryScreen({
   const [initializedScheduleSeed, setInitializedScheduleSeed] = useState<string | null>(null);
   const manualFormSuggestedHotelNameRef = useRef("");
   const baseTripSuggestedHotelByIdRef = useRef<Record<string, string>>({});
+  const groupNumber = watch("groupNumber");
+  const groupName = watch("groupName");
+  const packageType = watch("packageType");
+  const paxCount = watch("paxCount");
+  const totalBusRequired = watch("totalBusRequired");
+  const startDate = watch("startDate");
+  const endDate = watch("endDate");
+  const musyrifName = watch("musyrifName");
+  const musyrifPhone = watch("musyrifPhone");
   const {
     isIdentityOnlyMode,
     isScheduleOnlyMode,
@@ -317,7 +414,7 @@ export function InputItineraryScreen({
   };
 
   const handlePaxCountChange = (value: string) => {
-    setPaxCount(value);
+    setValue("paxCount", value, { shouldDirty: true, shouldValidate: true });
 
     const parsedValue = Number.parseInt(value, 10);
     if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
@@ -325,13 +422,12 @@ export function InputItineraryScreen({
     }
 
     const nextMinimumBusCount = getMinimumBusCountForPax(parsedValue);
-    setTotalBusRequired((currentValue) => {
-      if (!currentValue.trim()) {
-        return String(nextMinimumBusCount);
-      }
-
-      return currentValue;
-    });
+    if (!getValues("totalBusRequired").trim()) {
+      setValue("totalBusRequired", String(nextMinimumBusCount), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
   };
 
   const handleResetForm = () => {
@@ -696,7 +792,7 @@ export function InputItineraryScreen({
       return;
     }
 
-    const parsedPax = Number.parseInt(paxCount, 10);
+    const parsedPax = Number.parseInt(effectivePaxCountValue, 10);
     const safePax = Number.isFinite(parsedPax) && parsedPax > 0 ? parsedPax : 1;
     const safeTotalBuses = resolveTotalBusCount(safePax, parsedTotalBusRequired);
     const startTimestamp = Date.parse(effectiveStartDate);
@@ -830,11 +926,13 @@ export function InputItineraryScreen({
               <span>Group Number</span>
               <input
                 type="text"
-                value={groupNumber}
-                onChange={(event) => setGroupNumber(event.target.value)}
+                {...register("groupNumber")}
                 placeholder="e.g. GR-7721-UMA"
                 className={`${inputClassName} text-lg font-semibold tracking-tight`}
               />
+              {identityErrors.groupNumber ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.groupNumber.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -842,10 +940,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="text"
-                value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
+                {...register("groupName")}
                 placeholder="e.g. Jakarta Umrah March Batch"
               />
+              {identityErrors.groupName ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.groupName.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -853,10 +953,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="text"
-                value={packageType}
-                onChange={(event) => setPackageType(event.target.value)}
+                {...register("packageType")}
                 placeholder="e.g. Custom VIP Package"
               />
+              {identityErrors.packageType ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.packageType.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -869,6 +971,9 @@ export function InputItineraryScreen({
                 onChange={(event) => handlePaxCountChange(event.target.value)}
                 placeholder="45"
               />
+              {identityErrors.paxCount ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.paxCount.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -877,10 +982,12 @@ export function InputItineraryScreen({
                 className={inputClassName}
                 type="number"
                 min={1}
-                value={totalBusRequired}
-                onChange={(event) => setTotalBusRequired(event.target.value)}
+                {...register("totalBusRequired")}
                 placeholder={String(minimumBusCount)}
               />
+              {identityErrors.totalBusRequired ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.totalBusRequired.message}</p>
+              ) : null}
             </label>
 
             <p className={routeHintClassName}>
@@ -895,20 +1002,38 @@ export function InputItineraryScreen({
 
             <label className={fieldClassName}>
               <span>Start Date</span>
-              <DatePickerInput
-                inputClassName={inputClassName}
-                value={startDate}
-                onChange={setStartDate}
+              <Controller
+                name="startDate"
+                control={control}
+                render={({ field }) => (
+                  <DatePickerInput
+                    inputClassName={inputClassName}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
+              {identityErrors.startDate ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.startDate.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
               <span>End Date</span>
-              <DatePickerInput
-                inputClassName={inputClassName}
-                value={endDate}
-                onChange={setEndDate}
+              <Controller
+                name="endDate"
+                control={control}
+                render={({ field }) => (
+                  <DatePickerInput
+                    inputClassName={inputClassName}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
+              {identityErrors.endDate ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.endDate.message}</p>
+              ) : null}
             </label>
           </div>
 
@@ -951,10 +1076,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="text"
-                value={musyrifName}
-                onChange={(event) => setMusyrifName(event.target.value)}
+                {...register("musyrifName")}
                 placeholder="Ustadz Abdul Hakim"
               />
+              {identityErrors.musyrifName ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.musyrifName.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -962,10 +1089,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="tel"
-                value={musyrifPhone}
-                onChange={(event) => setMusyrifPhone(event.target.value)}
+                {...register("musyrifPhone")}
                 placeholder="+62 812-3456-7890"
               />
+              {identityErrors.musyrifPhone ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.musyrifPhone.message}</p>
+              ) : null}
             </label>
           </div>
         </section>
