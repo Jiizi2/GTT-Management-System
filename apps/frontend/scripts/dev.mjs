@@ -1,7 +1,8 @@
 import * as esbuild from "esbuild";
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { watch } from "node:fs";
-import { copyFile, mkdir, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +18,98 @@ const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? "4173");
 const displayHost = host === "127.0.0.1" ? "localhost" : host;
 let shuttingDown = false;
+let httpServer = null;
+
+function resolveContentType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+
+  if (extension === ".html") {
+    return "text/html; charset=utf-8";
+  }
+
+  if (extension === ".js" || extension === ".mjs") {
+    return "application/javascript; charset=utf-8";
+  }
+
+  if (extension === ".css") {
+    return "text/css; charset=utf-8";
+  }
+
+  if (extension === ".json") {
+    return "application/json; charset=utf-8";
+  }
+
+  if (extension === ".svg") {
+    return "image/svg+xml";
+  }
+
+  if (extension === ".png") {
+    return "image/png";
+  }
+
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+
+  if (extension === ".woff2") {
+    return "font/woff2";
+  }
+
+  return "application/octet-stream";
+}
+
+function normalizeRequestPath(rawUrl) {
+  const parsedUrl = new URL(rawUrl ?? "/", "http://127.0.0.1");
+  const decodedPath = decodeURIComponent(parsedUrl.pathname);
+  return decodedPath === "/" ? "/index.html" : decodedPath;
+}
+
+async function startSpaServer() {
+  const server = createServer(async (request, response) => {
+    const normalizedPath = normalizeRequestPath(request.url);
+    const relativePath = normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
+    const requestedPath = path.resolve(distDir, `.${relativePath}`);
+
+    if (!requestedPath.startsWith(distDir)) {
+      response.statusCode = 403;
+      response.end("Forbidden");
+      return;
+    }
+
+    const hasExtension = path.extname(requestedPath).length > 0;
+
+    try {
+      const body = await readFile(requestedPath);
+      response.statusCode = 200;
+      response.setHeader("content-type", resolveContentType(requestedPath));
+      response.end(body);
+      return;
+    } catch {
+      if (hasExtension) {
+        response.statusCode = 404;
+        response.end("Not found");
+        return;
+      }
+    }
+
+    try {
+      const fallbackBody = await readFile(path.join(distDir, "index.html"));
+      response.statusCode = 200;
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(fallbackBody);
+    } catch {
+      response.statusCode = 500;
+      response.end("Failed to read frontend build output.");
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, host, () => resolve());
+  });
+
+  return server;
+}
 
 async function ensurePublicFiles() {
   await mkdir(distDir, { recursive: true });
@@ -72,11 +165,7 @@ tailwindWatcher.on("exit", (code) => {
 });
 
 await ctx.watch();
-const server = await ctx.serve({
-  servedir: distDir,
-  host,
-  port,
-});
+httpServer = await startSpaServer();
 
 const publicWatcher = watch(publicDir, { recursive: true }, async () => {
   try {
@@ -87,7 +176,7 @@ const publicWatcher = watch(publicDir, { recursive: true }, async () => {
   }
 });
 
-console.log(`Frontend dev server running at http://${displayHost}:${server.port}`);
+console.log(`Frontend dev server running at http://${displayHost}:${port}`);
 console.log("Watching src, CSS, and public/ assets for changes. Press Ctrl+C to stop.");
 
 async function shutdown() {
@@ -99,6 +188,18 @@ async function shutdown() {
   publicWatcher.close();
   if (!tailwindWatcher.killed) {
     tailwindWatcher.kill();
+  }
+  if (httpServer) {
+    await new Promise((resolve, reject) => {
+      httpServer.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
   }
   await ctx.dispose();
   process.exit(0);
