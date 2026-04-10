@@ -1,5 +1,7 @@
 import { Suspense, lazy, useMemo } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { buildVisaTrackingRowsFromGroups } from "../shared/app-domain";
+import { buildDashboardPath } from "../shared/app-route";
 import type { AppController } from "../hooks/use-app-controller";
 
 const LazyAddGroupWorkspaceScreen = lazy(async () => ({
@@ -69,194 +71,164 @@ export function AppMainContent({
     [controller.groupRecords, controller.selectedVisaRow],
   );
 
-  if (controller.selectedGroupCode && !controller.selectedGroup) {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyPlaceholderScreen
-          eyebrow="Group Detail"
-          title="Group belum ditemukan"
-          description="Endpoint group detail sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
-          icon="travel_explore"
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.selectedVisaGroupCode && !freshSelectedVisaRow) {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyPlaceholderScreen
-          eyebrow="Visa Detail"
-          title="Visa detail belum ditemukan"
-          description="Endpoint visa detail sedang dibuka, tapi data visa group-nya belum tersedia di browser saat ini."
-          icon="fact_check"
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.selectedGroup) {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyGroupDetail
-          group={controller.selectedGroup}
-          onBack={controller.handleBackToOverview}
-          onDeleteGroup={controller.handleDeleteGroup}
-          onSaveGroup={controller.handleSaveGroupDetail}
-        />
-      </Suspense>
-    );
-  }
-
-  if (freshSelectedVisaRow) {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyVisaTrackingDetailScreen
-          row={freshSelectedVisaRow}
-          groups={controller.groupRecords}
-          onBack={controller.handleBackToVisaTracking}
-          onUpdateVisaStatus={controller.handleUpdateVisaStatus}
-          onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
-          onUpdateSyarikah={controller.handleUpdateSyarikah}
-          onUpdateVisaHotel={controller.handleUpdateVisaHotel}
-          onDeleteVisaHotel={controller.handleDeleteVisaHotel}
-          onUpdateRaudhahAppointment={controller.handleUpdateRaudhahAppointment}
-          onClearRaudhahAppointment={controller.handleClearRaudhahAppointment}
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "overview") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyOverviewScreen
-          query={controller.query}
-          filteredGroups={controller.filteredGroups}
-          isActiveOnly={controller.isActiveOnly}
-          statCards={controller.statCards}
-          summaryMessage={controller.summaryMessage}
-          onQueryChange={controller.handleQueryChange}
-          onToggleActiveOnly={controller.handleToggleActiveOnly}
-          onOpenDetail={controller.handleOpenDetail}
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "input" || controller.activeNav === "new-group") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyAddGroupWorkspaceScreen
-          onSaveGroup={controller.handleSaveInputGroup}
-          onCancel={controller.handleBackToOverview}
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "checklist") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyChecklistScreen groups={controller.groupRecords} />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "visa") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyVisaTrackingScreen
-          groups={controller.groupRecords}
-          onOpenDetail={controller.handleOpenVisaDetail}
-          onUpdateAgreementStatus={controller.handleUpdateAgreementStatus}
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "invoice") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "raudhah-reminder") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyRaudhahReminderScreen
-          groups={controller.groupRecords}
-          onOpenDetail={controller.handleOpenDetail}
-          onOpenVisaDetail={controller.handleOpenVisaDetail}
-          onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
-        />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "user-management") {
-    if (controller.sessionAccessTier !== "super-admin") {
-      return (
-        <Suspense fallback={<ScreenLoadingFallback />}>
-          <LazyPlaceholderScreen
-            eyebrow="Restricted"
-            title="Super Admin Only"
-            description="User Management hanya tersedia untuk akun Super Admin."
-            icon="lock"
-          />
-        </Suspense>
-      );
-    }
-
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyUserManagementScreen />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "master-data") {
-    if (controller.sessionAccessTier !== "super-admin") {
-      return (
-        <Suspense fallback={<ScreenLoadingFallback />}>
-          <LazyPlaceholderScreen
-            eyebrow="Restricted"
-            title="Super Admin Only"
-            description="Master Data hanya tersedia untuk akun Super Admin."
-            icon="lock"
-          />
-        </Suspense>
-      );
-    }
-
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyMasterDataScreen />
-      </Suspense>
-    );
-  }
-
-  if (controller.activeNav === "profile") {
-    return (
-      <Suspense fallback={<ScreenLoadingFallback />}>
-        <LazyProfileScreen
-          onNavigate={controller.handleNavigate}
-          sessionAccessTier={controller.sessionAccessTier}
-        />
-      </Suspense>
-    );
-  }
-
   return (
     <Suspense fallback={<ScreenLoadingFallback />}>
-      <LazyPlaceholderScreen
-        eyebrow="Coming Soon"
-        title="Page Not Available"
-        description="This module is not available yet."
-        icon="dashboard_customize"
-      />
+      <Routes>
+        <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
+        <Route
+          path="/overview"
+          element={(
+            <LazyOverviewScreen
+              query={controller.query}
+              filteredGroups={controller.filteredGroups}
+              isActiveOnly={controller.isActiveOnly}
+              statCards={controller.statCards}
+              summaryMessage={controller.summaryMessage}
+              onQueryChange={controller.handleQueryChange}
+              onToggleActiveOnly={controller.handleToggleActiveOnly}
+              onOpenDetail={controller.handleOpenDetail}
+            />
+          )}
+        />
+        <Route
+          path="/groups/:groupCode"
+          element={
+            controller.selectedGroup ? (
+              <LazyGroupDetail
+                group={controller.selectedGroup}
+                onBack={controller.handleBackToOverview}
+                onDeleteGroup={controller.handleDeleteGroup}
+                onSaveGroup={controller.handleSaveGroupDetail}
+              />
+            ) : (
+              <LazyPlaceholderScreen
+                eyebrow="Group Detail"
+                title="Group belum ditemukan"
+                description="Endpoint group detail sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
+                icon="travel_explore"
+              />
+            )
+          }
+        />
+        <Route
+          path="/new-group"
+          element={(
+            <LazyAddGroupWorkspaceScreen
+              onSaveGroup={controller.handleSaveInputGroup}
+              onCancel={controller.handleBackToOverview}
+            />
+          )}
+        />
+        <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
+        <Route
+          path="/checklist"
+          element={<LazyChecklistScreen groups={controller.groupRecords} />}
+        />
+        <Route
+          path="/visa"
+          element={(
+            <LazyVisaTrackingScreen
+              groups={controller.groupRecords}
+              onOpenDetail={controller.handleOpenVisaDetail}
+              onUpdateAgreementStatus={controller.handleUpdateAgreementStatus}
+            />
+          )}
+        />
+        <Route
+          path="/visa/:groupCode"
+          element={
+            freshSelectedVisaRow ? (
+              <LazyVisaTrackingDetailScreen
+                row={freshSelectedVisaRow}
+                groups={controller.groupRecords}
+                onBack={controller.handleBackToVisaTracking}
+                onUpdateVisaStatus={controller.handleUpdateVisaStatus}
+                onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
+                onUpdateSyarikah={controller.handleUpdateSyarikah}
+                onUpdateVisaHotel={controller.handleUpdateVisaHotel}
+                onDeleteVisaHotel={controller.handleDeleteVisaHotel}
+                onUpdateRaudhahAppointment={controller.handleUpdateRaudhahAppointment}
+                onClearRaudhahAppointment={controller.handleClearRaudhahAppointment}
+              />
+            ) : (
+              <LazyPlaceholderScreen
+                eyebrow="Visa Detail"
+                title="Visa detail belum ditemukan"
+                description="Endpoint visa detail sedang dibuka, tapi data visa group-nya belum tersedia di browser saat ini."
+                icon="fact_check"
+              />
+            )
+          }
+        />
+        <Route
+          path="/invoice"
+          element={(
+            <LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />
+          )}
+        />
+        <Route
+          path="/raudhah-reminder"
+          element={(
+            <LazyRaudhahReminderScreen
+              groups={controller.groupRecords}
+              onOpenDetail={controller.handleOpenDetail}
+              onOpenVisaDetail={controller.handleOpenVisaDetail}
+              onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
+            />
+          )}
+        />
+        <Route
+          path="/user-management"
+          element={
+            controller.sessionAccessTier === "super-admin" ? (
+              <LazyUserManagementScreen />
+            ) : (
+              <LazyPlaceholderScreen
+                eyebrow="Restricted"
+                title="Super Admin Only"
+                description="User Management hanya tersedia untuk akun Super Admin."
+                icon="lock"
+              />
+            )
+          }
+        />
+        <Route path="/manage-role" element={<Navigate to="/user-management" replace />} />
+        <Route
+          path="/master-data"
+          element={
+            controller.sessionAccessTier === "super-admin" ? (
+              <LazyMasterDataScreen />
+            ) : (
+              <LazyPlaceholderScreen
+                eyebrow="Restricted"
+                title="Super Admin Only"
+                description="Master Data hanya tersedia untuk akun Super Admin."
+                icon="lock"
+              />
+            )
+          }
+        />
+        <Route
+          path="/profile"
+          element={(
+            <LazyProfileScreen
+              onNavigate={controller.handleNavigate}
+              sessionAccessTier={controller.sessionAccessTier}
+            />
+          )}
+        />
+        <Route
+          path="*"
+          element={(
+            <LazyPlaceholderScreen
+              eyebrow="Coming Soon"
+              title="Page Not Available"
+              description="This module is not available yet."
+              icon="dashboard_customize"
+            />
+          )}
+        />
+      </Routes>
     </Suspense>
   );
 }

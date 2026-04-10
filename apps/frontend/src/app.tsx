@@ -1,32 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppSidebar } from "./components/app-sidebar";
 import { AppMainContent } from "./components/app-main-content";
 import { MobileNav } from "./components/mobile-nav";
 import { MobileQuickActionsSheet } from "./components/mobile-quick-actions-sheet";
 import { ThemeToggleButton } from "./components/theme-toggle-button";
-import {
-  fetchCurrentSessionFromBackend,
-  loginWithBackend,
-  logoutFromBackend,
-} from "./hooks/use-auth-backend";
 import { useAppController } from "./hooks/use-app-controller";
+import { useAuthSessionQuery, useLoginMutation, useLogoutMutation } from "./hooks/use-auth-session-query";
 import { type DevelopmentLoginAccountHint, LoginScreen, type LoginCredentials } from "./pages/login-page";
-import {
-  AUTH_STATE_CHANGED_EVENT,
-  clearAuthSession,
-  persistAuthSession,
-  readPersistedAuthSession,
-  type AuthSession,
-} from "./shared/auth-session";
+import type { AuthSession } from "./shared/auth-session";
 import { buildDashboardPath, buildLoginPath, isLoginRoute } from "./shared/app-route";
-
-function shouldRenderStandaloneLoginScreen(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return isLoginRoute(window.location.pathname, window.location.search);
-}
 
 const DEVELOPMENT_LOGIN_ACCOUNTS: DevelopmentLoginAccountHint[] = [
   {
@@ -50,6 +33,20 @@ function shouldExposeDevelopmentLoginHints(): boolean {
 
   const host = window.location.hostname.trim().toLowerCase();
   return host === "localhost" || host === "127.0.0.1";
+}
+
+function RestoringSessionScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-surface-container-low px-6 text-center">
+      <div className="max-w-sm rounded-3xl border border-outline-variant/40 bg-surface-container-lowest px-6 py-8 shadow-ambient">
+        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary">Secure Session</p>
+        <h1 className="mt-3 text-2xl font-semibold text-on-surface">Memverifikasi sesi</h1>
+        <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+          Dashboard sedang memastikan sesi login Anda masih valid.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function DashboardWorkspaceShell({
@@ -85,7 +82,6 @@ function DashboardWorkspaceShell({
   } as const;
 
   useEffect(() => {
-    // Force-reset root spacing to prevent any unexpected top gap injected by external styles.
     const html = document.documentElement;
     const body = document.body;
     const appRoot = document.getElementById("app");
@@ -177,141 +173,76 @@ function DashboardWorkspaceShell({
 }
 
 export function App() {
-  const [authSession, setAuthSession] = useState<AuthSession | null>(() => readPersistedAuthSession());
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
-  const [loginErrorMessage, setLoginErrorMessage] = useState("");
+  const location = useLocation();
+  const authSessionQuery = useAuthSessionQuery();
+  const loginMutation = useLoginMutation();
+  const logoutMutation = useLogoutMutation();
+  const authSession = authSessionQuery.data ?? null;
+  const isRestoringSession =
+    authSessionQuery.isPending ||
+    (authSessionQuery.isFetching && !authSessionQuery.isFetchedAfterMount);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const syncSessionFromStorage = () => {
-      setAuthSession(readPersistedAuthSession());
-    };
-
-    window.addEventListener(AUTH_STATE_CHANGED_EVENT, syncSessionFromStorage);
-    window.addEventListener("storage", syncSessionFromStorage);
-
-    return () => {
-      window.removeEventListener(AUTH_STATE_CHANGED_EVENT, syncSessionFromStorage);
-      window.removeEventListener("storage", syncSessionFromStorage);
-    };
-  }, []);
-
-  useEffect(() => {
-    let isActive = true;
-
-    void fetchCurrentSessionFromBackend()
-      .then((resolvedSession) => {
-        if (!isActive) {
-          return;
-        }
-
-        if (resolvedSession) {
-          persistAuthSession(resolvedSession);
-          setAuthSession(resolvedSession);
-
-          if (
-            typeof window !== "undefined" &&
-            isLoginRoute(window.location.pathname, window.location.search)
-          ) {
-            window.history.replaceState(null, "", buildDashboardPath("overview"));
-          }
-
-          return;
-        }
-
-        clearAuthSession();
-        setAuthSession(null);
-      })
-      .catch(() => {
-        if (!isActive) {
-          return;
-        }
-
-        setAuthSession((current) => current ?? readPersistedAuthSession());
-      })
-      .finally(() => {
-        if (isActive) {
-          setIsRestoringSession(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
-
-  const handleLoginSubmit = useCallback(async (credentials: LoginCredentials) => {
-    const identifier = credentials.identifier.trim();
-    if (!identifier || !credentials.password) {
-      setLoginErrorMessage("Username/email dan password wajib diisi.");
-      return;
-    }
-
-    setIsSigningIn(true);
-    setLoginErrorMessage("");
-
-    try {
-      const nextSession = await loginWithBackend(credentials);
-      persistAuthSession(nextSession);
-      setAuthSession(nextSession);
-
-      if (typeof window !== "undefined" && isLoginRoute(window.location.pathname, window.location.search)) {
-        window.history.replaceState(null, "", buildDashboardPath("overview"));
-      }
-    } catch (error: unknown) {
-      setLoginErrorMessage(
-        error instanceof Error && error.message.trim()
-          ? error.message.trim()
-          : "Login gagal. Silakan coba lagi.",
-      );
-    } finally {
-      setIsSigningIn(false);
-    }
-  }, []);
+  const handleLoginSubmit = useCallback(
+    async (credentials: LoginCredentials) => {
+      loginMutation.reset();
+      await loginMutation.mutateAsync(credentials);
+    },
+    [loginMutation],
+  );
 
   const handleLogout = useCallback(() => {
-    void logoutFromBackend().catch(() => undefined);
-    clearAuthSession();
-    setAuthSession(null);
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", buildLoginPath());
-    }
-  }, []);
+    logoutMutation.mutate();
+  }, [logoutMutation]);
 
   if (isRestoringSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-container-low px-6 text-center">
-        <div className="max-w-sm rounded-3xl border border-outline-variant/40 bg-surface-container-lowest px-6 py-8 shadow-ambient">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary">Secure Session</p>
-          <h1 className="mt-3 text-2xl font-semibold text-on-surface">Memverifikasi sesi</h1>
-          <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-            Dashboard sedang memastikan sesi login Anda masih valid.
-          </p>
-        </div>
-      </div>
-    );
+    return <RestoringSessionScreen />;
   }
 
-  if (shouldRenderStandaloneLoginScreen() || !authSession) {
-    return (
-      <LoginScreen
-        onSubmit={handleLoginSubmit}
-        isSubmitting={isSigningIn}
-        errorMessage={loginErrorMessage}
-        developmentAccounts={shouldExposeDevelopmentLoginHints() ? DEVELOPMENT_LOGIN_ACCOUNTS : []}
-      />
-    );
+  if (isLoginRoute(location.pathname, location.search)) {
+    if (authSession) {
+      return <Navigate to={buildDashboardPath("overview")} replace />;
+    }
+
+    if (location.pathname !== buildLoginPath()) {
+      return <Navigate to={buildLoginPath()} replace />;
+    }
   }
 
   return (
-    <DashboardWorkspaceShell
-      onLogout={handleLogout}
-      sessionAccessTier={authSession.user.accessTier}
-    />
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          authSession ? (
+            <Navigate to={buildDashboardPath("overview")} replace />
+          ) : (
+            <LoginScreen
+              onSubmit={handleLoginSubmit}
+              isSubmitting={loginMutation.isPending}
+              errorMessage={
+                loginMutation.error instanceof Error && loginMutation.error.message.trim()
+                  ? loginMutation.error.message.trim()
+                  : ""
+              }
+              developmentAccounts={shouldExposeDevelopmentLoginHints() ? DEVELOPMENT_LOGIN_ACCOUNTS : []}
+            />
+          )
+        }
+      />
+      <Route path="/auth/login" element={<Navigate to={buildLoginPath()} replace />} />
+      <Route
+        path="*"
+        element={
+          authSession ? (
+            <DashboardWorkspaceShell
+              onLogout={handleLogout}
+              sessionAccessTier={authSession.user.accessTier}
+            />
+          ) : (
+            <Navigate to={buildLoginPath()} replace />
+          )
+        }
+      />
+    </Routes>
   );
 }
-
