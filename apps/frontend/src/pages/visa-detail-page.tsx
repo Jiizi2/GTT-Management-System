@@ -251,18 +251,9 @@ export function VisaTrackingDetailScreen({
   >(null);
   const [visaStatusDraft, setVisaStatusDraft] = useState<VisaStatus>(row.visaStatus);
   const [paymentStatusDraft, setPaymentStatusDraft] = useState<VisaPaymentStatus>(row.paymentStatus);
-  const [syarikahDraft, setSyarikahDraft] = useState("");
   const [hotelCityDraft, setHotelCityDraft] = useState<"makkah" | "madinah">("makkah");
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
   const [hotelDraftId, setHotelDraftId] = useState<string | null>(null);
-  const [hotelDraft, setHotelDraft] = useState<VisaHotelEditFormState>({
-    hotelName: "",
-    agreementNumber: "",
-    pax: "",
-    status: "Waiting for Approval",
-    stayStartIso: "",
-    stayEndIso: "",
-  });
   const [addingHotelCity, setAddingHotelCity] = useState<"makkah" | "madinah" | null>(null);
   const [addingHotelDraft, setAddingHotelDraft] = useState<VisaHotelEditFormState>({
     hotelName: "",
@@ -271,9 +262,6 @@ export function VisaTrackingDetailScreen({
     status: "Waiting for Approval",
     stayStartIso: "",
     stayEndIso: "",
-  });
-  const [raudhahDraft, setRaudhahDraft] = useState<VisaRaudhahEditFormState>({
-    appointments: [],
   });
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
@@ -460,7 +448,6 @@ export function VisaTrackingDetailScreen({
   };
 
   const openSyarikahModal = () => {
-    setSyarikahDraft(providerName);
     setActiveModal("syarikah");
   };
 
@@ -473,7 +460,6 @@ export function VisaTrackingDetailScreen({
     setHotelCityDraft(city);
     setHotelDraftMode(mode);
     setHotelDraftId(mode === "edit" ? hotelId ?? null : null);
-    setHotelDraft(buildHotelDraft(city, mode, hotelId));
     setActiveModal("hotel");
   };
 
@@ -488,7 +474,6 @@ export function VisaTrackingDetailScreen({
   };
 
   const openRaudhahModal = () => {
-    setRaudhahDraft(buildRaudhahDraft());
     setActiveModal("raudhah");
   };
 
@@ -507,23 +492,23 @@ export function VisaTrackingDetailScreen({
     closeModal();
   };
 
-  const saveSyarikah = () => {
-    onUpdateSyarikah(row.groupCode, syarikahDraft);
+  const saveSyarikah = (nextValue: string) => {
+    onUpdateSyarikah(row.groupCode, nextValue);
     closeModal();
   };
 
-  const saveHotel = () => {
+  const saveHotel = (hotel: VisaHotelEditFormState) => {
     onUpdateVisaHotel(
       row.groupCode,
       hotelCityDraft,
-      hotelDraft,
+      hotel,
       hotelDraftMode === "edit" ? hotelDraftId ?? undefined : undefined,
     );
     closeModal();
   };
 
-  const saveRaudhah = () => {
-    onUpdateRaudhahAppointment(row.groupCode, raudhahDraft);
+  const saveRaudhah = (appointment: VisaRaudhahEditFormState) => {
+    onUpdateRaudhahAppointment(row.groupCode, appointment);
     closeModal();
   };
 
@@ -562,50 +547,6 @@ export function VisaTrackingDetailScreen({
     }, 1600);
   };
 
-  const handleHotelDraftChange = <Key extends keyof VisaHotelEditFormState>(
-    field: Key,
-    nextValue: VisaHotelEditFormState[Key],
-  ) => {
-    setHotelDraft((current) => ({ ...current, [field]: nextValue }));
-  };
-
-  const handleAddRaudhahDraftAppointment = () => {
-    setRaudhahDraft((current) => ({
-      appointments: [
-        ...current.appointments,
-        {
-          id: `${row.groupCode}-raudhah-draft-${Date.now().toString(36)}-${current.appointments.length + 1}`,
-          dateIso: row.departureIso,
-          status: "After",
-          tasrehPrinted: false,
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveRaudhahDraftAppointment = (appointmentId: string) => {
-    setRaudhahDraft((current) => ({
-      appointments: current.appointments.filter((appointment) => appointment.id !== appointmentId),
-    }));
-  };
-
-  const handleRaudhahDraftAppointmentChange = (
-    appointmentId: string,
-    field: "dateIso" | "status",
-    nextValue: string | "Free" | "Before" | "After",
-  ) => {
-    setRaudhahDraft((current) => ({
-      appointments: current.appointments.map((appointment) =>
-        appointment.id === appointmentId
-          ? {
-              ...appointment,
-              [field]: nextValue,
-            }
-          : appointment,
-      ),
-    }));
-  };
-
   const handleAddingHotelDraftChange = <Key extends keyof VisaHotelEditFormState>(
     field: Key,
     nextValue: VisaHotelEditFormState[Key],
@@ -621,9 +562,6 @@ export function VisaTrackingDetailScreen({
     !addingHotelDraft.stayStartIso.trim() ||
     !addingHotelDraft.stayEndIso.trim() ||
     addingHotelDraft.stayEndIso < addingHotelDraft.stayStartIso;
-  const isRaudhahDraftSaveDisabled = raudhahDraft.appointments.some(
-    (appointment) => !appointment.dateIso.trim(),
-  );
 
   useEffect(() => {
     setPaymentStatus(row.paymentStatus);
@@ -1336,11 +1274,9 @@ export function VisaTrackingDetailScreen({
 
       {activeModal === "syarikah" ? (
         <SyarikahModal
-          value={syarikahDraft}
-          onChange={(nextValue) => setSyarikahDraft(nextValue)}
+          initialValue={providerName}
           onClose={closeModal}
           onSave={saveSyarikah}
-          isSaveDisabled={!syarikahDraft.trim()}
         />
       ) : null}
 
@@ -1348,31 +1284,19 @@ export function VisaTrackingDetailScreen({
         <VisaHotelModal
           city={hotelCityDraft}
           mode={hotelDraftMode}
-          value={hotelDraft}
-          onChange={handleHotelDraftChange}
+          initialValue={buildHotelDraft(hotelCityDraft, hotelDraftMode, hotelDraftId ?? undefined)}
           onClose={closeModal}
           onSave={saveHotel}
-          isSaveDisabled={
-            !hotelDraft.hotelName.trim() ||
-            !hotelDraft.agreementNumber.trim() ||
-            !hotelDraft.pax.trim() ||
-            Number.parseInt(hotelDraft.pax, 10) <= 0 ||
-            !hotelDraft.stayStartIso.trim() ||
-            !hotelDraft.stayEndIso.trim() ||
-            hotelDraft.stayEndIso < hotelDraft.stayStartIso
-          }
         />
       ) : null}
 
       {activeModal === "raudhah" ? (
         <VisaRaudhahModal
-          value={raudhahDraft}
-          onAddAppointment={handleAddRaudhahDraftAppointment}
-          onRemoveAppointment={handleRemoveRaudhahDraftAppointment}
-          onChangeAppointment={handleRaudhahDraftAppointmentChange}
+          initialValue={buildRaudhahDraft()}
+          appointmentIdPrefix={row.groupCode}
+          defaultAppointmentDateIso={row.departureIso}
           onClose={closeModal}
           onSave={saveRaudhah}
-          isSaveDisabled={isRaudhahDraftSaveDisabled}
         />
       ) : null}
 
