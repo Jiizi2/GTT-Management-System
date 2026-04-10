@@ -1576,7 +1576,7 @@ export function InputItineraryScreen({
                         : "Step aktif sudah lengkap."}
                   </p>
 
-                  <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+                  <div className="grid gap-3 sm:flex sm:items-center sm:justify-between">
                     <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
                       <button
                         type="button"
@@ -1597,7 +1597,7 @@ export function InputItineraryScreen({
                       </button>
                     </div>
 
-                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+                    <div className="grid w-full grid-cols-1 gap-2 border-t border-slate-200 pt-3 sm:flex sm:w-auto sm:items-center sm:border-0 sm:pt-0">
                       <button
                         type="button"
                         className="serene-btn-primary min-h-10 w-full sm:w-auto"
