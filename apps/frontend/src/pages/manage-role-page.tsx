@@ -541,8 +541,7 @@ export function UserManagementScreen() {
 
   return (
     <>
-      <div className="hidden lg:block">
-        <div className="mx-auto max-w-7xl space-y-6 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-8">
           <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="space-y-2">
               <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
@@ -769,7 +768,6 @@ export function UserManagementScreen() {
             </div>
           </section>
         </div>
-      </div>
 
       {editingUser ? (
         <UserManagementModalPortal>

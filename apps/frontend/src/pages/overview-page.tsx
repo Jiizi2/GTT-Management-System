@@ -101,7 +101,7 @@ export function OverviewScreen({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.95fr_1fr_1fr_1fr]" aria-label="Weekly summary">
-        <article className="flex min-h-[11rem] flex-col rounded-2xl bg-surface-container-low p-4 shadow-ambient sm:min-h-[12.25rem] sm:p-6">
+        <article className="flex min-h-[11rem] flex-col rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-4 shadow-ambient sm:min-h-[12.25rem] sm:p-6">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
               <span className="material-symbols-outlined text-xl" aria-hidden="true">
@@ -116,32 +116,38 @@ export function OverviewScreen({
             </h2>
           </div>
 
-          <button
-            type="button"
-            className={`mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-              hasGroupsForExport
-                ? "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
-                : "cursor-not-allowed bg-surface-container-high/70 text-on-surface-variant/70"
-            }`}
-            onClick={() => {
-              const exported = exportOverviewReportPdf({
-                groups: filteredGroups,
-                query,
-                isActiveOnly,
-                summaryMessage,
-              });
-              if (!exported) {
-                window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
-              }
-            }}
-            disabled={!hasGroupsForExport}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              download
-            </span>
-            <span className="sm:hidden">Export</span>
-            <span className="hidden sm:inline">Export Report</span>
-          </button>
+          <p className="mt-2 text-xs font-medium text-on-surface-variant sm:text-sm">
+            Generate and download weekly itinerary report.
+          </p>
+
+          <div className="mt-auto pt-3">
+            <button
+              type="button"
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                hasGroupsForExport
+                  ? "bg-primary text-on-primary shadow-cta-soft hover:bg-primary-container"
+                  : "cursor-not-allowed bg-surface-container-high/70 text-on-surface-variant/70"
+              }`}
+              onClick={() => {
+                const exported = exportOverviewReportPdf({
+                  groups: filteredGroups,
+                  query,
+                  isActiveOnly,
+                  summaryMessage,
+                });
+                if (!exported) {
+                  window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
+                }
+              }}
+              disabled={!hasGroupsForExport}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                download
+              </span>
+              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">Export Report</span>
+            </button>
+          </div>
         </article>
 
         {statCards.map((card) => (

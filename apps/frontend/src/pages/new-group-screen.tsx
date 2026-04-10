@@ -451,14 +451,10 @@ export function NewGroupScreen({
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          className="serene-btn-secondary"
+          className="inline-flex items-center text-sm font-semibold text-primary transition hover:text-primary/85 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           onClick={() => handleAddAgreement(city)}
         >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            add_circle
-          </span>
-          <span className="sm:hidden">Add Hotel</span>
-          <span className="hidden sm:inline">Add Another Hotel</span>
+          <span>Add Hotel</span>
         </button>
       </div>
     </div>

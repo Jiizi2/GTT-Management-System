@@ -166,6 +166,14 @@ function createFormFromOption(option: MasterDataOption): MasterDataFormState {
   };
 }
 
+function getStatusButtonClassName(isActive: boolean): string {
+  return `inline-flex min-w-[88px] justify-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition ${
+    isActive
+      ? "border-emerald-200 bg-emerald-100/80 text-emerald-700 hover:bg-emerald-100"
+      : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
+  }`;
+}
+
 export function MasterDataScreen() {
   const [categories, setCategories] = useState<MasterDataCategory[]>([]);
   const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryKey | null>(null);
@@ -410,23 +418,23 @@ export function MasterDataScreen() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="space-y-2">
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
+    <div className="mx-auto max-w-7xl space-y-5 px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="space-y-1">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-[2.2rem]">
             Master Data
           </h1>
-          <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+          <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant">
             Kelola opsi dropdown untuk invoice, user management, dan kota Saudi tanpa ubah kode.
           </p>
         </div>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5 sm:self-auto" />
+        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:self-auto" />
       </header>
 
       {notice ? (
         <div
-          className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-ambient ${
+          className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
             notice.tone === "success"
               ? "border-primary/25 bg-primary-fixed text-on-primary-fixed-variant"
               : "border-error/25 bg-error-container/60 text-on-error-container"
@@ -441,26 +449,31 @@ export function MasterDataScreen() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[0.95fr_2fr]">
-        <article className="rounded-3xl border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-ambient sm:p-5">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Category</h2>
+      <section className="grid gap-4 lg:grid-cols-[0.92fr_2.08fr]">
+        <article className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest shadow-ambient">
+          <div className="flex items-center justify-between gap-2 border-b border-outline-variant/30 px-4 py-3 sm:px-5">
+            <div>
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                Category
+              </h2>
+              <p className="mt-1 text-xs text-on-surface-variant">Pilih kategori master data.</p>
+            </div>
             {isLoadingCategories ? (
               <span className="text-xs font-semibold text-on-surface-variant">Loading...</span>
             ) : null}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1 p-2">
             {sortedCategories.map((category) => {
               const isSelected = category.key === activeCategoryKey;
               return (
                 <button
                   key={category.key}
                   type="button"
-                  className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
+                  className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
                     isSelected
-                      ? "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant"
-                      : "border-outline-variant/35 bg-surface-container-low hover:border-primary/35"
+                      ? "border-primary/40 bg-primary/10"
+                      : "border-transparent hover:border-outline-variant/35 hover:bg-surface-container-low"
                   }`}
                   onClick={() => {
                     setActiveCategoryKey(category.key);
@@ -469,29 +482,42 @@ export function MasterDataScreen() {
                     setEditingForm(EMPTY_FORM);
                   }}
                 >
-                  <p className="text-sm font-bold text-on-surface">{category.label}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{category.description}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
-                    Active {category.activeOptions} / Total {category.totalOptions}
-                  </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-on-surface">{category.label}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                        {category.description}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-md border border-outline-variant/35 bg-surface-container-lowest px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                      {category.activeOptions}/{category.totalOptions}
+                    </span>
+                  </div>
                 </button>
               );
             })}
           </div>
         </article>
 
-        <article className="rounded-3xl border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-ambient sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <article className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 px-4 py-3 sm:px-5">
             <div>
-              <h2 className="text-lg font-bold text-on-surface">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                Option Table
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-on-surface">
                 {activeCategory?.label ?? "Select category"}
               </h2>
-              <p className="text-xs text-on-surface-variant">
+              <p className="mt-0.5 text-xs text-on-surface-variant">
                 {activeCategory?.description ?? "Pilih kategori di panel kiri."}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
+                Menampilkan {options.length} option
+                {includeInactive ? " (termasuk inactive)." : "."}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
               <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
                 <input
                   type="checkbox"
@@ -503,7 +529,7 @@ export function MasterDataScreen() {
               </label>
               <button
                 type="button"
-                className="serene-btn-primary min-h-[38px] px-3 py-1.5 text-xs"
+                className="serene-btn-primary min-h-[38px] w-full px-3 py-1.5 text-xs sm:w-auto sm:px-4"
                 onClick={() => {
                   setIsCreateOpen((current) => !current);
                   setCreatingForm(EMPTY_FORM);
@@ -516,10 +542,13 @@ export function MasterDataScreen() {
           </div>
 
           {isCreateOpen && activeCategoryKey && activeCategoryFormConfig ? (
-            <form className="mt-4 grid gap-2 rounded-2xl border border-outline-variant/35 bg-surface-container-low p-3" onSubmit={handleCreateSubmit}>
-              <div className="grid gap-2 sm:grid-cols-2">
+            <form
+              className="mx-4 mt-4 grid gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 sm:mx-5"
+              onSubmit={handleCreateSubmit}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
-                  <span className="text-[11px] font-semibold text-on-surface-variant">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     {activeCategoryFormConfig.valueLabel}
                   </span>
                   <input
@@ -532,7 +561,7 @@ export function MasterDataScreen() {
                   />
                 </label>
                 <label className="grid gap-1">
-                  <span className="text-[11px] font-semibold text-on-surface-variant">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     {activeCategoryFormConfig.labelLabel}
                   </span>
                   <input
@@ -546,10 +575,12 @@ export function MasterDataScreen() {
                 </label>
               </div>
               {activeCategoryFormConfig.valueHint ? (
-                <p className="text-xs text-on-surface-variant">{activeCategoryFormConfig.valueHint}</p>
+                <p className="rounded-md border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
+                  {activeCategoryFormConfig.valueHint}
+                </p>
               ) : null}
               <label className="grid gap-1">
-                <span className="text-[11px] font-semibold text-on-surface-variant">
+                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                   {activeCategoryFormConfig.descriptionLabel}
                 </span>
                 <input
@@ -561,10 +592,12 @@ export function MasterDataScreen() {
                   placeholder={activeCategoryFormConfig.descriptionPlaceholder}
                 />
               </label>
-              <p className="text-xs text-on-surface-variant">Urutan tampil ditentukan otomatis oleh sistem.</p>
+              <p className="text-xs text-on-surface-variant">
+                Urutan tampil ditentukan otomatis oleh sistem.
+              </p>
               {activeCategoryFormConfig.showMetadata ? (
                 <label className="grid gap-1">
-                  <span className="text-[11px] font-semibold text-on-surface-variant">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     {activeCategoryFormConfig.metadataLabel}
                   </span>
                   <textarea
@@ -595,83 +628,152 @@ export function MasterDataScreen() {
                 Aktif
               </label>
               <div className="flex justify-end">
-                <button type="submit" className="serene-btn-primary" disabled={isCreating}>
+                <button type="submit" className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs" disabled={isCreating}>
                   {isCreating ? "Menyimpan..." : "Simpan Option"}
                 </button>
               </div>
             </form>
           ) : null}
 
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-outline-variant/30 bg-surface-container-low">
+          <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
             {isLoadingOptions ? (
-              <div className="px-4 py-5 text-sm font-medium text-on-surface-variant">Memuat option...</div>
+              <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
+                Memuat option...
+              </div>
             ) : options.length === 0 ? (
-              <div className="px-4 py-5 text-sm font-medium text-on-surface-variant">
+              <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
                 Belum ada option untuk kategori ini.
               </div>
             ) : (
-              <table className="min-w-full border-collapse text-left text-sm">
-                <thead className="border-b border-outline-variant/30 bg-surface-container-lowest">
-                  <tr>
-                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-on-surface-variant">Value</th>
-                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-on-surface-variant">Label</th>
-                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-on-surface-variant">Sort</th>
-                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-on-surface-variant">Status</th>
-                    <th className="px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-on-surface-variant">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/20">
-                  {options.map((option) => {
-                    return (
-                      <tr key={option.id} className="align-top">
-                        <td className="px-3 py-2 font-mono text-xs text-on-surface">{option.value}</td>
-                        <td className="px-3 py-2">
-                          <p className="font-semibold text-on-surface">{option.label}</p>
+              <>
+                <div className="space-y-2 p-2 sm:hidden">
+                  {options.map((option) => (
+                    <article
+                      key={`${option.id}-mobile`}
+                      className="rounded-lg border border-outline-variant/35 bg-surface-container-low p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="break-all font-mono text-[11px] text-on-surface-variant">{option.value}</p>
+                          <p className="mt-1 text-sm font-semibold text-on-surface">{option.label}</p>
                           {option.description ? (
-                            <p className="mt-0.5 text-xs text-on-surface-variant">{option.description}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{option.description}</p>
                           ) : null}
-                        </td>
-                        <td className="px-3 py-2 text-xs font-semibold text-on-surface-variant">{option.sortOrder}</td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
-                              option.isActive
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-200 text-slate-700"
-                            }`}
-                            onClick={() => void handleToggleActive(option)}
-                            disabled={isUpdating}
-                          >
-                            {option.isActive ? "Active" : "Inactive"}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            className="inline-flex rounded-lg border border-outline-variant/45 px-2.5 py-1 text-xs font-semibold text-on-surface transition hover:border-primary/40"
-                            onClick={() => {
-                              setEditingOptionId(option.id);
-                              setEditingForm(createFormFromOption(option));
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </td>
+                          <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
+                            Sort {option.sortOrder}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          className={`${getStatusButtonClassName(option.isActive)} shrink-0`}
+                          onClick={() => void handleToggleActive(option)}
+                          disabled={isUpdating}
+                        >
+                          {option.isActive ? "Active" : "Inactive"}
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-[34px] items-center rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-primary/45 hover:text-primary"
+                          onClick={() => {
+                            setEditingOptionId(option.id);
+                            setEditingForm(createFormFromOption(option));
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto sm:block">
+                  <table className="w-full min-w-[760px] table-fixed border-collapse text-left text-sm">
+                    <colgroup>
+                      <col className="w-[21%]" />
+                      <col className="w-[35%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[16%]" />
+                    </colgroup>
+                    <thead className="border-b border-outline-variant/30 bg-surface-container-low">
+                      <tr>
+                        <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                          Value
+                        </th>
+                        <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                          Label
+                        </th>
+                        <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                          Sort
+                        </th>
+                        <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                          Status
+                        </th>
+                        <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                          Action
+                        </th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/20">
+                      {options.map((option) => {
+                        return (
+                          <tr key={option.id} className="align-middle transition hover:bg-primary/5">
+                            <td className="break-all px-4 py-3 font-mono text-[11px] text-on-surface-variant">
+                              {option.value}
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-semibold text-on-surface">{option.label}</p>
+                              {option.description ? (
+                                <p className="mt-0.5 text-xs text-on-surface-variant">{option.description}</p>
+                              ) : null}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-on-surface-variant">
+                              {option.sortOrder}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3">
+                              <button
+                                type="button"
+                                className={getStatusButtonClassName(option.isActive)}
+                                onClick={() => void handleToggleActive(option)}
+                                disabled={isUpdating}
+                              >
+                                {option.isActive ? "Active" : "Inactive"}
+                              </button>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3">
+                              <button
+                                type="button"
+                                className="inline-flex min-h-[34px] items-center rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-primary/45 hover:text-primary"
+                                onClick={() => {
+                                  setEditingOptionId(option.id);
+                                  setEditingForm(createFormFromOption(option));
+                                }}
+                              >
+                                Edit
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
 
           {editingOptionId && activeCategoryFormConfig ? (
-            <section className="mt-4 rounded-2xl border border-outline-variant/35 bg-surface-container-low p-3">
-              <h3 className="text-sm font-bold text-on-surface">Edit Option</h3>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <section className="mx-4 mt-4 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 sm:mx-5 sm:mb-5">
+              <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-on-surface-variant">
+                Edit Option
+              </h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
-                  <span className="text-[11px] font-semibold text-on-surface-variant">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     {activeCategoryFormConfig.valueLabel}
                   </span>
                   <input
@@ -684,7 +786,7 @@ export function MasterDataScreen() {
                   />
                 </label>
                 <label className="grid gap-1">
-                  <span className="text-[11px] font-semibold text-on-surface-variant">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     {activeCategoryFormConfig.labelLabel}
                   </span>
                   <input
@@ -697,8 +799,8 @@ export function MasterDataScreen() {
                   />
                 </label>
               </div>
-              <label className="mt-2 grid gap-1">
-                <span className="text-[11px] font-semibold text-on-surface-variant">
+              <label className="mt-3 grid gap-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                   {activeCategoryFormConfig.descriptionLabel}
                 </span>
                 <input
@@ -710,12 +812,12 @@ export function MasterDataScreen() {
                   placeholder={activeCategoryFormConfig.descriptionPlaceholder}
                 />
               </label>
-              <p className="mt-2 text-xs text-on-surface-variant">
+              <p className="mt-3 text-xs text-on-surface-variant">
                 Urutan tampil ditentukan otomatis oleh sistem.
               </p>
               {activeCategoryFormConfig.showMetadata ? (
-                <label className="mt-2 grid gap-1">
-                  <span className="text-[11px] font-semibold text-on-surface-variant">
+                <label className="mt-3 grid gap-1">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     {activeCategoryFormConfig.metadataLabel}
                   </span>
                   <textarea
@@ -734,7 +836,7 @@ export function MasterDataScreen() {
                   ) : null}
                 </label>
               ) : null}
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
                   <input
                     type="checkbox"
@@ -750,7 +852,7 @@ export function MasterDataScreen() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="serene-btn-secondary"
+                    className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs"
                     onClick={() => {
                       setEditingOptionId(null);
                       setEditingForm(EMPTY_FORM);
@@ -760,7 +862,7 @@ export function MasterDataScreen() {
                   </button>
                   <button
                     type="button"
-                    className="serene-btn-primary"
+                    className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs"
                     onClick={() => void handleSaveEdit()}
                     disabled={isUpdating}
                   >

@@ -1576,11 +1576,11 @@ export function InputItineraryScreen({
                         : "Step aktif sudah lengkap."}
                   </p>
 
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                  <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
                       <button
                         type="button"
-                        className="serene-btn-secondary min-h-10 flex-1 sm:flex-none"
+                        className="serene-btn-secondary min-h-10 w-full sm:w-auto"
                         onClick={() => handleBaseTripStepChange("previous")}
                         disabled={!isGroupReadyForItinerary || isFirstBaseTripStep}
                       >
@@ -1589,7 +1589,7 @@ export function InputItineraryScreen({
 
                       <button
                         type="button"
-                        className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-4 py-2 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-4 py-2 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
                         onClick={() => handleBaseTripStepChange("next")}
                         disabled={!isGroupReadyForItinerary || isLastBaseTripStep}
                       >
@@ -1597,14 +1597,15 @@ export function InputItineraryScreen({
                       </button>
                     </div>
 
-                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
                       <button
                         type="button"
                         className="serene-btn-primary min-h-10 w-full sm:w-auto"
                         onClick={handleSaveBaseTrips}
                         disabled={isBaseTripSaveDisabled}
                       >
-                        Save 5 Base Trips
+                        <span className="sm:hidden">Save Trips</span>
+                        <span className="hidden sm:inline">Save 5 Base Trips</span>
                       </button>
                       <button
                         type="button"
@@ -1632,32 +1633,34 @@ export function InputItineraryScreen({
             )}
 
             {!isBaseTripFormVisible ? (
-              <button
-                type="button"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-brand-neutral px-4 py-3 text-base font-semibold text-brand-primary transition hover:bg-brand-primary/10 disabled:cursor-not-allowed disabled:opacity-45"
-                onClick={handleOpenCreateForm}
-                disabled={!isGroupReadyForItinerary}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  add_circle
-                </span>
-                <span className="sm:hidden">Add 5 Trips</span>
-                <span className="hidden sm:inline">Add 5 Base Trips</span>
-              </button>
-            ) : null}
+              <>
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-brand-neutral px-4 py-3 text-base font-semibold text-brand-primary transition hover:bg-brand-primary/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  onClick={handleOpenCreateForm}
+                  disabled={!isGroupReadyForItinerary}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    add_circle
+                  </span>
+                  <span className="sm:hidden">Add 5 Trips</span>
+                  <span className="hidden sm:inline">Add 5 Base Trips</span>
+                </button>
 
-            <button
-              type="button"
-              className="serene-btn-secondary w-full"
-              onClick={handleOpenManualCreateForm}
-              disabled={!isGroupReadyForItinerary}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                add
-              </span>
-              <span className="sm:hidden">Add Manual Schedule</span>
-              <span className="hidden sm:inline">Add Single Schedule (Manual)</span>
-            </button>
+                <button
+                  type="button"
+                  className="serene-btn-secondary w-full"
+                  onClick={handleOpenManualCreateForm}
+                  disabled={!isGroupReadyForItinerary}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    add
+                  </span>
+                  <span className="sm:hidden">Add Manual Schedule</span>
+                  <span className="hidden sm:inline">Add Single Schedule (Manual)</span>
+                </button>
+              </>
+            ) : null}
           </div>
         </section>
         {isScheduleFormVisible && typeof document !== "undefined"

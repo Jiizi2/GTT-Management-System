@@ -57,7 +57,7 @@ function DashboardWorkspaceShell({ onLogout }: { onLogout: () => void }) {
   const controller = useAppController();
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const shouldShowFloatingThemeToggle = !(
-    (controller.activeNav === "overview" && !controller.selectedGroup) ||
+    controller.activeNav === "overview" ||
     controller.activeNav === "checklist" ||
     (controller.activeNav === "visa" && !controller.selectedVisaRow) ||
     controller.activeNav === "invoice" ||
