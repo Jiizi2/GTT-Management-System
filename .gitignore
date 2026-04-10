@@ -1,0 +1,13 @@
+node_modules
+dist
+apps/*/dist
+apps/*/dist-smoke
+apps/frontend/playwright-report
+apps/frontend/test-results
+coverage
+.nyc_output
+*.log
+.env
+.env.*
+apps/*/.env
+apps/*/.env.*

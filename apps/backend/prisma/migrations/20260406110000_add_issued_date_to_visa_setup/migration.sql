@@ -1,0 +1,2 @@
+ALTER TABLE "VisaSetup"
+ADD COLUMN "issuedDate" TIMESTAMP(3);

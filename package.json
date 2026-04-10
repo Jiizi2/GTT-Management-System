@@ -1,0 +1,38 @@
+{
+  "name": "typescript-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A workspace monorepo with separate frontend and backend apps.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:frontend": "npm run build --workspace frontend",
+    "build:backend": "npm run build --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "start:backend": "npm run start --workspace backend",
+    "check": "npm run check --workspaces",
+    "test:unit": "npm run test:unit --workspaces",
+    "test:integration": "npm run test:integration --workspace backend",
+    "test:unit:coverage": "c8 --temp-directory .nyc_output/unit --reporter=text --reporter=html --reporter=lcov --report-dir coverage/unit npm run test:unit",
+    "test:unit:coverage:check": "c8 --temp-directory .nyc_output/unit --reporter=text --reporter=html --reporter=lcov --report-dir coverage/unit --check-coverage --lines 55 --functions 65 --branches 60 --statements 55 npm run test:unit",
+    "test": "npm run test --workspaces",
+    "test:e2e:frontend": "npm run build:backend && npm run build:frontend && npm run test:e2e --workspace frontend",
+    "verify": "npm run check && npm run test && npm run build",
+    "db:generate:backend": "npm run db:generate --workspace backend",
+    "db:migrate:backend": "npm run db:migrate --workspace backend",
+    "db:seed:backend": "npm run db:seed --workspace backend",
+    "db:studio:backend": "npm run db:studio --workspace backend"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "c8": "^11.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GroupTone {
+  ACTIVE
+  INACTIVE
+}
+
+enum VisaStatus {
+  DRAFT
+  PENDING
+  ISSUED
+}
+
+enum VisaPaymentStatus {
+  PAID
+  UNPAID
+  PARTIAL
+}
+
+enum AgreementApprovalStatus {
+  WAITING
+  APPROVED
+}
+
+enum AgreementCity {
+  MAKKAH
+  MADINAH
+}
+
+enum GroupRaudhahStatus {
+  FREE
+  AFTER
+  BEFORE
+}
+
+enum ChecklistAssignmentStatus {
+  NOT_COMPLETE
+  ASSIGNED
+}
+
+enum InvoiceStatus {
+  PAID
+  PENDING
+  OVERDUE
+  CANCELLED
+}
+
+model Group {
+  id                 String                @id @default(cuid())
+  code               String                @unique
+  name               String
+  status             String
+  tone               GroupTone             @default(ACTIVE)
+  arrivalDate        DateTime
+  returnDate         DateTime
+  pax                Int
+  totalBuses         Int?
+  packageName        String
+  durationDays       Int
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  musyrif            Musyrif?
+  nextActivity       NextActivity?
+  timeline           GroupTimelineItem[]
+  itinerary          ItineraryItem[]
+  notes              GroupNote[]
+  visaSetup          VisaSetup?
+  checklistAssignments ChecklistAssignment[]
+  invoiceClients     InvoiceClient[]
+  invoices           Invoice[]
+
+  @@index([createdAt])
+}
+
+model InvoiceClient {
+  id          String    @id @default(cuid())
+  name        String
+  sortOrder   Int
+  groupId     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  group       Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  invoices    Invoice[]
+
+  @@unique([sortOrder])
+  @@index([name])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  clientId      String
+  groupId       String?
+  issuedDate    DateTime
+  dueDate       DateTime
+  amount        Decimal       @default(0) @db.Decimal(12, 2)
+  status        InvoiceStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  client        InvoiceClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  group         Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([dueDate])
+  @@index([clientId, dueDate])
+  @@index([groupId])
+}
+
+model Musyrif {
+  id        String   @id @default(cuid())
+  groupId   String   @unique
+  name      String
+  phone     String
+  avatar    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model NextActivity {
+  id        String   @id @default(cuid())
+  groupId   String   @unique
+  title     String
+  dateLabel String
+  timeLabel String
+  icon      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model GroupTimelineItem {
+  id           String   @id @default(cuid())
+  groupId      String
+  sortOrder    Int
+  dateLabel    String
+  title        String
+  isCurrent    Boolean  @default(false)
+  nextActivity String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, sortOrder])
+  @@unique([groupId, sortOrder])
+}
+
+model ItineraryItem {
+  id                    String   @id @default(cuid())
+  groupId               String
+  sortOrder             Int
+  dateLabel             String
+  yearLabel             String
+  category              String
+  categoryKey           String?
+  title                 String
+  meta                  String
+  icon                  String
+  highlighted           Boolean  @default(false)
+  isoDate               DateTime?
+  time                  String?
+  flightNumber          String?
+  fromLocation          String?
+  toLocation            String?
+  cityTourCity          String?
+  requiresBus           Boolean  @default(false)
+  notes                 String?
+  transferByTrain       Boolean  @default(false)
+  trainDepartureTime    String?
+  destinationPickupTime String?
+  hotelPickupRequestTime String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  group                 Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  checklistAssignments  ChecklistAssignment[]
+
+  @@index([groupId, sortOrder])
+  @@unique([groupId, sortOrder])
+}
+
+model GroupNote {
+  id        String   @id @default(cuid())
+  groupId   String
+  sortOrder Int
+  text      String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, sortOrder])
+}
+
+model VisaSetup {
+  id                  String               @id @default(cuid())
+  groupId             String               @unique
+  visaStatus          VisaStatus           @default(DRAFT)
+  issuedDate          DateTime?
+  syarikah            String
+  paymentStatus       VisaPaymentStatus    @default(UNPAID)
+  outstandingAmount   Decimal              @default(0) @db.Decimal(12, 2)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  group               Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  hotelAgreements     VisaHotelAgreement[]
+  raudhahAppointments RaudhahAppointment[]
+}
+
+model VisaHotelAgreement {
+  id              String                  @id @default(cuid())
+  visaSetupId     String
+  city            AgreementCity
+  hotelName       String
+  agreementNumber String
+  pax             Int
+  status          AgreementApprovalStatus @default(WAITING)
+  stayStart       DateTime
+  stayEnd         DateTime
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  visaSetup       VisaSetup               @relation(fields: [visaSetupId], references: [id], onDelete: Cascade)
+
+  @@index([visaSetupId, city, stayStart])
+}
+
+model RaudhahAppointment {
+  id         String             @id @default(cuid())
+  visaSetupId String
+  date       DateTime
+  status     GroupRaudhahStatus @default(FREE)
+  tasrehPrinted Boolean         @default(false)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  visaSetup  VisaSetup          @relation(fields: [visaSetupId], references: [id], onDelete: Cascade)
+
+  @@index([visaSetupId, date])
+}
+
+model ChecklistAssignment {
+  id                 String                    @id @default(cuid())
+  groupId            String
+  itineraryItemId    String?
+  tripDate           DateTime
+  activity           String
+  tripLabel          String
+  requiredBusCount   Int                       @default(1)
+  scheduledTime      String
+  transferByTrain    Boolean                   @default(false)
+  trainDepartureTime String?
+  stationPickupTime  String?
+  status             ChecklistAssignmentStatus @default(NOT_COMPLETE)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  group              Group                     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  itineraryItem      ItineraryItem?            @relation(fields: [itineraryItemId], references: [id], onDelete: SetNull)
+  drivers            ChecklistDriver[]
+
+  @@index([groupId, tripDate])
+}
+
+model ChecklistDriver {
+  id                    String               @id @default(cuid())
+  checklistAssignmentId String
+  slotNumber            Int
+  name                  String
+  phone                 String
+  plateNumber           String
+  isVerified            Boolean              @default(false)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  checklistAssignment   ChecklistAssignment  @relation(fields: [checklistAssignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([checklistAssignmentId, slotNumber])
+  @@index([checklistAssignmentId])
+}

@@ -1,0 +1,1670 @@
+import { buildVisaAgreementNumber, formatVisaDateWithYear, formatVisaLongDate, formatVisaShortDate, getGroupAgreementHotelsByCity, hasMissingHotelAllocation, isIsoDateValue, isVisaRowActionRequired, resolveVisaAgreementDateRange, resolveVisaAgreementNumber, resolveVisaProvider, shiftIsoDate, } from "./visa-domain.js";
+export { buildVisaAgreementNumber, formatVisaDateWithYear, formatVisaLongDate, formatVisaShortDate, getGroupAgreementHotelsByCity, hasMissingHotelAllocation, isIsoDateValue, isVisaRowActionRequired, resolveVisaAgreementDateRange, resolveVisaAgreementNumber, resolveVisaProvider, shiftIsoDate, };
+export function formatLocalIsoDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+export function getLocalIsoDateWithOffset(days) {
+    const nextDate = new Date();
+    nextDate.setHours(12, 0, 0, 0);
+    nextDate.setDate(nextDate.getDate() + days);
+    return formatLocalIsoDate(nextDate);
+}
+export function resolveValidRaudhahAppointments(group) {
+    const fallbackGroupCode = group?.code?.trim() || "group";
+    return (group?.visaSetup?.raudhahAppointments ?? [])
+        .map((appointment, index) => ({
+        id: appointment.id?.trim() || `${fallbackGroupCode}-raudhah-${index + 1}`,
+        dateIso: appointment.dateIso.trim(),
+        status: appointment.status,
+        tasrehPrinted: Boolean(appointment.tasrehPrinted),
+    }))
+        .filter((appointment) => isIsoDateValue(appointment.dateIso))
+        .sort((left, right) => {
+        const dateOrder = left.dateIso.localeCompare(right.dateIso);
+        if (dateOrder !== 0) {
+            return dateOrder;
+        }
+        return left.id.localeCompare(right.id);
+    });
+}
+export const operatorAvatar = "https://lh3.googleusercontent.com/aida-public/AB6AXuDYxTyP2luvJIjGFQzfh0xRh0AHPBDoS_l-3WNItTegB4jnCMIfkjN_571ulocggZTAS6voqaMm4EoSA-kfN3SxNgXwoxo3NzlaWM8-b3HQoMbNFooz3nsVQqL3smWPEyp8UBTeqYDJEr1qfnNB68B9-4XfLzbyS06bFPL9b8w1TnJJnp2O_s6gH8MLguE3BOtb8uac28oSHRl62ewwxmQRLXyku6cbSP2nh2BszE7hmDB40X8HQtKF-kOCZ_UOJwRQ4i28LoZ6mys";
+export const musyrifAvatar = "https://lh3.googleusercontent.com/aida-public/AB6AXuDh2QYe9f16M9LsFkFiiV-OWeoRQURwjlEBJp3y0F89mrcICkRZYBeBkUm_v0qJ-0yBwSt9K_oWvo7_ckbWvElV1I9mW0eNQp13OqJr51wrBQWMtG-BTce2SZQmPAB4D-vi6dN4r1WOZwOLU_Is3wpMQtnpUX0Q6ADcQpch-DsiK9LqNdTe66t4O5_thVoBNA5vZTfaC5uZWCis1rIXwkpdy8jYpB95SGSj2_tepJPL9kV9YNSbfHtNGlUneW0vOtsh7v8XP-XTxvk";
+export const sidebarItems = [
+    { id: "overview", label: "Overview", icon: "dashboard" },
+    { id: "checklist", label: "H-1 Checklist", icon: "fact_check" },
+    { id: "visa", label: "Visa Tracking", icon: "fact_check" },
+    { id: "invoice", label: "Invoice", icon: "request_quote" },
+    { id: "raudhah-reminder", label: "Raudhah Reminder", icon: "notifications_active" },
+];
+export const sidebarAccountItem = {
+    id: "profile",
+    label: "Profile",
+    icon: "account_circle",
+};
+export const mobileItems = [
+    { id: "overview", label: "Overview", icon: "dashboard" },
+    { id: "checklist", label: "Checklist", icon: "fact_check" },
+    { id: "visa", label: "Visa", icon: "fact_check" },
+    { id: "profile", label: "Profile", icon: "account_circle" },
+];
+const checklistTwoBusTodayIso = getLocalIsoDateWithOffset(0);
+const checklistTwoBusTomorrowIso = getLocalIsoDateWithOffset(1);
+const checklistTwoBusPastIso = getLocalIsoDateWithOffset(-4);
+const checklistTwoBusTodayDisplay = formatScheduleDate(checklistTwoBusTodayIso);
+const checklistTwoBusTomorrowDisplay = formatScheduleDate(checklistTwoBusTomorrowIso);
+const checklistTwoBusPastDisplay = formatScheduleDate(checklistTwoBusPastIso);
+export const baseGroups = [
+    {
+        code: "901794508",
+        name: "Majestic Umrah Group",
+        status: "Active",
+        tone: "active",
+        pax: 70,
+        totalBuses: 2,
+        packageName: "Standard Gold",
+        durationDays: 14,
+        timeline: [
+            { date: "2 Apr", title: "Jeddah Arrival & Transfer" },
+            {
+                date: "3 Apr",
+                title: "Makkah City Ziyarah",
+                isCurrent: true,
+                nextActivity: "Bus Boarding (08:30)",
+            },
+        ],
+        nextActivity: {
+            title: "Makkah City Ziyarah",
+            date: "3 Apr",
+            time: "08:30",
+            icon: "tour",
+        },
+        itinerary: [
+            {
+                date: "2 Apr",
+                year: "2026",
+                category: "Arrival",
+                categoryKey: "arrival",
+                title: "Jeddah Arrival and Airport Transfer",
+                meta: "04:20 | SV-827 | Hajj Terminal",
+                icon: "flight_land",
+                flightNumber: "SV-827",
+                isoDate: "2026-04-02",
+                time: "04:20",
+                from: "JED Airport",
+                to: "Makkah",
+            },
+            {
+                date: "2 Apr",
+                year: "2026",
+                category: "Arrival",
+                categoryKey: "arrival",
+                title: "Hotel Check-in Makkah",
+                meta: "11:00 | Swissotel Al Maqam",
+                icon: "flight_land",
+                isoDate: "2026-04-02",
+                time: "11:00",
+                from: "Makkah Arrival Point",
+                to: "Swissotel Al Maqam",
+            },
+            {
+                date: "3 Apr",
+                year: "2026",
+                category: "City Tour",
+                categoryKey: "city-tour",
+                title: "Makkah City Ziyarah",
+                meta: "08:30 | Bus 02 | Gate A",
+                icon: "tour",
+                highlighted: true,
+                isoDate: "2026-04-03",
+                time: "08:30",
+                from: "Makkah Hotel",
+                to: "Jabal Rahmah",
+                cityTourCity: "Makkah",
+                requiresBus: true,
+            },
+        ],
+        notes: [
+            "Airport transfer driver needs final reconfirmation before arrival.",
+            "Hotel team requested the final rooming list for extra bed allocation.",
+        ],
+        musyrif: {
+            name: "Ust. Ahmad Hidayat",
+            phone: "+62 812-3456-7890",
+            avatar: musyrifAvatar,
+        },
+    },
+    {
+        code: "901794509",
+        name: "Honeymoon Special",
+        status: "Active",
+        tone: "active",
+        pax: 12,
+        totalBuses: 2,
+        packageName: "VIP Deluxe",
+        durationDays: 12,
+        timeline: [
+            { date: "3 Apr", title: "Departure from Jakarta" },
+            {
+                date: "4 Apr",
+                title: "Check-in Madinah Hotel",
+                isCurrent: true,
+                nextActivity: "Room Distribution",
+            },
+        ],
+        nextActivity: {
+            title: "Check-in Madinah Hotel",
+            date: "4 Apr",
+            time: "14:00",
+            icon: "hotel",
+        },
+        itinerary: [
+            {
+                date: "3 Apr",
+                year: "2026",
+                category: "Departure",
+                categoryKey: "departure",
+                title: "Departure CGK to Madinah",
+                meta: "09:30 | SV-819 | Terminal 3",
+                icon: "flight_takeoff",
+                flightNumber: "SV-819",
+                isoDate: "2026-04-03",
+                time: "09:30",
+                hotelPickupRequestTime: "06:30",
+                from: "Jakarta",
+                to: "CGK Airport",
+            },
+            {
+                date: "4 Apr",
+                year: "2026",
+                category: "Arrival",
+                categoryKey: "arrival",
+                title: "Madinah Hotel Arrival",
+                meta: "14:00 | Pullman Zamzam Madinah",
+                icon: "flight_land",
+                highlighted: true,
+                isoDate: "2026-04-04",
+                time: "14:00",
+                from: "MED Airport",
+                to: "Madinah",
+            },
+            {
+                date: "4 Apr",
+                year: "2026",
+                category: "Transfer",
+                categoryKey: "transfer",
+                title: "Transfer Haramain High Speed Railway",
+                meta: "13:15 | HHR Transfer | Madinah ke Makkah",
+                icon: "airport_shuttle",
+                isoDate: "2026-04-04",
+                time: "13:15",
+                from: "Madinah",
+                to: "Makkah",
+                requiresBus: true,
+                transferByTrain: true,
+                trainDepartureTime: "13:15",
+                destinationPickupTime: "15:35",
+            },
+            {
+                date: "4 Apr",
+                year: "2026",
+                category: "City Tour",
+                categoryKey: "city-tour",
+                title: "Rawdah Entry Coordination",
+                meta: "07:00 | Lobby Assembly Point",
+                icon: "tour",
+                isoDate: "2026-04-04",
+                time: "07:00",
+                from: "Madinah Hotel",
+                to: "Rawdah Gate",
+                cityTourCity: "Madinah",
+            },
+        ],
+        notes: [
+            "Welcome amenity for the VIP rooms should be placed before 13:00.",
+            "Need a final seat map for the airport buggy service booking.",
+        ],
+        musyrif: {
+            name: "Ust. Faris Maulana",
+            phone: "+62 811-9900-7722",
+            avatar: musyrifAvatar,
+        },
+    },
+    {
+        code: "901794510",
+        name: "Family Group C",
+        status: "In Active",
+        tone: "inactive",
+        pax: 32,
+        packageName: "Economic",
+        durationDays: 13,
+        timeline: [
+            { date: "4 Apr", title: "Final Departure Briefing" },
+            {
+                date: "5 Apr",
+                title: "Airport Assembly",
+                isCurrent: true,
+                nextActivity: "Document Verification",
+            },
+        ],
+        nextActivity: {
+            title: "Airport Assembly",
+            date: "5 Apr",
+            time: "06:30",
+            icon: "flight_takeoff",
+        },
+        itinerary: [
+            {
+                date: "4 Apr",
+                year: "2026",
+                category: "Departure",
+                categoryKey: "departure",
+                title: "Final Departure Briefing",
+                meta: "19:30 | Office Hall | Session C",
+                icon: "flight_takeoff",
+                isoDate: "2026-04-04",
+                time: "19:30",
+                hotelPickupRequestTime: "17:00",
+                from: "Jakarta",
+                to: "CGK Airport",
+            },
+            {
+                date: "5 Apr",
+                year: "2026",
+                category: "Departure",
+                categoryKey: "departure",
+                title: "Airport Assembly",
+                meta: "06:30 | Terminal 3 | Gate C",
+                icon: "flight_takeoff",
+                highlighted: true,
+                isoDate: "2026-04-05",
+                time: "06:30",
+                hotelPickupRequestTime: "04:30",
+                from: "Jakarta",
+                to: "CGK Airport",
+            },
+            {
+                date: "5 Apr",
+                year: "2026",
+                category: "Departure",
+                categoryKey: "departure",
+                title: "Departure to Jeddah",
+                meta: "09:45 | SV-835 | Terminal 3",
+                icon: "flight_takeoff",
+                flightNumber: "SV-835",
+                isoDate: "2026-04-05",
+                time: "09:45",
+                hotelPickupRequestTime: "07:00",
+                from: "Jakarta",
+                to: "CGK Airport",
+            },
+        ],
+        notes: [
+            "Three passports are still pending courier confirmation.",
+            "Family room allocation needs a final review for connecting rooms.",
+        ],
+        musyrif: {
+            name: "Ust. Yusuf Akbar",
+            phone: "+62 813-7008-2200",
+            avatar: musyrifAvatar,
+        },
+    },
+    {
+        code: "901794526",
+        name: "Checklist 2 Bus Trial",
+        status: "Active",
+        tone: "active",
+        pax: 70,
+        totalBuses: 2,
+        packageName: "Standard Gold",
+        durationDays: 10,
+        timeline: [
+            { date: checklistTwoBusPastDisplay.date, title: "Jeddah Arrival & Transfer" },
+            {
+                date: checklistTwoBusTomorrowDisplay.date,
+                title: "Madinah City Tour",
+                isCurrent: true,
+                nextActivity: "Driver Briefing (08:00)",
+            },
+        ],
+        nextActivity: {
+            title: "Madinah City Tour",
+            date: checklistTwoBusTomorrowDisplay.date,
+            time: "08:00",
+            icon: "tour",
+        },
+        itinerary: [
+            {
+                date: checklistTwoBusPastDisplay.date,
+                year: checklistTwoBusPastDisplay.year,
+                category: "Arrival",
+                categoryKey: "arrival",
+                title: "Jeddah Arrival and Transfer",
+                meta: "04:30 | SV-902 | Hajj Terminal",
+                icon: "flight_land",
+                flightNumber: "SV-902",
+                isoDate: checklistTwoBusPastIso,
+                time: "04:30",
+                from: "JED Airport",
+                to: "Madinah",
+                requiresBus: true,
+            },
+            {
+                date: checklistTwoBusTomorrowDisplay.date,
+                year: checklistTwoBusTomorrowDisplay.year,
+                category: "City Tour",
+                categoryKey: "city-tour",
+                title: "Madinah City Tour",
+                meta: "08:00 | Bus 01 & 02 | Hotel Lobby",
+                icon: "tour",
+                highlighted: true,
+                isoDate: checklistTwoBusTomorrowIso,
+                time: "08:00",
+                from: "Madinah Hotel",
+                to: "Quba Mosque",
+                cityTourCity: "Madinah",
+                requiresBus: true,
+            },
+        ],
+        notes: [
+            "Demo group for validating two-bus assignment flow in H-1 checklist.",
+            "Can be removed after QA verification.",
+        ],
+        musyrif: {
+            name: "Ust. Demo Driver",
+            phone: "+62 812-0000-5260",
+            avatar: musyrifAvatar,
+        },
+    },
+];
+export const overviewDummySeeds = [
+    {
+        code: "901794511",
+        name: "An-Nur Jakarta Batch",
+        tone: "active",
+        pax: 38,
+        packageName: "Standard Silver",
+        durationDays: 12,
+        startDay: 2,
+        musyrifName: "Ust. Ridwan Fauzi",
+        musyrifPhone: "+62 812-1001-2201",
+    },
+    {
+        code: "901794512",
+        name: "Ar-Rahmah Family Group",
+        tone: "inactive",
+        pax: 29,
+        packageName: "Economic",
+        durationDays: 13,
+        startDay: 2,
+        musyrifName: "Ust. Khalid Amir",
+        musyrifPhone: "+62 812-1001-2202",
+    },
+    {
+        code: "901794513",
+        name: "Nurul Iman Bandung",
+        tone: "inactive",
+        pax: 41,
+        packageName: "Standard Gold",
+        durationDays: 14,
+        startDay: 3,
+        musyrifName: "Ust. Salman Azmi",
+        musyrifPhone: "+62 812-1001-2203",
+    },
+    {
+        code: "901794514",
+        name: "Madinah Executive Team",
+        tone: "active",
+        pax: 24,
+        packageName: "VIP Deluxe",
+        durationDays: 11,
+        startDay: 3,
+        musyrifName: "Ust. Dany Iskandar",
+        musyrifPhone: "+62 812-1001-2204",
+    },
+    {
+        code: "901794515",
+        name: "Al-Hikmah Surabaya",
+        tone: "inactive",
+        pax: 34,
+        packageName: "Standard Gold",
+        durationDays: 12,
+        startDay: 4,
+        musyrifName: "Ust. Bima Rasyid",
+        musyrifPhone: "+62 812-1001-2205",
+    },
+    {
+        code: "901794516",
+        name: "Safa Marwah Couple",
+        tone: "active",
+        pax: 16,
+        packageName: "VIP Deluxe",
+        durationDays: 10,
+        startDay: 4,
+        musyrifName: "Ust. Fahri Mahesa",
+        musyrifPhone: "+62 812-1001-2206",
+    },
+    {
+        code: "901794517",
+        name: "Darussalam Community",
+        tone: "inactive",
+        pax: 36,
+        packageName: "Standard Silver",
+        durationDays: 13,
+        startDay: 5,
+        musyrifName: "Ust. Yogi Pratama",
+        musyrifPhone: "+62 812-1001-2207",
+    },
+    {
+        code: "901794518",
+        name: "Al-Barokah Premium",
+        tone: "active",
+        pax: 27,
+        packageName: "Standard Gold",
+        durationDays: 12,
+        startDay: 6,
+        musyrifName: "Ust. Irfan Ramadhan",
+        musyrifPhone: "+62 812-1001-2208",
+    },
+    {
+        code: "901794519",
+        name: "Ummul Qura Team",
+        tone: "inactive",
+        pax: 43,
+        packageName: "Economic",
+        durationDays: 14,
+        startDay: 7,
+        musyrifName: "Ust. Rafi Hidayat",
+        musyrifPhone: "+62 812-1001-2209",
+    },
+    {
+        code: "901794520",
+        name: "Zamzam Family Circle",
+        tone: "active",
+        pax: 31,
+        packageName: "Standard Silver",
+        durationDays: 12,
+        startDay: 8,
+        musyrifName: "Ust. Ali Mubarok",
+        musyrifPhone: "+62 812-1001-2210",
+    },
+    {
+        code: "901794521",
+        name: "Haramain West Java",
+        tone: "inactive",
+        pax: 33,
+        packageName: "Standard Gold",
+        durationDays: 13,
+        startDay: 9,
+        musyrifName: "Ust. Ghani Akbar",
+        musyrifPhone: "+62 812-1001-2211",
+    },
+    {
+        code: "901794522",
+        name: "Quba Pioneer Group",
+        tone: "active",
+        pax: 22,
+        packageName: "Economic",
+        durationDays: 11,
+        startDay: 10,
+        musyrifName: "Ust. Rizky Maulana",
+        musyrifPhone: "+62 812-1001-2212",
+    },
+    {
+        code: "901794523",
+        name: "Hijrah Care Medan",
+        tone: "inactive",
+        pax: 30,
+        packageName: "Standard Silver",
+        durationDays: 12,
+        startDay: 11,
+        musyrifName: "Ust. Naufal Rahman",
+        musyrifPhone: "+62 812-1001-2213",
+    },
+    {
+        code: "901794524",
+        name: "Arafah Women Group",
+        tone: "active",
+        pax: 18,
+        packageName: "VIP Deluxe",
+        durationDays: 10,
+        startDay: 12,
+        musyrifName: "Ust. Harits Akmal",
+        musyrifPhone: "+62 812-1001-2214",
+    },
+    {
+        code: "901794525",
+        name: "Makkah Service Unit",
+        tone: "inactive",
+        pax: 40,
+        packageName: "Standard Gold",
+        durationDays: 13,
+        startDay: 13,
+        musyrifName: "Ust. Fikri Ardian",
+        musyrifPhone: "+62 812-1001-2215",
+    },
+];
+export function formatAprilIsoDate(day) {
+    return `2026-04-${String(Math.min(Math.max(day, 1), 30)).padStart(2, "0")}`;
+}
+export function formatAprilDisplayDate(day) {
+    return `${Math.min(Math.max(day, 1), 30)} Apr`;
+}
+export function getStatusByTone(tone) {
+    if (tone === "active") {
+        return "Active";
+    }
+    return "In Active";
+}
+export const saudiLocationKeywords = [
+    "saudi",
+    "makkah",
+    "madinah",
+    "jeddah",
+    "jed",
+    "med",
+    "haram",
+    "rawdah",
+    "jabal",
+];
+export const nonSaudiLocationKeywords = [
+    "jakarta",
+    "surabaya",
+    "bandung",
+    "medan",
+    "indonesia",
+    "cgk",
+    "soekarno",
+    "soetta",
+    "terminal 3",
+];
+export function includesKnownKeyword(value, keywords) {
+    const normalizedValue = value.toLowerCase();
+    return keywords.some((keyword) => normalizedValue.includes(keyword));
+}
+export function resolveGroupToneByItinerary(itinerary) {
+    if (itinerary.length === 0) {
+        return "inactive";
+    }
+    const latestItem = [...itinerary].sort((left, right) => {
+        const leftDate = left.isoDate ?? parseDisplayDateToIso(left.date, left.year);
+        const rightDate = right.isoDate ?? parseDisplayDateToIso(right.date, right.year);
+        const leftKey = `${leftDate}T${left.time ?? "00:00"}`;
+        const rightKey = `${rightDate}T${right.time ?? "00:00"}`;
+        return leftKey.localeCompare(rightKey);
+    })[itinerary.length - 1];
+    if (!latestItem) {
+        return "inactive";
+    }
+    const routeHint = [latestItem.to, latestItem.from, latestItem.title, latestItem.meta]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+    const hasSaudiKeyword = includesKnownKeyword(routeHint, saudiLocationKeywords);
+    const hasNonSaudiKeyword = includesKnownKeyword(routeHint, nonSaudiLocationKeywords);
+    if (hasSaudiKeyword) {
+        return "active";
+    }
+    if (hasNonSaudiKeyword) {
+        return "inactive";
+    }
+    return "inactive";
+}
+function sortItineraryForOverview(items) {
+    return [...items].sort((left, right) => {
+        const leftDate = getItineraryIsoDate(left) || "9999-12-31";
+        const rightDate = getItineraryIsoDate(right) || "9999-12-31";
+        const leftMetaTime = parseTimeForInput(left.meta.split(" | ")[0] ?? "");
+        const rightMetaTime = parseTimeForInput(right.meta.split(" | ")[0] ?? "");
+        const leftTime = left.time?.trim() || leftMetaTime || "00:00";
+        const rightTime = right.time?.trim() || rightMetaTime || "00:00";
+        const leftKey = `${leftDate}T${leftTime}`;
+        const rightKey = `${rightDate}T${rightTime}`;
+        return leftKey.localeCompare(rightKey);
+    });
+}
+function resolveItineraryOverviewDate(item) {
+    const isoDate = getItineraryIsoDate(item);
+    if (!isoDate) {
+        return item.date || "-";
+    }
+    return formatScheduleDate(isoDate).date;
+}
+function resolveItineraryOverviewTime(item) {
+    const fallbackMetaTime = parseTimeForInput(item.meta.split(" | ")[0] ?? "");
+    const rawTime = item.time?.trim() || fallbackMetaTime;
+    if (!rawTime) {
+        return "";
+    }
+    const normalizedTime = formatScheduleTime(rawTime);
+    return normalizedTime === "TBD" ? "" : normalizedTime;
+}
+function resolveItineraryOverviewSummary(item) {
+    const from = item.from?.trim() ?? "";
+    const to = item.to?.trim() ?? "";
+    if (from && to) {
+        return formatRouteSummary(inferCategoryKey(item), from, to, item.cityTourCity ?? "");
+    }
+    return item.title.trim() || "Activity detail pending";
+}
+function buildOverviewSnapshotFromItinerary(itinerary, currentGroup) {
+    const sortedItems = sortItineraryForOverview(itinerary);
+    const firstItem = sortedItems[0];
+    if (!firstItem) {
+        return {
+            timeline: currentGroup.timeline,
+            nextActivity: currentGroup.nextActivity,
+        };
+    }
+    const secondItem = sortedItems[1];
+    const firstTypeOption = getScheduleTypeOption(inferCategoryKey(firstItem));
+    const firstDateLabel = resolveItineraryOverviewDate(firstItem);
+    const firstSummary = resolveItineraryOverviewSummary(firstItem);
+    const firstTime = resolveItineraryOverviewTime(firstItem);
+    const timelineFirst = {
+        date: firstDateLabel,
+        title: `${firstTypeOption.cardLabel} | ${firstSummary}`,
+    };
+    const timelineSecond = secondItem
+        ? (() => {
+            const secondTypeOption = getScheduleTypeOption(inferCategoryKey(secondItem));
+            const secondDateLabel = resolveItineraryOverviewDate(secondItem);
+            const secondSummary = resolveItineraryOverviewSummary(secondItem);
+            const secondTime = resolveItineraryOverviewTime(secondItem);
+            const secondTimelineActivity = secondTime && secondTime.length > 0
+                ? `${secondTime}${secondItem.requiresBus ? " | Requires Bus" : ""}`
+                : "Awaiting operator update";
+            return {
+                date: secondDateLabel,
+                title: `${secondTypeOption.cardLabel} | ${secondSummary}`,
+                isCurrent: true,
+                nextActivity: secondTimelineActivity,
+            };
+        })()
+        : {
+            date: firstDateLabel,
+            title: "Next activity to be confirmed",
+            isCurrent: true,
+            nextActivity: "Awaiting operator update",
+        };
+    return {
+        timeline: [timelineFirst, timelineSecond],
+        nextActivity: {
+            title: `${firstTypeOption.cardLabel}: ${firstSummary}`,
+            date: firstDateLabel,
+            time: firstTime,
+            icon: firstItem.icon?.trim() || firstTypeOption.icon,
+        },
+    };
+}
+export function normalizeGroupStatus(group) {
+    const normalizedItinerary = expandTransferTrainItineraryItems(group.itinerary);
+    const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(normalizedItinerary);
+    const currentArrivalDate = group.arrivalDate?.trim() ?? "";
+    const currentReturnDate = group.returnDate?.trim() ?? "";
+    const normalizedArrivalDate = isIsoDateValue(currentArrivalDate)
+        ? currentArrivalDate
+        : earliestIsoDate ?? getLocalIsoDateWithOffset(0);
+    const fallbackReturnDate = latestIsoDate ?? shiftIsoDate(normalizedArrivalDate, Math.max(1, group.durationDays - 1));
+    const normalizedReturnDateCandidate = isIsoDateValue(currentReturnDate)
+        ? currentReturnDate
+        : fallbackReturnDate;
+    const normalizedReturnDate = normalizedReturnDateCandidate >= normalizedArrivalDate
+        ? normalizedReturnDateCandidate
+        : normalizedArrivalDate;
+    const tone = resolveGroupToneByItinerary(normalizedItinerary);
+    const overviewSnapshot = buildOverviewSnapshotFromItinerary(normalizedItinerary, group);
+    return {
+        ...group,
+        arrivalDate: normalizedArrivalDate,
+        returnDate: normalizedReturnDate,
+        itinerary: normalizedItinerary,
+        timeline: overviewSnapshot.timeline,
+        nextActivity: overviewSnapshot.nextActivity,
+        tone,
+        status: getStatusByTone(tone),
+        totalBuses: resolveTotalBusCount(group.pax, group.totalBuses),
+    };
+}
+export function createDummyOverviewGroups() {
+    return overviewDummySeeds.map((seed, index) => {
+        const departureDay = seed.startDay;
+        const arrivalDay = Math.min(seed.startDay + 1, 30);
+        const operationDay = Math.min(seed.startDay + 2, 30);
+        const departureTime = `${String(5 + (index % 6)).padStart(2, "0")}:${index % 2 === 0 ? "30" : "45"}`;
+        const arrivalTime = `${String(9 + (index % 5)).padStart(2, "0")}:${index % 2 === 0 ? "10" : "25"}`;
+        const operationTime = `${String(7 + (index % 6)).padStart(2, "0")}:${index % 2 === 0 ? "00" : "15"}`;
+        const flightNumber = `SV-${840 + index}`;
+        const isCityTour = index % 2 === 0;
+        const operationCategory = isCityTour ? "City Tour" : "Transfer";
+        const operationCategoryKey = isCityTour ? "city-tour" : "transfer";
+        const operationIcon = isCityTour ? "tour" : "airport_shuttle";
+        const operationFrom = isCityTour ? "Makkah Hotel" : "Makkah";
+        const operationTo = isCityTour ? "Jabal Rahmah" : "Madinah";
+        const operationTitle = isCityTour
+            ? "Makkah City Ziyarah"
+            : "Transfer from Makkah to Madinah";
+        const operationMeta = isCityTour
+            ? `${formatScheduleTime(operationTime)} | Bus ${String((index % 9) + 1).padStart(2, "0")} | Gate A`
+            : `${formatScheduleTime(operationTime)} | Highway Route 40`;
+        return {
+            code: seed.code,
+            name: seed.name,
+            status: getStatusByTone(seed.tone),
+            tone: seed.tone,
+            pax: seed.pax,
+            totalBuses: resolveTotalBusCount(seed.pax),
+            packageName: seed.packageName,
+            durationDays: seed.durationDays,
+            timeline: [
+                { date: formatAprilDisplayDate(departureDay), title: "Departure from Jakarta" },
+                {
+                    date: formatAprilDisplayDate(operationDay),
+                    title: operationTitle,
+                    isCurrent: true,
+                    nextActivity: `${operationCategory} (${formatScheduleTime(operationTime)})`,
+                },
+            ],
+            nextActivity: {
+                title: operationTitle,
+                date: formatAprilDisplayDate(operationDay),
+                time: operationTime,
+                icon: operationIcon,
+            },
+            itinerary: [
+                {
+                    date: formatAprilDisplayDate(departureDay),
+                    year: "2026",
+                    category: "Departure",
+                    categoryKey: "departure",
+                    title: "Depart from Jakarta to CGK Airport",
+                    meta: `${formatScheduleTime(departureTime)} | ${flightNumber} | Terminal 3`,
+                    icon: "flight_takeoff",
+                    flightNumber,
+                    isoDate: formatAprilIsoDate(departureDay),
+                    time: departureTime,
+                    hotelPickupRequestTime: departureTime,
+                    from: "Jakarta",
+                    to: "CGK Airport",
+                },
+                {
+                    date: formatAprilDisplayDate(arrivalDay),
+                    year: "2026",
+                    category: "Arrival",
+                    categoryKey: "arrival",
+                    title: "Landing at JED Airport and heading to Makkah",
+                    meta: `${formatScheduleTime(arrivalTime)} | Hajj Terminal | Group Bus`,
+                    icon: "flight_land",
+                    isoDate: formatAprilIsoDate(arrivalDay),
+                    time: arrivalTime,
+                    from: "JED Airport",
+                    to: "Makkah",
+                },
+                {
+                    date: formatAprilDisplayDate(operationDay),
+                    year: "2026",
+                    category: operationCategory,
+                    categoryKey: operationCategoryKey,
+                    title: operationTitle,
+                    meta: operationMeta,
+                    icon: operationIcon,
+                    highlighted: true,
+                    isoDate: formatAprilIsoDate(operationDay),
+                    time: operationTime,
+                    from: operationFrom,
+                    to: operationTo,
+                    cityTourCity: isCityTour ? operationFrom : "",
+                    requiresBus: true,
+                },
+            ],
+            notes: [
+                "Driver coordination needs reconfirmation 24 hours before schedule.",
+                "Rooming and baggage list already shared with ground handling team.",
+            ],
+            musyrif: {
+                name: seed.musyrifName,
+                phone: seed.musyrifPhone,
+                avatar: musyrifAvatar,
+            },
+        };
+    });
+}
+export const groups = [];
+export const scheduleTypeOptions = [
+    { value: "arrival", cardLabel: "Arrival", modalLabel: "Arrival", icon: "flight_land" },
+    { value: "city-tour", cardLabel: "City Tour", modalLabel: "City Tour", icon: "tour" },
+    { value: "transfer", cardLabel: "Transfer", modalLabel: "Transfer", icon: "airport_shuttle" },
+    { value: "departure", cardLabel: "Departure", modalLabel: "Departure", icon: "flight_takeoff" },
+];
+export const saudiCityOptions = [
+    "Makkah",
+    "Madinah",
+    "Jeddah",
+    "Riyadh",
+    "Taif",
+    "Abha",
+    "Tabuk",
+    "Dammam",
+    "Khobar",
+    "Buraidah",
+    "AlUla",
+    "Yanbu",
+    "Hail",
+    "Jubail",
+    "Najran",
+    "Jazan",
+    "Al Ahsa",
+    "Qassim",
+];
+export const OVERVIEW_PAGE_SIZE = 9;
+export const CHECKLIST_PAGE_SIZE = 6;
+export const VISA_PAGE_SIZE = 15;
+export const MAX_PAX_PER_BUS = 50;
+export function getMinimumBusCountForPax(pax) {
+    const safePax = Number.isFinite(pax) && pax > 0 ? pax : 1;
+    return Math.max(1, Math.ceil(safePax / MAX_PAX_PER_BUS));
+}
+export function resolveTotalBusCount(pax, requestedTotalBuses) {
+    const minimumBusCount = getMinimumBusCountForPax(pax);
+    if (!Number.isFinite(requestedTotalBuses) || !requestedTotalBuses || requestedTotalBuses < 1) {
+        return minimumBusCount;
+    }
+    return Math.max(minimumBusCount, Math.floor(requestedTotalBuses));
+}
+export function createInitialInputItineraryForm() {
+    return {
+        date: "",
+        time: "",
+        category: scheduleTypeOptions[1].value,
+        from: "",
+        to: "",
+        cityTourCity: "",
+        flightNumber: "",
+        requiresBus: true,
+        notes: "",
+        transferByTrain: false,
+        trainDepartureTime: "",
+        destinationPickupTime: "",
+        hotelPickupRequestTime: "",
+    };
+}
+export function createNewGroupAgreementForm(city) {
+    return {
+        id: `${city}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        hotelName: "",
+        agreementNumber: "",
+        pax: "",
+        status: "Waiting for Approval",
+        stayStartIso: "",
+        stayEndIso: "",
+    };
+}
+export function createNewGroupRaudhahForm() {
+    return {
+        id: `raudhah-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        dateIso: "",
+        status: "Free",
+        tasrehPrinted: false,
+    };
+}
+export function sortInputItineraryItems(items) {
+    return [...items].sort((left, right) => {
+        const leftKey = `${left.date}T${left.time || "00:00"}`;
+        const rightKey = `${right.date}T${right.time || "00:00"}`;
+        return leftKey.localeCompare(rightKey);
+    });
+}
+export function createInitialScheduleForm() {
+    return {
+        category: scheduleTypeOptions[1].value,
+        date: "",
+        time: "",
+        flightNumber: "",
+        from: "",
+        to: "",
+        cityTourCity: "",
+        note: "",
+        highlighted: false,
+        transferByTrain: false,
+        trainDepartureTime: "",
+        destinationPickupTime: "",
+        hotelPickupRequestTime: "",
+    };
+}
+export function createInitialNoteForm() {
+    return {
+        text: "",
+        pinned: false,
+    };
+}
+export function createEmptyChecklistDriverProfile() {
+    return {
+        name: "",
+        phone: "",
+        plateNumber: "",
+    };
+}
+export function createEmptyChecklistDraft() {
+    return createEmptyChecklistDriverProfile();
+}
+export function createNoteItems(notes, groupCode) {
+    return notes.map((note, index) => ({
+        id: `${groupCode}-note-${index}`,
+        text: note,
+        pinned: false,
+    }));
+}
+export function getScheduleTypeOption(category) {
+    return scheduleTypeOptions.find((option) => option.value === category) ?? scheduleTypeOptions[1];
+}
+export function isFlightActivityType(category) {
+    const normalizedCategory = category.toLowerCase();
+    return normalizedCategory === "arrival" || normalizedCategory === "departure";
+}
+export function isTransferActivityType(category) {
+    return category.toLowerCase() === "transfer";
+}
+export function isCityTourActivityType(category) {
+    return category.toLowerCase() === "city-tour";
+}
+export function isDepartureActivityType(category) {
+    return category.toLowerCase() === "departure";
+}
+export function hasIncompleteTransferTrainFields(fields) {
+    if (!isTransferActivityType(fields.category) || !fields.transferByTrain) {
+        return false;
+    }
+    return !fields.trainDepartureTime.trim() || !fields.destinationPickupTime.trim();
+}
+export function buildTransferTrainSummary(fields) {
+    if (!isTransferActivityType(fields.category) || !fields.transferByTrain) {
+        return "";
+    }
+    return [
+        "HHR Transfer",
+        `Train departure: ${formatScheduleTime(fields.trainDepartureTime.trim())}`,
+        `Station pickup: ${formatScheduleTime(fields.destinationPickupTime.trim())}`,
+    ].join(" | ");
+}
+export function inferCategoryKey(item) {
+    if (item.categoryKey) {
+        return item.categoryKey;
+    }
+    const normalizedCategory = item.category.toLowerCase();
+    if (normalizedCategory.includes("arrival")) {
+        return "arrival";
+    }
+    if (normalizedCategory.includes("city tour") || normalizedCategory.includes("tour")) {
+        return "city-tour";
+    }
+    if (normalizedCategory.includes("transfer")) {
+        return "transfer";
+    }
+    if (normalizedCategory.includes("departure")) {
+        return "departure";
+    }
+    if (item.icon === "flight_land") {
+        return "arrival";
+    }
+    if (item.icon === "airport_shuttle") {
+        return "transfer";
+    }
+    if (item.icon === "flight_takeoff") {
+        return "departure";
+    }
+    return "city-tour";
+}
+export function formatScheduleDate(isoDate) {
+    const [year, month, day] = isoDate.split("-");
+    const monthIndex = Number(month) - 1;
+    const shortMonths = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    ];
+    return {
+        date: `${Number(day)} ${shortMonths[monthIndex] ?? "Jan"}`,
+        year,
+    };
+}
+export function formatScheduleTime(value) {
+    if (!value) {
+        return "TBD";
+    }
+    const trimmedValue = value.trim();
+    const parsedFromMeridiem = parseTimeForInput(trimmedValue);
+    if (parsedFromMeridiem) {
+        return parsedFromMeridiem;
+    }
+    const twentyFourHourMatch = trimmedValue.match(/^(\d{1,2}):(\d{2})$/);
+    if (!twentyFourHourMatch) {
+        return trimmedValue;
+    }
+    const [, rawHour, rawMinute] = twentyFourHourMatch;
+    const hour = Number(rawHour);
+    const minute = Number(rawMinute);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+        return trimmedValue;
+    }
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        return trimmedValue;
+    }
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+export function parseDisplayDateToIso(date, year) {
+    if (!date || !year) {
+        return "";
+    }
+    const [day, monthLabel] = date.split(" ");
+    const monthMap = {
+        Jan: "01",
+        Feb: "02",
+        Mar: "03",
+        Apr: "04",
+        May: "05",
+        Jun: "06",
+        Jul: "07",
+        Aug: "08",
+        Sep: "09",
+        Oct: "10",
+        Nov: "11",
+        Dec: "12",
+    };
+    const month = monthMap[monthLabel];
+    if (!month) {
+        return "";
+    }
+    return `${year}-${month}-${String(Number(day)).padStart(2, "0")}`;
+}
+export function parseTimeForInput(value) {
+    if (!value) {
+        return "";
+    }
+    if (/^\d{2}:\d{2}$/.test(value)) {
+        return value;
+    }
+    const match = value.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) {
+        return "";
+    }
+    const [, rawHour, minute, rawSuffix] = match;
+    let hour = Number(rawHour);
+    const suffix = rawSuffix.toUpperCase();
+    if (suffix === "PM" && hour !== 12) {
+        hour += 12;
+    }
+    if (suffix === "AM" && hour === 12) {
+        hour = 0;
+    }
+    return `${String(hour).padStart(2, "0")}:${minute}`;
+}
+export function createScheduleMeta({ category, time, flightNumber, hotelPickupRequestTime, from, to, cityTourCity, note, transferTrainSummary, }) {
+    const trimmedFrom = from?.trim() ?? "";
+    const trimmedTo = to?.trim() ?? "";
+    const route = trimmedFrom && trimmedTo
+        ? formatRouteSummary(category ?? "", trimmedFrom, trimmedTo, cityTourCity)
+        : [trimmedFrom, trimmedTo].filter(Boolean).join(" -> ");
+    const trimmedFlightNumber = flightNumber?.trim() ?? "";
+    const trimmedHotelPickupRequestTime = hotelPickupRequestTime?.trim() ?? "";
+    const hotelPickupRequestSummary = trimmedHotelPickupRequestTime
+        ? `Hotel pickup request ${formatScheduleTime(trimmedHotelPickupRequestTime)}`
+        : "";
+    const trimmedNote = note?.trim() ?? "";
+    const trimmedTransferTrainSummary = transferTrainSummary?.trim() ?? "";
+    const compactNote = trimmedNote.length > 42 ? `${trimmedNote.slice(0, 39).trimEnd()}...` : trimmedNote;
+    return [
+        formatScheduleTime(time),
+        trimmedFlightNumber,
+        hotelPickupRequestSummary,
+        route,
+        trimmedTransferTrainSummary,
+        compactNote,
+    ]
+        .filter(Boolean)
+        .join(" | ") || "Schedule details pending confirmation";
+}
+export function detectCityFromText(rawValue) {
+    const normalized = rawValue.trim().toLowerCase();
+    if (!normalized) {
+        return "";
+    }
+    const foundCity = saudiCityOptions.find((city) => normalized.includes(city.toLowerCase()));
+    return foundCity ?? "";
+}
+export function normalizeSaudiCityValue(rawValue) {
+    const trimmedValue = rawValue.trim();
+    if (!trimmedValue) {
+        return "";
+    }
+    const matchedCity = saudiCityOptions.find((city) => city.toLowerCase() === trimmedValue.toLowerCase());
+    return matchedCity ?? "";
+}
+export function inferCityTourCity(item) {
+    if (item.cityTourCity?.trim()) {
+        return item.cityTourCity.trim();
+    }
+    return (detectCityFromText(item.from ?? "") ||
+        detectCityFromText(item.to ?? "") ||
+        detectCityFromText(item.title ?? "") ||
+        detectCityFromText(item.notes ?? ""));
+}
+export function createEditScheduleForm(item) {
+    const category = inferCategoryKey(item);
+    const parsedTime = item.time ?? parseTimeForInput(item.meta.split(" | ")[0] ?? "");
+    const isTransferByTrain = category === "transfer" && (item.transferByTrain ?? false);
+    const isDepartureActivity = isDepartureActivityType(category);
+    const rawFromValue = (item.from ?? "").trim();
+    const rawToValue = (item.to ?? item.title).trim();
+    const fromValue = category === "transfer" ? normalizeSaudiCityValue(rawFromValue) : rawFromValue;
+    const toValue = category === "arrival" || category === "transfer"
+        ? normalizeSaudiCityValue(rawToValue)
+        : rawToValue;
+    return {
+        date: item.isoDate ?? parseDisplayDateToIso(item.date, item.year),
+        time: parsedTime,
+        category,
+        flightNumber: item.flightNumber ?? "",
+        from: fromValue,
+        to: toValue,
+        cityTourCity: category === "city-tour" ? inferCityTourCity(item) : "",
+        requiresBus: item.requiresBus ?? /bus/i.test(item.meta),
+        notes: item.notes ?? "",
+        transferByTrain: isTransferByTrain,
+        trainDepartureTime: item.trainDepartureTime ?? (isTransferByTrain ? parsedTime : ""),
+        destinationPickupTime: item.destinationPickupTime ?? "",
+        hotelPickupRequestTime: isDepartureActivity ? item.hotelPickupRequestTime ?? "" : "",
+    };
+}
+export function buildItineraryItemFromEditForm(currentItem, form) {
+    const typeOption = getScheduleTypeOption(form.category);
+    const formattedDate = formatScheduleDate(form.date);
+    const nextCityTourCity = isCityTourActivityType(form.category) ? form.cityTourCity.trim() : "";
+    const nextTitle = form.from.trim() && form.to.trim()
+        ? formatRouteSummary(form.category, form.from, form.to, nextCityTourCity)
+        : currentItem.title;
+    const nextFlightNumber = isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
+    const nextHotelPickupRequestTime = isDepartureActivityType(form.category)
+        ? form.hotelPickupRequestTime.trim()
+        : "";
+    const isTransferByTrain = isTransferActivityType(form.category) && form.transferByTrain;
+    const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
+    const transferTrainSummary = buildTransferTrainSummary(form);
+    return {
+        ...currentItem,
+        date: formattedDate.date,
+        year: formattedDate.year,
+        category: typeOption.cardLabel,
+        title: nextTitle,
+        meta: createScheduleMeta({
+            category: form.category,
+            time: scheduleTime,
+            flightNumber: nextFlightNumber,
+            hotelPickupRequestTime: nextHotelPickupRequestTime,
+            from: form.from,
+            to: form.to,
+            cityTourCity: nextCityTourCity,
+            note: form.notes,
+            transferTrainSummary,
+        }),
+        icon: typeOption.icon,
+        categoryKey: typeOption.value,
+        isoDate: form.date,
+        time: scheduleTime,
+        flightNumber: nextFlightNumber,
+        from: form.from.trim(),
+        to: form.to.trim(),
+        cityTourCity: nextCityTourCity,
+        requiresBus: isTransferByTrain ? true : form.requiresBus,
+        notes: form.notes.trim(),
+        transferByTrain: isTransferByTrain,
+        trainDepartureTime: isTransferByTrain ? form.trainDepartureTime.trim() : "",
+        destinationPickupTime: isTransferByTrain ? form.destinationPickupTime.trim() : "",
+        hotelPickupRequestTime: nextHotelPickupRequestTime,
+    };
+}
+export function isFridayDate(value) {
+    if (!value) {
+        return false;
+    }
+    const date = new Date(`${value}T12:00:00`);
+    return !Number.isNaN(date.getTime()) && date.getDay() === 5;
+}
+export function shouldShowFridayCityTourWarning(category, date) {
+    return category === "city-tour" && isFridayDate(date);
+}
+export function getRouteFieldConfigByCategory(category) {
+    if (category === "arrival") {
+        return {
+            fromLabel: "Landing Airport City",
+            toLabel: "To City",
+            fromPlaceholder: "e.g. Jeddah",
+            toPlaceholder: "e.g. Makkah",
+            helperText: "Enter the landing airport city and select the destination city.",
+        };
+    }
+    if (category === "transfer") {
+        return {
+            fromLabel: "From City",
+            toLabel: "To City",
+            fromPlaceholder: "e.g. Makkah",
+            toPlaceholder: "e.g. Madinah",
+            helperText: "Enter the origin city and select the destination city.",
+        };
+    }
+    if (category === "departure") {
+        return {
+            fromLabel: "Departure City",
+            toLabel: "Destination Airport",
+            fromPlaceholder: "e.g. Madinah",
+            toPlaceholder: "e.g. MED Airport",
+            helperText: "Enter origin and airport, then fill flight return time and hotel pickup request time.",
+        };
+    }
+    if (category === "city-tour") {
+        return {
+            fromLabel: "Meeting Point",
+            toLabel: "Tour Destination",
+            fromPlaceholder: "e.g. Madinah Hotel Lobby",
+            toPlaceholder: "e.g. Masjid Quba",
+            helperText: "Select the city tour city, then fill in the meeting point and ziyarah destination.",
+        };
+    }
+    return {
+        fromLabel: "From Location",
+        toLabel: "To Location",
+        fromPlaceholder: "e.g. Makkah Hotel",
+        toPlaceholder: "e.g. Jabal Rahmah",
+        helperText: "",
+    };
+}
+export function formatRouteSummary(category, from, to, cityTourCity = "") {
+    const trimmedFrom = from.trim();
+    const trimmedTo = to.trim();
+    const trimmedCityTourCity = cityTourCity.trim();
+    if (!trimmedFrom || !trimmedTo) {
+        return [trimmedFrom, trimmedTo].filter(Boolean).join(" -> ");
+    }
+    if (category === "arrival") {
+        return `Landing at ${trimmedFrom} and heading to ${trimmedTo}`;
+    }
+    if (category === "transfer") {
+        return `Transfer from ${trimmedFrom} to ${trimmedTo}`;
+    }
+    if (category === "departure") {
+        return `Depart from ${trimmedFrom} to ${trimmedTo}`;
+    }
+    if (category === "city-tour") {
+        if (!trimmedCityTourCity) {
+            return `${trimmedFrom} -> ${trimmedTo}`;
+        }
+        return `City Tour in ${trimmedCityTourCity}: ${trimmedFrom} -> ${trimmedTo}`;
+    }
+    return `${trimmedFrom} -> ${trimmedTo}`;
+}
+export function getTransferTrainSegmentCategory(segment) {
+    return segment === "train-departure"
+        ? "Transfer - Train Departure"
+        : "Transfer - Arrival Station Pickup";
+}
+export function expandInputTransferTrainItems(items) {
+    return items.flatMap((item) => {
+        const isTransferByTrain = isTransferActivityType(item.categoryKey) && item.transferByTrain;
+        if (!isTransferByTrain) {
+            return [item];
+        }
+        const transferCategoryKey = "transfer";
+        const transferIcon = "airport_shuttle";
+        const departureTime = item.trainDepartureTime.trim() || item.time.trim();
+        const pickupTime = item.destinationPickupTime.trim() || departureTime;
+        const trimmedFrom = item.from.trim();
+        const trimmedTo = item.to.trim();
+        const trimmedNotes = item.notes.trim();
+        return [
+            {
+                id: `${item.id}-train-departure`,
+                date: item.date,
+                time: departureTime,
+                category: getTransferTrainSegmentCategory("train-departure"),
+                categoryKey: transferCategoryKey,
+                from: trimmedFrom,
+                to: trimmedTo,
+                cityTourCity: "",
+                flightNumber: "",
+                requiresBus: true,
+                notes: trimmedNotes,
+                icon: transferIcon,
+                transferByTrain: false,
+                trainDepartureTime: "",
+                destinationPickupTime: "",
+                hotelPickupRequestTime: "",
+            },
+            {
+                id: `${item.id}-station-pickup`,
+                date: item.date,
+                time: pickupTime,
+                category: getTransferTrainSegmentCategory("station-pickup"),
+                categoryKey: transferCategoryKey,
+                from: trimmedFrom,
+                to: trimmedTo,
+                cityTourCity: "",
+                flightNumber: "",
+                requiresBus: true,
+                notes: "",
+                icon: transferIcon,
+                transferByTrain: false,
+                trainDepartureTime: "",
+                destinationPickupTime: "",
+                hotelPickupRequestTime: "",
+            },
+        ];
+    });
+}
+export function expandTransferTrainItineraryItems(items) {
+    return items.flatMap((item) => {
+        const categoryKey = inferCategoryKey(item);
+        const isTransferByTrain = categoryKey === "transfer" && (item.transferByTrain ?? false);
+        if (!isTransferByTrain) {
+            return [item];
+        }
+        const fallbackMetaTime = parseTimeForInput(item.meta.split(" | ")[0] ?? "");
+        const departureTime = (item.trainDepartureTime ?? "").trim() || (item.time ?? "").trim() || fallbackMetaTime;
+        const pickupTime = (item.destinationPickupTime ?? "").trim() || departureTime;
+        const isoDate = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
+        const formattedDate = isoDate ? formatScheduleDate(isoDate) : { date: item.date, year: item.year };
+        const transferCategoryKey = "transfer";
+        const transferIcon = "airport_shuttle";
+        const trimmedFrom = item.from?.trim() ?? "";
+        const trimmedTo = item.to?.trim() ?? "";
+        const trimmedNotes = item.notes?.trim() ?? "";
+        const routeTitle = trimmedFrom && trimmedTo
+            ? formatRouteSummary("transfer", trimmedFrom, trimmedTo, item.cityTourCity ?? "")
+            : item.title;
+        return [
+            {
+                ...item,
+                date: formattedDate.date,
+                year: formattedDate.year,
+                category: getTransferTrainSegmentCategory("train-departure"),
+                title: routeTitle,
+                meta: createScheduleMeta({
+                    category: "transfer",
+                    time: departureTime,
+                    from: trimmedFrom,
+                    to: trimmedTo,
+                    note: trimmedNotes,
+                }),
+                icon: transferIcon,
+                categoryKey: transferCategoryKey,
+                isoDate: isoDate ?? item.isoDate,
+                time: departureTime,
+                flightNumber: "",
+                from: trimmedFrom,
+                to: trimmedTo,
+                cityTourCity: "",
+                requiresBus: true,
+                notes: trimmedNotes,
+                transferByTrain: false,
+                trainDepartureTime: "",
+                destinationPickupTime: "",
+                hotelPickupRequestTime: "",
+            },
+            {
+                ...item,
+                date: formattedDate.date,
+                year: formattedDate.year,
+                category: getTransferTrainSegmentCategory("station-pickup"),
+                title: routeTitle,
+                meta: createScheduleMeta({
+                    category: "transfer",
+                    time: pickupTime,
+                    from: trimmedFrom,
+                    to: trimmedTo,
+                }),
+                icon: transferIcon,
+                highlighted: false,
+                categoryKey: transferCategoryKey,
+                isoDate: isoDate ?? item.isoDate,
+                time: pickupTime,
+                flightNumber: "",
+                from: trimmedFrom,
+                to: trimmedTo,
+                cityTourCity: "",
+                requiresBus: true,
+                notes: "",
+                transferByTrain: false,
+                trainDepartureTime: "",
+                destinationPickupTime: "",
+                hotelPickupRequestTime: "",
+            },
+        ];
+    });
+}
+export function escapeHtml(value) {
+    return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+export function getChecklistRangeDates() {
+    return [getLocalIsoDateWithOffset(0), getLocalIsoDateWithOffset(1), getLocalIsoDateWithOffset(2)];
+}
+export function getChecklistDayLabel(tripDate) {
+    if (!tripDate) {
+        return "-";
+    }
+    const date = new Date(`${tripDate}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+        return tripDate;
+    }
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+    });
+}
+export function formatChecklistCopyDate(tripDate) {
+    if (!tripDate) {
+        return "-";
+    }
+    const date = new Date(`${tripDate}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+        return tripDate.toUpperCase();
+    }
+    return date
+        .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    })
+        .toUpperCase();
+}
+export function getItineraryIsoDate(item) {
+    return item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
+}
+function resolveItineraryBoundaryIsoDates(itinerary) {
+    let earliestKey = null;
+    let latestKey = null;
+    let earliestIsoDate = null;
+    let latestIsoDate = null;
+    for (const item of itinerary) {
+        const itineraryIsoDate = getItineraryIsoDate(item);
+        const metaTime = parseTimeForInput(item.meta.split(" | ")[0] ?? "");
+        const itineraryTime = item.time?.trim() || metaTime || "00:00";
+        const sortKey = `${itineraryIsoDate || "9999-12-31"}T${itineraryTime}`;
+        if (earliestKey === null || sortKey.localeCompare(earliestKey) < 0) {
+            earliestKey = sortKey;
+            earliestIsoDate = itineraryIsoDate || null;
+        }
+        if (latestKey === null || sortKey.localeCompare(latestKey) > 0) {
+            latestKey = sortKey;
+            latestIsoDate = itineraryIsoDate || null;
+        }
+    }
+    return {
+        earliestIsoDate,
+        latestIsoDate,
+    };
+}
+export function buildVisaTrackingRowsFromGroups(groups) {
+    return groups.map((group, index) => {
+        const visaSetup = group.visaSetup;
+        const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary);
+        const configuredArrivalIso = group.arrivalDate?.trim() ?? "";
+        const configuredReturnIso = group.returnDate?.trim() ?? "";
+        const groupArrivalIso = isIsoDateValue(configuredArrivalIso) ? configuredArrivalIso : "";
+        const groupReturnIso = isIsoDateValue(configuredReturnIso) ? configuredReturnIso : "";
+        const fallbackDeparture = getLocalIsoDateWithOffset(index % 4);
+        const itineraryDepartureIso = groupArrivalIso || earliestIsoDate || fallbackDeparture;
+        const resolvedReturnIso = groupReturnIso || latestIsoDate || "";
+        const itineraryReturnIso = resolvedReturnIso && resolvedReturnIso >= itineraryDepartureIso
+            ? resolvedReturnIso
+            : shiftIsoDate(itineraryDepartureIso, Math.max(6, group.durationDays - 1));
+        const customAgreementDateRange = resolveVisaAgreementDateRange({ departureIso: itineraryDepartureIso, returnIso: itineraryReturnIso }, group.durationDays, group);
+        const departureIso = customAgreementDateRange.makkahStartIso;
+        const returnIso = customAgreementDateRange.madinahEndIso;
+        const visaStatus = visaSetup?.visaStatus ?? (index % 6 === 0 ? "Draft" : index % 4 === 0 ? "Pending" : "Issued");
+        const paymentStatus = visaSetup?.paymentStatus ?? (index % 5 === 0 ? "Unpaid" : index % 3 === 0 ? "Partial" : "Paid");
+        const configuredIssuedDate = visaSetup?.issuedDate?.trim() ?? "";
+        const issuedDateIso = visaStatus === "Issued"
+            ? isIsoDateValue(configuredIssuedDate)
+                ? configuredIssuedDate
+                : departureIso
+            : "";
+        const pax = Math.max(1, group.pax);
+        const visaDelayFactor = visaStatus === "Issued" ? 0 : 1;
+        const defaultMakkahGap = (index % 5 === 0 ? Math.max(1, Math.ceil(pax * 0.12)) : 0) + visaDelayFactor;
+        const defaultMadinahGap = (index % 4 === 0 ? Math.max(1, Math.ceil(pax * 0.18)) : 0) + visaDelayFactor;
+        const fallbackMakkahVerified = Math.max(0, pax - Math.min(pax, defaultMakkahGap));
+        const fallbackMadinahVerified = Math.max(0, pax - Math.min(pax, defaultMadinahGap));
+        const mappedMakkahVerified = visaSetup
+            ? Math.min(pax, Math.max(0, visaSetup.makkahHotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0)))
+            : fallbackMakkahVerified;
+        const mappedMadinahVerified = visaSetup
+            ? Math.min(pax, Math.max(0, visaSetup.madinahHotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0)))
+            : fallbackMadinahVerified;
+        const makkahVerified = mappedMakkahVerified;
+        const madinahVerified = mappedMadinahVerified;
+        const validRaudhahAppointments = resolveValidRaudhahAppointments(group);
+        const firstRaudhah = validRaudhahAppointments.find((appointment) => appointment.status !== "Free") ??
+            validRaudhahAppointments[0];
+        const raudhahTone = !firstRaudhah || firstRaudhah.status === "Free"
+            ? "muted"
+            : firstRaudhah.status === "Before"
+                ? "warn"
+                : "good";
+        const raudhahLabel = !firstRaudhah || firstRaudhah.status === "Free"
+            ? "Not Set"
+            : `${formatVisaShortDate(firstRaudhah.dateIso)} ${firstRaudhah.status}`;
+        const raudhahHint = !firstRaudhah || firstRaudhah.status === "Free"
+            ? "Appointment pending"
+            : firstRaudhah.status === "Before"
+                ? "Before 13:00"
+                : "After 13:00";
+        const outstandingAmount = paymentStatus === "Unpaid" ? pax * 280 : paymentStatus === "Partial" ? pax * 120 : 0;
+        return {
+            id: `${group.code}-visa-${index}`,
+            groupCode: group.code,
+            groupName: group.name,
+            pax,
+            packageName: group.packageName,
+            issuedDateIso,
+            departureIso,
+            returnIso,
+            visaStatus,
+            paymentStatus,
+            raudhahLabel,
+            raudhahHint,
+            raudhahTone,
+            makkahVerified,
+            madinahVerified,
+            outstandingAmount,
+        };
+    });
+}
+export function buildChecklistActivityLabel(item, categoryKey) {
+    const baseCategory = item.category?.trim() || "Activity";
+    if (categoryKey !== "city-tour") {
+        return baseCategory;
+    }
+    const cityTourCity = inferCityTourCity(item);
+    if (!cityTourCity) {
+        return baseCategory;
+    }
+    return baseCategory.toLowerCase().includes(cityTourCity.toLowerCase())
+        ? baseCategory
+        : `${baseCategory} ${cityTourCity}`;
+}
+export function buildChecklistItemsFromGroups(groups) {
+    const allowedDateSet = new Set(getChecklistRangeDates());
+    const result = [];
+    groups.forEach((group) => {
+        const normalizedItinerary = expandTransferTrainItineraryItems(group.itinerary);
+        normalizedItinerary.forEach((item, index) => {
+            const tripDate = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
+            if (!tripDate || !allowedDateSet.has(tripDate)) {
+                return;
+            }
+            const categoryKey = inferCategoryKey(item);
+            const typeOption = getScheduleTypeOption(categoryKey);
+            const parsedTime = item.time ?? parseTimeForInput(item.meta.split(" | ")[0] ?? "");
+            const normalizedTime = parsedTime ? formatScheduleTime(parsedTime) : "TBD";
+            const transferByTrain = categoryKey === "transfer" && (item.transferByTrain ?? false);
+            const isDepartureActivity = categoryKey === "departure";
+            const requiredBusCount = resolveTotalBusCount(group.pax, group.totalBuses);
+            const trainDepartureSource = item.trainDepartureTime ?? (transferByTrain ? parsedTime : "");
+            const stationPickupSource = item.destinationPickupTime ?? "";
+            const hotelPickupRequestSource = isDepartureActivity ? item.hotelPickupRequestTime ?? "" : "";
+            const trainDepartureTime = trainDepartureSource
+                ? formatScheduleTime(trainDepartureSource)
+                : "TBD";
+            const stationPickupTime = stationPickupSource ? formatScheduleTime(stationPickupSource) : "TBD";
+            const hotelPickupRequestTime = hotelPickupRequestSource
+                ? formatScheduleTime(hotelPickupRequestSource)
+                : "";
+            const departureFlightTime = isDepartureActivity ? normalizedTime : "";
+            const scheduledTime = transferByTrain
+                ? trainDepartureTime
+                : hotelPickupRequestTime || normalizedTime;
+            result.push({
+                id: `${group.code}-${tripDate}-${index}-${categoryKey}`,
+                groupCode: group.code,
+                groupName: group.name,
+                groupPax: group.pax,
+                tripDate,
+                activity: buildChecklistActivityLabel(item, categoryKey),
+                trip: item.from && item.to
+                    ? formatRouteSummary(categoryKey, item.from, item.to, item.cityTourCity)
+                    : item.title,
+                activityIcon: typeOption.icon,
+                requiredBusCount,
+                scheduledTime,
+                transferByTrain,
+                trainDepartureTime: transferByTrain ? trainDepartureTime : "",
+                stationPickupTime: transferByTrain ? stationPickupTime : "",
+                hotelPickupRequestTime,
+                departureFlightTime,
+            });
+        });
+    });
+    return result.sort((left, right) => {
+        const leftKey = `${left.tripDate} ${left.scheduledTime}`;
+        const rightKey = `${right.tripDate} ${right.scheduledTime}`;
+        return leftKey.localeCompare(rightKey);
+    });
+}
+export function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}

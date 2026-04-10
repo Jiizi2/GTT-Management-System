@@ -1,0 +1,28 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json && npm run build:css && npm run build:js && node -e \"const fs=require('fs'); const path=require('path'); const copy=(src,dst)=>{const stat=fs.statSync(src); if(stat.isDirectory()){fs.mkdirSync(dst,{recursive:true}); for(const entry of fs.readdirSync(src)){copy(path.join(src,entry),path.join(dst,entry));} return;} fs.mkdirSync(path.dirname(dst),{recursive:true}); fs.copyFileSync(src,dst);}; copy('public','dist');\"",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles.css -o dist/index.css --minify",
+    "build:js": "esbuild src/index.tsx --bundle --format=esm --platform=browser --target=es2022 --jsx=automatic --splitting --minify --outdir=dist --entry-names=index --chunk-names=chunks/[name]-[hash]",
+    "dev": "node scripts/dev.mjs",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test:unit": "tsc -p tsconfig.unit.json && node --experimental-specifier-resolution=node dist-unit/unit/auth-session.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/use-auth-backend.unit.test.js && node --experimental-specifier-resolution=node dist-unit/unit/app-domain.unit.test.js",
+    "test": "tsc -p tsconfig.smoke.json && node dist-smoke/smoke/frontend.smoke.test.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
+  }
+}
