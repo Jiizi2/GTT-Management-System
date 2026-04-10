@@ -200,5 +200,5 @@ export function hasMissingHotelAllocation(row: VisaTrackingRow): boolean {
 }
 
 export function isVisaRowActionRequired(row: VisaTrackingRow): boolean {
-  return row.visaStatus !== "Issued" || row.paymentStatus !== "Paid" || hasMissingHotelAllocation(row);
+  return row.visaStatus !== "Issued";
 }

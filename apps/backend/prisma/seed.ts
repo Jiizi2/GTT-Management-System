@@ -5,15 +5,18 @@ import {
   GroupRaudhahStatus,
   GroupTone,
   InvoiceStatus,
+  Prisma,
   PrismaClient,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
 import { createDefaultAuthUserStorageRecords } from "../src/auth/auth-default-users";
+import { DEFAULT_MASTER_DATA_OPTIONS } from "../src/master-data/master-data.defaults";
 
 const prisma = new PrismaClient();
 
 async function resetData(): Promise<void> {
+  await prisma.masterDataOption.deleteMany();
   await prisma.authUser.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.invoiceClient.deleteMany();
@@ -28,6 +31,45 @@ async function resetData(): Promise<void> {
   await prisma.nextActivity.deleteMany();
   await prisma.musyrif.deleteMany();
   await prisma.group.deleteMany();
+}
+
+async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): Promise<void> {
+  const existingCount = await prisma.masterDataOption.count();
+  if (existingCount > 0 && !resetDataFirst) {
+    console.log(
+      `Master data seed skipped: found ${existingCount} existing option(s). Set SEED_RESET=true to reset and reseed.`,
+    );
+    return;
+  }
+
+  for (const option of DEFAULT_MASTER_DATA_OPTIONS) {
+    await prisma.masterDataOption.upsert({
+      where: {
+        categoryKey_value: {
+          categoryKey: option.categoryKey,
+          value: option.value,
+        },
+      },
+      update: {
+        label: option.label,
+        description: option.description ?? null,
+        sortOrder: option.sortOrder,
+        isActive: option.isActive ?? true,
+        metadata: option.metadata ?? Prisma.JsonNull,
+      },
+      create: {
+        categoryKey: option.categoryKey,
+        value: option.value,
+        label: option.label,
+        description: option.description ?? null,
+        sortOrder: option.sortOrder,
+        isActive: option.isActive ?? true,
+        metadata: option.metadata ?? Prisma.JsonNull,
+      },
+    });
+  }
+
+  console.log(`Seeded master data options: ${DEFAULT_MASTER_DATA_OPTIONS.length}`);
 }
 
 async function seedAuthUsers(): Promise<void> {
@@ -1229,6 +1271,7 @@ async function main(): Promise<void> {
   }
 
   await seedAuthUsers();
+  await seedMasterData({ resetDataFirst });
   await seedGroups({ resetDataFirst });
   await seedInvoiceClients({ resetDataFirst });
   await seedInvoices({ resetDataFirst });

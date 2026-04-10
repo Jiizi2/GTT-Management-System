@@ -8,14 +8,25 @@ import {
   updateManagedUserInBackend,
   type BackendManagedUser,
 } from "../hooks/use-user-management-backend";
+import {
+  fetchMasterDataOptionsFromBackend,
+  type MasterDataOption,
+} from "../hooks/use-master-data-backend";
 
 type RoleId = BackendManagedUser["roleId"];
 
 type RoleCatalogItem = {
-  id: RoleId;
+  id: string;
   label: string;
   description: string;
   permissions: string[];
+};
+
+type UserRoleOption = {
+  id: RoleId;
+  label: string;
+  description: string;
+  sortOrder: number;
 };
 
 type UserAccount = {
@@ -42,7 +53,7 @@ type NoticeState = {
   message: string;
 };
 
-const roleCatalog: RoleCatalogItem[] = [
+const defaultRoleCatalog: RoleCatalogItem[] = [
   {
     id: "super-admin",
     label: "Super Admin",
@@ -69,18 +80,34 @@ const roleCatalog: RoleCatalogItem[] = [
   },
 ];
 
+const roleIdSet = new Set<RoleId>([
+  "super-admin",
+  "admin",
+  "finance-manager",
+  "customer-support",
+]);
+
+const defaultUserRoleOptions: UserRoleOption[] = defaultRoleCatalog
+  .filter((role): role is RoleCatalogItem & { id: RoleId } => roleIdSet.has(role.id as RoleId))
+  .map((role, index) => ({
+    id: role.id,
+    label: role.label,
+    description: role.description,
+    sortOrder: index + 1,
+  }));
+
 const initialUsers: UserAccount[] = [];
 
 const defaultNewUserForm: NewUserFormState = {
   name: "",
   email: "",
-  roleId: "admin",
+  roleId: defaultUserRoleOptions[0]?.id ?? "admin",
 };
 
 const defaultEditUserForm: EditUserFormState = {
   name: "",
   email: "",
-  roleId: "admin",
+  roleId: defaultUserRoleOptions[0]?.id ?? "admin",
 };
 
 function UserManagementModalPortal({ children }: { children: ReactNode }) {
@@ -91,7 +118,7 @@ function UserManagementModalPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }
 
-function resolveRoleToneClass(roleId: RoleId): string {
+function resolveRoleToneClass(roleId: string): string {
   if (roleId === "super-admin") {
     return "bg-primary text-white";
   }
@@ -109,6 +136,64 @@ function resolveRoleToneClass(roleId: RoleId): string {
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isRoleId(value: string): value is RoleId {
+  return roleIdSet.has(value as RoleId);
+}
+
+function readMetadataPermissions(metadata: MasterDataOption["metadata"]): string[] {
+  if (!metadata || typeof metadata !== "object") {
+    return [];
+  }
+
+  const rawPermissions = metadata.permissions;
+  if (!Array.isArray(rawPermissions)) {
+    return [];
+  }
+
+  return rawPermissions
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function mapUserRoleOptionsFromMasterData(options: MasterDataOption[]): UserRoleOption[] {
+  if (options.length === 0) {
+    return defaultUserRoleOptions;
+  }
+
+  const mapped = options
+    .filter((option) => option.isActive && isRoleId(option.value))
+    .map((option) => ({
+      id: option.value as RoleId,
+      label: option.label.trim() || option.value,
+      description: option.description?.trim() || "",
+      sortOrder: option.sortOrder,
+    }))
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+
+  return mapped;
+}
+
+function mapRoleCatalogFromMasterData(options: MasterDataOption[]): RoleCatalogItem[] {
+  if (options.length === 0) {
+    return defaultRoleCatalog;
+  }
+
+  const mapped = options
+    .filter((option) => option.isActive)
+    .map((option) => ({
+      id: option.value.trim() || option.id,
+      label: option.label.trim() || option.value,
+      description: option.description?.trim() || "-",
+      permissions: readMetadataPermissions(option.metadata),
+      sortOrder: option.sortOrder,
+    }))
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map(({ sortOrder, ...role }) => role);
+
+  return mapped;
 }
 
 function mapBackendUserToLocal(user: BackendManagedUser): UserAccount {
@@ -130,6 +215,8 @@ function extractErrorMessage(error: unknown, fallbackMessage: string): string {
 
 export function UserManagementScreen() {
   const [users, setUsers] = useState<UserAccount[]>(initialUsers);
+  const [userRoleOptions, setUserRoleOptions] = useState<UserRoleOption[]>(defaultUserRoleOptions);
+  const [roleCatalogItems, setRoleCatalogItems] = useState<RoleCatalogItem[]>(defaultRoleCatalog);
   const [newUserForm, setNewUserForm] = useState<NewUserFormState>(defaultNewUserForm);
   const [editUserForm, setEditUserForm] = useState<EditUserFormState>(defaultEditUserForm);
   const [notice, setNotice] = useState<NoticeState | null>(null);
@@ -141,20 +228,57 @@ export function UserManagementScreen() {
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
 
   const roleCatalogById = useMemo(
-    () => new Map(roleCatalog.map((role) => [role.id, role] as const)),
-    [],
+    () => new Map(roleCatalogItems.map((role) => [role.id, role] as const)),
+    [roleCatalogItems],
   );
 
   const totalSuperAdmin = useMemo(
     () => users.filter((user) => user.roleId === "super-admin").length,
     [users],
   );
+  const hasActiveRoleOptions = userRoleOptions.length > 0;
 
   useEffect(() => {
     const controller = new AbortController();
 
-    void fetchManagedUsersFromBackend({ signal: controller.signal })
-      .then((backendUsers) => {
+    void Promise.all([
+      fetchManagedUsersFromBackend({ signal: controller.signal }),
+      fetchMasterDataOptionsFromBackend({
+        categoryKey: "user-role",
+        signal: controller.signal,
+      }),
+      fetchMasterDataOptionsFromBackend({
+        categoryKey: "role-catalog",
+        signal: controller.signal,
+      }),
+    ])
+      .then(([backendUsers, userRoleOptionsRows, roleCatalogRows]) => {
+        const nextUserRoleOptions = mapUserRoleOptionsFromMasterData(userRoleOptionsRows);
+        const nextRoleCatalogItems = mapRoleCatalogFromMasterData(roleCatalogRows);
+
+        setUserRoleOptions(nextUserRoleOptions);
+        setRoleCatalogItems(nextRoleCatalogItems);
+        setNewUserForm((current) => {
+          if (nextUserRoleOptions.some((role) => role.id === current.roleId)) {
+            return current;
+          }
+
+          return {
+            ...current,
+            roleId: nextUserRoleOptions[0]?.id ?? "admin",
+          };
+        });
+        setEditUserForm((current) => {
+          if (nextUserRoleOptions.some((role) => role.id === current.roleId)) {
+            return current;
+          }
+
+          return {
+            ...current,
+            roleId: nextUserRoleOptions[0]?.id ?? "admin",
+          };
+        });
+
         if (backendUsers.length > 0) {
           setUsers(backendUsers.map((user) => mapBackendUserToLocal(user)));
         } else {
@@ -166,6 +290,8 @@ export function UserManagementScreen() {
           return;
         }
 
+        setUserRoleOptions(defaultUserRoleOptions);
+        setRoleCatalogItems(defaultRoleCatalog);
         setNotice({
           tone: "error",
           message: extractErrorMessage(
@@ -187,7 +313,10 @@ export function UserManagementScreen() {
 
   const closeEditModal = () => {
     setEditingUser(null);
-    setEditUserForm(defaultEditUserForm);
+    setEditUserForm({
+      ...defaultEditUserForm,
+      roleId: userRoleOptions[0]?.id ?? "admin",
+    });
   };
 
   const closeDeleteModal = () => {
@@ -200,7 +329,9 @@ export function UserManagementScreen() {
     setEditUserForm({
       name: user.name,
       email: user.email,
-      roleId: user.roleId,
+      roleId: userRoleOptions.some((role) => role.id === user.roleId)
+        ? user.roleId
+        : (userRoleOptions[0]?.id ?? "admin"),
     });
   };
 
@@ -230,6 +361,14 @@ export function UserManagementScreen() {
   const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isCreateSubmitting) {
+      return;
+    }
+
+    if (!hasActiveRoleOptions) {
+      setNotice({
+        tone: "error",
+        message: "Belum ada role aktif. Aktifkan User Role terlebih dahulu di Master Data.",
+      });
       return;
     }
 
@@ -271,7 +410,10 @@ export function UserManagementScreen() {
       });
 
       setUsers((current) => [mapBackendUserToLocal(createdFromBackend), ...current]);
-      setNewUserForm(defaultNewUserForm);
+      setNewUserForm({
+        ...defaultNewUserForm,
+        roleId: userRoleOptions[0]?.id ?? "admin",
+      });
       setNotice({
         tone: "success",
         message: `User ${normalizedName} berhasil ditambahkan.`,
@@ -293,6 +435,14 @@ export function UserManagementScreen() {
     event.preventDefault();
 
     if (!editingUser || isEditSubmitting) {
+      return;
+    }
+
+    if (!hasActiveRoleOptions) {
+      setNotice({
+        tone: "error",
+        message: "Belum ada role aktif. Aktifkan User Role terlebih dahulu di Master Data.",
+      });
       return;
     }
 
@@ -456,21 +606,31 @@ export function UserManagementScreen() {
                     setNewUserForm((current) => ({ ...current, roleId: event.target.value as RoleId }))
                   }
                   aria-label="Role user baru"
+                  disabled={!hasActiveRoleOptions}
                 >
-                  {roleCatalog.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.label}
-                    </option>
-                  ))}
+                  {hasActiveRoleOptions ? (
+                    userRoleOptions.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.label}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="admin">Belum ada role aktif</option>
+                  )}
                 </SereneSelect>
                 <button
                   type="submit"
                   className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4"
-                  disabled={isCreateSubmitting}
+                  disabled={isCreateSubmitting || !hasActiveRoleOptions}
                 >
                   {isCreateSubmitting ? "Menyimpan..." : "Tambah User"}
                 </button>
               </form>
+              {!hasActiveRoleOptions ? (
+                <p className="mt-3 text-xs font-semibold text-error">
+                  Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
+                </p>
+              ) : null}
             </div>
 
             <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
@@ -562,38 +722,44 @@ export function UserManagementScreen() {
                 Role Catalog
               </h2>
               <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                {roleCatalog.map((role) => (
-                  <article
-                    key={role.id}
-                    className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-lg font-bold text-on-surface">{role.label}</h3>
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${resolveRoleToneClass(
-                          role.id,
-                        )}`}
-                      >
-                        {role.permissions.length} permissions
-                      </span>
-                    </div>
-
-                    <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                      {role.description}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {role.permissions.map((permission) => (
+                {roleCatalogItems.length === 0 ? (
+                  <div className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5 text-sm font-medium text-on-surface-variant">
+                    Belum ada Role Catalog yang aktif. Aktifkan option pada kategori <strong>Role Catalog</strong> di Master Data.
+                  </div>
+                ) : (
+                  roleCatalogItems.map((role) => (
+                    <article
+                      key={role.id}
+                      className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-lg font-bold text-on-surface">{role.label}</h3>
                         <span
-                          key={permission}
-                          className="inline-flex rounded-md border border-outline-variant/35 bg-surface-container-lowest px-2 py-1 text-[10px] font-black tracking-[0.08em] text-on-surface-variant"
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${resolveRoleToneClass(
+                            role.id,
+                          )}`}
                         >
-                          {permission}
+                          {role.permissions.length} permissions
                         </span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
+                      </div>
+
+                      <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                        {role.description}
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {role.permissions.map((permission) => (
+                          <span
+                            key={permission}
+                            className="inline-flex rounded-md border border-outline-variant/35 bg-surface-container-lowest px-2 py-1 text-[10px] font-black tracking-[0.08em] text-on-surface-variant"
+                          >
+                            {permission}
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ))
+                )}
               </div>
             </div>
           </section>
@@ -671,14 +837,24 @@ export function UserManagementScreen() {
                     onChange={(event) =>
                       setEditUserForm((current) => ({ ...current, roleId: event.target.value as RoleId }))
                     }
+                    disabled={!hasActiveRoleOptions}
                   >
-                    {roleCatalog.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.label}
-                      </option>
-                    ))}
+                    {hasActiveRoleOptions ? (
+                      userRoleOptions.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="admin">Belum ada role aktif</option>
+                    )}
                   </SereneSelect>
                 </div>
+                {!hasActiveRoleOptions ? (
+                  <p className="text-xs font-semibold text-error">
+                    Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data.
+                  </p>
+                ) : null}
 
                 <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <button
@@ -689,7 +865,11 @@ export function UserManagementScreen() {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="serene-btn-primary" disabled={isEditSubmitting}>
+                  <button
+                    type="submit"
+                    className="serene-btn-primary"
+                    disabled={isEditSubmitting || !hasActiveRoleOptions}
+                  >
                     {isEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
                   </button>
                 </div>

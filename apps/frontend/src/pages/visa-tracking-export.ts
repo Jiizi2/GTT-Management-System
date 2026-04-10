@@ -91,10 +91,10 @@ export function exportVisaTrackingReportPdf({
     <style>
       :root {
         --ink: #1b1a17;
-        --muted: #495247;
-        --line: #d8d2c4;
-        --surface: #fcfaf5;
-        --header-bg: #f6f2e9;
+        --muted: #4b5563;
+        --line: #d1d5db;
+        --surface: #ffffff;
+        --header-bg: #e5e7eb;
         --accent: #2e7d32;
       }
       * {

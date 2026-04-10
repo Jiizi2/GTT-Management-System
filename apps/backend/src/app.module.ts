@@ -3,6 +3,7 @@ import { AuthModule } from "./auth/auth.module";
 import { GroupsModule } from "./groups/groups.module";
 import { HealthModule } from "./health/health.module";
 import { InvoicesModule } from "./invoices/invoices.module";
+import { MasterDataModule } from "./master-data/master-data.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
@@ -12,6 +13,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     HealthModule,
     GroupsModule,
     InvoicesModule,
+    MasterDataModule,
   ],
 })
 export class AppModule {}

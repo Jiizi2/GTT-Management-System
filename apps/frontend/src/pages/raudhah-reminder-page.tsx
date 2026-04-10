@@ -13,7 +13,7 @@ const {
   shiftIsoDate,
 } = Domain;
 
-type ReminderSlot = "h2" | "h7";
+type ReminderSlot = "h2" | "h7" | "h7Upcoming";
 type ReminderSlotStatus = "open" | "upcoming" | "missed";
 
 type ReminderAppointmentItem = {
@@ -75,14 +75,29 @@ const reminderSectionConfig: Record<ReminderSlot, ReminderSectionConfig> = {
     cardClassName: "border-outline-variant/45 bg-surface-container-lowest",
     codeChipClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
   },
+  h7Upcoming: {
+    title: "Upcoming H-7",
+    subtitle: "TARGET H-8 SAMPAI H-12",
+    emptyCardClassName: "border-outline-variant/55 bg-surface-container-low text-on-surface-variant",
+    emptyTitle: "No upcoming H-7 reminders",
+    emptyDescription: "Belum ada target date pada rentang H-8 sampai H-12.",
+    cardClassName: "border-outline-variant/45 bg-surface-container-lowest",
+    codeChipClassName: "border-sky-200 bg-sky-50 text-sky-700",
+  },
 };
+
+const MAX_H7_UPCOMING_TARGET_DAYS = 12;
 
 function getSectionBadgeAccentClass(slot: ReminderSlot): string {
   if (slot === "h2") {
     return "border border-rose-700/30 bg-rose-600 text-white";
   }
 
-  return "border border-emerald-700/30 bg-emerald-600 text-white";
+  if (slot === "h7") {
+    return "border border-emerald-700/30 bg-emerald-600 text-white";
+  }
+
+  return "border border-sky-700/30 bg-sky-600 text-white";
 }
 
 function getSectionDividerAccentClass(slot: ReminderSlot): string {
@@ -90,7 +105,11 @@ function getSectionDividerAccentClass(slot: ReminderSlot): string {
     return "bg-rose-200";
   }
 
-  return "bg-emerald-200";
+  if (slot === "h7") {
+    return "bg-emerald-200";
+  }
+
+  return "bg-sky-200";
 }
 
 function parseIsoAtNoon(isoDate: string): Date | null {
@@ -341,6 +360,7 @@ function countSlotStatuses(
 ): {
   open: number;
   upcoming: number;
+  notPrinted: number;
 } {
   return appointments.reduce(
     (accumulator, appointment) => {
@@ -348,31 +368,49 @@ function countSlotStatuses(
         accumulator.open += 1;
       } else if (appointment.slotStatus === "upcoming") {
         accumulator.upcoming += 1;
+      } else if (!appointment.tasrehPrinted) {
+        accumulator.notPrinted += 1;
       }
       return accumulator;
     },
-    { open: 0, upcoming: 0 },
+    { open: 0, upcoming: 0, notPrinted: 0 },
   );
 }
 
-function formatReminderCardStatusLabel(summary: { open: number; upcoming: number }): string {
+function formatReminderCardStatusLabel(summary: { open: number; upcoming: number; notPrinted: number }): string {
   if (summary.open > 0) {
     return `${summary.open} Open Today`;
+  }
+
+  if (summary.notPrinted > 0) {
+    return "Not Printed";
   }
 
   return `${summary.upcoming} Upcoming`;
 }
 
-function getReminderCardStatusClass(summary: { open: number; upcoming: number }): string {
+function getReminderCardStatusClass(summary: { open: number; upcoming: number; notPrinted: number }): string {
   if (summary.open > 0) {
     return "text-rose-700";
+  }
+
+  if (summary.notPrinted > 0) {
+    return "text-amber-700";
   }
 
   return "text-emerald-700";
 }
 
 function getSlotLabel(slot: ReminderSlot): string {
-  return slot === "h2" ? "H-2" : "H-7";
+  if (slot === "h2") {
+    return "H-2";
+  }
+
+  if (slot === "h7") {
+    return "H-7";
+  }
+
+  return "Upcoming H-7";
 }
 
 function ReminderSection({
@@ -692,8 +730,8 @@ export function RaudhahReminderScreen({
   );
 
   const reminderItems = useMemo<ReminderItem[]>(() => {
-    const slotOrder: ReminderSlot[] = ["h2", "h7"];
-    const slotPriority: Record<ReminderSlot, number> = { h2: 0, h7: 1 };
+    const slotOrder: ReminderSlot[] = ["h2", "h7", "h7Upcoming"];
+    const slotPriority: Record<ReminderSlot, number> = { h2: 0, h7: 1, h7Upcoming: 2 };
     const statusPriority: Record<ReminderSlotStatus, number> = { open: 0, upcoming: 1, missed: 2 };
 
     const resolveNearestRankingValue = (item: ReminderItem): number => {
@@ -739,6 +777,7 @@ export function RaudhahReminderScreen({
         const appointmentsBySlot: Record<ReminderSlot, ReminderAppointmentItem[]> = {
           h2: [],
           h7: [],
+          h7Upcoming: [],
         };
 
         appointmentEntries.forEach((appointment) => {
@@ -749,6 +788,8 @@ export function RaudhahReminderScreen({
             slot = "h2";
           } else if (targetDaysLeft >= 0 && targetDaysLeft <= 7) {
             slot = "h7";
+          } else if (targetDaysLeft > 7 && targetDaysLeft <= MAX_H7_UPCOMING_TARGET_DAYS) {
+            slot = "h7Upcoming";
           }
 
           if (!slot) {
@@ -756,7 +797,7 @@ export function RaudhahReminderScreen({
           }
 
           const h7BookingDateIso = shiftIsoDate(appointment.dateIso, -7);
-          const bookingDateIso = slot === "h7" ? h7BookingDateIso : shiftIsoDate(appointment.dateIso, -2);
+          const bookingDateIso = slot === "h2" ? shiftIsoDate(appointment.dateIso, -2) : h7BookingDateIso;
           const daysUntilBooking = getDaysLeft(bookingDateIso, todayIso);
           const slotStatus = resolveSlotStatus(daysUntilBooking);
           const shouldKeepMissedH2ForTasreh =
@@ -856,6 +897,7 @@ export function RaudhahReminderScreen({
 
   const h2Items = filteredItems.filter((item) => item.slot === "h2");
   const h7Items = filteredItems.filter((item) => item.slot === "h7");
+  const upcomingH7Items = filteredItems.filter((item) => item.slot === "h7Upcoming");
 
   const slotStatusSummary = useMemo(
     () =>
@@ -1005,6 +1047,15 @@ export function RaudhahReminderScreen({
           <ReminderSection
             slot="h7"
             items={h7Items}
+            copiedItemId={copiedItemId}
+            onCopyTemplate={handleCopyTemplate}
+            onOpenVisaDetail={handleOpenVisaDetail}
+            onSetRaudhahTasrehPrinted={onSetRaudhahTasrehPrinted}
+          />
+
+          <ReminderSection
+            slot="h7Upcoming"
+            items={upcomingH7Items}
             copiedItemId={copiedItemId}
             onCopyTemplate={handleCopyTemplate}
             onOpenVisaDetail={handleOpenVisaDetail}

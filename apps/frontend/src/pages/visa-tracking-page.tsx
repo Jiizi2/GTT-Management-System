@@ -299,12 +299,6 @@ export function VisaTrackingScreen({
       ? "All Months"
       : issuedMonthOptions.find((option) => option.value === issuedMonthFilter)?.label ?? issuedMonthFilter;
   const actionRequiredCount = visaRows.filter((row) => isVisaRowActionRequired(row)).length;
-  const totalOutstanding = visaRows.reduce((total, row) => total + row.outstandingAmount, 0);
-  const formattedOutstanding = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(totalOutstanding);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / VISA_PAGE_SIZE));
   const startIndex = (currentPage - 1) * VISA_PAGE_SIZE;
@@ -398,14 +392,6 @@ export function VisaTrackingScreen({
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end sm:self-start">
-          <div className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 sm:w-auto">
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              fact_check
-            </span>
-            <span className="sm:hidden">{filteredRows.length} groups</span>
-            <span className="hidden sm:inline">{filteredRows.length} groups in focus</span>
-          </div>
-
           <button
             type="button"
             className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition sm:w-auto ${
@@ -516,8 +502,11 @@ export function VisaTrackingScreen({
             payments
           </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outstanding</p>
-            <strong className="text-xl font-bold text-slate-900">{formattedOutstanding}</strong>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <span className="sm:hidden">Payment</span>
+              <span className="hidden sm:inline">Payment Attention</span>
+            </p>
+            <strong className="text-xl font-bold text-slate-900">{unpaidCount}</strong>
           </div>
         </article>
       </section>
