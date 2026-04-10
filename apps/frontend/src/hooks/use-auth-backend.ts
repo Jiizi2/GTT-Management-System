@@ -1,19 +1,6 @@
 import { type LoginCredentials } from "../pages/login-page.js";
+import { resolveBackendApiBaseUrl } from "../shared/backend-api-base.js";
 import { coerceAuthSession, type AuthSession } from "../shared/auth-session.js";
-
-function resolveBackendApiBaseUrl(): string {
-  const customUrl = (globalThis as { __GTT_API_BASE_URL__?: string }).__GTT_API_BASE_URL__;
-  if (customUrl?.trim()) {
-    return customUrl.trim().replace(/\/+$/, "");
-  }
-
-  const hostname = globalThis.location?.hostname ?? "";
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3001/api";
-  }
-
-  return "/api";
-}
 
 function extractBackendErrorMessage(status: number, payload: unknown, fallbackText: string): string {
   if (payload && typeof payload === "object" && "message" in payload) {

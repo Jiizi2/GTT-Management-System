@@ -141,6 +141,27 @@ async function testLoginFallsBackToLocalhostApiBaseUrl(): Promise<void> {
   });
 }
 
+async function testLoginPreservesLoopbackHostnameForCookieAuth(): Promise<void> {
+  await withApiBaseOverride(undefined, async () => {
+    await withLocationHostname("127.0.0.1", async () => {
+      await withMockFetch(
+        async () =>
+          new Response(createSessionResponseJson(), {
+            status: 200,
+          }),
+        async (calls) => {
+          await loginWithBackend({
+            identifier: "dev.superadmin",
+            password: "DevSuperAdmin#2026",
+            rememberSession: false,
+          });
+          assert.equal(String(calls[0].input), "http://127.0.0.1:3001/api/auth/login");
+        },
+      );
+    });
+  });
+}
+
 async function testLoginReturnsStructuredBackendErrorMessage(): Promise<void> {
   await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
     await withMockFetch(
@@ -259,6 +280,7 @@ async function testLogoutUsesCredentialedPost(): Promise<void> {
 async function main(): Promise<void> {
   await runCase("loginWithBackend custom api base url", testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier);
   await runCase("loginWithBackend localhost fallback url", testLoginFallsBackToLocalhostApiBaseUrl);
+  await runCase("loginWithBackend preserves loopback hostname", testLoginPreservesLoopbackHostnameForCookieAuth);
   await runCase("loginWithBackend structured error message", testLoginReturnsStructuredBackendErrorMessage);
   await runCase("loginWithBackend fallback error message", testLoginUsesFallbackTextWhenBackendErrorPayloadIsUnknown);
   await runCase("loginWithBackend invalid payload handling", testLoginRejectsInvalidSessionPayload);

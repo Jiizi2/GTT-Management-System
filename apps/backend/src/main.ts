@@ -31,7 +31,12 @@ async function bootstrap(): Promise<void> {
         return;
       }
 
-      callback(new Error("CORS origin is not allowed."), false);
+      callback(
+        new Error(
+          `CORS origin is not allowed: '${origin}'. Allowed origins: ${corsOrigins.join(", ")}`,
+        ),
+        false,
+      );
     },
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

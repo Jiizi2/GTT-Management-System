@@ -1,6 +1,7 @@
 export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled";
 export type BackendDataSource = "memory" | "prisma";
 
+import { resolveBackendApiBaseUrl } from "../shared/backend-api-base";
 import { clearAuthSession } from "../shared/auth-session";
 
 export type BackendInvoiceClient = {
@@ -74,20 +75,6 @@ type BackendInvoiceRecord = {
   status?: unknown;
   monthKey?: unknown;
 };
-
-function resolveBackendApiBaseUrl(): string {
-  const customUrl = (globalThis as { __GTT_API_BASE_URL__?: string }).__GTT_API_BASE_URL__;
-  if (customUrl?.trim()) {
-    return customUrl.trim().replace(/\/+$/, "");
-  }
-
-  const hostname = globalThis.location?.hostname ?? "";
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3001/api";
-  }
-
-  return "/api";
-}
 
 async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(endpoint, {
