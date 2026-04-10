@@ -40,6 +40,8 @@ type AuthManagedUserRecord = {
 
 const TOKEN_TYPE = "Bearer" as const;
 const HEADER_TEMPLATE = { alg: "HS256", typ: "JWT" };
+const DEFAULT_AUTH_SECRET = "gtt-dev-auth-secret-please-change-in-production";
+const MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH = 32;
 
 const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
 const REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 14;
@@ -85,8 +87,9 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
       ? record.accessTier
       : null;
   const exp = toPositiveInteger(record.exp);
+  const rememberSession = typeof record.rememberSession === "boolean" ? record.rememberSession : null;
 
-  if (!id || !name || !username || !email || !accessTier || !exp) {
+  if (!id || !name || !username || !email || !accessTier || !exp || rememberSession === null) {
     return null;
   }
 
@@ -97,26 +100,43 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
     email,
     accessTier,
     exp,
+    rememberSession,
   };
 }
 
 function resolveAuthSecret(): string {
   const configured = process.env.AUTH_SECRET?.trim();
+  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+
   if (configured) {
+    if (nodeEnv === "production" && configured.length < MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH) {
+      throw new Error(
+        `AUTH_SECRET must be at least ${MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH} characters in production.`,
+      );
+    }
+
+    if (nodeEnv === "production" && configured === DEFAULT_AUTH_SECRET) {
+      throw new Error("AUTH_SECRET must not use the development default value in production.");
+    }
+
     return configured;
   }
 
-  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
   if (nodeEnv === "production") {
     throw new Error("AUTH_SECRET is required in production.");
   }
 
-  return "gtt-dev-auth-secret-please-change-in-production";
+  return DEFAULT_AUTH_SECRET;
 }
 
 function resolveShouldBootstrapPrismaAuthUsers(): boolean {
   const configured = process.env.AUTH_BOOTSTRAP_DEFAULT_USERS?.trim().toLowerCase();
   if (configured === "true") {
+    const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+    if (nodeEnv === "production") {
+      throw new Error("AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production.");
+    }
+
     return true;
   }
 
@@ -353,6 +373,7 @@ export class AuthService {
     const tokenPayload: AuthTokenPayload = {
       ...account,
       exp: expiresAtEpochSeconds,
+      rememberSession,
     };
     const accessToken = this.signToken(tokenPayload);
 

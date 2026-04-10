@@ -3,46 +3,50 @@ import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
 import { resolveRuntimeConfig, resolveStartupErrorMessage } from "./runtime-config";
 
-const DEFAULT_CORS_ORIGINS = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-
-function resolveCorsOrigins(rawOrigins: string | undefined): string[] {
-  const parsed = (rawOrigins ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-
-  if (parsed.length === 0) {
-    return DEFAULT_CORS_ORIGINS;
-  }
-
-  return Array.from(new Set(parsed));
-}
+type CorsOriginCallback = (error: Error | null, allow?: boolean) => void;
+type HeaderResponse = {
+  setHeader: (name: string, value: string) => void;
+};
+type NextHandler = () => void;
 
 async function bootstrap(): Promise<void> {
   const { port, dataSource } = resolveRuntimeConfig(process.env);
   const corsOrigins = resolveCorsOrigins(process.env.CORS_ORIGINS);
-  const allowAllOrigins = corsOrigins.includes("*");
-  const corsSummary = allowAllOrigins ? "*" : `${corsOrigins.length} origins`;
+  const corsSummary = `${corsOrigins.length} origins`;
   const app = await NestFactory.create(AppModule, {
-    cors: {
-      origin: (origin, callback) => {
-        if (!origin || allowAllOrigins || corsOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
+    logger: ["error", "warn", "log"],
+  });
+  const httpServer = app.getHttpAdapter().getInstance() as {
+    disable?: (name: string) => void;
+  };
+  httpServer.disable?.("x-powered-by");
 
-        callback(new Error("CORS origin is not allowed."), false);
-      },
+  app.enableCors({
+    origin: (origin: string | undefined, callback: CorsOriginCallback) => {
+      if (!origin || isOriginAllowed(origin, corsOrigins)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("CORS origin is not allowed."), false);
     },
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
+
+  app.use((_: unknown, response: HeaderResponse, next: NextHandler) => {
+    response.setHeader("Referrer-Policy", "no-referrer");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("X-Frame-Options", "DENY");
+    response.setHeader("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+    response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    response.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+    next();
   });
 
   app.setGlobalPrefix("api");

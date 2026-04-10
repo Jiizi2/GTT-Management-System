@@ -1,7 +1,7 @@
 export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled";
 export type BackendDataSource = "memory" | "prisma";
 
-import { clearAuthSession, getAuthAccessToken } from "../shared/auth-session";
+import { clearAuthSession } from "../shared/auth-session";
 
 export type BackendInvoiceClient = {
   id: string;
@@ -89,20 +89,11 @@ function resolveBackendApiBaseUrl(): string {
   return "/api";
 }
 
-function createAuthorizedHeaders(initialHeaders?: HeadersInit): Headers {
-  const headers = new Headers(initialHeaders);
-  const accessToken = getAuthAccessToken();
-  if (accessToken && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${accessToken}`);
-  }
-
-  return headers;
-}
-
 async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(endpoint, {
     ...init,
-    headers: createAuthorizedHeaders(init?.headers),
+    credentials: "include",
+    headers: new Headers(init?.headers),
   });
 
   if (response.status === 401) {

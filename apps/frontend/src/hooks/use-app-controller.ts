@@ -166,26 +166,6 @@ function resolveDocumentTitle({
   return "GTT | Itinerary Overview";
 }
 
-const SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
-
-const loadPersistedSessionAccessTier = (): SessionAccessTier => {
-  if (typeof window === "undefined") {
-    return "super-admin";
-  }
-
-  try {
-    const persistedAccessTier = window.localStorage
-      .getItem(SESSION_ACCESS_TIER_STORAGE_KEY)
-      ?.trim()
-      .toLowerCase();
-    return persistedAccessTier === "admin" || persistedAccessTier === "super-admin"
-      ? persistedAccessTier
-      : "super-admin";
-  } catch {
-    return "super-admin";
-  }
-};
-
 function getCurrentWeekIsoRange(referenceDate = new Date()): {
   weekStartIso: string;
   weekEndIso: string;
@@ -254,9 +234,8 @@ function isLocalDevelopmentHost(): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
-export function useAppController(): AppController {
+export function useAppController(sessionAccessTier: SessionAccessTier): AppController {
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
-  const [sessionAccessTier] = useState<SessionAccessTier>(() => loadPersistedSessionAccessTier());
   const initialDashboardRouteRef = useRef(
     typeof window === "undefined"
       ? resolveDashboardRouteFromPathname("/overview")

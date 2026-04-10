@@ -26,13 +26,16 @@ Modul utama di `src/app.module.ts`:
 Implementasi:
 
 - Guard global (`AuthGuard`) dipasang lewat `APP_GUARD`.
-- Endpoint non-public wajib header `Authorization: Bearer <token>`.
+- Browser session sekarang memakai cookie `HttpOnly` + `SameSite=Lax`.
+- Guard tetap menerima header `Authorization: Bearer <token>` untuk kompatibilitas internal/test.
 - Token diverifikasi di `AuthService` (HMAC signed token).
+- Request write yang terautentikasi via cookie harus datang dari origin tepercaya (proteksi CSRF berbasis origin).
 
 Route public:
 
 - `GET /api/health`
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
 
 Route protected:
 
@@ -52,13 +55,16 @@ Variabel penting:
 - `DATA_SOURCE` (`memory` | `prisma`)
 - `DATABASE_URL` (wajib jika `DATA_SOURCE=prisma`)
 - `NODE_ENV`
-- `AUTH_SECRET` (wajib di production)
+- `AUTH_SECRET` (wajib dan minimal 32 karakter di production)
 - `CORS_ORIGINS`
+- `AUTH_COOKIE_DOMAIN` (opsional; default host-only cookie)
 - login rate limit env (`AUTH_LOGIN_RATE_LIMIT_*`)
 
 Aturan khusus:
 
 - `NODE_ENV=production` mewajibkan `DATA_SOURCE=prisma`.
+- `AUTH_BOOTSTRAP_DEFAULT_USERS=true` ditolak di production.
+- `CORS_ORIGINS` harus diisi origin eksplisit; wildcard `*` tidak didukung untuk mode cookie auth.
 
 ## 5. Mode Data
 
@@ -84,6 +90,7 @@ Aturan khusus:
 ## Auth
 
 - `POST /api/auth/login` (public)
+- `POST /api/auth/logout` (public)
 - `GET /api/auth/session`
 - `GET /api/auth/users`
 - `POST /api/auth/users`
@@ -166,4 +173,3 @@ Command dari root:
 - `npm run test --workspace backend` -> unit test backend.
 - `npm run test:integration --workspace backend` -> integration Prisma.
 - `npm run test:api --workspace backend` -> API e2e backend.
-

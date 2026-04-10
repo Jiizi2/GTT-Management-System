@@ -33,6 +33,7 @@ function extractBackendErrorMessage(status: number, payload: unknown, fallbackTe
 export async function loginWithBackend(credentials: LoginCredentials): Promise<AuthSession> {
   const response = await fetch(`${resolveBackendApiBaseUrl()}/auth/login`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "content-type": "application/json",
     },
@@ -63,4 +64,43 @@ export async function loginWithBackend(credentials: LoginCredentials): Promise<A
   }
 
   return session;
+}
+
+export async function fetchCurrentSessionFromBackend(): Promise<AuthSession | null> {
+  const response = await fetch(`${resolveBackendApiBaseUrl()}/auth/session`, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (response.status === 401) {
+    return null;
+  }
+
+  const responseText = await response.text();
+  let payload: unknown = null;
+  if (responseText.trim()) {
+    try {
+      payload = JSON.parse(responseText) as unknown;
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(extractBackendErrorMessage(response.status, payload, responseText));
+  }
+
+  const session = coerceAuthSession(payload);
+  if (!session) {
+    throw new Error("Session response is invalid.");
+  }
+
+  return session;
+}
+
+export async function logoutFromBackend(): Promise<void> {
+  await fetch(`${resolveBackendApiBaseUrl()}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
 }

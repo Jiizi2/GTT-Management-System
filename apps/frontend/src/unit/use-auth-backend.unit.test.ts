@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { loginWithBackend } from "../hooks/use-auth-backend.js";
+import {
+  fetchCurrentSessionFromBackend,
+  loginWithBackend,
+  logoutFromBackend,
+} from "../hooks/use-auth-backend.js";
 
 type FetchFn = typeof fetch;
 
@@ -8,10 +12,8 @@ type FetchCall = {
   init?: RequestInit;
 };
 
-function createLoginResponseJson(overrides: Partial<Record<string, unknown>> = {}): string {
+function createSessionResponseJson(overrides: Partial<Record<string, unknown>> = {}): string {
   return JSON.stringify({
-    accessToken: "token-789",
-    tokenType: "Bearer",
     expiresAt: "2099-01-01T00:00:00.000Z",
     rememberSession: true,
     user: {
@@ -92,7 +94,7 @@ async function testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier(): Promise<v
   await withApiBaseOverride("http://127.0.0.1:4100/api///", async () => {
     await withMockFetch(
       async () =>
-        new Response(createLoginResponseJson(), {
+        new Response(createSessionResponseJson(), {
           status: 200,
         }),
       async (calls) => {
@@ -102,9 +104,10 @@ async function testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier(): Promise<v
           rememberSession: true,
         });
 
-        assert.equal(session.accessToken, "token-789");
+        assert.equal(session.user.username, "dev.admin");
         assert.equal(calls.length, 1);
         assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/auth/login");
+        assert.equal(calls[0].init?.credentials, "include");
 
         const parsedBody = JSON.parse(String(calls[0].init?.body ?? "{}")) as {
           identifier?: string;
@@ -122,7 +125,7 @@ async function testLoginFallsBackToLocalhostApiBaseUrl(): Promise<void> {
     await withLocationHostname("localhost", async () => {
       await withMockFetch(
         async () =>
-          new Response(createLoginResponseJson(), {
+          new Response(createSessionResponseJson(), {
             status: 200,
           }),
         async (calls) => {
@@ -188,7 +191,7 @@ async function testLoginRejectsInvalidSessionPayload(): Promise<void> {
       async () =>
         new Response(
           JSON.stringify({
-            accessToken: "",
+            expiresAt: "",
           }),
           {
             status: 200,
@@ -209,12 +212,58 @@ async function testLoginRejectsInvalidSessionPayload(): Promise<void> {
   });
 }
 
+async function testFetchCurrentSessionHandlesUnauthorizedAndValidPayload(): Promise<void> {
+  await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
+    await withMockFetch(
+      async ({ input }) => {
+        if (String(input).endsWith("/auth/session")) {
+          return new Response(createSessionResponseJson({ rememberSession: false }), {
+            status: 200,
+          });
+        }
+
+        return new Response(null, { status: 500 });
+      },
+      async (calls) => {
+        const session = await fetchCurrentSessionFromBackend();
+        assert.equal(session?.rememberSession, false);
+        assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/auth/session");
+        assert.equal(calls[0].init?.credentials, "include");
+      },
+    );
+
+    await withMockFetch(
+      async () => new Response(null, { status: 401 }),
+      async () => {
+        const session = await fetchCurrentSessionFromBackend();
+        assert.equal(session, null);
+      },
+    );
+  });
+}
+
+async function testLogoutUsesCredentialedPost(): Promise<void> {
+  await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
+    await withMockFetch(
+      async () => new Response(null, { status: 204 }),
+      async (calls) => {
+        await logoutFromBackend();
+        assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/auth/logout");
+        assert.equal(calls[0].init?.method, "POST");
+        assert.equal(calls[0].init?.credentials, "include");
+      },
+    );
+  });
+}
+
 async function main(): Promise<void> {
   await runCase("loginWithBackend custom api base url", testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier);
   await runCase("loginWithBackend localhost fallback url", testLoginFallsBackToLocalhostApiBaseUrl);
   await runCase("loginWithBackend structured error message", testLoginReturnsStructuredBackendErrorMessage);
   await runCase("loginWithBackend fallback error message", testLoginUsesFallbackTextWhenBackendErrorPayloadIsUnknown);
   await runCase("loginWithBackend invalid payload handling", testLoginRejectsInvalidSessionPayload);
+  await runCase("fetchCurrentSessionFromBackend restore flow", testFetchCurrentSessionHandlesUnauthorizedAndValidPayload);
+  await runCase("logoutFromBackend credentialed request", testLogoutUsesCredentialedPost);
 }
 
 void main().catch((error: unknown) => {

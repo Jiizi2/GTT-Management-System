@@ -49,7 +49,7 @@ Tanggung jawab hook ini:
 - Memuat data grup dari backend.
 - Menangani save/update/delete grup dan perubahan visa/checklist.
 - Menampilkan feedback sinkronisasi sukses/gagal.
-- Menyimpan nav aktif dan access tier ke localStorage.
+- Memakai access tier dari sesi aktif yang sudah direstorasi dari backend.
 
 Strategi update:
 
@@ -69,8 +69,12 @@ File inti:
 Mekanisme:
 
 - Login kirim `identifier`, `password`, `rememberSession` ke `/api/auth/login`.
-- Session + access token disimpan di localStorage.
-- Semua request backend menambahkan header `Authorization: Bearer <token>`.
+- Backend mengembalikan snapshot sesi lalu menyimpan auth token ke cookie `HttpOnly`.
+- Frontend hanya menyimpan snapshot sesi non-sensitif:
+  - `localStorage` bila `rememberSession=true`
+  - `sessionStorage` bila `rememberSession=false`
+- Semua request backend memakai `credentials: "include"`.
+- Saat bootstrap app, frontend memanggil `/api/auth/session` untuk memverifikasi dan merestorasi sesi.
 - Bila backend balas `401`, session dihapus otomatis.
 
 ## 6. Integrasi API per Domain
@@ -95,6 +99,11 @@ Ini memungkinkan deploy frontend dan backend:
 
 - domain yang sama (reverse proxy), atau
 - domain terpisah dengan injeksi runtime config.
+
+Catatan keamanan deployment:
+
+- Jika frontend dan backend beda origin, backend harus mengizinkan origin frontend secara eksplisit di `CORS_ORIGINS`.
+- Jangan gunakan wildcard `*` karena auth browser sekarang berbasis cookie ber-credential.
 
 Saat build atau `dev` dijalankan, frontend menulis `dist/runtime-config.js` dari
 `GTT_API_BASE_URL` bila env itu diisi. File ini dimuat sebelum `index.js`, jadi

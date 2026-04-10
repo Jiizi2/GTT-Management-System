@@ -15,7 +15,7 @@ const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.supe
 const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
 const prisma = new PrismaClient();
-let activeAccessToken: string | null = null;
+let activeAuthCookie: string | null = null;
 
 function runCase(name: string, fn: () => Promise<void>): Promise<void> {
   return fn().then(() => {
@@ -109,10 +109,20 @@ async function requestJson(
   baseUrl: string,
   path: string,
   init?: RequestInit,
-): Promise<{ status: number; json: unknown; text: string }> {
+): Promise<{ status: number; json: unknown; text: string; headers: Headers }> {
   const headers = new Headers(init?.headers);
-  if (activeAccessToken && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${activeAccessToken}`);
+  const method = init?.method?.trim().toUpperCase() ?? "GET";
+  if (activeAuthCookie && !headers.has("cookie")) {
+    headers.set("cookie", activeAuthCookie);
+  }
+  if (
+    activeAuthCookie &&
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    !headers.has("origin")
+  ) {
+    headers.set("origin", baseUrl);
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -134,6 +144,7 @@ async function requestJson(
     status: response.status,
     json,
     text,
+    headers: response.headers,
   };
 }
 
@@ -151,9 +162,15 @@ async function authenticateDevSession(baseUrl: string): Promise<void> {
   });
 
   assert.equal(loginResponse.status, 200, `Auth login failed: ${loginResponse.text}`);
-  const accessToken = (loginResponse.json as { accessToken?: unknown })?.accessToken;
-  assert.equal(typeof accessToken, "string", "Auth login should return accessToken.");
-  activeAccessToken = accessToken as string;
+  assert.equal(
+    typeof (loginResponse.json as { user?: unknown })?.user,
+    "object",
+    "Auth login should return a browser session payload.",
+  );
+  const setCookie = loginResponse.headers.get("set-cookie") ?? "";
+  const cookieHeader = setCookie.split(";")[0]?.trim() ?? "";
+  assert.notEqual(cookieHeader, "", "Auth login should return a session cookie.");
+  activeAuthCookie = cookieHeader;
 }
 
 async function cleanupCreatedRecords(clientName: string): Promise<void> {
@@ -272,7 +289,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
     assert.equal(matched?.amount, 888000);
     assert.equal(matched?.status, "Paid");
   } finally {
-    activeAccessToken = null;
+    activeAuthCookie = null;
     await cleanupCreatedRecords(testClientName);
     await server.shutdown();
   }
@@ -393,7 +410,7 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
       "Concurrent client creation should keep unique sort orders.",
     );
   } finally {
-    activeAccessToken = null;
+    activeAuthCookie = null;
     await cleanupCreatedRecordsByPrefix(testClientPrefix);
     await server.shutdown();
   }

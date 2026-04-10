@@ -4,7 +4,11 @@ import { AppMainContent } from "./components/app-main-content";
 import { MobileNav } from "./components/mobile-nav";
 import { MobileQuickActionsSheet } from "./components/mobile-quick-actions-sheet";
 import { ThemeToggleButton } from "./components/theme-toggle-button";
-import { loginWithBackend } from "./hooks/use-auth-backend";
+import {
+  fetchCurrentSessionFromBackend,
+  loginWithBackend,
+  logoutFromBackend,
+} from "./hooks/use-auth-backend";
 import { useAppController } from "./hooks/use-app-controller";
 import { type DevelopmentLoginAccountHint, LoginScreen, type LoginCredentials } from "./pages/login-page";
 import {
@@ -48,8 +52,14 @@ function shouldExposeDevelopmentLoginHints(): boolean {
   return host === "localhost" || host === "127.0.0.1";
 }
 
-function DashboardWorkspaceShell({ onLogout }: { onLogout: () => void }) {
-  const controller = useAppController();
+function DashboardWorkspaceShell({
+  onLogout,
+  sessionAccessTier,
+}: {
+  onLogout: () => void;
+  sessionAccessTier: AuthSession["user"]["accessTier"];
+}) {
+  const controller = useAppController(sessionAccessTier);
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const shouldShowFloatingThemeToggle = !(
     controller.activeNav === "overview" ||
@@ -169,6 +179,7 @@ function DashboardWorkspaceShell({ onLogout }: { onLogout: () => void }) {
 export function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => readPersistedAuthSession());
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [loginErrorMessage, setLoginErrorMessage] = useState("");
 
   useEffect(() => {
@@ -186,6 +197,50 @@ export function App() {
     return () => {
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, syncSessionFromStorage);
       window.removeEventListener("storage", syncSessionFromStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    void fetchCurrentSessionFromBackend()
+      .then((resolvedSession) => {
+        if (!isActive) {
+          return;
+        }
+
+        if (resolvedSession) {
+          persistAuthSession(resolvedSession);
+          setAuthSession(resolvedSession);
+
+          if (
+            typeof window !== "undefined" &&
+            isLoginRoute(window.location.pathname, window.location.search)
+          ) {
+            window.history.replaceState(null, "", buildDashboardPath("overview"));
+          }
+
+          return;
+        }
+
+        clearAuthSession();
+        setAuthSession(null);
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
+        setAuthSession((current) => current ?? readPersistedAuthSession());
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsRestoringSession(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
     };
   }, []);
 
@@ -219,12 +274,27 @@ export function App() {
   }, []);
 
   const handleLogout = useCallback(() => {
+    void logoutFromBackend().catch(() => undefined);
     clearAuthSession();
     setAuthSession(null);
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", buildLoginPath());
     }
   }, []);
+
+  if (isRestoringSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low px-6 text-center">
+        <div className="max-w-sm rounded-3xl border border-outline-variant/40 bg-surface-container-lowest px-6 py-8 shadow-ambient">
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary">Secure Session</p>
+          <h1 className="mt-3 text-2xl font-semibold text-on-surface">Memverifikasi sesi</h1>
+          <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+            Dashboard sedang memastikan sesi login Anda masih valid.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (shouldRenderStandaloneLoginScreen() || !authSession) {
     return (
@@ -237,6 +307,11 @@ export function App() {
     );
   }
 
-  return <DashboardWorkspaceShell onLogout={handleLogout} />;
+  return (
+    <DashboardWorkspaceShell
+      onLogout={handleLogout}
+      sessionAccessTier={authSession.user.accessTier}
+    />
+  );
 }
 
