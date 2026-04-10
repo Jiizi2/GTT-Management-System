@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import type { NavId, SessionAccessTier } from "../shared/app-domain";
 import { clearAuthSession } from "../shared/auth-session";
 
@@ -30,7 +33,7 @@ type ProfileData = {
   phone: string;
 };
 
-type PasswordForm = {
+type PasswordFormValues = {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -41,7 +44,54 @@ type ProfileNotice = {
   message: string;
 };
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const roleTitleSchema = z.enum([
+  "super-admin",
+  "operations-manager",
+  "finance-manager",
+  "customer-support",
+]);
+
+const profileFormSchema = z.object({
+  fullName: z.string().trim().min(1, "Semua field profile wajib diisi."),
+  roleTitleId: roleTitleSchema,
+  email: z
+    .string()
+    .trim()
+    .min(1, "Semua field profile wajib diisi.")
+    .email("Format email tidak valid."),
+  phone: z.string().trim().min(1, "Semua field profile wajib diisi."),
+});
+
+const passwordFormSchema = z
+  .object({
+    currentPassword: z.string().trim().min(1, "Password lama dan password baru wajib diisi."),
+    newPassword: z
+      .string()
+      .min(1, "Password lama dan password baru wajib diisi.")
+      .min(8, "Password baru minimal 8 karakter."),
+    confirmPassword: z.string().min(1, "Konfirmasi password tidak sama."),
+  })
+  .superRefine((values, context) => {
+    if (values.newPassword !== values.confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Konfirmasi password tidak sama.",
+      });
+    }
+
+    if (
+      values.currentPassword.trim() &&
+      values.newPassword.trim() &&
+      values.currentPassword === values.newPassword
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["newPassword"],
+        message: "Password baru harus berbeda dari password lama.",
+      });
+    }
+  });
 
 function resolveRoleTitleLabel(roleTitleId: RoleTitleId): string {
   return roleTitleOptions.find((option) => option.id === roleTitleId)?.label ?? "Unknown Role";
@@ -115,6 +165,224 @@ function ProfileModalOverlay({
   );
 }
 
+function EditProfileModal({
+  initialValues,
+  canEditRoleTitle,
+  onClose,
+  onSave,
+}: {
+  initialValues: ProfileData;
+  canEditRoleTitle: boolean;
+  onClose: () => void;
+  onSave: (values: ProfileData) => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileData>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: initialValues,
+  });
+
+  useEffect(() => {
+    reset(initialValues);
+  }, [initialValues, reset]);
+
+  return (
+    <ProfileModalOverlay onClose={onClose}>
+      <section
+        className="serene-modal-shell my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto p-5 sm:max-h-[calc(100dvh-2rem)] sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit profile"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Edit Profile</h3>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              <span className="sm:hidden">Perbarui akun operator.</span>
+              <span className="hidden sm:inline">Perbarui informasi akun operator.</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high"
+            aria-label="Close edit profile modal"
+            onClick={onClose}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </header>
+
+        <form className="mt-5" onSubmit={handleSubmit((values) => onSave(values))}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="serene-field sm:col-span-2">
+              <span className="text-sm font-semibold text-on-surface-variant">Full Name</span>
+              <input type="text" className="serene-input" {...register("fullName")} />
+            </label>
+
+            <label className="serene-field sm:col-span-2">
+              <span className="text-sm font-semibold text-on-surface-variant">Role Title</span>
+              <select className="serene-select" {...register("roleTitleId")} disabled={!canEditRoleTitle}>
+                {roleTitleOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span
+                className={`mt-1 inline-flex items-center gap-1.5 text-xs font-medium ${
+                  canEditRoleTitle ? "text-primary" : "text-on-surface-variant"
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                  {canEditRoleTitle ? "lock_open" : "lock"}
+                </span>
+                {canEditRoleTitle
+                  ? "Role Title dapat diubah oleh akun Super Admin."
+                  : "Role Title hanya bisa diubah oleh role Super Admin."}
+              </span>
+            </label>
+
+            <label className="serene-field">
+              <span className="text-sm font-semibold text-on-surface-variant">Email Address</span>
+              <input type="email" className="serene-input" {...register("email")} />
+            </label>
+
+            <label className="serene-field">
+              <span className="text-sm font-semibold text-on-surface-variant">Phone</span>
+              <input type="text" className="serene-input" {...register("phone")} />
+            </label>
+          </div>
+
+          {errors.fullName?.message || errors.email?.message || errors.phone?.message || errors.roleTitleId?.message ? (
+            <p className="mt-4 rounded-md border border-error-container/65 bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container">
+              {errors.fullName?.message ??
+                errors.email?.message ??
+                errors.phone?.message ??
+                errors.roleTitleId?.message}
+            </p>
+          ) : null}
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="serene-btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="serene-btn-primary" disabled={isSubmitting}>
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </section>
+    </ProfileModalOverlay>
+  );
+}
+
+function ChangePasswordModal({
+  onClose,
+  onSave,
+}: {
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordFormSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  useEffect(() => {
+    reset({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+  }, [reset]);
+
+  return (
+    <ProfileModalOverlay onClose={onClose}>
+      <section
+        className="serene-modal-shell my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto p-5 sm:max-h-[calc(100dvh-2rem)] sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Change password"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Change Password</h3>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              <span className="sm:hidden">Buat password baru.</span>
+              <span className="hidden sm:inline">Buat password baru untuk akun operator.</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high"
+            aria-label="Close change password modal"
+            onClick={onClose}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </header>
+
+        <form className="mt-5" onSubmit={handleSubmit(() => onSave())}>
+          <div className="grid gap-3">
+            <label className="serene-field">
+              <span className="text-sm font-semibold text-on-surface-variant">Current Password</span>
+              <input type="password" className="serene-input" {...register("currentPassword")} />
+            </label>
+
+            <label className="serene-field">
+              <span className="text-sm font-semibold text-on-surface-variant">New Password</span>
+              <input type="password" className="serene-input" {...register("newPassword")} />
+            </label>
+
+            <label className="serene-field">
+              <span className="text-sm font-semibold text-on-surface-variant">Confirm New Password</span>
+              <input type="password" className="serene-input" {...register("confirmPassword")} />
+            </label>
+          </div>
+
+          {errors.currentPassword?.message ||
+          errors.newPassword?.message ||
+          errors.confirmPassword?.message ? (
+            <p className="mt-4 rounded-md border border-error-container/65 bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container">
+              {errors.currentPassword?.message ??
+                errors.newPassword?.message ??
+                errors.confirmPassword?.message}
+            </p>
+          ) : null}
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="serene-btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="serene-btn-primary" disabled={isSubmitting}>
+              Update Password
+            </button>
+          </div>
+        </form>
+      </section>
+    </ProfileModalOverlay>
+  );
+}
+
 export function ProfileScreen({
   onNavigate,
   sessionAccessTier = "admin",
@@ -131,18 +399,10 @@ export function ProfileScreen({
     email: "operator.admin@ghaniyatravel.com",
     phone: "+62 812 3456 7890",
   });
-  const [profileDraft, setProfileDraft] = useState<ProfileData>(profileData);
-  const [passwordForm, setPasswordForm] = useState<PasswordForm>({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
   const [notice, setNotice] = useState<ProfileNotice | null>(null);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
-  const [editProfileError, setEditProfileError] = useState("");
-  const [changePasswordError, setChangePasswordError] = useState("");
 
   const currentRoleTitleLabel = useMemo(
     () => resolveRoleTitleLabel(profileData.roleTitleId),
@@ -176,8 +436,6 @@ export function ProfileScreen({
         setIsEditProfileModalOpen(false);
         setIsChangePasswordModalOpen(false);
         setIsSignOutModalOpen(false);
-        setEditProfileError("");
-        setChangePasswordError("");
       }
     };
 
@@ -191,52 +449,22 @@ export function ProfileScreen({
   }, [hasOpenModal]);
 
   const openEditProfileModal = () => {
-    setProfileDraft(profileData);
-    setEditProfileError("");
     setIsEditProfileModalOpen(true);
   };
 
   const closeEditProfileModal = () => {
     setIsEditProfileModalOpen(false);
-    setEditProfileError("");
   };
 
-  const handleEditProfileDraftChange = <Key extends keyof ProfileData>(
-    field: Key,
-    value: ProfileData[Key],
-  ) => {
-    setProfileDraft((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleSaveProfile = () => {
-    const trimmedFullName = profileDraft.fullName.trim();
-    const trimmedEmail = profileDraft.email.trim();
-    const trimmedPhone = profileDraft.phone.trim();
-    const nextRoleTitleId = canEditRoleTitle ? profileDraft.roleTitleId : profileData.roleTitleId;
-
-    if (!trimmedFullName || !trimmedEmail || !trimmedPhone) {
-      setEditProfileError("Semua field profile wajib diisi.");
-      return;
-    }
-
-    if (!roleTitleOptions.some((option) => option.id === nextRoleTitleId)) {
-      setEditProfileError("Role title tidak valid.");
-      return;
-    }
-
-    if (!emailPattern.test(trimmedEmail)) {
-      setEditProfileError("Format email tidak valid.");
-      return;
-    }
-
+  const handleSaveProfile = (values: ProfileData) => {
+    const nextRoleTitleId = canEditRoleTitle ? values.roleTitleId : profileData.roleTitleId;
     setProfileData({
-      fullName: trimmedFullName,
+      fullName: values.fullName.trim(),
       roleTitleId: nextRoleTitleId,
-      email: trimmedEmail,
-      phone: trimmedPhone,
+      email: values.email.trim(),
+      phone: values.phone.trim(),
     });
     setIsEditProfileModalOpen(false);
-    setEditProfileError("");
     setNotice({
       tone: "success",
       message: "Profile berhasil diperbarui.",
@@ -244,50 +472,15 @@ export function ProfileScreen({
   };
 
   const openChangePasswordModal = () => {
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setChangePasswordError("");
     setIsChangePasswordModalOpen(true);
   };
 
   const closeChangePasswordModal = () => {
     setIsChangePasswordModalOpen(false);
-    setChangePasswordError("");
-  };
-
-  const handleChangePasswordField = <Key extends keyof PasswordForm>(
-    field: Key,
-    value: PasswordForm[Key],
-  ) => {
-    setPasswordForm((current) => ({ ...current, [field]: value }));
   };
 
   const handleSavePassword = () => {
-    if (!passwordForm.currentPassword.trim() || !passwordForm.newPassword.trim()) {
-      setChangePasswordError("Password lama dan password baru wajib diisi.");
-      return;
-    }
-
-    if (passwordForm.newPassword.length < 8) {
-      setChangePasswordError("Password baru minimal 8 karakter.");
-      return;
-    }
-
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setChangePasswordError("Konfirmasi password tidak sama.");
-      return;
-    }
-
-    if (passwordForm.currentPassword === passwordForm.newPassword) {
-      setChangePasswordError("Password baru harus berbeda dari password lama.");
-      return;
-    }
-
     setIsChangePasswordModalOpen(false);
-    setChangePasswordError("");
     setNotice({
       tone: "success",
       message: "Password berhasil diperbarui.",
@@ -483,191 +676,16 @@ export function ProfileScreen({
       </section>
 
       {isEditProfileModalOpen ? (
-        <ProfileModalOverlay onClose={closeEditProfileModal}>
-          <section
-            className="serene-modal-shell my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto p-5 sm:max-h-[calc(100dvh-2rem)] sm:p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit profile"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Edit Profile</h3>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  <span className="sm:hidden">Perbarui akun operator.</span>
-                  <span className="hidden sm:inline">Perbarui informasi akun operator.</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high"
-                aria-label="Close edit profile modal"
-                onClick={closeEditProfileModal}
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </header>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="serene-field sm:col-span-2">
-                <span className="text-sm font-semibold text-on-surface-variant">Full Name</span>
-                <input
-                  type="text"
-                  className="serene-input"
-                  value={profileDraft.fullName}
-                  onChange={(event) => handleEditProfileDraftChange("fullName", event.target.value)}
-                />
-              </label>
-
-              <label className="serene-field sm:col-span-2">
-                <span className="text-sm font-semibold text-on-surface-variant">Role Title</span>
-                <select
-                  className="serene-select"
-                  value={profileDraft.roleTitleId}
-                  onChange={(event) =>
-                    handleEditProfileDraftChange("roleTitleId", event.target.value as RoleTitleId)
-                  }
-                  disabled={!canEditRoleTitle}
-                >
-                  {roleTitleOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  className={`mt-1 inline-flex items-center gap-1.5 text-xs font-medium ${
-                    canEditRoleTitle ? "text-primary" : "text-on-surface-variant"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                    {canEditRoleTitle ? "lock_open" : "lock"}
-                  </span>
-                  {canEditRoleTitle
-                    ? "Role Title dapat diubah oleh akun Super Admin."
-                    : "Role Title hanya bisa diubah oleh role Super Admin."}
-                </span>
-              </label>
-
-              <label className="serene-field">
-                <span className="text-sm font-semibold text-on-surface-variant">Email Address</span>
-                <input
-                  type="email"
-                  className="serene-input"
-                  value={profileDraft.email}
-                  onChange={(event) => handleEditProfileDraftChange("email", event.target.value)}
-                />
-              </label>
-
-              <label className="serene-field">
-                <span className="text-sm font-semibold text-on-surface-variant">Phone</span>
-                <input
-                  type="text"
-                  className="serene-input"
-                  value={profileDraft.phone}
-                  onChange={(event) => handleEditProfileDraftChange("phone", event.target.value)}
-                />
-              </label>
-            </div>
-
-            {editProfileError ? (
-              <p className="mt-4 rounded-md border border-error-container/65 bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container">
-                {editProfileError}
-              </p>
-            ) : null}
-
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" className="serene-btn-secondary" onClick={closeEditProfileModal}>
-                Cancel
-              </button>
-              <button type="button" className="serene-btn-primary" onClick={handleSaveProfile}>
-                Save Changes
-              </button>
-            </div>
-          </section>
-        </ProfileModalOverlay>
+        <EditProfileModal
+          initialValues={profileData}
+          canEditRoleTitle={canEditRoleTitle}
+          onClose={closeEditProfileModal}
+          onSave={handleSaveProfile}
+        />
       ) : null}
 
       {isChangePasswordModalOpen ? (
-        <ProfileModalOverlay onClose={closeChangePasswordModal}>
-          <section
-            className="serene-modal-shell my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto p-5 sm:max-h-[calc(100dvh-2rem)] sm:p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Change password"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Change Password</h3>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  <span className="sm:hidden">Buat password baru.</span>
-                  <span className="hidden sm:inline">Buat password baru untuk akun operator.</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high"
-                aria-label="Close change password modal"
-                onClick={closeChangePasswordModal}
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </header>
-
-            <div className="mt-5 grid gap-3">
-              <label className="serene-field">
-                <span className="text-sm font-semibold text-on-surface-variant">Current Password</span>
-                <input
-                  type="password"
-                  className="serene-input"
-                  value={passwordForm.currentPassword}
-                  onChange={(event) => handleChangePasswordField("currentPassword", event.target.value)}
-                />
-              </label>
-
-              <label className="serene-field">
-                <span className="text-sm font-semibold text-on-surface-variant">New Password</span>
-                <input
-                  type="password"
-                  className="serene-input"
-                  value={passwordForm.newPassword}
-                  onChange={(event) => handleChangePasswordField("newPassword", event.target.value)}
-                />
-              </label>
-
-              <label className="serene-field">
-                <span className="text-sm font-semibold text-on-surface-variant">Confirm New Password</span>
-                <input
-                  type="password"
-                  className="serene-input"
-                  value={passwordForm.confirmPassword}
-                  onChange={(event) => handleChangePasswordField("confirmPassword", event.target.value)}
-                />
-              </label>
-            </div>
-
-            {changePasswordError ? (
-              <p className="mt-4 rounded-md border border-error-container/65 bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container">
-                {changePasswordError}
-              </p>
-            ) : null}
-
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" className="serene-btn-secondary" onClick={closeChangePasswordModal}>
-                Cancel
-              </button>
-              <button type="button" className="serene-btn-primary" onClick={handleSavePassword}>
-                Update Password
-              </button>
-            </div>
-          </section>
-        </ProfileModalOverlay>
+        <ChangePasswordModal onClose={closeChangePasswordModal} onSave={handleSavePassword} />
       ) : null}
 
       {isSignOutModalOpen ? (
