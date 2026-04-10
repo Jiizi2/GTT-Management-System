@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, type FieldErrors, useForm } from "react-hook-form";
+import { Controller, type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { z } from "zod";
@@ -85,6 +85,14 @@ const defaultInvoiceStatusOptions: InvoiceStatusOption[] = [
   { value: "Cancelled", label: "Cancelled" },
 ];
 
+const invoiceDraftItemSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  pax: z.number(),
+  currency: z.enum(["IDR", "USD", "SAR"]),
+  unitPrice: z.number(),
+});
+
 const invoiceWorkspaceFormSchema = z
   .object({
     issueDateIso: z.string().trim().min(1, "Select issue date before saving invoice."),
@@ -97,6 +105,7 @@ const invoiceWorkspaceFormSchema = z
     address: z.string(),
     bankAccount: z.string(),
     notes: z.string(),
+    items: z.array(invoiceDraftItemSchema),
   })
   .superRefine((values, context) => {
     if (
@@ -351,6 +360,26 @@ function createEmptyDraftItems(): InvoiceDraftItem[] {
       pax: 0,
       currency: "IDR",
       unitPrice: 0,
+    },
+  ];
+}
+
+function createInitialInvoiceDraftItems(
+  initialInvoice: InvoiceWorkspaceInitialData | null,
+): InvoiceDraftItem[] {
+  if (!initialInvoice) {
+    return createEmptyDraftItems();
+  }
+
+  return [
+    {
+      id: "line-1",
+      description: initialInvoice.groupCode
+        ? `Invoice for Group ${initialInvoice.groupCode}`
+        : `Invoice ${initialInvoice.invoiceNumber}`,
+      pax: 1,
+      currency: "IDR",
+      unitPrice: Math.max(0, Math.round(initialInvoice.amount)),
     },
   ];
 }
@@ -622,6 +651,7 @@ function CreateInvoiceWorkspace({
       address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
       bankAccount: isEditMode ? bankDisbursementOptions[0]?.value ?? "" : "",
       notes: "",
+      items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
     },
   });
   const dueDateIso = watch("dueDateIso");
@@ -631,6 +661,12 @@ function CreateInvoiceWorkspace({
   const selectedGroupCode = watch("selectedGroupCode");
   const address = watch("address");
   const bankAccount = watch("bankAccount");
+  const items = watch("items");
+  const { fields: itemFields, append: appendItem, remove: removeItemFromForm } = useFieldArray({
+    control,
+    name: "items",
+    keyName: "fieldKey",
+  });
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId],
@@ -643,21 +679,6 @@ function CreateInvoiceWorkspace({
   const nextInvoiceNumberPreview = useMemo(
     () => buildNextInvoiceNumber(existingInvoiceNumbers, extractYearFromIsoDate(dueDateIso)),
     [existingInvoiceNumbers, dueDateIso],
-  );
-  const [items, setItems] = useState<InvoiceDraftItem[]>(() =>
-    resolvedInitialInvoice
-      ? [
-          {
-            id: "line-1",
-            description: resolvedInitialInvoice.groupCode
-              ? `Invoice for Group ${resolvedInitialInvoice.groupCode}`
-              : `Invoice ${resolvedInitialInvoice.invoiceNumber}`,
-            pax: 1,
-            currency: "IDR",
-            unitPrice: Math.max(0, Math.round(resolvedInitialInvoice.amount)),
-          },
-        ]
-      : createEmptyDraftItems(),
   );
   const [usdToIdr, setUsdToIdr] = useState(15_845);
   const [sarToIdr, setSarToIdr] = useState(4_225);
@@ -765,36 +786,21 @@ function CreateInvoiceWorkspace({
     const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
     rowCounterRef.current += 1;
 
-    setItems((current) => [
-      ...current,
-      {
-        id: nextId,
-        description: "",
-        pax: Math.max(1, selectedGroup?.pax ?? 1),
-        currency: "IDR",
-        unitPrice: 0,
-      },
-    ]);
-  };
-
-  const updateItem = <K extends keyof InvoiceDraftItem>(
-    itemId: string,
-    key: K,
-    value: InvoiceDraftItem[K],
-  ) => {
-    setItems((current) =>
-      current.map((item) => (item.id === itemId ? { ...item, [key]: value } : item)),
-    );
-  };
-
-  const removeItem = (itemId: string) => {
-    setItems((current) => {
-      if (current.length <= 1) {
-        return current;
-      }
-
-      return current.filter((item) => item.id !== itemId);
+    appendItem({
+      id: nextId,
+      description: "",
+      pax: Math.max(1, selectedGroup?.pax ?? 1),
+      currency: "IDR",
+      unitPrice: 0,
     });
+  };
+
+  const removeItem = (index: number) => {
+    if (itemFields.length <= 1) {
+      return;
+    }
+
+    removeItemFromForm(index);
   };
 
   const handleWorkspaceValidationError = (errors: FieldErrors<InvoiceWorkspaceFormValues>) => {
@@ -823,7 +829,7 @@ function CreateInvoiceWorkspace({
       return;
     }
 
-    const normalizedItems = normalizeInvoiceDraftItems(items);
+    const normalizedItems = normalizeInvoiceDraftItems(values.items);
     if (normalizedItems.length === 0) {
       setSaveFeedback("Add at least one valid package item first.");
       return;
@@ -910,7 +916,7 @@ function CreateInvoiceWorkspace({
     }
 
     clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
-    const normalizedItems = normalizeInvoiceDraftItems(items);
+    const normalizedItems = normalizeInvoiceDraftItems(values.items);
     if (normalizedItems.length === 0) {
       setSaveFeedback("Add at least one valid package item first.");
       return;
@@ -1408,7 +1414,8 @@ function CreateInvoiceWorkspace({
                 </thead>
 
                 <tbody className="divide-y divide-outline-variant/15">
-                  {items.map((item, index) => {
+                  {itemFields.map((itemField, index) => {
+                    const item = items[index] ?? itemField;
                     const lineSubtotal = Math.max(0, item.pax) * Math.max(0, item.unitPrice);
                     const lineSubtotalIdr = convertToIdr({
                       amount: lineSubtotal,
@@ -1421,7 +1428,7 @@ function CreateInvoiceWorkspace({
                         ? "-"
                         : `${item.currency} ${formatNumberInput(lineSubtotal)}`;
                     return (
-                      <tr key={item.id} className="transition hover:bg-surface-container-low/45">
+                      <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
                         <td className="px-5 py-3 text-xs font-bold text-on-surface">
                           {String(index + 1).padStart(2, "0")}
                         </td>
@@ -1430,9 +1437,7 @@ function CreateInvoiceWorkspace({
                             type="text"
                             className="w-full border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0"
                             value={item.description}
-                            onChange={(event) =>
-                              updateItem(item.id, "description", event.target.value)
-                            }
+                            onChange={(event) => setValue(`items.${index}.description`, event.target.value)}
                           />
                         </td>
                         <td className="px-5 py-3">
@@ -1442,9 +1447,8 @@ function CreateInvoiceWorkspace({
                             className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
                             value={item.pax}
                             onChange={(event) =>
-                              updateItem(
-                                item.id,
-                                "pax",
+                              setValue(
+                                `items.${index}.pax`,
                                 Math.max(0, Number.parseInt(event.target.value || "0", 10)),
                               )
                             }
@@ -1456,7 +1460,7 @@ function CreateInvoiceWorkspace({
                               className="serene-select h-auto min-w-[72px] border-none bg-transparent p-0 text-xs font-bold text-on-surface shadow-none"
                               value={item.currency}
                               onChange={(event) =>
-                                updateItem(item.id, "currency", event.target.value as InvoiceDraftCurrency)
+                                setValue(`items.${index}.currency`, event.target.value as InvoiceDraftCurrency)
                               }
                             >
                               <option value="IDR">IDR</option>
@@ -1468,7 +1472,7 @@ function CreateInvoiceWorkspace({
                               className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
                               value={formatNumberInput(item.unitPrice)}
                               onChange={(event) =>
-                                updateItem(item.id, "unitPrice", parseNumberInput(event.target.value))
+                                setValue(`items.${index}.unitPrice`, parseNumberInput(event.target.value))
                               }
                             />
                           </div>
@@ -1484,7 +1488,7 @@ function CreateInvoiceWorkspace({
                             type="button"
                             className="inline-flex h-7 w-7 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
                             aria-label={`Delete row ${index + 1}`}
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(index)}
                           >
                             <span className="material-symbols-outlined text-base" aria-hidden="true">
                               delete
