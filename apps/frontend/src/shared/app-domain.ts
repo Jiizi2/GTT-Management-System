@@ -37,6 +37,7 @@ export type NavId =
   | "invoice"
   | "raudhah-reminder"
   | "user-management"
+  | "master-data"
   | "profile";
 
 export type NavItem = {
@@ -1322,6 +1323,71 @@ export const saudiCityOptions = [
   "Qassim",
 ] as const;
 
+const SAUDI_CITY_OPTIONS_STORAGE_KEY = "gtt-master-saudi-city-options-v1";
+
+function normalizeSaudiCityOptionsList(options: readonly string[]): string[] {
+  return Array.from(
+    new Set(
+      options
+        .map((city) => city.trim())
+        .filter((city) => city.length > 0),
+    ),
+  );
+}
+
+function readPersistedSaudiCityOptions(): string[] | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const runtimeOptions = (window as { __GTT_SAUDI_CITY_OPTIONS__?: unknown }).__GTT_SAUDI_CITY_OPTIONS__;
+  if (Array.isArray(runtimeOptions)) {
+    const normalizedRuntime = normalizeSaudiCityOptionsList(runtimeOptions.filter((entry): entry is string => typeof entry === "string"));
+    if (normalizedRuntime.length > 0) {
+      return normalizedRuntime;
+    }
+  }
+
+  try {
+    const rawStorageValue = window.localStorage.getItem(SAUDI_CITY_OPTIONS_STORAGE_KEY);
+    if (!rawStorageValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawStorageValue) as unknown;
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+
+    const normalizedStored = normalizeSaudiCityOptionsList(parsed.filter((entry): entry is string => typeof entry === "string"));
+    return normalizedStored.length > 0 ? normalizedStored : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getSaudiCityOptions(): string[] {
+  return readPersistedSaudiCityOptions() ?? [...saudiCityOptions];
+}
+
+export function registerSaudiCityOptions(options: readonly string[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalized = normalizeSaudiCityOptionsList(options);
+  if (normalized.length === 0) {
+    return;
+  }
+
+  (window as { __GTT_SAUDI_CITY_OPTIONS__?: string[] }).__GTT_SAUDI_CITY_OPTIONS__ = normalized;
+  try {
+    window.localStorage.setItem(SAUDI_CITY_OPTIONS_STORAGE_KEY, JSON.stringify(normalized));
+  } catch {
+    // Ignore storage write errors.
+  }
+}
+
 export const OVERVIEW_PAGE_SIZE = 9;
 export const CHECKLIST_PAGE_SIZE = 6;
 export const VISA_PAGE_SIZE = 15;
@@ -1703,7 +1769,7 @@ export function detectCityFromText(rawValue: string): string {
     return "";
   }
 
-  const foundCity = saudiCityOptions.find((city) => normalized.includes(city.toLowerCase()));
+  const foundCity = getSaudiCityOptions().find((city) => normalized.includes(city.toLowerCase()));
   return foundCity ?? "";
 }
 
@@ -1731,7 +1797,7 @@ export function normalizeSaudiCityValue(rawValue: string): string {
     return "";
   }
 
-  const matchedCity = saudiCityOptions.find(
+  const matchedCity = getSaudiCityOptions().find(
     (city) => city.toLowerCase() === trimmedValue.toLowerCase(),
   );
   return matchedCity ?? "";

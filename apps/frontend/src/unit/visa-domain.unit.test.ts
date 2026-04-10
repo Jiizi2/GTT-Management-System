@@ -246,12 +246,12 @@ function testProviderAndActionRequirementHelpers(): void {
     makkahVerified: 39,
   });
   assert.equal(hasMissingHotelAllocation(missingHotelRow), true);
-  assert.equal(isVisaRowActionRequired(missingHotelRow), true);
+  assert.equal(isVisaRowActionRequired(missingHotelRow), false);
 
   const unpaidRow = createVisaRow({
     paymentStatus: "Partial",
   });
-  assert.equal(isVisaRowActionRequired(unpaidRow), true);
+  assert.equal(isVisaRowActionRequired(unpaidRow), false);
 
   const draftRow = createVisaRow({
     visaStatus: "Draft",

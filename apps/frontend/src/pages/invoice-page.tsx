@@ -15,6 +15,7 @@ import {
   fetchInvoicesFromBackend,
   updateInvoiceInBackend,
 } from "../hooks/use-invoice-backend";
+import { fetchMasterDataOptionsFromBackend } from "../hooks/use-master-data-backend";
 import { exportInvoicePdf } from "./invoice-export";
 
 const INVOICE_PAGE_SIZE = 8;
@@ -26,6 +27,16 @@ type InvoiceClientOption = BackendInvoiceClient;
 
 type DueMonthOption = {
   value: string;
+  label: string;
+};
+
+type SelectOption = {
+  value: string;
+  label: string;
+};
+
+type InvoiceStatusOption = {
+  value: InvoiceStatus;
   label: string;
 };
 
@@ -52,11 +63,23 @@ type InvoiceWorkspaceInitialData = {
   status: InvoiceStatus;
 };
 
-const bankAccountOptions = [
+const defaultBankDisbursementOptions: SelectOption[] = [
   { value: "bsi", label: "Mandiri Syariah (BSI) - 7088 1234 5678" },
   { value: "bca", label: "BCA (IDR) - 035 123 4455" },
   { value: "bca_usd", label: "BCA (USD) - 035 998 7766" },
-] as const;
+];
+
+const defaultIssuingOfficeOptions: SelectOption[] = [
+  { value: "Bekasi Office", label: "Bekasi Office" },
+  { value: "Jakarta HQ", label: "Jakarta HQ" },
+];
+
+const defaultInvoiceStatusOptions: InvoiceStatusOption[] = [
+  { value: "Pending", label: "Pending" },
+  { value: "Paid", label: "Paid" },
+  { value: "Overdue", label: "Overdue" },
+  { value: "Cancelled", label: "Cancelled" },
+];
 
 const packageBaseRateMap: Array<{
   keyword: string;
@@ -294,8 +317,49 @@ function createEmptyDraftItems(): InvoiceDraftItem[] {
   ];
 }
 
-function resolveBankAccountLabel(value: string): string {
-  return bankAccountOptions.find((option) => option.value === value)?.label ?? value;
+function mapMasterDataToSelectOptions(options: Array<{ value: string; label: string; isActive: boolean }>): SelectOption[] {
+  return options
+    .filter((option) => option.isActive)
+    .map((option) => ({
+      value: option.value.trim(),
+      label: option.label.trim() || option.value.trim(),
+    }))
+    .filter((option) => option.value.length > 0);
+}
+
+function mapMasterDataToInvoiceStatusOptions(
+  options: Array<{ value: string; label: string; isActive: boolean }>,
+): InvoiceStatusOption[] {
+  const allowedStatuses = new Set<InvoiceStatus>(["Pending", "Paid", "Overdue", "Cancelled"]);
+  return mapMasterDataToSelectOptions(options)
+    .filter((option): option is { value: InvoiceStatus; label: string } =>
+      allowedStatuses.has(option.value as InvoiceStatus),
+    )
+    .sort(
+      (left, right) =>
+        defaultInvoiceStatusOptions.findIndex((option) => option.value === left.value) -
+        defaultInvoiceStatusOptions.findIndex((option) => option.value === right.value),
+    );
+}
+
+function mapMasterDataToClientSuggestions(
+  options: Array<{ label: string; isActive: boolean }>,
+): string[] {
+  return Array.from(
+    new Set(
+      options
+        .filter((option) => option.isActive)
+        .map((option) => option.label.trim())
+        .filter((label) => label.length > 0),
+    ),
+  );
+}
+
+function resolveBankAccountLabel(
+  value: string,
+  options: ReadonlyArray<SelectOption> = defaultBankDisbursementOptions,
+): string {
+  return options.find((option) => option.value === value)?.label ?? value;
 }
 
 function sortInvoiceRows(rows: InvoiceRow[]): InvoiceRow[] {
@@ -417,6 +481,10 @@ function CreateInvoiceWorkspace({
   mode,
   initialInvoice,
   clients,
+  issuingOfficeOptions,
+  invoiceStatusOptions,
+  bankDisbursementOptions,
+  manualClientNameSuggestions,
   groups,
   existingInvoiceNumbers,
   isBackendAvailable,
@@ -427,6 +495,10 @@ function CreateInvoiceWorkspace({
   mode: "create" | "edit";
   initialInvoice?: InvoiceWorkspaceInitialData | null;
   clients: InvoiceClientOption[];
+  issuingOfficeOptions: SelectOption[];
+  invoiceStatusOptions: InvoiceStatusOption[];
+  bankDisbursementOptions: SelectOption[];
+  manualClientNameSuggestions: string[];
   groups: GroupData[];
   existingInvoiceNumbers: string[];
   isBackendAvailable: boolean;
@@ -443,9 +515,11 @@ function CreateInvoiceWorkspace({
     () => resolvedInitialInvoice?.dueDateIso ?? "",
   );
   const [invoiceStatus, setInvoiceStatus] = useState<InvoiceStatus | "">(
-    () => resolvedInitialInvoice?.status ?? "",
+    () => resolvedInitialInvoice?.status ?? (isEditMode ? invoiceStatusOptions[0]?.value ?? "" : ""),
   );
-  const [issuingOffice, setIssuingOffice] = useState(() => (isEditMode ? "Bekasi Office" : ""));
+  const [issuingOffice, setIssuingOffice] = useState(
+    () => (isEditMode ? issuingOfficeOptions[0]?.value ?? "" : ""),
+  );
   const [selectedClientId, setSelectedClientId] = useState(
     () => resolvedInitialInvoice?.clientId ?? "",
   );
@@ -484,7 +558,9 @@ function CreateInvoiceWorkspace({
   const [address, setAddress] = useState(
     () => resolvedInitialInvoice?.clientName ?? "",
   );
-  const [bankAccount, setBankAccount] = useState(() => (isEditMode ? "bsi" : ""));
+  const [bankAccount, setBankAccount] = useState(
+    () => (isEditMode ? bankDisbursementOptions[0]?.value ?? "" : ""),
+  );
   const [usdToIdr, setUsdToIdr] = useState(15_845);
   const [sarToIdr, setSarToIdr] = useState(4_225);
   const [notes, setNotes] = useState("");
@@ -522,6 +598,30 @@ function CreateInvoiceWorkspace({
       setAddress(selectedClient.name);
     }
   }, [selectedClient, selectedGroupCode, isEditMode, isManualClientSelected, address]);
+
+  useEffect(() => {
+    if (!isEditMode || issuingOffice.trim() || issuingOfficeOptions.length === 0) {
+      return;
+    }
+
+    setIssuingOffice(issuingOfficeOptions[0].value);
+  }, [isEditMode, issuingOffice, issuingOfficeOptions]);
+
+  useEffect(() => {
+    if (!isEditMode || invoiceStatus || invoiceStatusOptions.length === 0) {
+      return;
+    }
+
+    setInvoiceStatus(invoiceStatusOptions[0].value);
+  }, [isEditMode, invoiceStatus, invoiceStatusOptions]);
+
+  useEffect(() => {
+    if (!isEditMode || bankAccount.trim() || bankDisbursementOptions.length === 0) {
+      return;
+    }
+
+    setBankAccount(bankDisbursementOptions[0].value);
+  }, [isEditMode, bankAccount, bankDisbursementOptions]);
 
   useEffect(() => {
     if (!saveFeedback) {
@@ -790,7 +890,7 @@ function CreateInvoiceWorkspace({
         clientName: savedInvoice.clientName,
         clientCode: linkedGroupCode || savedInvoice.groupCode || savedInvoice.clientLabel,
         address: address.trim(),
-        bankAccountLabel: resolveBankAccountLabel(bankAccount),
+        bankAccountLabel: resolveBankAccountLabel(bankAccount, bankDisbursementOptions),
         notes: notes.trim(),
         usdToIdr,
         sarToIdr,
@@ -996,8 +1096,11 @@ function CreateInvoiceWorkspace({
                     onChange={(event) => setIssuingOffice(event.target.value)}
                   >
                     <option value="">Select office</option>
-                    <option value="Bekasi Office">Bekasi Office</option>
-                    <option value="Jakarta HQ">Jakarta HQ</option>
+                    {issuingOfficeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </SereneSelect>
                 </label>
 
@@ -1011,10 +1114,11 @@ function CreateInvoiceWorkspace({
                     onChange={(event) => setInvoiceStatus(event.target.value as InvoiceStatus | "")}
                   >
                     <option value="">Select status</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Paid">Paid</option>
-                    <option value="Overdue">Overdue</option>
-                    <option value="Cancelled">Cancelled</option>
+                    {invoiceStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </SereneSelect>
                 </label>
               </div>
@@ -1064,8 +1168,16 @@ function CreateInvoiceWorkspace({
                       className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
                       value={manualClientName}
                       onChange={(event) => setManualClientName(event.target.value)}
+                      list="invoice-manual-client-suggestions"
                       placeholder="Type client name..."
                     />
+                    {manualClientNameSuggestions.length > 0 ? (
+                      <datalist id="invoice-manual-client-suggestions">
+                        {manualClientNameSuggestions.map((suggestion) => (
+                          <option key={suggestion} value={suggestion} />
+                        ))}
+                      </datalist>
+                    ) : null}
                   </label>
                 ) : null}
 
@@ -1256,7 +1368,7 @@ function CreateInvoiceWorkspace({
                     onChange={(event) => setBankAccount(event.target.value)}
                   >
                     <option value="">Select bank account</option>
-                    {bankAccountOptions.map((option) => (
+                    {bankDisbursementOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -1485,6 +1597,16 @@ export function InvoiceScreen({
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
   const [invoiceClients, setInvoiceClients] = useState<InvoiceClientOption[]>([]);
+  const [issuingOfficeOptions, setIssuingOfficeOptions] = useState<SelectOption[]>(
+    defaultIssuingOfficeOptions,
+  );
+  const [invoiceStatusOptions, setInvoiceStatusOptions] = useState<InvoiceStatusOption[]>(
+    defaultInvoiceStatusOptions,
+  );
+  const [bankDisbursementOptions, setBankDisbursementOptions] = useState<SelectOption[]>(
+    defaultBankDisbursementOptions,
+  );
+  const [manualClientNameSuggestions, setManualClientNameSuggestions] = useState<string[]>([]);
   const [isInvoiceBackendAvailable, setIsInvoiceBackendAvailable] = useState(false);
   const [isInvoiceDataLoading, setIsInvoiceDataLoading] = useState(true);
   const [listFeedback, setListFeedback] = useState<string | null>(null);
@@ -1497,11 +1619,59 @@ export function InvoiceScreen({
       fetchInvoiceBackendDataSource({ signal: controller.signal }),
       fetchInvoiceClientsFromBackend({ signal: controller.signal }),
       fetchInvoicesFromBackend({ signal: controller.signal }),
+      fetchMasterDataOptionsFromBackend({
+        categoryKey: "invoice-issuing-office",
+        signal: controller.signal,
+      }),
+      fetchMasterDataOptionsFromBackend({
+        categoryKey: "invoice-status",
+        signal: controller.signal,
+      }),
+      fetchMasterDataOptionsFromBackend({
+        categoryKey: "bank-disbursement",
+        signal: controller.signal,
+      }),
+      fetchMasterDataOptionsFromBackend({
+        categoryKey: "invoice-client-name",
+        signal: controller.signal,
+      }),
     ])
-      .then(([invoiceDataSource, clientRows, invoiceRowsResponse]) => {
+      .then(
+        ([
+          invoiceDataSource,
+          clientRows,
+          invoiceRowsResponse,
+          issuingOfficeRows,
+          invoiceStatusRows,
+          bankDisbursementRows,
+          invoiceClientNameRows,
+        ]) => {
         if (controller.signal.aborted) {
           return;
         }
+
+        const nextIssuingOfficeOptions = mapMasterDataToSelectOptions(issuingOfficeRows).map(
+          (option) => ({
+            value: option.label,
+            label: option.label,
+          }),
+        );
+        const nextInvoiceStatusOptions = mapMasterDataToInvoiceStatusOptions(invoiceStatusRows);
+        const nextBankDisbursementOptions = mapMasterDataToSelectOptions(bankDisbursementRows);
+        const nextManualClientSuggestions = mapMasterDataToClientSuggestions(invoiceClientNameRows);
+
+        setIssuingOfficeOptions(
+          nextIssuingOfficeOptions.length > 0 ? nextIssuingOfficeOptions : defaultIssuingOfficeOptions,
+        );
+        setInvoiceStatusOptions(
+          nextInvoiceStatusOptions.length > 0 ? nextInvoiceStatusOptions : defaultInvoiceStatusOptions,
+        );
+        setBankDisbursementOptions(
+          nextBankDisbursementOptions.length > 0
+            ? nextBankDisbursementOptions
+            : defaultBankDisbursementOptions,
+        );
+        setManualClientNameSuggestions(nextManualClientSuggestions);
 
         if (invoiceDataSource !== "prisma") {
           setInvoiceClients([]);
@@ -1522,7 +1692,8 @@ export function InvoiceScreen({
             ? "Backend invoice terhubung, tetapi daftar client invoice masih kosong. Jalankan seed database lalu refresh halaman."
             : null,
         );
-      })
+        },
+      )
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return;
@@ -1530,6 +1701,10 @@ export function InvoiceScreen({
 
         setInvoiceClients([]);
         setInvoiceRows([]);
+        setIssuingOfficeOptions(defaultIssuingOfficeOptions);
+        setInvoiceStatusOptions(defaultInvoiceStatusOptions);
+        setBankDisbursementOptions(defaultBankDisbursementOptions);
+        setManualClientNameSuggestions([]);
         setIsInvoiceBackendAvailable(false);
         setListFeedback(
           "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.",
@@ -1605,10 +1780,6 @@ export function InvoiceScreen({
         ? 100
         : 0;
   const monthlyGrowthLabel = `${monthlyGrowth >= 0 ? "+" : ""}${monthlyGrowth.toFixed(1)}%`;
-  const selectedMonthLabel =
-    dueMonthFilter === "all"
-      ? "All Due Months"
-      : dueMonthOptions.find((option) => option.value === dueMonthFilter)?.label ?? dueMonthFilter;
   const dueDateRangeLabel =
     dueMonthFilter === "all"
       ? resolveDateRangeLabel(invoiceRows)
@@ -1670,6 +1841,10 @@ export function InvoiceScreen({
         mode="create"
         initialInvoice={null}
         clients={invoiceClients}
+        issuingOfficeOptions={issuingOfficeOptions}
+        invoiceStatusOptions={invoiceStatusOptions}
+        bankDisbursementOptions={bankDisbursementOptions}
+        manualClientNameSuggestions={manualClientNameSuggestions}
         groups={groups}
         isBackendAvailable={isInvoiceBackendAvailable}
         existingInvoiceNumbers={invoiceRows.map((row) => row.invoiceNumber)}
@@ -1707,6 +1882,10 @@ export function InvoiceScreen({
         mode="edit"
         initialInvoice={editingInvoice}
         clients={invoiceClients}
+        issuingOfficeOptions={issuingOfficeOptions}
+        invoiceStatusOptions={invoiceStatusOptions}
+        bankDisbursementOptions={bankDisbursementOptions}
+        manualClientNameSuggestions={manualClientNameSuggestions}
         groups={groups}
         isBackendAvailable={isInvoiceBackendAvailable}
         existingInvoiceNumbers={invoiceRows.map((row) => row.invoiceNumber)}
@@ -1778,32 +1957,6 @@ export function InvoiceScreen({
 
           <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary sm:hidden" />
         </div>
-
-        <button
-          type="button"
-          className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-cta-soft transition sm:ml-auto ${
-            isInvoiceBackendAvailable
-              ? "bg-primary hover:bg-primary-container"
-              : "cursor-not-allowed bg-slate-300"
-          }`}
-          aria-label="Create new invoice"
-          disabled={!isInvoiceBackendAvailable}
-          onClick={() => {
-            setEditingInvoice(null);
-            setWorkspaceMode("create");
-          }}
-          title={
-            isInvoiceBackendAvailable
-              ? undefined
-              : "Backend invoice/database belum terhubung, invoice belum bisa disimpan."
-          }
-        >
-          <span className="material-symbols-outlined text-base" aria-hidden="true">
-            add
-          </span>
-          <span className="sm:hidden">New</span>
-          <span className="hidden sm:inline">New Invoice</span>
-        </button>
       </header>
 
       <section className="space-y-2">
@@ -1818,17 +1971,35 @@ export function InvoiceScreen({
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/45 bg-surface-container-low px-3 py-1.5 text-xs font-bold leading-none text-on-surface-variant">
-            <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">
-              calendar_month
+          <button
+            type="button"
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-cta-soft transition ${
+              isInvoiceBackendAvailable
+                ? "bg-primary hover:bg-primary-container"
+                : "cursor-not-allowed bg-slate-300"
+            }`}
+            aria-label="Create new invoice"
+            disabled={!isInvoiceBackendAvailable}
+            onClick={() => {
+              setEditingInvoice(null);
+              setWorkspaceMode("create");
+            }}
+            title={
+              isInvoiceBackendAvailable
+                ? undefined
+                : "Backend invoice/database belum terhubung, invoice belum bisa disimpan."
+            }
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              add
             </span>
-            <span>{selectedMonthLabel}</span>
-          </div>
+            <span>New Invoice</span>
+          </button>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
-        <article className="rounded-2xl bg-surface-container-low p-4 shadow-ambient sm:p-5">
+        <article className="rounded-2xl border border-outline-variant/45 bg-surface-container-low p-4 shadow-ambient sm:p-5">
           <div className="grid gap-4 md:grid-cols-[1fr_0.9fr_auto] md:items-end">
             <label className="space-y-1">
               <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">

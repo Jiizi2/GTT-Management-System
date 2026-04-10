@@ -129,6 +129,46 @@ function resolveBankMeta(bankAccountLabel: string): {
   };
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function resolveBillToName(payload: InvoiceExportPayload): string {
+  const normalizedClientName = payload.clientName.trim();
+  const normalizedClientCode = payload.clientCode.trim();
+
+  if (!normalizedClientName) {
+    return normalizedClientCode || "Umrah Corporate";
+  }
+
+  if (normalizedClientCode) {
+    const strictCodePrefixPattern = new RegExp(
+      `^${escapeRegex(normalizedClientCode)}\\s*[-:|]\\s*`,
+      "i",
+    );
+    const looseCodePrefixPattern = new RegExp(
+      `^${escapeRegex(normalizedClientCode)}\\s+`,
+      "i",
+    );
+    const withoutCodePrefix = normalizedClientName
+      .replace(strictCodePrefixPattern, "")
+      .replace(looseCodePrefixPattern, "")
+      .trim();
+    if (withoutCodePrefix) {
+      return withoutCodePrefix;
+    }
+  }
+
+  const withoutNumericLabel = normalizedClientName.replace(/^\d+\.\s*/, "").trim();
+  const genericCodePrefixPattern = /^[A-Z0-9]{2,}(?:[-_/][A-Z0-9]{2,})*\s*[-:|]\s*/i;
+  const genericDigitCodePrefixPattern = /^[A-Z0-9._/-]*\d[A-Z0-9._/-]*\s*[-:|.]?\s+/i;
+  const cleanedName = withoutNumericLabel
+    .replace(genericCodePrefixPattern, "")
+    .replace(genericDigitCodePrefixPattern, "")
+    .trim();
+  return cleanedName || withoutNumericLabel || normalizedClientName;
+}
+
 function resolvePrintableWindow(options: InvoiceExportWindowOptions): Window | null {
   const reusableWindow = options.printWindow;
   if (reusableWindow && !reusableWindow.closed) {
@@ -183,6 +223,7 @@ export function exportInvoicePdf(
   const statusLabel = resolvePaymentStatusLabel(payload);
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
+  const billToName = resolveBillToName(payload);
 
   const rowsHtml = payload.items
     .map(
@@ -210,10 +251,6 @@ export function exportInvoicePdf(
   const notesHtml = payload.notes.trim()
     ? escapeHtml(payload.notes).replace(/\n/g, "<br/>")
     : "Thank you for choosing Ghaniya Tour and Travel for your spiritual pilgrimage. We look forward to serving your group.";
-
-  const billToDescription = payload.address.trim()
-    ? escapeHtml(payload.address)
-    : "Authorized Travel Partner for Sacred Journeys and Spiritual Management.";
 
   const printableHtml = `<!DOCTYPE html>
 <html lang="en"><head>
@@ -280,10 +317,6 @@ export function exportInvoicePdf(
                 border-top: 2px solid var(--invoice-gold) !important;
                 box-shadow: none !important;
             }
-            .invoice-status-badge {
-                background-color: var(--invoice-black) !important;
-                color: var(--invoice-gold) !important;
-            }
             .invoice-total-due-label {
                 color: var(--invoice-gold) !important;
             }
@@ -317,18 +350,10 @@ export function exportInvoicePdf(
                 line-height: 1 !important;
                 margin-bottom: 4mm !important;
             }
-            .invoice-bill-to-label {
-                font-size: 8px !important;
-                letter-spacing: 0.18em !important;
-            }
             .invoice-bill-to-name {
-                font-size: 1.35rem !important;
-                line-height: 1.15 !important;
-            }
-            .invoice-bill-to-description {
-                font-size: 10px !important;
+                font-size: 1.1rem !important;
                 line-height: 1.4 !important;
-                max-width: none !important;
+                letter-spacing: 0.08em !important;
             }
             .invoice-meta-card {
                 padding: 5mm !important;
@@ -421,20 +446,19 @@ export function exportInvoicePdf(
             border-top: 2px solid var(--invoice-gold) !important;
             box-shadow: none !important;
         }
-        .invoice-status-label,
-        .invoice-status-badge,
         .invoice-section-accent,
         .invoice-accent-icon {
             color: var(--invoice-gold) !important;
+        }
+        .invoice-status-label,
+        .invoice-status-value {
+            color: var(--invoice-ink) !important;
         }
         .invoice-total-due-label {
             color: var(--invoice-gold) !important;
         }
         .invoice-total-due-value {
             color: var(--invoice-ink) !important;
-        }
-        .invoice-status-badge {
-            background-color: var(--invoice-black) !important;
         }
         .invoice-footer {
             border-top: 2px solid var(--invoice-gold) !important;
@@ -469,9 +493,7 @@ export function exportInvoicePdf(
 <div class="col-span-7">
 <h1 class="invoice-main-title font-headline text-6xl font-extrabold text-luxury-black tracking-tighter mb-6">INVOICE</h1>
 <div class="space-y-1">
-<p class="invoice-bill-to-label text-stone-400 text-xs uppercase tracking-widest font-bold">Bill To:</p>
-<h2 class="invoice-bill-to-name text-2xl font-bold text-luxury-black">${escapeHtml(payload.clientName)}</h2>
-<p class="invoice-bill-to-description text-stone-600 text-sm max-w-xs leading-relaxed">${billToDescription}</p>
+<h2 class="invoice-bill-to-name text-xl font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
 </div>
 </div>
 <div class="invoice-meta-card col-span-5 bg-stone-50 p-8 border-t-2 border-luxury-black space-y-4">
@@ -486,7 +508,7 @@ export function exportInvoicePdf(
 <div class="pt-4 border-t border-stone-200">
 <div class="flex justify-between items-center">
 <span class="invoice-status-label font-bold text-[10px] uppercase tracking-widest">Status</span>
-<span class="invoice-status-badge px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest">${escapeHtml(statusLabel)}</span>
+<span class="invoice-status-value text-[10px] font-bold uppercase tracking-widest">${escapeHtml(statusLabel)}</span>
 </div>
 </div>
 </div>
@@ -570,13 +592,8 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
 <p class="invoice-section-accent text-[9px] font-bold uppercase tracking-widest mt-1">${escapeHtml(companyProfile.directorTitle)}</p>
 </div>
 </section>
-<footer class="invoice-footer flex justify-between items-center w-full px-12 py-8 mt-auto luxury-gradient border-t-2 border-gold-primary">
-<span class="invoice-footer-muted font-inter text-[8pt] uppercase tracking-[0.2em]">© 2024 Ghaniya Tour | Spiritual Journey Management</span>
-<div class="flex gap-8">
-<span class="font-inter text-[8pt] uppercase tracking-[0.15em]">Terms of Service</span>
-<span class="font-inter text-[8pt] uppercase tracking-[0.15em]">Bank Info</span>
-<span class="font-inter text-[8pt] uppercase tracking-[0.15em]">Support</span>
-</div>
+<footer class="invoice-footer flex justify-center items-center w-full px-12 py-8 mt-auto luxury-gradient border-t-2 border-gold-primary">
+<span class="invoice-footer-muted font-inter text-[8pt] uppercase tracking-[0.2em]">© 2026 Ghaniya Tour</span>
 </footer>
 </div>
 <button class="no-print fixed bottom-8 right-8 bg-luxury-black text-gold-primary w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform border border-gold-primary/30" onclick="window.print()">

@@ -35,6 +35,7 @@ import {
   buildAgreementItineraryPrefill,
   buildNewGroupPayload,
 } from "./new-group-screen-helpers";
+import { useSaudiCityOptions } from "../hooks/use-saudi-city-options";
 const {
   createInitialInputItineraryForm,
   expandInputTransferTrainItems,
@@ -56,7 +57,7 @@ const {
   resolveGroupToneByItinerary,
   resolveTotalBusCount,
   resolveVisaAgreementNumber,
-  saudiCityOptions,
+  saudiCityOptions: defaultSaudiCityOptions,
   scheduleTypeOptions,
   shiftIsoDate,
   shouldShowFridayCityTourWarning,
@@ -84,6 +85,7 @@ export function InputItineraryScreen({
   emitIdentityInDraft?: boolean;
   itineraryPrefill?: ItineraryPrefill | null;
 }) {
+  const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const [groupNumber, setGroupNumber] = useState("");
   const [groupName, setGroupName] = useState("");
   const [packageType, setPackageType] = useState("");
@@ -746,46 +748,46 @@ export function InputItineraryScreen({
   const transferTrainCardClassName = "md:col-span-2 rounded-2xl bg-surface-container-high p-3";
   const transferTrainGridClassName = "mt-2 grid gap-3 md:grid-cols-2";
   const itineraryTagClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-100 text-emerald-800",
-    transfer: "border-slate-300 bg-slate-100 text-slate-700",
-    "city-tour": "border-amber-200 bg-amber-100 text-amber-800",
-    departure: "border-rose-200 bg-rose-100 text-rose-700",
+    arrival: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    transfer: "border-slate-200 bg-slate-50 text-slate-700",
+    "city-tour": "border-amber-200 bg-amber-50 text-amber-700",
+    departure: "border-rose-200 bg-rose-50 text-rose-700",
   };
   const itineraryCardClassMap: Record<string, string> = {
-    arrival: "border-emerald-100 bg-emerald-50/60",
-    transfer: "border-slate-200 bg-slate-50",
-    "city-tour": "border-amber-100 bg-amber-50/60",
-    departure: "border-rose-100 bg-rose-50/60",
+    arrival: "border-emerald-200 bg-emerald-50/60",
+    transfer: "border-slate-200 bg-slate-50/70",
+    "city-tour": "border-amber-200 bg-amber-50/60",
+    departure: "border-rose-200 bg-rose-50/60",
   };
   const activityTypeCardClassMap: Record<string, string> = {
-    arrival: "border-emerald-100 bg-emerald-50/60",
-    transfer: "border-slate-200 bg-slate-50",
-    "city-tour": "border-amber-100 bg-amber-50/60",
-    departure: "border-rose-100 bg-rose-50/60",
+    arrival: "border-emerald-200 bg-emerald-50/60",
+    transfer: "border-slate-200 bg-slate-50/70",
+    "city-tour": "border-amber-200 bg-amber-50/60",
+    departure: "border-rose-200 bg-rose-50/60",
   };
   const activityTypeBannerClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-100 text-emerald-800",
-    transfer: "border-slate-300 bg-slate-100 text-slate-700",
-    "city-tour": "border-amber-200 bg-amber-100 text-amber-800",
-    departure: "border-rose-200 bg-rose-100 text-rose-700",
+    arrival: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    transfer: "border-slate-200 bg-slate-50 text-slate-700",
+    "city-tour": "border-amber-200 bg-amber-50 text-amber-700",
+    departure: "border-rose-200 bg-rose-50 text-rose-700",
   };
   const activityTypeTitleClassMap: Record<string, string> = {
-    arrival: "text-emerald-800",
-    transfer: "text-slate-800",
-    "city-tour": "text-amber-800",
-    departure: "text-rose-800",
+    arrival: "text-emerald-700",
+    transfer: "text-slate-700",
+    "city-tour": "text-amber-700",
+    departure: "text-rose-700",
   };
   const activityTypeBadgeClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-100 text-emerald-800",
-    transfer: "border-slate-300 bg-slate-100 text-slate-700",
-    "city-tour": "border-amber-200 bg-amber-100 text-amber-800",
-    departure: "border-rose-200 bg-rose-100 text-rose-700",
+    arrival: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    transfer: "border-slate-200 bg-slate-50 text-slate-700",
+    "city-tour": "border-amber-200 bg-amber-50 text-amber-700",
+    departure: "border-rose-200 bg-rose-50 text-rose-700",
   };
   const activityTypeActiveStepClassMap: Record<string, string> = {
-    arrival: "border-emerald-700 bg-emerald-700 text-white",
-    transfer: "border-slate-700 bg-slate-700 text-white",
-    "city-tour": "border-amber-600 bg-amber-500 text-amber-950",
-    departure: "border-rose-700 bg-rose-700 text-white",
+    arrival: "border-emerald-300 bg-emerald-100 text-emerald-800",
+    transfer: "border-slate-300 bg-slate-100 text-slate-800",
+    "city-tour": "border-amber-300 bg-amber-100 text-amber-800",
+    departure: "border-rose-300 bg-rose-100 text-rose-800",
   };
   const activityTypeFocusLabelMap: Record<string, string> = {
     arrival: "Start Trip - Arrival (Paling Penting)",
@@ -1087,100 +1089,99 @@ export function InputItineraryScreen({
                 );
               })
             ) : isBaseTripFormVisible ? (
-          <section className="serene-section space-y-4">
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-4 flex items-start gap-3">
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    route
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Structured 5 Base Trips</h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    <span className="sm:hidden">Isi trip step 1-5. Yang tidak dipakai bisa di-skip.</span>
-                    <span className="hidden sm:inline">
-                      Isi trip secara bertahap dari step 1 sampai 5. Trip yang tidak dipakai bisa di-skip.
-                    </span>
-                  </p>
-                </div>
-              </div>
-
               <div className="space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-800">
-                      Step {currentBaseTripStepIndex + 1} of {baseTripDrafts.length || 5}
-                    </p>
-                    {activeBaseTrip ? (
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
-                          activityTypeBadgeClassMap[activeBaseTrip.category] ??
-                          "border-slate-300 bg-slate-50 text-slate-700"
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                          {getScheduleTypeOption(activeBaseTrip.category).icon}
-                        </span>
-                        <span>
-                          {activeBaseTrip.title} - {enabledBaseTripCount} trip dipakai
-                        </span>
-                      </span>
-                    ) : null}
+                <div className="flex items-start gap-3 rounded-xl bg-slate-50 px-3 py-3">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      route
+                    </span>
                   </div>
-
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Activity type per trip
-                  </p>
-
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                    {baseTripDrafts.map((trip, index) => {
-                      const isCurrentStep = index === currentBaseTripStepIndex;
-                      const isDisabledStep = !trip.isEnabled;
-                      const isCompletedStep = !isBaseTripDraftInvalid(trip);
-                      const stepToneClass =
-                        activityTypeBadgeClassMap[trip.category] ??
-                        "border-slate-300 bg-white text-slate-600";
-                      const activeStepToneClass =
-                        activityTypeActiveStepClassMap[trip.category] ??
-                        "border-brand-primary bg-brand-primary text-white";
-                      const tripTypeLabel = `${getScheduleTypeOption(trip.category).cardLabel}${
-                        trip.category === "city-tour" ? ` ${index === 1 ? "1" : "2"}` : ""
-                      }`;
-
-                      return (
-                        <button
-                          key={trip.id}
-                          type="button"
-                          className={`inline-flex min-h-12 items-center justify-start gap-2 rounded-xl border-2 px-3 text-left text-sm font-semibold transition ${
-                            isCurrentStep
-                              ? activeStepToneClass
-                              : isDisabledStep
-                                ? "border-slate-200 bg-slate-100 text-slate-400"
-                              : isCompletedStep
-                                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                                : `${stepToneClass} hover:border-brand-primary hover:text-brand-primary`
-                          }`}
-                          onClick={() => handleJumpToBaseTripStep(index)}
-                          disabled={!isGroupReadyForItinerary}
-                          aria-label={`Go to step ${index + 1}`}
-                        >
-                          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-surface-container-lowest px-2 text-xs font-bold text-brand-primary shadow-sm">
-                            {index + 1}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-base" aria-hidden="true">
-                              {getScheduleTypeOption(trip.category).icon}
-                            </span>
-                            <span className="text-xs sm:text-sm">{tripTypeLabel}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Structured 5 Base Trips</h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      <span className="sm:hidden">Isi trip step 1-5. Yang tidak dipakai bisa di-skip.</span>
+                      <span className="hidden sm:inline">
+                        Isi trip secara bertahap dari step 1 sampai 5. Trip yang tidak dipakai bisa di-skip.
+                      </span>
+                    </p>
                   </div>
                 </div>
 
-                {(activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
+                <div className="space-y-4">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800">
+                        Step {currentBaseTripStepIndex + 1} of {baseTripDrafts.length || 5}
+                      </p>
+                      {activeBaseTrip ? (
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
+                            activityTypeBadgeClassMap[activeBaseTrip.category] ??
+                            "border-slate-300 bg-slate-50 text-slate-700"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                            {getScheduleTypeOption(activeBaseTrip.category).icon}
+                          </span>
+                          <span>
+                            {activeBaseTrip.title} - {enabledBaseTripCount} trip dipakai
+                          </span>
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Activity type per trip
+                    </p>
+
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      {baseTripDrafts.map((trip, index) => {
+                        const isCurrentStep = index === currentBaseTripStepIndex;
+                        const isDisabledStep = !trip.isEnabled;
+                        const isCompletedStep = !isBaseTripDraftInvalid(trip);
+                        const stepToneClass =
+                          activityTypeBadgeClassMap[trip.category] ??
+                          "border-slate-300 bg-white text-slate-600";
+                        const activeStepToneClass =
+                          activityTypeActiveStepClassMap[trip.category] ??
+                          "border-brand-primary/40 bg-brand-primary/10 text-brand-primary";
+                        const tripTypeLabel = `${getScheduleTypeOption(trip.category).cardLabel}${
+                          trip.category === "city-tour" ? ` ${index === 1 ? "1" : "2"}` : ""
+                        }`;
+
+                        return (
+                          <button
+                            key={trip.id}
+                            type="button"
+                            className={`inline-flex min-h-12 items-center justify-start gap-2 rounded-xl border-2 px-3 text-left text-sm font-semibold transition ${
+                              isCurrentStep
+                                ? activeStepToneClass
+                                : isDisabledStep
+                                  ? "border-slate-200 bg-slate-100 text-slate-400"
+                                : isCompletedStep
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                                  : `${stepToneClass} hover:border-brand-primary hover:text-brand-primary`
+                            }`}
+                            onClick={() => handleJumpToBaseTripStep(index)}
+                            disabled={!isGroupReadyForItinerary}
+                            aria-label={`Go to step ${index + 1}`}
+                          >
+                            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-surface-container-lowest px-2 text-xs font-bold text-brand-primary shadow-sm">
+                              {index + 1}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                                {getScheduleTypeOption(trip.category).icon}
+                              </span>
+                              <span className="text-xs sm:text-sm">{tripTypeLabel}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {(activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
                   const showFlightNumberInput = isFlightActivityType(item.category);
                   const showHotelNameInput =
                     item.category === "arrival" ||
@@ -1559,65 +1560,64 @@ export function InputItineraryScreen({
                       ) : null}
                     </article>
                   );
-                })}
-              </div>
+                  })}
+                </div>
 
-              <div className="mt-4 space-y-2">
-                <p
-                  className={`text-xs font-medium ${
-                    isActiveBaseTripInvalid ? "text-amber-700" : "text-emerald-700"
-                  }`}
-                >
-                  {enabledBaseTripCount === 0
-                    ? "Pilih minimal 1 trip yang digunakan."
-                    : isActiveBaseTripInvalid
-                      ? "Step aktif belum lengkap. Pastikan tanggal, rute, dan field wajib sudah terisi."
-                      : "Step aktif sudah lengkap."}
-                </p>
+                <div className="space-y-2 rounded-xl bg-slate-50 px-3 py-3">
+                  <p
+                    className={`text-xs font-medium ${
+                      isActiveBaseTripInvalid ? "text-amber-700" : "text-emerald-700"
+                    }`}
+                  >
+                    {enabledBaseTripCount === 0
+                      ? "Pilih minimal 1 trip yang digunakan."
+                      : isActiveBaseTripInvalid
+                        ? "Step aktif belum lengkap. Pastikan tanggal, rute, dan field wajib sudah terisi."
+                        : "Step aktif sudah lengkap."}
+                  </p>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                    <button
-                      type="button"
-                      className="serene-btn-secondary min-h-10 flex-1 sm:flex-none"
-                      onClick={() => handleBaseTripStepChange("previous")}
-                      disabled={!isGroupReadyForItinerary || isFirstBaseTripStep}
-                    >
-                      Previous
-                    </button>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                      <button
+                        type="button"
+                        className="serene-btn-secondary min-h-10 flex-1 sm:flex-none"
+                        onClick={() => handleBaseTripStepChange("previous")}
+                        disabled={!isGroupReadyForItinerary || isFirstBaseTripStep}
+                      >
+                        Previous
+                      </button>
 
-                    <button
-                      type="button"
-                      className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-4 py-2 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
-                      onClick={() => handleBaseTripStepChange("next")}
-                      disabled={!isGroupReadyForItinerary || isLastBaseTripStep}
-                    >
-                      Next
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-4 py-2 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
+                        onClick={() => handleBaseTripStepChange("next")}
+                        disabled={!isGroupReadyForItinerary || isLastBaseTripStep}
+                      >
+                        Next
+                      </button>
+                    </div>
 
-                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                    <button
-                      type="button"
-                      className="serene-btn-primary min-h-10 w-full sm:w-auto"
-                      onClick={handleSaveBaseTrips}
-                      disabled={isBaseTripSaveDisabled}
-                    >
-                      Save 5 Base Trips
-                    </button>
-                    <button
-                      type="button"
-                      className="serene-btn-secondary min-h-10 w-full sm:w-auto"
-                      onClick={handleCloseBaseTripForm}
-                      disabled={!isGroupReadyForItinerary}
-                    >
-                      Cancel
-                    </button>
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                      <button
+                        type="button"
+                        className="serene-btn-primary min-h-10 w-full sm:w-auto"
+                        onClick={handleSaveBaseTrips}
+                        disabled={isBaseTripSaveDisabled}
+                      >
+                        Save 5 Base Trips
+                      </button>
+                      <button
+                        type="button"
+                        className="serene-btn-secondary min-h-10 w-full sm:w-auto"
+                        onClick={handleCloseBaseTripForm}
+                        disabled={!isGroupReadyForItinerary}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </article>
-          </section>
             ) : (
               <article className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-7 text-center">
                 <span className="material-symbols-outlined" aria-hidden="true">

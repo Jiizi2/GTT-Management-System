@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
 import { SereneSelect } from "./serene-select";
+import { useSaudiCityOptions } from "../hooks/use-saudi-city-options";
 import type {
   EditScheduleFormState,
   ItineraryItem,
@@ -17,7 +18,7 @@ const {
   isFlightActivityType,
   isTransferActivityType,
   normalizeSaudiCityValue,
-  saudiCityOptions,
+  saudiCityOptions: defaultSaudiCityOptions,
   scheduleTypeOptions,
 } = Domain;
 
@@ -405,6 +406,7 @@ export function ScheduleModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const showFlightNumberField = isFlightActivityType(form.category);
   const showPrimaryHotelNameField =
     form.category === "arrival" || form.category === "transfer" || form.category === "departure";
@@ -846,6 +848,7 @@ export function EditScheduleModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const showFlightNumberField = isFlightActivityType(form.category);
   const showPrimaryHotelNameField =
     form.category === "arrival" || form.category === "transfer" || form.category === "departure";

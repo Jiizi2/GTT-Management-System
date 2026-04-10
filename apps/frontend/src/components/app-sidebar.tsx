@@ -36,7 +36,10 @@ export function AppSidebar({
   );
   const desktopOnlyAdminItems: Array<{ id: NavId; label: string; icon: string }> =
     sessionAccessTier === "super-admin"
-      ? [{ id: "user-management", label: "User Management", icon: "admin_panel_settings" }]
+      ? [
+          { id: "master-data", label: "Master Data", icon: "dataset" },
+          { id: "user-management", label: "User Management", icon: "admin_panel_settings" },
+        ]
       : [];
   const toolsNavItems = [...utilityNavItems, ...desktopOnlyAdminItems];
 

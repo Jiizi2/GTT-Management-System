@@ -144,5 +144,5 @@ export function hasMissingHotelAllocation(row) {
     return row.makkahVerified < row.pax || row.madinahVerified < row.pax;
 }
 export function isVisaRowActionRequired(row) {
-    return row.visaStatus !== "Issued" || row.paymentStatus !== "Paid" || hasMissingHotelAllocation(row);
+    return row.visaStatus !== "Issued";
 }

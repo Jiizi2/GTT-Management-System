@@ -147,6 +147,10 @@ function resolveDocumentTitle({
     return "GTT | User Management";
   }
 
+  if (activeNav === "master-data") {
+    return "GTT | Master Data";
+  }
+
   if (activeNav === "profile") {
     return "GTT | Operator Profile";
   }
@@ -166,6 +170,7 @@ const resolvePersistedNavId = (value: string | null): NavId => {
     case "invoice":
     case "raudhah-reminder":
     case "user-management":
+    case "master-data":
     case "profile":
       return value;
     case "manage-role":
@@ -673,7 +678,7 @@ export function useAppController(): AppController {
   }, [activeNav, selectedGroup, selectedVisaRow]);
 
   useEffect(() => {
-    if (activeNav !== "user-management") {
+    if (activeNav !== "user-management" && activeNav !== "master-data") {
       return;
     }
 
@@ -705,7 +710,7 @@ export function useAppController(): AppController {
 
   const handleNavigate = (navId: NavId) => {
     const normalizedNavId = navId === "input" ? "new-group" : navId;
-    if (normalizedNavId === "user-management") {
+    if (normalizedNavId === "user-management" || normalizedNavId === "master-data") {
       if (sessionAccessTier !== "super-admin") {
         return;
       }

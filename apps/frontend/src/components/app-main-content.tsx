@@ -26,6 +26,9 @@ const LazyPlaceholderScreen = lazy(async () => ({
 const LazyProfileScreen = lazy(async () => ({
   default: (await import("../pages/profile-page")).ProfileScreen,
 }));
+const LazyMasterDataScreen = lazy(async () => ({
+  default: (await import("../pages/master-data-page")).MasterDataScreen,
+}));
 const LazyRaudhahReminderScreen = lazy(async () => ({
   default: (await import("../pages/raudhah-reminder-page")).RaudhahReminderScreen,
 }));
@@ -184,6 +187,27 @@ export function AppMainContent({
     return (
       <Suspense fallback={<ScreenLoadingFallback />}>
         <LazyUserManagementScreen />
+      </Suspense>
+    );
+  }
+
+  if (controller.activeNav === "master-data") {
+    if (controller.sessionAccessTier !== "super-admin") {
+      return (
+        <Suspense fallback={<ScreenLoadingFallback />}>
+          <LazyPlaceholderScreen
+            eyebrow="Restricted"
+            title="Super Admin Only"
+            description="Master Data hanya tersedia untuk akun Super Admin."
+            icon="lock"
+          />
+        </Suspense>
+      );
+    }
+
+    return (
+      <Suspense fallback={<ScreenLoadingFallback />}>
+        <LazyMasterDataScreen />
       </Suspense>
     );
   }
