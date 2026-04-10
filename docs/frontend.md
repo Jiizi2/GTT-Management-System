@@ -87,7 +87,7 @@ Hook backend utama:
 
 Base URL API di-resolve berurutan:
 
-1. `window.__GTT_API_BASE_URL__` (jika di-inject runtime),
+1. `window.__GTT_API_BASE_URL__` (jika sudah ada sebelum bundle app jalan),
 2. `http://localhost:3001/api` saat host `localhost/127.0.0.1`,
 3. fallback `/api` (same-origin).
 
@@ -95,6 +95,36 @@ Ini memungkinkan deploy frontend dan backend:
 
 - domain yang sama (reverse proxy), atau
 - domain terpisah dengan injeksi runtime config.
+
+Saat build atau `dev` dijalankan, frontend menulis `dist/runtime-config.js` dari
+`GTT_API_BASE_URL` bila env itu diisi. File ini dimuat sebelum `index.js`, jadi
+deploy VPS bisa tetap pakai satu artifact build yang sama dan tinggal mengubah
+env saat proses build.
+
+## 8. Browser Routes
+
+Frontend sekarang memakai URL path sebagai navigasi browser. Endpoint yang bisa
+langsung diketik di address bar:
+
+- `/overview`
+- `/checklist`
+- `/visa`
+- `/visa/:groupCode`
+- `/groups/:groupCode`
+- `/new-group`
+- `/invoice`
+- `/raudhah-reminder`
+- `/user-management`
+- `/master-data`
+- `/profile`
+- `/login`
+
+Catatan deploy:
+
+- Server frontend harus mengarah ke `index.html` untuk semua path di atas agar
+  refresh dan direct access tidak menghasilkan `404`.
+- Kalau frontend dan backend ada di domain berbeda, tetap pastikan `/api`
+  diproxy ke backend atau `GTT_API_BASE_URL` diisi saat build.
 
 ## 8. Command Frontend
 
@@ -106,4 +136,3 @@ Dari root project:
 - `npm run test --workspace frontend` -> unit test frontend.
 - `npm run test:smoke --workspace frontend` -> smoke test frontend.
 - `npm run test:e2e --workspace frontend` -> Playwright e2e frontend.
-

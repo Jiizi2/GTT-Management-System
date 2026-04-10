@@ -31,6 +31,12 @@ import {
   replaceGroupInBackend,
   sortHotelsByStayStart,
 } from "./use-app-controller-backend";
+import {
+  buildDashboardPath,
+  buildGroupDetailPath,
+  buildVisaDetailPath,
+  resolveDashboardRouteFromPathname,
+} from "../shared/app-route";
 
 export type OverviewStatCard = {
   label: string;
@@ -52,7 +58,9 @@ export type AppController = {
   activeNav: NavId;
   query: string;
   isActiveOnly: boolean;
+  selectedGroupCode: string | null;
   selectedGroup: GroupData | null;
+  selectedVisaGroupCode: string | null;
   selectedVisaRow: VisaTrackingRow | null;
   isSidebarCollapsed: boolean;
   filteredGroups: GroupData[];
@@ -158,41 +166,7 @@ function resolveDocumentTitle({
   return "GTT | Itinerary Overview";
 }
 
-export const ACTIVE_NAV_STORAGE_KEY = "gtt-active-nav-v1";
 const SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
-
-const resolvePersistedNavId = (value: string | null): NavId => {
-  switch (value) {
-    case "overview":
-    case "checklist":
-    case "visa":
-    case "new-group":
-    case "invoice":
-    case "raudhah-reminder":
-    case "user-management":
-    case "master-data":
-    case "profile":
-      return value;
-    case "manage-role":
-      return "user-management";
-    case "input":
-      return "new-group";
-    default:
-      return "overview";
-  }
-};
-
-const loadPersistedActiveNav = (): NavId => {
-  if (typeof window === "undefined") {
-    return "overview";
-  }
-
-  try {
-    return resolvePersistedNavId(window.localStorage.getItem(ACTIVE_NAV_STORAGE_KEY));
-  } catch {
-    return "overview";
-  }
-};
 
 const loadPersistedSessionAccessTier = (): SessionAccessTier => {
   if (typeof window === "undefined") {
@@ -283,11 +257,20 @@ function isLocalDevelopmentHost(): boolean {
 export function useAppController(): AppController {
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
   const [sessionAccessTier] = useState<SessionAccessTier>(() => loadPersistedSessionAccessTier());
-  const [activeNav, setActiveNav] = useState<NavId>(() => loadPersistedActiveNav());
+  const initialDashboardRouteRef = useRef(
+    typeof window === "undefined"
+      ? resolveDashboardRouteFromPathname("/overview")
+      : resolveDashboardRouteFromPathname(window.location.pathname),
+  );
+  const [activeNav, setActiveNav] = useState<NavId>(initialDashboardRouteRef.current.activeNav);
   const [query, setQuery] = useState("");
   const [isActiveOnly, setIsActiveOnly] = useState(false);
-  const [selectedGroupCode, setSelectedGroupCode] = useState<string | null>(null);
-  const [selectedVisaRow, setSelectedVisaRow] = useState<VisaTrackingRow | null>(null);
+  const [selectedGroupCode, setSelectedGroupCode] = useState<string | null>(
+    initialDashboardRouteRef.current.selectedGroupCode,
+  );
+  const [selectedVisaGroupCode, setSelectedVisaGroupCode] = useState<string | null>(
+    initialDashboardRouteRef.current.selectedVisaGroupCode,
+  );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<SyncFeedback | null>(null);
   const [remoteSearchMatches, setRemoteSearchMatches] = useState<GroupData[] | null>(null);
@@ -295,6 +278,18 @@ export function useAppController(): AppController {
   const normalizedQuery = deferredQuery.trim().toLowerCase();
   const groupRecordsRef = useRef(groupRecords);
   const allowLocalFallback = isLocalDevelopmentHost();
+  const visaTrackingRows = useMemo(() => buildVisaTrackingRowsFromGroups(groupRecords), [groupRecords]);
+  const selectedVisaRow = useMemo(() => {
+    if (!selectedVisaGroupCode) {
+      return null;
+    }
+
+    const normalizedSelectedVisaGroupCode = selectedVisaGroupCode.trim().toUpperCase();
+    return (
+      visaTrackingRows.find((row) => row.groupCode.trim().toUpperCase() === normalizedSelectedVisaGroupCode) ??
+      null
+    );
+  }, [selectedVisaGroupCode, visaTrackingRows]);
 
   useEffect(() => {
     groupRecordsRef.current = groupRecords;
@@ -320,7 +315,7 @@ export function useAppController(): AppController {
         setGroupRecords([]);
         setRemoteSearchMatches(null);
         setSelectedGroupCode(null);
-        setSelectedVisaRow(null);
+        setSelectedVisaGroupCode(null);
         console.warn("Failed to restore group state from backend.", error);
       });
   };
@@ -392,7 +387,7 @@ export function useAppController(): AppController {
         setGroupRecords([]);
         setRemoteSearchMatches(null);
         setSelectedGroupCode(null);
-        setSelectedVisaRow(null);
+        setSelectedVisaGroupCode(null);
         showSyncFeedback(
           "error",
           "Backend tidak terhubung. Data tidak bisa dimuat dari database.",
@@ -544,7 +539,9 @@ export function useAppController(): AppController {
   const selectedGroup = useMemo(
     () =>
       selectedGroupCode
-        ? groupRecords.find((group) => group.code === selectedGroupCode) ?? null
+        ? groupRecords.find(
+            (group) => group.code.trim().toUpperCase() === selectedGroupCode.trim().toUpperCase(),
+          ) ?? null
         : null,
     [groupRecords, selectedGroupCode],
   );
@@ -684,20 +681,66 @@ export function useAppController(): AppController {
 
     if (sessionAccessTier !== "super-admin") {
       setActiveNav("overview");
+      setSelectedGroupCode(null);
+      setSelectedVisaGroupCode(null);
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", buildDashboardPath("overview"));
+      }
+      scrollToTop();
     }
   }, [activeNav, sessionAccessTier]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const canonicalPath = initialDashboardRouteRef.current.canonicalPath;
+    if (window.location.pathname.replace(/\/+$/, "") !== canonicalPath) {
+      window.history.replaceState(null, "", canonicalPath);
+    }
+
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handlePopState = () => {
+      const nextRoute = resolveDashboardRouteFromPathname(window.location.pathname);
+      setActiveNav(nextRoute.activeNav);
+      setSelectedGroupCode(nextRoute.selectedGroupCode);
+      setSelectedVisaGroupCode(nextRoute.selectedVisaGroupCode);
+      scrollToTop();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  const updateBrowserPath = (pathname: string, { replace = false }: { replace?: boolean } = {}) => {
+    if (typeof window === "undefined") {
       return;
     }
 
-    try {
-      window.localStorage.setItem(ACTIVE_NAV_STORAGE_KEY, activeNav);
-    } catch {
-      // No-op if storage is blocked or full.
+    const normalizedPathname = pathname.trim() || "/";
+    const normalizedCurrentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+    const normalizedNextPath = normalizedPathname.replace(/\/+$/, "") || "/";
+    if (normalizedCurrentPath === normalizedNextPath) {
+      return;
     }
-  }, [activeNav]);
+
+    if (replace) {
+      window.history.replaceState(null, "", normalizedNextPath);
+      return;
+    }
+
+    window.history.pushState(null, "", normalizedNextPath);
+  };
 
   const handleNavigate = (navId: NavId) => {
     const normalizedNavId = navId === "input" ? "new-group" : navId;
@@ -709,27 +752,41 @@ export function useAppController(): AppController {
 
     setActiveNav(normalizedNavId);
     setSelectedGroupCode(null);
-    setSelectedVisaRow(null);
+    setSelectedVisaGroupCode(null);
+    updateBrowserPath(buildDashboardPath(normalizedNavId));
     scrollToTop();
   };
 
   const handleOpenDetail = (groupCode: string) => {
+    const normalizedGroupCode = groupCode.trim();
     setActiveNav("overview");
-    setSelectedGroupCode(groupCode);
-    setSelectedVisaRow(null);
+    setSelectedGroupCode(normalizedGroupCode);
+    setSelectedVisaGroupCode(null);
+    updateBrowserPath(buildGroupDetailPath(normalizedGroupCode));
     scrollToTop();
   };
 
   const handleBackToOverview = () => {
+    setActiveNav("overview");
     setSelectedGroupCode(null);
+    setSelectedVisaGroupCode(null);
+    updateBrowserPath(buildDashboardPath("overview"), { replace: true });
     scrollToTop();
   };
 
   const handleDeleteGroup = (groupCode: string) => {
-    setGroupRecords((current) => current.filter((group) => group.code !== groupCode));
-    setSelectedGroupCode(null);
-    setSelectedVisaRow((current) => (current?.groupCode === groupCode ? null : current));
+    const normalizedGroupCode = groupCode.trim().toUpperCase();
+    setGroupRecords((current) =>
+      current.filter((group) => group.code.trim().toUpperCase() !== normalizedGroupCode),
+    );
+    setSelectedGroupCode((current) =>
+      current?.trim().toUpperCase() === normalizedGroupCode ? null : current,
+    );
+    setSelectedVisaGroupCode((current) =>
+      current?.trim().toUpperCase() === normalizedGroupCode ? null : current,
+    );
     setActiveNav("overview");
+    updateBrowserPath(buildDashboardPath("overview"), { replace: true });
     scrollToTop();
 
     runBackendSync({
@@ -741,9 +798,11 @@ export function useAppController(): AppController {
   };
 
   const handleOpenVisaDetail = (row: VisaTrackingRow) => {
+    const normalizedGroupCode = row.groupCode.trim();
     setActiveNav("visa");
     setSelectedGroupCode(null);
-    setSelectedVisaRow(row);
+    setSelectedVisaGroupCode(normalizedGroupCode);
+    updateBrowserPath(buildVisaDetailPath(normalizedGroupCode));
     scrollToTop();
   };
 
@@ -995,14 +1054,17 @@ export function useAppController(): AppController {
   };
 
   const handleBackToVisaTracking = () => {
-    setSelectedVisaRow(null);
+    setActiveNav("visa");
+    setSelectedVisaGroupCode(null);
+    updateBrowserPath(buildDashboardPath("visa"), { replace: true });
     scrollToTop();
   };
 
   const handleOpenNewGroup = () => {
     setActiveNav("new-group");
     setSelectedGroupCode(null);
-    setSelectedVisaRow(null);
+    setSelectedVisaGroupCode(null);
+    updateBrowserPath(buildDashboardPath("new-group"));
     scrollToTop();
   };
 
@@ -1024,8 +1086,9 @@ export function useAppController(): AppController {
 
     setQuery("");
     setSelectedGroupCode(null);
-    setSelectedVisaRow(null);
+    setSelectedVisaGroupCode(null);
     setActiveNav("overview");
+    updateBrowserPath(buildDashboardPath("overview"), { replace: true });
     scrollToTop();
 
     runBackendSync({
@@ -1076,21 +1139,10 @@ export function useAppController(): AppController {
 
     const backendTargetGroupCode = normalizedSourceGroupCode ?? normalizedNextGroupCode;
 
-    setSelectedGroupCode((current) => {
-      if (!current) {
-        return current;
-      }
+    updateBrowserPath(buildGroupDetailPath(nextGroup.code), { replace: true });
 
-      const normalizedCurrent = current.trim().toUpperCase();
-      if (
-        normalizedCurrent === nextGroup.code ||
-        (normalizedSourceGroupCode && normalizedCurrent === normalizedSourceGroupCode)
-      ) {
-        return nextGroup.code;
-      }
-
-      return current;
-    });
+    setSelectedGroupCode(nextGroup.code);
+    setSelectedVisaGroupCode(null);
 
     setGroupRecords((current) => {
       const existingIndex = current.findIndex((item) => item.code === nextGroup.code);
@@ -1140,7 +1192,9 @@ export function useAppController(): AppController {
     activeNav,
     query,
     isActiveOnly,
+    selectedGroupCode,
     selectedGroup,
+    selectedVisaGroupCode,
     selectedVisaRow,
     isSidebarCollapsed,
     filteredGroups,

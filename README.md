@@ -57,7 +57,7 @@ docker compose up -d
 ```env
 PORT=3001
 DATA_SOURCE=prisma
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:6543/gtt_ops?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/gtt_ops?schema=public"
 ```
 
 3. Generate client, migrate, dan seed:
