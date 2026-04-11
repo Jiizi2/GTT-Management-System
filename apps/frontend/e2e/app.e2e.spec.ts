@@ -17,6 +17,7 @@ type StartedFrontendServer = {
 };
 
 type NestLikeApplication = {
+  enableCors: (options?: Record<string, unknown>) => void;
   setGlobalPrefix: (prefix: string) => void;
   useGlobalPipes: (...pipes: unknown[]) => void;
   listen: (port: number, host: string) => Promise<void>;
@@ -230,9 +231,14 @@ async function startBackendApiServer(): Promise<StartedBackendServer> {
 
   try {
     app = (await NestFactory.create(AppModule, {
-      cors: true,
       logger: false,
     })) as NestLikeApplication;
+    app.enableCors({
+      origin: true,
+      credentials: true,
+      methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    });
     app.setGlobalPrefix("api");
     app.useGlobalPipes(
       new ValidationPipe({

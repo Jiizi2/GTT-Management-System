@@ -138,96 +138,125 @@ function createIdentityFormSchema(requireIdentityFields: boolean) {
 
 type IdentityFormValues = z.infer<ReturnType<typeof createIdentityFormSchema>>;
 
-const manualScheduleFormSchema = z
-  .object({
-    date: z.string().trim().min(1, "Tanggal aktivitas wajib diisi."),
-    time: z.string(),
-    category: z.string().trim().min(1, "Jenis aktivitas wajib dipilih."),
-    hotelName: z.string(),
-    fromHotelName: z.string(),
-    from: z.string().trim().min(1, "Lokasi asal wajib diisi."),
-    to: z.string().trim().min(1, "Lokasi tujuan wajib diisi."),
-    cityTourCity: z.string(),
-    flightNumber: z.string(),
-    requiresBus: z.boolean(),
-    notes: z.string(),
-    transferByTrain: z.boolean(),
-    trainDepartureTime: z.string(),
-    destinationPickupTime: z.string(),
-    hotelPickupRequestTime: z.string(),
-  })
-  .superRefine((values, context) => {
-    if (isFlightActivityType(values.category) && !values.flightNumber.trim()) {
+const manualScheduleFormBaseSchema = z.object({
+  date: z.string().trim().min(1, "Tanggal aktivitas wajib diisi."),
+  time: z.string(),
+  category: z.string().trim().min(1, "Jenis aktivitas wajib dipilih."),
+  hotelName: z.string(),
+  fromHotelName: z.string(),
+  from: z.string().trim().min(1, "Lokasi asal wajib diisi."),
+  to: z.string().trim().min(1, "Lokasi tujuan wajib diisi."),
+  cityTourCity: z.string(),
+  flightNumber: z.string(),
+  requiresBus: z.boolean(),
+  notes: z.string(),
+  transferByTrain: z.boolean(),
+  trainDepartureTime: z.string(),
+  destinationPickupTime: z.string(),
+  hotelPickupRequestTime: z.string(),
+});
+
+type ManualScheduleValidationValues = {
+  date: string;
+  time: string;
+  category: string;
+  hotelName?: string;
+  fromHotelName?: string;
+  from: string;
+  to: string;
+  cityTourCity: string;
+  flightNumber: string;
+  requiresBus: boolean;
+  notes: string;
+  transferByTrain: boolean;
+  trainDepartureTime: string;
+  destinationPickupTime: string;
+  hotelPickupRequestTime: string;
+};
+
+function validateManualSchedule(
+  values: ManualScheduleValidationValues,
+  context: z.RefinementCtx,
+): void {
+  if (isFlightActivityType(values.category) && !values.flightNumber.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["flightNumber"],
+      message: "Nomor penerbangan wajib diisi.",
+    });
+  }
+
+  const isHotelNameRequired =
+    values.category === "arrival" || values.category === "transfer" || values.category === "departure";
+  if (isHotelNameRequired && !(values.hotelName?.trim() ?? "")) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hotelName"],
+      message: "Nama hotel wajib diisi.",
+    });
+  }
+
+  if (values.category === "departure" && !values.time.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["time"],
+      message: "Jam flight return wajib diisi.",
+    });
+  }
+
+  if (values.category === "departure" && !values.hotelPickupRequestTime.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hotelPickupRequestTime"],
+      message: "Jam pickup hotel wajib diisi.",
+    });
+  }
+
+  if (isCityTourActivityType(values.category) && !values.cityTourCity.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cityTourCity"],
+      message: "Kota city tour wajib dipilih.",
+    });
+  }
+
+  if (hasIncompleteTransferTrainFields(values)) {
+    if (!values.trainDepartureTime.trim()) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["flightNumber"],
-        message: "Nomor penerbangan wajib diisi.",
+        path: ["trainDepartureTime"],
+        message: "Jam keberangkatan kereta wajib diisi.",
       });
     }
 
-    const isHotelNameRequired =
-      values.category === "arrival" || values.category === "transfer" || values.category === "departure";
-    if (isHotelNameRequired && !values.hotelName.trim()) {
+    if (!values.destinationPickupTime.trim()) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["hotelName"],
-        message: "Nama hotel wajib diisi.",
+        path: ["destinationPickupTime"],
+        message: "Jam pickup di stasiun tujuan wajib diisi.",
       });
     }
+  }
+}
 
-    if (values.category === "departure" && !values.time.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["time"],
-        message: "Jam flight return wajib diisi.",
-      });
-    }
-
-    if (values.category === "departure" && !values.hotelPickupRequestTime.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["hotelPickupRequestTime"],
-        message: "Jam pickup hotel wajib diisi.",
-      });
-    }
-
-    if (isCityTourActivityType(values.category) && !values.cityTourCity.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["cityTourCity"],
-        message: "Kota city tour wajib dipilih.",
-      });
-    }
-
-    if (hasIncompleteTransferTrainFields(values)) {
-      if (!values.trainDepartureTime.trim()) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["trainDepartureTime"],
-          message: "Jam keberangkatan kereta wajib diisi.",
-        });
-      }
-
-      if (!values.destinationPickupTime.trim()) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["destinationPickupTime"],
-          message: "Jam pickup di stasiun tujuan wajib diisi.",
-        });
-      }
-    }
-  });
+const manualScheduleFormSchema = manualScheduleFormBaseSchema.superRefine(validateManualSchedule);
 
 type ManualScheduleFormValues = z.infer<typeof manualScheduleFormSchema>;
 
-const baseTripDraftSchema = manualScheduleFormSchema.extend({
+const baseTripDraftSchema = manualScheduleFormBaseSchema
+  .omit({
+    hotelName: true,
+    fromHotelName: true,
+  })
+  .extend({
   hotelName: z.string().optional(),
   fromHotelName: z.string().optional(),
   id: z.string(),
   title: z.string(),
   description: z.string(),
   isEnabled: z.boolean(),
-});
+  })
+  .superRefine(validateManualSchedule);
 
 const baseTripFormSchema = z.object({
   trips: z.array(baseTripDraftSchema),
