@@ -608,15 +608,19 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   const managedUserEmail = `qa.admin.${suffix}@ghaniyatravel.com`;
   const initialPassword = `QaInit#${suffix}`;
   const resetPassword = `QaReset#${suffix}`;
-  const createUserForm = page.locator("form").first();
+  await page.getByRole("button", { name: "Tambah User" }).click();
 
-  await page.getByLabel("Nama lengkap user baru").fill(managedUserName);
-  await page.getByLabel("Email user baru").fill(managedUserEmail);
-  await page.getByLabel("Role user baru").click();
+  const createUserDrawer = page.getByRole("dialog", { name: "Tambah user baru" });
+  await expect(createUserDrawer).toBeVisible();
+
+  await createUserDrawer.getByLabel("Nama lengkap user baru").fill(managedUserName);
+  await createUserDrawer.getByLabel("Email user baru").fill(managedUserEmail);
+  await createUserDrawer.getByLabel("Role user baru").click();
   await page.getByRole("option", { name: "Admin", exact: true }).click();
-  await createUserForm.evaluate((form) => {
+  await createUserDrawer.locator("form").evaluate((form) => {
     (form as HTMLFormElement).requestSubmit();
   });
+  await expect(createUserDrawer).toBeHidden();
 
   const managedUserCard = page.locator("div.border-b").filter({ hasText: managedUserEmail }).first();
   await expect(managedUserCard).toBeVisible();

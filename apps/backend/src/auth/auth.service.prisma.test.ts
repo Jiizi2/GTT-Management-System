@@ -697,18 +697,42 @@ async function testPrismaBootstrapAndRetryAfterFailure(): Promise<void> {
       AUTH_SECRET: "unit-test-secret",
       AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
       NODE_ENV: "test",
+      DEV_AUTH_SUPERADMIN_PASSWORD: undefined,
+      DEV_AUTH_ADMIN_PASSWORD: undefined,
+    },
+    async () => {
+      const prisma = createPrismaServiceMock();
+      const service = new AuthService(prisma);
+
+      await assertRejectsWithMessage(
+        () => service.listManagedUsers(),
+        Error,
+        /DEV_AUTH_SUPERADMIN_PASSWORD.*DEV_AUTH_ADMIN_PASSWORD/i,
+      );
+      assert.equal(prisma.__state.createCalls, 0);
+    },
+  );
+
+  await withEnv(
+    {
+      DATA_SOURCE: "prisma",
+      AUTH_SECRET: "unit-test-secret",
+      AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
+      DEV_AUTH_SUPERADMIN_PASSWORD: "BootstrapSuper#2026",
+      DEV_AUTH_ADMIN_PASSWORD: "BootstrapAdmin#2026",
+      NODE_ENV: "test",
     },
     async () => {
       const prisma = createPrismaServiceMock();
       const service = new AuthService(prisma);
 
       const firstList = await service.listManagedUsers();
-      assert.equal(firstList.length, 5);
-      assert.equal(prisma.__state.createCalls, 5);
+      assert.equal(firstList.length, 2);
+      assert.equal(prisma.__state.createCalls, 2);
 
       const secondList = await service.listManagedUsers();
-      assert.equal(secondList.length, 5);
-      assert.equal(prisma.__state.createCalls, 5);
+      assert.equal(secondList.length, 2);
+      assert.equal(prisma.__state.createCalls, 2);
 
       const failingPrisma = createPrismaServiceMock({ failCreateOnce: true });
       const failingService = new AuthService(failingPrisma);
@@ -720,8 +744,8 @@ async function testPrismaBootstrapAndRetryAfterFailure(): Promise<void> {
       );
 
       const recoveredList = await failingService.listManagedUsers();
-      assert.equal(recoveredList.length, 5);
-      assert.equal(failingPrisma.__state.createCalls, 6);
+      assert.equal(recoveredList.length, 2);
+      assert.equal(failingPrisma.__state.createCalls, 3);
     },
   );
 }
@@ -826,7 +850,9 @@ async function testTokenValidationAndEnvironmentGuards(): Promise<void> {
     {
       DATA_SOURCE: "prisma",
       AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+      AUTH_BOOTSTRAP_DEFAULT_USERS: undefined,
+      DEV_AUTH_SUPERADMIN_PASSWORD: "UnusedSuper#2026",
+      DEV_AUTH_ADMIN_PASSWORD: "UnusedAdmin#2026",
       NODE_ENV: "test",
     },
     async () => {
@@ -850,6 +876,7 @@ async function testTokenValidationAndEnvironmentGuards(): Promise<void> {
       });
       assert.equal(response.user.accessTier, "admin");
       assert.equal(prisma.__state.findUniqueCalls, 0);
+      assert.equal(prisma.__state.createCalls, 0);
     },
   );
 

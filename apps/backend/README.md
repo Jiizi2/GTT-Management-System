@@ -16,6 +16,7 @@
    - `npm run db:migrate --workspace backend`
 7. Seed sample data:
    - `npm run db:seed --workspace backend`
+   - Requires `DEV_AUTH_SUPERADMIN_PASSWORD` and `DEV_AUTH_ADMIN_PASSWORD` in `.env`.
    - By default this is non-destructive and only seeds missing defaults (including auth users).
    - To reset and reseed explicitly:
      - macOS/Linux: `SEED_RESET=true npm run db:seed --workspace backend`
@@ -63,8 +64,8 @@
 - `CORS_ORIGINS` is required in production and must use explicit origins.
 - `TRUST_PROXY` should stay `false` unless proxy headers are sanitized by trusted infrastructure.
 - `AUTH_BOOTSTRAP_DEFAULT_USERS` controls auto-creation of default auth users on startup in Prisma mode.
-  - Defaults to `true` outside production.
-  - Defaults to `false` in production.
+  - Defaults to `false` until explicitly set to `true`.
+  - Requires `DEV_AUTH_SUPERADMIN_PASSWORD` and `DEV_AUTH_ADMIN_PASSWORD` when enabled.
 - Global API throttling is controlled by:
   - `THROTTLE_DEFAULT_TTL_MS`
   - `THROTTLE_DEFAULT_LIMIT`
@@ -91,7 +92,7 @@
 - Identifier bisa pakai username atau email:
   - `superadmin.dev@ghaniya.local`
   - `admin.dev@ghaniya.local`
-- Akun default ini disimpan di tabel `AuthUser` (via seed atau bootstrap auth di Prisma mode).
+- Akun default ini disimpan di tabel `AuthUser` via seed atau bootstrap Prisma yang diaktifkan eksplisit.
 
 ## API Base URL
 

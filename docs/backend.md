@@ -69,6 +69,8 @@ Aturan khusus:
 
 - `NODE_ENV=production` mewajibkan `DATA_SOURCE=prisma`.
 - `AUTH_BOOTSTRAP_DEFAULT_USERS=true` ditolak di production.
+- `AUTH_BOOTSTRAP_DEFAULT_USERS` default-nya `false` dan harus diaktifkan eksplisit.
+- Saat `DATA_SOURCE=prisma` dan `AUTH_BOOTSTRAP_DEFAULT_USERS=true`, env `DEV_AUTH_SUPERADMIN_PASSWORD` dan `DEV_AUTH_ADMIN_PASSWORD` wajib diisi.
 - `CORS_ORIGINS` wajib diisi origin eksplisit di production; wildcard `*` tidak didukung untuk mode cookie auth.
 - `TRUST_PROXY=true` hanya boleh dipakai jika header proxy benar-benar disanitasi oleh reverse proxy tepercaya.
 
@@ -175,6 +177,11 @@ Reset seed (destruktif terhadap data target):
 
 - PowerShell:
   - `$env:SEED_RESET="true"; npm run db:seed:backend`
+
+Catatan:
+
+- `npm run db:seed:backend` menolak berjalan saat `NODE_ENV=production`.
+- Seed auth user Prisma membutuhkan `DEV_AUTH_SUPERADMIN_PASSWORD` dan `DEV_AUTH_ADMIN_PASSWORD`.
 
 ## 9. Testing Backend
 

@@ -22,8 +22,10 @@ import {
   mapPrismaRoleToManagedRole,
   normalizeAuthEmail,
   normalizeAuthIdentifier,
+  requireDefaultAuthUserPasswordOverrides,
 } from "./auth-default-users";
 import {
+  hashAuthPassword,
   hashAuthPasswordAsync,
   isLegacyAuthPasswordHash,
   verifyAuthPasswordAsync,
@@ -36,10 +38,6 @@ import {
   type AuthSessionUser,
   type AuthTokenPayload,
 } from "./auth.types";
-
-type AuthDevAccount = AuthSessionUser & {
-  password: string;
-};
 
 type AuthManagedUserRecord = {
   id: string;
@@ -144,75 +142,42 @@ function resolveAuthSecret(configService?: ConfigService): string {
 
 function resolveShouldBootstrapPrismaAuthUsers(configService?: ConfigService): boolean {
   const configured = resolveConfiguredBoolean(configService, "AUTH_BOOTSTRAP_DEFAULT_USERS");
-  if (configured === true) {
-    const nodeEnv = resolveConfiguredNodeEnv(configService);
-    if (nodeEnv === "production") {
-      throw new Error("AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production.");
-    }
-
-    return true;
-  }
-
-  if (configured === false) {
+  if (configured !== true) {
     return false;
   }
 
   const nodeEnv = resolveConfiguredNodeEnv(configService);
-  return nodeEnv !== "production";
+  if (nodeEnv === "production") {
+    throw new Error("AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production.");
+  }
+
+  return true;
 }
 
-function createDefaultDevAccounts(configService?: ConfigService): AuthDevAccount[] {
+function createDefaultManagedUsers(configService?: ConfigService): AuthManagedUserRecord[] {
+  const now = Date.now();
+  const defaultSuperAdminPassword =
+    resolveConfiguredString(configService, "DEV_AUTH_SUPERADMIN_PASSWORD") || "DevSuperAdmin#2026";
+  const defaultAdminPassword =
+    resolveConfiguredString(configService, "DEV_AUTH_ADMIN_PASSWORD") || "DevAdmin#2026";
+
   return [
     {
       id: "dev-super-admin",
       name: "Dev Super Admin",
       username: "dev.superadmin",
       email: "superadmin.dev@ghaniya.local",
-      accessTier: "super-admin",
-      password:
-        resolveConfiguredString(configService, "DEV_AUTH_SUPERADMIN_PASSWORD") ||
-        "DevSuperAdmin#2026",
+      roleId: "super-admin",
+      passwordHash: hashAuthPassword(defaultSuperAdminPassword),
+      updatedAtEpochMs: now,
     },
     {
       id: "dev-admin",
       name: "Dev Admin",
       username: "dev.admin",
       email: "admin.dev@ghaniya.local",
-      accessTier: "admin",
-      password:
-        resolveConfiguredString(configService, "DEV_AUTH_ADMIN_PASSWORD") || "DevAdmin#2026",
-    },
-  ];
-}
-
-function createDefaultManagedUsers(): AuthManagedUserRecord[] {
-  const now = Date.now();
-  return [
-    {
-      id: "usr-1",
-      name: "Operator Admin",
-      username: "operator.admin",
-      email: "operator.admin@ghaniyatravel.com",
       roleId: "admin",
-      passwordHash: null,
-      updatedAtEpochMs: now,
-    },
-    {
-      id: "usr-2",
-      name: "Mila Finance",
-      username: "mila.finance",
-      email: "mila.finance@ghaniyatravel.com",
-      roleId: "finance-manager",
-      passwordHash: null,
-      updatedAtEpochMs: now,
-    },
-    {
-      id: "usr-3",
-      name: "Hadi Support",
-      username: "hadi.support",
-      email: "hadi.support@ghaniyatravel.com",
-      roleId: "customer-support",
-      passwordHash: null,
+      passwordHash: hashAuthPassword(defaultAdminPassword),
       updatedAtEpochMs: now,
     },
   ];
@@ -238,8 +203,7 @@ export class AuthService {
   private readonly authSecret: string;
   private readonly dataSource: "memory" | "prisma";
   private readonly shouldBootstrapPrismaAuthUsers: boolean;
-  private readonly accounts: AuthDevAccount[];
-  private readonly managedUsers = createDefaultManagedUsers();
+  private readonly managedUsers: AuthManagedUserRecord[];
   private prismaBootstrapPromise: Promise<void> | null = null;
 
   constructor(
@@ -249,7 +213,7 @@ export class AuthService {
     this.authSecret = resolveAuthSecret(this.configService);
     this.dataSource = resolveConfiguredDataSource(this.configService);
     this.shouldBootstrapPrismaAuthUsers = resolveShouldBootstrapPrismaAuthUsers(this.configService);
-    this.accounts = createDefaultDevAccounts(this.configService);
+    this.managedUsers = createDefaultManagedUsers(this.configService);
   }
 
   async login(payload: LoginDto): Promise<AuthLoginResponse> {
@@ -434,30 +398,6 @@ export class AuthService {
     const identifier = normalizeAuthIdentifier(payload.identifier);
     const password = payload.password;
     const rememberSession = Boolean(payload.rememberSession);
-
-    const account = this.accounts.find((entry) => {
-      return (
-        normalizeAuthIdentifier(entry.username) === identifier ||
-        normalizeAuthIdentifier(entry.email) === identifier
-      );
-    });
-
-    if (account) {
-      if (account.password !== password) {
-        throw new UnauthorizedException("Invalid username/email or password.");
-      }
-
-      return this.buildLoginResponse({
-        account: {
-          id: account.id,
-          name: account.name,
-          username: account.username,
-          email: account.email,
-          accessTier: account.accessTier,
-        },
-        rememberSession,
-      });
-    }
 
     const managedUser = this.managedUsers.find((entry) => {
       return (
@@ -920,7 +860,6 @@ export class AuthService {
     const [emailLocalPart] = normalizedEmail.split("@");
     const baseUsername = normalizeUsernameCandidate(emailLocalPart || "user");
     const reservedUsernames = new Set<string>([
-      ...this.accounts.map((entry) => normalizeAuthIdentifier(entry.username)),
       ...this.managedUsers.map((entry) => normalizeAuthIdentifier(entry.username)),
     ]);
 
@@ -955,10 +894,11 @@ export class AuthService {
   }
 
   private async bootstrapPrismaAuthUsers(): Promise<void> {
-    const defaultUsers = createDefaultAuthUserStorageRecordsWithOverrides({
+    const passwordOverrides = requireDefaultAuthUserPasswordOverrides({
       superAdminPassword: resolveConfiguredString(this.configService, "DEV_AUTH_SUPERADMIN_PASSWORD"),
       adminPassword: resolveConfiguredString(this.configService, "DEV_AUTH_ADMIN_PASSWORD"),
     });
+    const defaultUsers = createDefaultAuthUserStorageRecordsWithOverrides(passwordOverrides);
 
     for (const defaultUser of defaultUsers) {
       const existingByUsername = await this.prisma.authUser.findUnique({

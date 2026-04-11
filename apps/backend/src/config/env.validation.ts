@@ -93,5 +93,16 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
     }
   }
 
+  if (validated.DATA_SOURCE === "prisma" && validated.AUTH_BOOTSTRAP_DEFAULT_USERS === true) {
+    const superAdminPassword = validated.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() ?? "";
+    const adminPassword = validated.DEV_AUTH_ADMIN_PASSWORD?.trim() ?? "";
+
+    if (!superAdminPassword || !adminPassword) {
+      throw new Error(
+        "DEV_AUTH_SUPERADMIN_PASSWORD and DEV_AUTH_ADMIN_PASSWORD are required when AUTH_BOOTSTRAP_DEFAULT_USERS=true in Prisma mode.",
+      );
+    }
+  }
+
   return validated;
 }

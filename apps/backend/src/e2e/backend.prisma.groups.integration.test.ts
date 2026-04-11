@@ -38,6 +38,8 @@ type GroupPayload = {
 const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.superadmin";
 const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
+const DEV_AUTH_ADMIN_PASSWORD =
+  process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
 
@@ -65,10 +67,7 @@ function buildUniqueCode(prefix = "PRS-GRP"): string {
   return `${prefix}-${timeFragment}${randomFragment}`;
 }
 
-function restoreEnvVar(
-  key: "PORT" | "DATA_SOURCE" | "DATABASE_URL",
-  previousValue: string | undefined,
-): void {
+function restoreEnvVar(key: string, previousValue: string | undefined): void {
   if (previousValue === undefined) {
     delete process.env[key];
     return;
@@ -94,12 +93,18 @@ async function startBackendServerWithPrisma(): Promise<StartedServer> {
   const previousPort = process.env.PORT;
   const previousDataSource = process.env.DATA_SOURCE;
   const previousDatabaseUrl = process.env.DATABASE_URL;
+  const previousBootstrapDefaultUsers = process.env.AUTH_BOOTSTRAP_DEFAULT_USERS;
+  const previousDevSuperAdminPassword = process.env.DEV_AUTH_SUPERADMIN_PASSWORD;
+  const previousDevAdminPassword = process.env.DEV_AUTH_ADMIN_PASSWORD;
   const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
   if (testDatabaseUrl) {
     process.env.DATABASE_URL = testDatabaseUrl;
   }
   process.env.PORT = String(port);
   process.env.DATA_SOURCE = "prisma";
+  process.env.AUTH_BOOTSTRAP_DEFAULT_USERS = "true";
+  process.env.DEV_AUTH_SUPERADMIN_PASSWORD = DEV_AUTH_PASSWORD;
+  process.env.DEV_AUTH_ADMIN_PASSWORD = DEV_AUTH_ADMIN_PASSWORD;
 
   let app: INestApplication | null = null;
   try {
@@ -121,6 +126,9 @@ async function startBackendServerWithPrisma(): Promise<StartedServer> {
     restoreEnvVar("PORT", previousPort);
     restoreEnvVar("DATA_SOURCE", previousDataSource);
     restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
+    restoreEnvVar("AUTH_BOOTSTRAP_DEFAULT_USERS", previousBootstrapDefaultUsers);
+    restoreEnvVar("DEV_AUTH_SUPERADMIN_PASSWORD", previousDevSuperAdminPassword);
+    restoreEnvVar("DEV_AUTH_ADMIN_PASSWORD", previousDevAdminPassword);
     throw error;
   }
 
@@ -133,6 +141,9 @@ async function startBackendServerWithPrisma(): Promise<StartedServer> {
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("DATA_SOURCE", previousDataSource);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
+      restoreEnvVar("AUTH_BOOTSTRAP_DEFAULT_USERS", previousBootstrapDefaultUsers);
+      restoreEnvVar("DEV_AUTH_SUPERADMIN_PASSWORD", previousDevSuperAdminPassword);
+      restoreEnvVar("DEV_AUTH_ADMIN_PASSWORD", previousDevAdminPassword);
     },
   };
 }
