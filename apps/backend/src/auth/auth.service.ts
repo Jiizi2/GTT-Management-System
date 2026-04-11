@@ -14,6 +14,7 @@ import {
   resolveConfiguredNodeEnv,
   resolveConfiguredString,
 } from "../config/app-config";
+import { createStructuredLogger } from "../logging/create-structured-logger";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   createDefaultAuthUserStorageRecordsWithOverrides,
@@ -209,6 +210,7 @@ export class AuthService {
   private readonly shouldBootstrapPrismaAuthUsers: boolean;
   private readonly managedUsers: AuthManagedUserRecord[];
   private prismaBootstrapPromise: Promise<void> | null = null;
+  private readonly logger = createStructuredLogger(AuthService.name);
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -417,7 +419,7 @@ export class AuthService {
       throw new UnauthorizedException("Account is not allowed to access dashboard login.");
     }
 
-    return this.buildLoginResponse({
+    const loginResponse = this.buildLoginResponse({
       account: {
         id: managedUser.id,
         name: managedUser.name,
@@ -427,6 +429,8 @@ export class AuthService {
       },
       rememberSession,
     });
+    this.logLoginSuccess(loginResponse.user, rememberSession);
+    return loginResponse;
   }
 
   private async loginWithPrisma(payload: LoginDto): Promise<AuthLoginResponse> {
@@ -462,7 +466,7 @@ export class AuthService {
       throw new UnauthorizedException("Account is not allowed to access dashboard login.");
     }
 
-    return this.buildLoginResponse({
+    const loginResponse = this.buildLoginResponse({
       account: {
         id: account.id,
         name: account.name,
@@ -472,6 +476,8 @@ export class AuthService {
       },
       rememberSession,
     });
+    this.logLoginSuccess(loginResponse.user, rememberSession);
+    return loginResponse;
   }
 
   private listManagedUsersFromMemory(): AuthManagedUser[] {
@@ -528,6 +534,7 @@ export class AuthService {
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers.unshift(nextUser);
+    this.logManagedUserMutation("auth.user.created", this.toManagedUser(nextUser));
 
     return this.toManagedUser(nextUser);
   }
@@ -580,6 +587,7 @@ export class AuthService {
         },
       });
 
+      this.logManagedUserMutation("auth.user.created", this.toManagedUserFromPrisma(created));
       return this.toManagedUserFromPrisma(created);
     } catch (error: unknown) {
       if (
@@ -625,6 +633,7 @@ export class AuthService {
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers[targetIndex] = updated;
+    this.logManagedUserMutation("auth.user.updated", this.toManagedUser(updated));
 
     return this.toManagedUser(updated);
   }
@@ -692,6 +701,7 @@ export class AuthService {
       },
     });
 
+    this.logManagedUserMutation("auth.user.updated", this.toManagedUserFromPrisma(updated));
     return this.toManagedUserFromPrisma(updated);
   }
 
@@ -717,6 +727,7 @@ export class AuthService {
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers[targetIndex] = updated;
+    this.logManagedUserMutation("auth.user.password.updated", this.toManagedUser(updated));
     return this.toManagedUser(updated);
   }
 
@@ -748,6 +759,7 @@ export class AuthService {
         },
       });
 
+      this.logManagedUserMutation("auth.user.password.updated", this.toManagedUserFromPrisma(updated));
       return this.toManagedUserFromPrisma(updated);
     } catch (error: unknown) {
       if (
@@ -777,6 +789,15 @@ export class AuthService {
     }
 
     this.managedUsers.splice(targetIndex, 1);
+    this.logger.info(
+      {
+        action: "auth.user.deleted",
+        dataSource: this.dataSource,
+        userId: normalizedUserId,
+        roleId: target.roleId,
+      },
+      "Managed user deleted.",
+    );
   }
 
   private async deleteManagedUserWithPrisma(userId: string): Promise<void> {
@@ -803,6 +824,16 @@ export class AuthService {
         id: normalizedUserId,
       },
     });
+
+    this.logger.info(
+      {
+        action: "auth.user.deleted",
+        dataSource: this.dataSource,
+        userId: normalizedUserId,
+        roleId: mapPrismaRoleToManagedRole(currentUser.role),
+      },
+      "Managed user deleted.",
+    );
   }
 
   private async assertSuperAdminWillRemain(args: {
@@ -930,6 +961,15 @@ export class AuthService {
       await this.prisma.authUser.create({
         data: defaultUser,
       });
+      this.logger.info(
+        {
+          action: "auth.bootstrap.user-created",
+          dataSource: this.dataSource,
+          username: defaultUser.username,
+          role: defaultUser.role,
+        },
+        "Bootstrapped default auth user into Prisma storage.",
+      );
     }
   }
 
@@ -943,8 +983,44 @@ export class AuthService {
           passwordHash: await hashAuthPasswordAsync(password),
         },
       });
-    } catch {
-      // Best-effort migration so a transient write failure does not block login.
+    } catch (error: unknown) {
+      this.logger.warn(
+        {
+          action: "auth.password.legacy-upgrade.failed",
+          dataSource: this.dataSource,
+          userId,
+          error,
+        },
+        "Legacy password hash upgrade failed; login still succeeded with the legacy hash.",
+      );
     }
+  }
+
+  private logLoginSuccess(user: AuthSessionUser, rememberSession: boolean): void {
+    this.logger.info(
+      {
+        action: "auth.login.succeeded",
+        dataSource: this.dataSource,
+        userId: user.id,
+        username: user.username,
+        accessTier: user.accessTier,
+        rememberSession,
+      },
+      "Auth login succeeded.",
+    );
+  }
+
+  private logManagedUserMutation(action: string, user: AuthManagedUser): void {
+    this.logger.info(
+      {
+        action,
+        dataSource: this.dataSource,
+        userId: user.id,
+        email: user.email,
+        roleId: user.roleId,
+        hasPassword: user.hasPassword,
+      },
+      "Managed user mutation completed.",
+    );
   }
 }

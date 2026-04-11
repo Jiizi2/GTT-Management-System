@@ -1,36 +1,71 @@
 import { InvoiceStatus } from "@prisma/client";
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UpdateInvoiceDto {
+  @ApiPropertyOptional({
+    description: "ID client invoice yang baru.",
+    example: "clyourinvoiceclientid",
+  })
   @IsOptional()
   @IsString()
   clientId?: string;
 
+  @ApiPropertyOptional({
+    description: "Nama client baru jika ingin membuat / memilih client berdasarkan nama.",
+    example: "JSA",
+  })
   @IsOptional()
   @IsString()
   clientName?: string;
 
+  @ApiPropertyOptional({
+    description: "Kode group terkait invoice. Gunakan string kosong untuk melepas relasi group.",
+    example: "9017001002",
+  })
   @IsOptional()
   @IsString()
   groupCode?: string;
 
+  @ApiPropertyOptional({
+    description: "Tanggal penerbitan invoice dalam format ISO date.",
+    example: "2026-04-15",
+  })
   @IsOptional()
   @IsDateString()
   issuedDate?: string;
 
+  @ApiPropertyOptional({
+    description: "Tanggal jatuh tempo invoice dalam format ISO date.",
+    example: "2026-04-30",
+  })
   @IsOptional()
   @IsDateString()
   dueDate?: string;
 
+  @ApiPropertyOptional({
+    description: "Nominal invoice terbaru.",
+    example: 9800000,
+    minimum: 0,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   amount?: number;
 
+  @ApiPropertyOptional({
+    description: "Status invoice terbaru.",
+    enum: InvoiceStatus,
+    example: InvoiceStatus.PAID,
+  })
   @IsOptional()
   @IsEnum(InvoiceStatus)
   status?: InvoiceStatus;
 
+  @ApiPropertyOptional({
+    description: "Catatan internal invoice.",
+    example: "Sudah lunas pada pembayaran akhir April.",
+  })
   @IsOptional()
   @IsString()
   notes?: string;
