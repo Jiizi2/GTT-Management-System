@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { PrismaClient } from "@prisma/client";
-import { AppModule } from "../app.module";
 
 type StartedServer = {
   baseUrl: string;
@@ -15,7 +14,7 @@ const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.supe
 const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
 const prisma = new PrismaClient();
-let activeAccessToken: string | null = null;
+let activeAuthCookie: string | null = null;
 
 function runCase(name: string, fn: () => Promise<void>): Promise<void> {
   return fn().then(() => {
@@ -72,6 +71,7 @@ async function startBackendServerWithPrisma(): Promise<StartedServer> {
   let app: INestApplication | null = null;
 
   try {
+    const { AppModule } = await import("../app.module.js");
     app = await NestFactory.create(AppModule, { cors: true, logger: false });
     app.setGlobalPrefix("api");
     app.useGlobalPipes(
@@ -109,10 +109,20 @@ async function requestJson(
   baseUrl: string,
   path: string,
   init?: RequestInit,
-): Promise<{ status: number; json: unknown; text: string }> {
+): Promise<{ status: number; json: unknown; text: string; headers: Headers }> {
   const headers = new Headers(init?.headers);
-  if (activeAccessToken && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${activeAccessToken}`);
+  const method = init?.method?.trim().toUpperCase() ?? "GET";
+  if (activeAuthCookie && !headers.has("cookie")) {
+    headers.set("cookie", activeAuthCookie);
+  }
+  if (
+    activeAuthCookie &&
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    !headers.has("origin")
+  ) {
+    headers.set("origin", baseUrl);
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -134,6 +144,7 @@ async function requestJson(
     status: response.status,
     json,
     text,
+    headers: response.headers,
   };
 }
 
@@ -151,9 +162,15 @@ async function authenticateDevSession(baseUrl: string): Promise<void> {
   });
 
   assert.equal(loginResponse.status, 200, `Auth login failed: ${loginResponse.text}`);
-  const accessToken = (loginResponse.json as { accessToken?: unknown })?.accessToken;
-  assert.equal(typeof accessToken, "string", "Auth login should return accessToken.");
-  activeAccessToken = accessToken as string;
+  assert.equal(
+    typeof (loginResponse.json as { user?: unknown })?.user,
+    "object",
+    "Auth login should return a browser session payload.",
+  );
+  const setCookie = loginResponse.headers.get("set-cookie") ?? "";
+  const cookieHeader = setCookie.split(";")[0]?.trim() ?? "";
+  assert.notEqual(cookieHeader, "", "Auth login should return a session cookie.");
+  activeAuthCookie = cookieHeader;
 }
 
 async function cleanupCreatedRecords(clientName: string): Promise<void> {
@@ -187,6 +204,16 @@ async function cleanupCreatedRecordsByPrefix(clientNamePrefix: string): Promise<
     where: {
       name: {
         startsWith: clientNamePrefix,
+      },
+    },
+  });
+}
+
+async function cleanupManagedUsersByEmailPrefix(emailPrefix: string): Promise<void> {
+  await prisma.authUser.deleteMany({
+    where: {
+      email: {
+        startsWith: emailPrefix,
       },
     },
   });
@@ -272,7 +299,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
     assert.equal(matched?.amount, 888000);
     assert.equal(matched?.status, "Paid");
   } finally {
-    activeAccessToken = null;
+    activeAuthCookie = null;
     await cleanupCreatedRecords(testClientName);
     await server.shutdown();
   }
@@ -393,8 +420,111 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
       "Concurrent client creation should keep unique sort orders.",
     );
   } finally {
-    activeAccessToken = null;
+    activeAuthCookie = null;
     await cleanupCreatedRecordsByPrefix(testClientPrefix);
+    await server.shutdown();
+  }
+}
+
+async function testPrismaManagedUserPasswordFlow(): Promise<void> {
+  const server = await startBackendServerWithPrisma();
+  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)
+    .toString()
+    .padStart(4, "0")}`;
+  const emailPrefix = `managed.integration.${uniqueSuffix}`;
+  const managedUserEmail = `${emailPrefix}@example.com`;
+
+  try {
+    await authenticateDevSession(server.baseUrl);
+
+    const createResponse = await requestJson(server.baseUrl, "/api/auth/users", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Prisma Managed Admin",
+        email: managedUserEmail,
+        roleId: "admin",
+      }),
+    });
+    assert.equal(createResponse.status, 201, `Create managed user failed: ${createResponse.text}`);
+    const createdUser = createResponse.json as {
+      id?: string;
+      hasPassword?: boolean;
+    };
+    assert.equal(typeof createdUser.id, "string", `Expected managed user id: ${createResponse.text}`);
+    assert.equal(createdUser.hasPassword, false, `Expected hasPassword=false: ${createResponse.text}`);
+
+    const setPasswordResponse = await requestJson(
+      server.baseUrl,
+      `/api/auth/users/${encodeURIComponent(createdUser.id ?? "")}/password`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          password: "PrismaManaged#2026",
+        }),
+      },
+    );
+    assert.equal(
+      setPasswordResponse.status,
+      200,
+      `Set managed user password failed: ${setPasswordResponse.text}`,
+    );
+    assert.equal(
+      (setPasswordResponse.json as { hasPassword?: boolean }).hasPassword,
+      true,
+      `Expected hasPassword=true after reset: ${setPasswordResponse.text}`,
+    );
+
+    const logoutResponse = await requestJson(server.baseUrl, "/api/auth/logout", {
+      method: "POST",
+    });
+    assert.equal(logoutResponse.status, 204, `Logout failed: ${logoutResponse.text}`);
+    activeAuthCookie = null;
+
+    const loginResponse = await requestJson(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: managedUserEmail,
+        password: "PrismaManaged#2026",
+        rememberSession: false,
+      }),
+    });
+    assert.equal(loginResponse.status, 200, `Managed user login failed: ${loginResponse.text}`);
+    assert.equal(
+      (loginResponse.json as { user?: { accessTier?: string } })?.user?.accessTier,
+      "admin",
+      `Expected managed user access tier in login response: ${loginResponse.text}`,
+    );
+    const setCookie = loginResponse.headers.get("set-cookie") ?? "";
+    const cookieHeader = setCookie.split(";")[0]?.trim() ?? "";
+    assert.notEqual(cookieHeader, "", "Managed user login should return a session cookie.");
+    activeAuthCookie = cookieHeader;
+
+    const sessionResponse = await requestJson(server.baseUrl, "/api/auth/session");
+    assert.equal(sessionResponse.status, 200, `Fetch auth session failed: ${sessionResponse.text}`);
+    assert.equal(
+      (sessionResponse.json as { user?: { email?: string } })?.user?.email,
+      managedUserEmail,
+      `Expected auth session email in response: ${sessionResponse.text}`,
+    );
+
+    const forbiddenUsersResponse = await requestJson(server.baseUrl, "/api/auth/users");
+    assert.equal(
+      forbiddenUsersResponse.status,
+      403,
+      `Expected admin-managed account to be blocked from user management: ${forbiddenUsersResponse.text}`,
+    );
+  } finally {
+    activeAuthCookie = null;
+    await cleanupManagedUsersByEmailPrefix(emailPrefix);
     await server.shutdown();
   }
 }
@@ -404,6 +534,10 @@ async function main(): Promise<void> {
   await runCase(
     "backend prisma concurrent invoice create flow",
     testPrismaConcurrentInvoiceCreateFlow,
+  );
+  await runCase(
+    "backend prisma managed user password flow",
+    testPrismaManagedUserPasswordFlow,
   );
 }
 

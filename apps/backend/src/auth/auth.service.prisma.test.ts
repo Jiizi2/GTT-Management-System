@@ -7,7 +7,11 @@ import {
 } from "@nestjs/common";
 import { AuthUserRole, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { hashAuthPassword } from "./auth-password";
+import {
+  createLegacyScryptPasswordHashForTest,
+  hashAuthPassword,
+  verifyAuthPassword,
+} from "./auth-password";
 import { AuthService } from "./auth.service";
 
 type PrismaAuthUserRecord = {
@@ -35,12 +39,14 @@ type PrismaMockOptions = {
   users?: PrismaAuthUserRecord[];
   failCreateOnce?: boolean;
   failCreateWithP2002?: boolean;
+  failUpdateOnce?: boolean;
 };
 
 type PrismaMockState = {
   users: PrismaAuthUserRecord[];
   createCalls: number;
   findUniqueCalls: number;
+  updateCalls: number;
 };
 
 type PrismaMock = PrismaService & {
@@ -150,7 +156,8 @@ function createPrismaUser(overrides: Partial<PrismaAuthUserRecord>): PrismaAuthU
     email: overrides.email ?? "default.user@example.com",
     username: overrides.username ?? "default.user",
     role: overrides.role ?? "ADMIN",
-    passwordHash: overrides.passwordHash ?? hashAuthPassword("Password#2026"),
+    passwordHash:
+      overrides.passwordHash === undefined ? hashAuthPassword("Password#2026") : overrides.passwordHash,
     isActive: overrides.isActive ?? true,
     createdAt: overrides.createdAt ?? new Date("2026-04-09T08:00:00.000Z"),
     updatedAt: overrides.updatedAt ?? new Date("2026-04-09T08:00:00.000Z"),
@@ -160,10 +167,12 @@ function createPrismaUser(overrides: Partial<PrismaAuthUserRecord>): PrismaAuthU
 function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
   const users = [...(options.users ?? [])];
   let failCreateOnce = Boolean(options.failCreateOnce);
+  let failUpdateOnce = Boolean(options.failUpdateOnce);
   const state: PrismaMockState = {
     users,
     createCalls: 0,
     findUniqueCalls: 0,
+    updateCalls: 0,
   };
 
   const mock = {
@@ -265,12 +274,19 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
       update: async (args: {
         where: { id: string };
         data: {
-          name: string;
-          email: string;
-          role: AuthUserRole;
+          name?: string;
+          email?: string;
+          role?: AuthUserRole;
+          passwordHash?: string | null;
         };
         select?: Record<string, unknown>;
       }) => {
+        state.updateCalls += 1;
+        if (failUpdateOnce) {
+          failUpdateOnce = false;
+          throw new Error("password rehash failure");
+        }
+
         const targetIndex = state.users.findIndex((entry) => entry.id === args.where.id);
         if (targetIndex === -1) {
           throw new NotFoundException(`User '${args.where.id}' not found.`);
@@ -279,9 +295,11 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
         const current = state.users[targetIndex];
         const updated: PrismaAuthUserRecord = {
           ...current,
-          name: args.data.name,
-          email: args.data.email,
-          role: args.data.role,
+          name: args.data.name ?? current.name,
+          email: args.data.email ?? current.email,
+          role: args.data.role ?? current.role,
+          passwordHash:
+            args.data.passwordHash === undefined ? current.passwordHash : args.data.passwordHash,
           updatedAt: new Date(),
         };
         state.users[targetIndex] = updated;
@@ -373,6 +391,7 @@ async function testPrismaLoginAndManagedUserCrudFlow(): Promise<void> {
       assert.equal(managedUsers.length, 4);
       assert.equal(managedUsers[0].name, "Admin User");
       assert.equal(managedUsers.some((entry) => entry.roleId === "finance-manager"), true);
+      assert.equal(managedUsers.some((entry) => entry.hasPassword === false), true);
 
       const created = await service.createManagedUser({
         name: "  New User  ",
@@ -382,6 +401,7 @@ async function testPrismaLoginAndManagedUserCrudFlow(): Promise<void> {
       assert.equal(created.name, "New User");
       assert.equal(created.email, "new.user@example.com");
       assert.equal(created.roleId, "customer-support");
+      assert.equal(created.hasPassword, false);
       assert.equal(
         prisma.__state.users.some((entry) => entry.username === "new.user.1"),
         true,
@@ -402,6 +422,140 @@ async function testPrismaLoginAndManagedUserCrudFlow(): Promise<void> {
         false,
       );
       assert.equal(prisma.__state.findUniqueCalls > 0, true);
+    },
+  );
+}
+
+async function testPrismaManagedUserPasswordProvisioningFlow(): Promise<void> {
+  await withEnv(
+    {
+      DATA_SOURCE: "prisma",
+      AUTH_SECRET: "unit-test-secret",
+      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+      NODE_ENV: "test",
+    },
+    async () => {
+      const prisma = createPrismaServiceMock({
+        users: [
+          createPrismaUser({
+            id: "usr-super",
+            name: "Super Admin",
+            email: "super.admin@example.com",
+            username: "super.admin",
+            role: "SUPER_ADMIN",
+            passwordHash: hashAuthPassword("Super#2026"),
+          }),
+          createPrismaUser({
+            id: "usr-operator",
+            name: "Operator Admin",
+            email: "operator.admin@example.com",
+            username: "operator.admin",
+            role: "ADMIN",
+            passwordHash: null,
+          }),
+        ],
+      });
+
+      const service = new AuthService(prisma);
+      const created = await service.createManagedUser({
+        name: "  Access Admin  ",
+        email: "Access.Admin@example.com",
+        roleId: "admin",
+        password: "AccessAdmin#2026",
+      });
+      assert.equal(created.hasPassword, true);
+
+      const createdLogin = await service.login({
+        identifier: "access.admin@example.com",
+        password: "AccessAdmin#2026",
+      });
+      assert.equal(createdLogin.user.accessTier, "admin");
+
+      const reset = await service.setManagedUserPassword("usr-operator", "Operator#2026");
+      assert.equal(reset.hasPassword, true);
+
+      const resetLogin = await service.login({
+        identifier: "operator.admin@example.com",
+        password: "Operator#2026",
+      });
+      assert.equal(resetLogin.user.accessTier, "admin");
+    },
+  );
+}
+
+async function testPrismaLoginUpgradesLegacyPasswordHash(): Promise<void> {
+  await withEnv(
+    {
+      DATA_SOURCE: "prisma",
+      AUTH_SECRET: "unit-test-secret",
+      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+      NODE_ENV: "test",
+    },
+    async () => {
+      const legacyHash = createLegacyScryptPasswordHashForTest("Admin#2026");
+      const prisma = createPrismaServiceMock({
+        users: [
+          createPrismaUser({
+            id: "usr-admin",
+            name: "Admin User",
+            email: "admin.user@example.com",
+            username: "admin.user",
+            role: "ADMIN",
+            passwordHash: legacyHash,
+          }),
+        ],
+      });
+
+      const service = new AuthService(prisma);
+      const loginResponse = await service.login({
+        identifier: "admin.user@example.com",
+        password: "Admin#2026",
+      });
+
+      assert.equal(loginResponse.user.accessTier, "admin");
+      assert.equal(prisma.__state.updateCalls, 1);
+
+      const upgradedHash = prisma.__state.users[0]?.passwordHash ?? "";
+      assert.notEqual(upgradedHash, legacyHash);
+      assert.match(upgradedHash, /^\$2[aby]\$\d{2}\$/);
+      assert.equal(verifyAuthPassword("Admin#2026", upgradedHash), true);
+    },
+  );
+}
+
+async function testPrismaLoginStillSucceedsWhenLegacyHashUpgradeFails(): Promise<void> {
+  await withEnv(
+    {
+      DATA_SOURCE: "prisma",
+      AUTH_SECRET: "unit-test-secret",
+      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+      NODE_ENV: "test",
+    },
+    async () => {
+      const legacyHash = createLegacyScryptPasswordHashForTest("Admin#2026");
+      const prisma = createPrismaServiceMock({
+        failUpdateOnce: true,
+        users: [
+          createPrismaUser({
+            id: "usr-admin",
+            name: "Admin User",
+            email: "admin.user@example.com",
+            username: "admin.user",
+            role: "ADMIN",
+            passwordHash: legacyHash,
+          }),
+        ],
+      });
+
+      const service = new AuthService(prisma);
+      const loginResponse = await service.login({
+        identifier: "admin.user@example.com",
+        password: "Admin#2026",
+      });
+
+      assert.equal(loginResponse.user.accessTier, "admin");
+      assert.equal(prisma.__state.updateCalls, 1);
+      assert.equal(prisma.__state.users[0]?.passwordHash, legacyHash);
     },
   );
 }
@@ -718,6 +872,18 @@ async function testTokenValidationAndEnvironmentGuards(): Promise<void> {
 
 async function main(): Promise<void> {
   await runCase("auth prisma login and managed user CRUD", testPrismaLoginAndManagedUserCrudFlow);
+  await runCase(
+    "auth prisma managed user password provisioning",
+    testPrismaManagedUserPasswordProvisioningFlow,
+  );
+  await runCase(
+    "auth prisma login upgrades legacy password hash",
+    testPrismaLoginUpgradesLegacyPasswordHash,
+  );
+  await runCase(
+    "auth prisma login tolerates legacy password rehash failure",
+    testPrismaLoginStillSucceedsWhenLegacyHashUpgradeFails,
+  );
   await runCase("auth prisma conflict and protection branches", testPrismaConflictAndProtectionBranches);
   await runCase("auth prisma bootstrap and retry", testPrismaBootstrapAndRetryAfterFailure);
   await runCase("auth token validation and environment guards", testTokenValidationAndEnvironmentGuards);

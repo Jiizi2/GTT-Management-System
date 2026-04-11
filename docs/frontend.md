@@ -5,7 +5,7 @@ Dokumen ini menjelaskan arsitektur frontend, alur state, integrasi API, dan comm
 ## 1. Ringkasan Teknis
 
 - Lokasi: `apps/frontend`
-- Stack: React 19 + TypeScript + Tailwind CSS
+- Stack: React 19 + TypeScript + Tailwind CSS + React Router + TanStack Query + React Hook Form + Zod
 - Bundler/build: esbuild
 - Dev server: script custom `scripts/dev.mjs`
 - Testing: unit test, smoke test, dan Playwright e2e
@@ -14,16 +14,18 @@ Dokumen ini menjelaskan arsitektur frontend, alur state, integrasi API, dan comm
 
 Direktori utama:
 
-- `src/app.tsx`: root app shell + login gate + layout desktop/mobile.
+- `src/app.tsx`: root app routes + auth gate + layout desktop/mobile.
 - `src/components/*`: komponen UI reusable.
 - `src/pages/*`: layar/halaman per fitur.
 - `src/hooks/*`: state orchestration dan komunikasi backend.
+- `src/hooks/app-controller/*`: hook modular untuk navigation, feedback, dan group state.
 - `src/shared/*`: tipe domain + helper bisnis frontend.
 - `public/*`: aset statis + `index.html`.
 
 ## 3. Navigasi dan Halaman
 
-Navigasi dikendalikan oleh `activeNav` (bukan router framework eksternal). Halaman utama:
+Navigasi browser sekarang dikendalikan oleh `react-router-dom`, dengan `activeNav`
+turunan dari path aktif. Halaman utama:
 
 - Overview
 - Add New Group
@@ -35,7 +37,8 @@ Navigasi dikendalikan oleh `activeNav` (bukan router framework eksternal). Halam
 - Master Data
 - Profile
 
-Pemilihan layar dipusatkan di `src/components/app-main-content.tsx` (lazy loaded per screen).
+Deklarasi route halaman dipusatkan di `src/components/app-main-content.tsx`
+(lazy loaded per screen).
 
 ## 4. State Management dan Sinkronisasi
 
@@ -43,18 +46,25 @@ State global dashboard dipusatkan di hook:
 
 - `src/hooks/use-app-controller.ts`
 
+Hook ini sekarang mengomposisikan beberapa hook kecil:
+
+- `src/hooks/app-controller/use-dashboard-route-state.ts`
+- `src/hooks/app-controller/use-dashboard-sync-feedback.ts`
+- `src/hooks/app-controller/use-dashboard-group-records.ts`
+
 Tanggung jawab hook ini:
 
 - Menyimpan state UI (nav, query, sidebar, selection).
 - Memuat data grup dari backend.
 - Menangani save/update/delete grup dan perubahan visa/checklist.
 - Menampilkan feedback sinkronisasi sukses/gagal.
-- Menyimpan nav aktif dan access tier ke localStorage.
+- Memakai access tier dari sesi aktif yang sudah direstorasi dari backend.
 
 Strategi update:
 
 - Optimistic update di UI.
 - Lalu sync ke backend.
+- Fetch session dan group list memakai TanStack Query.
 - Jika backend gagal:
   - host lokal: tetap lanjut fallback lokal,
   - host non-lokal: state bisa direfresh dari backend.
@@ -69,8 +79,13 @@ File inti:
 Mekanisme:
 
 - Login kirim `identifier`, `password`, `rememberSession` ke `/api/auth/login`.
-- Session + access token disimpan di localStorage.
-- Semua request backend menambahkan header `Authorization: Bearer <token>`.
+- Form login memakai `react-hook-form` + `zod`.
+- Backend mengembalikan snapshot sesi lalu menyimpan auth token ke cookie `HttpOnly`.
+- Frontend hanya menyimpan snapshot sesi non-sensitif:
+  - `localStorage` bila `rememberSession=true`
+  - `sessionStorage` bila `rememberSession=false`
+- Semua request backend memakai `credentials: "include"`.
+- Saat bootstrap app, frontend memanggil `/api/auth/session` untuk memverifikasi dan merestorasi sesi.
 - Bila backend balas `401`, session dihapus otomatis.
 
 ## 6. Integrasi API per Domain
@@ -95,6 +110,11 @@ Ini memungkinkan deploy frontend dan backend:
 
 - domain yang sama (reverse proxy), atau
 - domain terpisah dengan injeksi runtime config.
+
+Catatan keamanan deployment:
+
+- Jika frontend dan backend beda origin, backend harus mengizinkan origin frontend secara eksplisit di `CORS_ORIGINS`.
+- Jangan gunakan wildcard `*` karena auth browser sekarang berbasis cookie ber-credential.
 
 Saat build atau `dev` dijalankan, frontend menulis `dist/runtime-config.js` dari
 `GTT_API_BASE_URL` bila env itu diisi. File ini dimuat sebelum `index.js`, jadi

@@ -3,15 +3,14 @@ import {
   AUTH_STATE_CHANGED_EVENT,
   clearAuthSession,
   coerceAuthSession,
-  getAuthAccessToken,
   persistAuthSession,
   readPersistedAuthSession,
   type AuthSession,
 } from "../shared/auth-session.js";
 
-const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v1";
-const AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
-const SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
+const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v2";
+const LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
+const LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
 
 type Listener = (event: Event) => void;
 
@@ -34,19 +33,24 @@ class MemoryStorage {
 function createWindowMock(): {
   windowMock: {
     localStorage: MemoryStorage;
+    sessionStorage: MemoryStorage;
     addEventListener: (type: string, listener: Listener) => void;
     removeEventListener: (type: string, listener: Listener) => void;
     dispatchEvent: (event: Event) => boolean;
   };
-  storage: MemoryStorage;
+  localStorage: MemoryStorage;
+  sessionStorage: MemoryStorage;
 } {
-  const storage = new MemoryStorage();
+  const localStorage = new MemoryStorage();
+  const sessionStorage = new MemoryStorage();
   const listenersByEvent = new Map<string, Set<Listener>>();
 
   return {
-    storage,
+    localStorage,
+    sessionStorage,
     windowMock: {
-      localStorage: storage,
+      localStorage,
+      sessionStorage,
       addEventListener: (type: string, listener: Listener) => {
         const listeners = listenersByEvent.get(type) ?? new Set<Listener>();
         listeners.add(listener);
@@ -74,10 +78,14 @@ function createWindowMock(): {
 }
 
 function withMockWindow<T>(
-  fn: (context: { storage: MemoryStorage; countAuthStateEvents: () => number }) => T,
+  fn: (context: {
+    localStorage: MemoryStorage;
+    sessionStorage: MemoryStorage;
+    countAuthStateEvents: () => number;
+  }) => T,
 ): T {
   const previousWindow = (globalThis as { window?: unknown }).window;
-  const { windowMock, storage } = createWindowMock();
+  const { windowMock, localStorage, sessionStorage } = createWindowMock();
   let authStateEventCount = 0;
 
   windowMock.addEventListener(AUTH_STATE_CHANGED_EVENT, () => {
@@ -92,7 +100,8 @@ function withMockWindow<T>(
 
   try {
     return fn({
-      storage,
+      localStorage,
+      sessionStorage,
       countAuthStateEvents: () => authStateEventCount,
     });
   } finally {
@@ -115,8 +124,6 @@ async function runCase(name: string, fn: () => void): Promise<void> {
 
 function testCoerceAuthSessionValidation(): void {
   const normalized = coerceAuthSession({
-    accessToken: "  token-123  ",
-    tokenType: "Bearer",
     expiresAt: "2026-08-10T07:00:00.000Z",
     rememberSession: 1,
     user: {
@@ -128,16 +135,11 @@ function testCoerceAuthSessionValidation(): void {
     },
   });
   assert.ok(normalized);
-  assert.equal(normalized?.accessToken, "token-123");
-  assert.equal(normalized?.tokenType, "Bearer");
   assert.equal(normalized?.rememberSession, true);
   assert.equal(normalized?.expiresAt, "2026-08-10T07:00:00.000Z");
 
   assert.equal(
     coerceAuthSession({
-      accessToken: "token-123",
-      tokenType: "Unknown",
-      expiresAt: "2026-08-10T07:00:00.000Z",
       rememberSession: false,
       user: {
         id: "usr-100",
@@ -152,8 +154,6 @@ function testCoerceAuthSessionValidation(): void {
 
   assert.equal(
     coerceAuthSession({
-      accessToken: "token-123",
-      tokenType: "Bearer",
       expiresAt: "not-a-date",
       rememberSession: false,
       user: {
@@ -168,11 +168,9 @@ function testCoerceAuthSessionValidation(): void {
   );
 }
 
-function testPersistReadAndClearAuthSession(): void {
-  withMockWindow(({ storage, countAuthStateEvents }) => {
+function testPersistReadAndClearRememberedAuthSession(): void {
+  withMockWindow(({ localStorage, sessionStorage, countAuthStateEvents }) => {
     const validSession: AuthSession = {
-      accessToken: "token-456",
-      tokenType: "Bearer",
       expiresAt: "2099-01-01T00:00:00.000Z",
       rememberSession: true,
       user: {
@@ -186,36 +184,55 @@ function testPersistReadAndClearAuthSession(): void {
 
     persistAuthSession(validSession);
     assert.equal(countAuthStateEvents(), 1);
-    assert.equal(storage.getItem(AUTH_ACCESS_TOKEN_STORAGE_KEY), "token-456");
-    assert.equal(storage.getItem(SESSION_ACCESS_TIER_STORAGE_KEY), "super-admin");
+    assert.equal(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
 
-    const rawStoredSession = storage.getItem(AUTH_SESSION_STORAGE_KEY);
+    const rawStoredSession = localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
     assert.ok(rawStoredSession);
-    const parsed = JSON.parse(rawStoredSession ?? "{}") as { accessToken?: string };
-    assert.equal(parsed.accessToken, "token-456");
+    const parsed = JSON.parse(rawStoredSession ?? "{}") as { expiresAt?: string; accessToken?: string };
+    assert.equal(parsed.expiresAt, validSession.expiresAt);
+    assert.equal(parsed.accessToken, undefined);
 
-    assert.equal(getAuthAccessToken(), "token-456");
     assert.equal(readPersistedAuthSession()?.user.username, "operator.two");
 
     clearAuthSession();
     assert.equal(countAuthStateEvents(), 2);
-    assert.equal(storage.getItem(AUTH_SESSION_STORAGE_KEY), null);
-    assert.equal(storage.getItem(AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
-    assert.equal(storage.getItem(SESSION_ACCESS_TIER_STORAGE_KEY), null);
-    assert.equal(getAuthAccessToken(), null);
+    assert.equal(localStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
+    assert.equal(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
+  });
+}
+
+function testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys(): void {
+  withMockWindow(({ localStorage, sessionStorage }) => {
+    localStorage.setItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
+    localStorage.setItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY, "admin");
+
+    persistAuthSession({
+      expiresAt: "2099-02-01T00:00:00.000Z",
+      rememberSession: false,
+      user: {
+        id: "usr-201",
+        name: "Operator Three",
+        username: "operator.three",
+        email: "operator.three@example.com",
+        accessTier: "admin",
+      },
+    });
+
+    assert.equal(localStorage.getItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
+    assert.notEqual(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
   });
 }
 
 function testReadPersistedSessionRejectsInvalidAndExpiredData(): void {
-  withMockWindow(({ storage, countAuthStateEvents }) => {
-    storage.setItem(AUTH_SESSION_STORAGE_KEY, "{ this-is-not-json");
+  withMockWindow(({ localStorage, sessionStorage, countAuthStateEvents }) => {
+    localStorage.setItem(AUTH_SESSION_STORAGE_KEY, "{ this-is-not-json");
     assert.equal(readPersistedAuthSession(), null);
-    assert.equal(storage.getItem(AUTH_SESSION_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
     assert.equal(countAuthStateEvents() >= 1, true);
 
     const expiredSession: AuthSession = {
-      accessToken: "token-expired",
-      tokenType: "Bearer",
       expiresAt: "2020-01-01T00:00:00.000Z",
       rememberSession: false,
       user: {
@@ -226,20 +243,21 @@ function testReadPersistedSessionRejectsInvalidAndExpiredData(): void {
         accessTier: "admin",
       },
     };
-    storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(expiredSession));
-    storage.setItem(AUTH_ACCESS_TOKEN_STORAGE_KEY, expiredSession.accessToken);
-    storage.setItem(SESSION_ACCESS_TIER_STORAGE_KEY, expiredSession.user.accessTier);
+    sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(expiredSession));
+    localStorage.setItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
+    localStorage.setItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY, expiredSession.user.accessTier);
 
     assert.equal(readPersistedAuthSession(), null);
-    assert.equal(storage.getItem(AUTH_SESSION_STORAGE_KEY), null);
-    assert.equal(storage.getItem(AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
-    assert.equal(storage.getItem(SESSION_ACCESS_TIER_STORAGE_KEY), null);
+    assert.equal(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY), null);
   });
 }
 
 async function main(): Promise<void> {
   await runCase("auth session coercion validation", testCoerceAuthSessionValidation);
-  await runCase("auth session persist/read/clear flow", testPersistReadAndClearAuthSession);
+  await runCase("auth session persist/read/clear remembered flow", testPersistReadAndClearRememberedAuthSession);
+  await runCase("auth session ephemeral storage and legacy purge", testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys);
   await runCase("auth session invalid/expired persistence guard", testReadPersistedSessionRejectsInvalidAndExpiredData);
 }
 

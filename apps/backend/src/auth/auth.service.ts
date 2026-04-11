@@ -5,18 +5,29 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { AuthUserRole, Prisma } from "@prisma/client";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+  resolveConfiguredBoolean,
+  resolveConfiguredDataSource,
+  resolveConfiguredNodeEnv,
+  resolveConfiguredString,
+} from "../config/app-config";
 import { PrismaService } from "../prisma/prisma.service";
 import {
-  createDefaultAuthUserStorageRecords,
+  createDefaultAuthUserStorageRecordsWithOverrides,
   mapManagedRoleToPrismaRole,
   mapPrismaRoleToAccessTier,
   mapPrismaRoleToManagedRole,
   normalizeAuthEmail,
   normalizeAuthIdentifier,
 } from "./auth-default-users";
-import { verifyAuthPassword } from "./auth-password";
+import {
+  hashAuthPasswordAsync,
+  isLegacyAuthPasswordHash,
+  verifyAuthPasswordAsync,
+} from "./auth-password";
 import { LoginDto } from "./dto/login.dto";
 import {
   type AuthLoginResponse,
@@ -33,13 +44,17 @@ type AuthDevAccount = AuthSessionUser & {
 type AuthManagedUserRecord = {
   id: string;
   name: string;
+  username: string;
   email: string;
   roleId: AuthManagedUserRole;
+  passwordHash: string | null;
   updatedAtEpochMs: number;
 };
 
 const TOKEN_TYPE = "Bearer" as const;
 const HEADER_TEMPLATE = { alg: "HS256", typ: "JWT" };
+const DEFAULT_AUTH_SECRET = "gtt-dev-auth-secret-please-change-in-production";
+const MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH = 32;
 
 const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
 const REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 14;
@@ -85,8 +100,9 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
       ? record.accessTier
       : null;
   const exp = toPositiveInteger(record.exp);
+  const rememberSession = typeof record.rememberSession === "boolean" ? record.rememberSession : null;
 
-  if (!id || !name || !username || !email || !accessTier || !exp) {
+  if (!id || !name || !username || !email || !accessTier || !exp || rememberSession === null) {
     return null;
   }
 
@@ -97,38 +113,55 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
     email,
     accessTier,
     exp,
+    rememberSession,
   };
 }
 
-function resolveAuthSecret(): string {
-  const configured = process.env.AUTH_SECRET?.trim();
+function resolveAuthSecret(configService?: ConfigService): string {
+  const configured = resolveConfiguredString(configService, "AUTH_SECRET");
+  const nodeEnv = resolveConfiguredNodeEnv(configService);
+
   if (configured) {
+    if (nodeEnv === "production" && configured.length < MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH) {
+      throw new Error(
+        `AUTH_SECRET must be at least ${MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH} characters in production.`,
+      );
+    }
+
+    if (nodeEnv === "production" && configured === DEFAULT_AUTH_SECRET) {
+      throw new Error("AUTH_SECRET must not use the development default value in production.");
+    }
+
     return configured;
   }
 
-  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
   if (nodeEnv === "production") {
     throw new Error("AUTH_SECRET is required in production.");
   }
 
-  return "gtt-dev-auth-secret-please-change-in-production";
+  return DEFAULT_AUTH_SECRET;
 }
 
-function resolveShouldBootstrapPrismaAuthUsers(): boolean {
-  const configured = process.env.AUTH_BOOTSTRAP_DEFAULT_USERS?.trim().toLowerCase();
-  if (configured === "true") {
+function resolveShouldBootstrapPrismaAuthUsers(configService?: ConfigService): boolean {
+  const configured = resolveConfiguredBoolean(configService, "AUTH_BOOTSTRAP_DEFAULT_USERS");
+  if (configured === true) {
+    const nodeEnv = resolveConfiguredNodeEnv(configService);
+    if (nodeEnv === "production") {
+      throw new Error("AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production.");
+    }
+
     return true;
   }
 
-  if (configured === "false") {
+  if (configured === false) {
     return false;
   }
 
-  const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+  const nodeEnv = resolveConfiguredNodeEnv(configService);
   return nodeEnv !== "production";
 }
 
-function createDefaultDevAccounts(): AuthDevAccount[] {
+function createDefaultDevAccounts(configService?: ConfigService): AuthDevAccount[] {
   return [
     {
       id: "dev-super-admin",
@@ -136,7 +169,9 @@ function createDefaultDevAccounts(): AuthDevAccount[] {
       username: "dev.superadmin",
       email: "superadmin.dev@ghaniya.local",
       accessTier: "super-admin",
-      password: process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026",
+      password:
+        resolveConfiguredString(configService, "DEV_AUTH_SUPERADMIN_PASSWORD") ||
+        "DevSuperAdmin#2026",
     },
     {
       id: "dev-admin",
@@ -144,7 +179,8 @@ function createDefaultDevAccounts(): AuthDevAccount[] {
       username: "dev.admin",
       email: "admin.dev@ghaniya.local",
       accessTier: "admin",
-      password: process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026",
+      password:
+        resolveConfiguredString(configService, "DEV_AUTH_ADMIN_PASSWORD") || "DevAdmin#2026",
     },
   ];
 }
@@ -155,22 +191,28 @@ function createDefaultManagedUsers(): AuthManagedUserRecord[] {
     {
       id: "usr-1",
       name: "Operator Admin",
+      username: "operator.admin",
       email: "operator.admin@ghaniyatravel.com",
       roleId: "admin",
+      passwordHash: null,
       updatedAtEpochMs: now,
     },
     {
       id: "usr-2",
       name: "Mila Finance",
+      username: "mila.finance",
       email: "mila.finance@ghaniyatravel.com",
       roleId: "finance-manager",
+      passwordHash: null,
       updatedAtEpochMs: now,
     },
     {
       id: "usr-3",
       name: "Hadi Support",
+      username: "hadi.support",
       email: "hadi.support@ghaniyatravel.com",
       roleId: "customer-support",
+      passwordHash: null,
       updatedAtEpochMs: now,
     },
   ];
@@ -187,18 +229,27 @@ function normalizeUsernameCandidate(value: string): string {
   return normalized || "user";
 }
 
+function mapManagedRoleToAccessTier(roleId: AuthManagedUserRole): AuthSessionUser["accessTier"] | null {
+  return mapPrismaRoleToAccessTier(mapManagedRoleToPrismaRole(roleId));
+}
+
 @Injectable()
 export class AuthService {
-  private readonly authSecret = resolveAuthSecret();
+  private readonly authSecret: string;
   private readonly dataSource: "memory" | "prisma";
-  private readonly shouldBootstrapPrismaAuthUsers = resolveShouldBootstrapPrismaAuthUsers();
-  private readonly accounts = createDefaultDevAccounts();
+  private readonly shouldBootstrapPrismaAuthUsers: boolean;
+  private readonly accounts: AuthDevAccount[];
   private readonly managedUsers = createDefaultManagedUsers();
   private prismaBootstrapPromise: Promise<void> | null = null;
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {
-    const configuredSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
-    this.dataSource = configuredSource === "prisma" ? "prisma" : "memory";
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly configService?: ConfigService,
+  ) {
+    this.authSecret = resolveAuthSecret(this.configService);
+    this.dataSource = resolveConfiguredDataSource(this.configService);
+    this.shouldBootstrapPrismaAuthUsers = resolveShouldBootstrapPrismaAuthUsers(this.configService);
+    this.accounts = createDefaultDevAccounts(this.configService);
   }
 
   async login(payload: LoginDto): Promise<AuthLoginResponse> {
@@ -268,6 +319,7 @@ export class AuthService {
     name: string;
     email: string;
     roleId: AuthManagedUserRole;
+    password?: string;
   }): Promise<AuthManagedUser> {
     if (this.dataSource === "prisma") {
       await this.ensurePrismaAuthUsersSeeded();
@@ -299,6 +351,15 @@ export class AuthService {
     this.deleteManagedUserInMemory(userId);
   }
 
+  async setManagedUserPassword(userId: string, password: string): Promise<AuthManagedUser> {
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaAuthUsersSeeded();
+      return this.setManagedUserPasswordWithPrisma(userId, password);
+    }
+
+    return this.setManagedUserPasswordInMemory(userId, password);
+  }
+
   private signToken(payload: AuthTokenPayload): string {
     const encodedHeader = base64UrlEncodeJson(HEADER_TEMPLATE);
     const encodedPayload = base64UrlEncodeJson(payload);
@@ -319,6 +380,7 @@ export class AuthService {
       name: user.name,
       email: user.email,
       roleId: user.roleId,
+      hasPassword: Boolean(user.passwordHash),
       updatedAt: new Date(user.updatedAtEpochMs).toISOString(),
     };
   }
@@ -328,6 +390,7 @@ export class AuthService {
     name: string;
     email: string;
     role: AuthUserRole;
+    passwordHash: string | null;
     updatedAt: Date;
   }): AuthManagedUser {
     return {
@@ -335,6 +398,7 @@ export class AuthService {
       name: user.name,
       email: normalizeManagedUserEmail(user.email),
       roleId: mapPrismaRoleToManagedRole(user.role),
+      hasPassword: Boolean(user.passwordHash),
       updatedAt: user.updatedAt.toISOString(),
     };
   }
@@ -353,6 +417,7 @@ export class AuthService {
     const tokenPayload: AuthTokenPayload = {
       ...account,
       exp: expiresAtEpochSeconds,
+      rememberSession,
     };
     const accessToken = this.signToken(tokenPayload);
 
@@ -365,7 +430,7 @@ export class AuthService {
     };
   }
 
-  private loginWithMemory(payload: LoginDto): AuthLoginResponse {
+  private async loginWithMemory(payload: LoginDto): Promise<AuthLoginResponse> {
     const identifier = normalizeAuthIdentifier(payload.identifier);
     const password = payload.password;
     const rememberSession = Boolean(payload.rememberSession);
@@ -377,17 +442,46 @@ export class AuthService {
       );
     });
 
-    if (!account || account.password !== password) {
+    if (account) {
+      if (account.password !== password) {
+        throw new UnauthorizedException("Invalid username/email or password.");
+      }
+
+      return this.buildLoginResponse({
+        account: {
+          id: account.id,
+          name: account.name,
+          username: account.username,
+          email: account.email,
+          accessTier: account.accessTier,
+        },
+        rememberSession,
+      });
+    }
+
+    const managedUser = this.managedUsers.find((entry) => {
+      return (
+        normalizeAuthIdentifier(entry.username) === identifier ||
+        normalizeAuthIdentifier(entry.email) === identifier
+      );
+    });
+
+    if (!managedUser?.passwordHash || !(await verifyAuthPasswordAsync(password, managedUser.passwordHash))) {
       throw new UnauthorizedException("Invalid username/email or password.");
+    }
+
+    const accessTier = mapManagedRoleToAccessTier(managedUser.roleId);
+    if (!accessTier) {
+      throw new UnauthorizedException("Account is not allowed to access dashboard login.");
     }
 
     return this.buildLoginResponse({
       account: {
-        id: account.id,
-        name: account.name,
-        username: account.username,
-        email: account.email,
-        accessTier: account.accessTier,
+        id: managedUser.id,
+        name: managedUser.name,
+        username: managedUser.username,
+        email: managedUser.email,
+        accessTier,
       },
       rememberSession,
     });
@@ -413,8 +507,12 @@ export class AuthService {
       },
     });
 
-    if (!account?.passwordHash || !verifyAuthPassword(password, account.passwordHash)) {
+    if (!account?.passwordHash || !(await verifyAuthPasswordAsync(password, account.passwordHash))) {
       throw new UnauthorizedException("Invalid username/email or password.");
+    }
+
+    if (isLegacyAuthPasswordHash(account.passwordHash)) {
+      await this.upgradeLegacyPasswordHash(account.id, password);
     }
 
     const accessTier = mapPrismaRoleToAccessTier(account.role);
@@ -448,6 +546,7 @@ export class AuthService {
         name: true,
         email: true,
         role: true,
+        passwordHash: true,
         updatedAt: true,
       },
     });
@@ -455,11 +554,12 @@ export class AuthService {
     return users.map((user) => this.toManagedUserFromPrisma(user));
   }
 
-  private createManagedUserInMemory(payload: {
+  private async createManagedUserInMemory(payload: {
     name: string;
     email: string;
     roleId: AuthManagedUserRole;
-  }): AuthManagedUser {
+    password?: string;
+  }): Promise<AuthManagedUser> {
     const normalizedName = normalizeManagedUserName(payload.name);
     const normalizedEmail = normalizeManagedUserEmail(payload.email);
     if (!normalizedName || !normalizedEmail) {
@@ -473,11 +573,16 @@ export class AuthService {
       throw new ConflictException(`Email '${normalizedEmail}' is already used by another user.`);
     }
 
+    const username = this.allocateMemoryUsername(normalizedEmail);
     const nextUser: AuthManagedUserRecord = {
       id: `usr-${Date.now().toString(36)}`,
       name: normalizedName,
+      username,
       email: normalizedEmail,
       roleId: payload.roleId,
+      passwordHash: payload.password?.trim()
+        ? await hashAuthPasswordAsync(payload.password.trim())
+        : null,
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers.unshift(nextUser);
@@ -489,6 +594,7 @@ export class AuthService {
     name: string;
     email: string;
     roleId: AuthManagedUserRole;
+    password?: string;
   }): Promise<AuthManagedUser> {
     const normalizedName = normalizeManagedUserName(payload.name);
     const normalizedEmail = normalizeManagedUserEmail(payload.email);
@@ -510,13 +616,16 @@ export class AuthService {
 
     const username = await this.allocateUsername(normalizedEmail);
     try {
+      const passwordHash = payload.password?.trim()
+        ? await hashAuthPasswordAsync(payload.password.trim())
+        : null;
       const created = await this.prisma.authUser.create({
         data: {
           name: normalizedName,
           email: normalizedEmail,
           username,
           role: mapManagedRoleToPrismaRole(payload.roleId),
-          passwordHash: null,
+          passwordHash,
           isActive: true,
         },
         select: {
@@ -524,6 +633,7 @@ export class AuthService {
           name: true,
           email: true,
           role: true,
+          passwordHash: true,
           updatedAt: true,
         },
       });
@@ -635,11 +745,78 @@ export class AuthService {
         name: true,
         email: true,
         role: true,
+        passwordHash: true,
         updatedAt: true,
       },
     });
 
     return this.toManagedUserFromPrisma(updated);
+  }
+
+  private async setManagedUserPasswordInMemory(
+    userId: string,
+    password: string,
+  ): Promise<AuthManagedUser> {
+    const normalizedUserId = userId.trim();
+    const targetIndex = this.managedUsers.findIndex((user) => user.id === normalizedUserId);
+    if (targetIndex === -1) {
+      throw new NotFoundException(`User '${userId}' not found.`);
+    }
+
+    const normalizedPassword = password.trim();
+    if (!normalizedPassword) {
+      throw new ConflictException("Password is required.");
+    }
+
+    const current = this.managedUsers[targetIndex];
+    const updated: AuthManagedUserRecord = {
+      ...current,
+      passwordHash: await hashAuthPasswordAsync(normalizedPassword),
+      updatedAtEpochMs: Date.now(),
+    };
+    this.managedUsers[targetIndex] = updated;
+    return this.toManagedUser(updated);
+  }
+
+  private async setManagedUserPasswordWithPrisma(
+    userId: string,
+    password: string,
+  ): Promise<AuthManagedUser> {
+    const normalizedUserId = userId.trim();
+    const normalizedPassword = password.trim();
+    if (!normalizedPassword) {
+      throw new ConflictException("Password is required.");
+    }
+
+    try {
+      const updated = await this.prisma.authUser.update({
+        where: {
+          id: normalizedUserId,
+        },
+        data: {
+          passwordHash: await hashAuthPasswordAsync(normalizedPassword),
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          passwordHash: true,
+          updatedAt: true,
+        },
+      });
+
+      return this.toManagedUserFromPrisma(updated);
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException(`User '${userId}' not found.`);
+      }
+
+      throw error;
+    }
   }
 
   private deleteManagedUserInMemory(userId: string): void {
@@ -739,6 +916,27 @@ export class AuthService {
     }
   }
 
+  private allocateMemoryUsername(normalizedEmail: string): string {
+    const [emailLocalPart] = normalizedEmail.split("@");
+    const baseUsername = normalizeUsernameCandidate(emailLocalPart || "user");
+    const reservedUsernames = new Set<string>([
+      ...this.accounts.map((entry) => normalizeAuthIdentifier(entry.username)),
+      ...this.managedUsers.map((entry) => normalizeAuthIdentifier(entry.username)),
+    ]);
+
+    let candidate = baseUsername;
+    let suffix = 1;
+    while (reservedUsernames.has(candidate)) {
+      candidate = `${baseUsername}.${suffix}`;
+      suffix += 1;
+      if (suffix > 1000) {
+        throw new ConflictException("Unable to allocate a unique username.");
+      }
+    }
+
+    return candidate;
+  }
+
   private async ensurePrismaAuthUsersSeeded(): Promise<void> {
     if (this.dataSource !== "prisma" || !this.shouldBootstrapPrismaAuthUsers) {
       return;
@@ -757,7 +955,10 @@ export class AuthService {
   }
 
   private async bootstrapPrismaAuthUsers(): Promise<void> {
-    const defaultUsers = createDefaultAuthUserStorageRecords();
+    const defaultUsers = createDefaultAuthUserStorageRecordsWithOverrides({
+      superAdminPassword: resolveConfiguredString(this.configService, "DEV_AUTH_SUPERADMIN_PASSWORD"),
+      adminPassword: resolveConfiguredString(this.configService, "DEV_AUTH_ADMIN_PASSWORD"),
+    });
 
     for (const defaultUser of defaultUsers) {
       const existingByUsername = await this.prisma.authUser.findUnique({
@@ -787,6 +988,21 @@ export class AuthService {
       await this.prisma.authUser.create({
         data: defaultUser,
       });
+    }
+  }
+
+  private async upgradeLegacyPasswordHash(userId: string, password: string): Promise<void> {
+    try {
+      await this.prisma.authUser.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          passwordHash: await hashAuthPasswordAsync(password),
+        },
+      });
+    } catch {
+      // Best-effort migration so a transient write failure does not block login.
     }
   }
 }

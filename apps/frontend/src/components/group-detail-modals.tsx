@@ -1,5 +1,8 @@
 import { createPortal } from "react-dom";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
 import { SereneSelect } from "./serene-select";
@@ -29,6 +32,21 @@ const modalSelectClassName = "serene-select";
 const modalTextareaClassName = "serene-textarea";
 const modalOverlayClassName = "serene-modal-overlay z-[120]";
 
+const musyrifModalSchema = z.object({
+  name: z.string().trim().min(1, "Musyrif name wajib diisi."),
+  phone: z.string().trim().min(1, "Phone number wajib diisi."),
+});
+
+const groupEditModalSchema = z.object({
+  code: z.string().trim().min(1, "Group number tidak boleh kosong."),
+  name: z.string().trim().min(1, "Group name tidak boleh kosong."),
+});
+
+const noteModalSchema = z.object({
+  text: z.string().trim().min(1, "Operational note wajib diisi.").max(2000, "Maksimal 2000 karakter."),
+  pinned: z.boolean(),
+});
+
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") {
     return null;
@@ -46,18 +64,28 @@ function shouldUseSaudiCityDropdown(category: string, field: "from" | "to"): boo
 }
 
 export function MusyrifModal({
-  form,
-  isSaveDisabled,
-  onChange,
+  initialValues,
   onClose,
   onSave,
 }: {
-  form: MusyrifFormState;
-  isSaveDisabled: boolean;
-  onChange: <Key extends keyof MusyrifFormState>(field: Key, value: MusyrifFormState[Key]) => void;
+  initialValues: MusyrifFormState;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (values: MusyrifFormState) => void | Promise<void>;
 }) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<MusyrifFormState>({
+    resolver: zodResolver(musyrifModalSchema),
+    defaultValues: initialValues,
+  });
+
+  useEffect(() => {
+    reset(initialValues);
+  }, [initialValues, reset]);
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
@@ -78,17 +106,17 @@ export function MusyrifModal({
             </button>
           </div>
 
-          <div className="space-y-4 px-5 py-4">
+          <form className="space-y-4 px-5 py-4" onSubmit={handleSubmit((values) => void onSave(values))}>
             <div className="grid gap-3 md:grid-cols-2">
               <label className={modalFieldClassName}>
                 <span>Musyrif Name</span>
                 <input
                   className={modalInputClassName}
                   type="text"
-                  value={form.name}
-                  onChange={(event) => onChange("name", event.target.value)}
+                  {...register("name")}
                   placeholder="e.g. Ust. Ahmad Hidayat"
                 />
+                {errors.name ? <p className="text-xs font-medium text-brand-tertiary">{errors.name.message}</p> : null}
               </label>
 
               <label className={modalFieldClassName}>
@@ -96,23 +124,23 @@ export function MusyrifModal({
                 <input
                   className={modalInputClassName}
                   type="tel"
-                  value={form.phone}
-                  onChange={(event) => onChange("phone", event.target.value)}
+                  {...register("phone")}
                   placeholder="+62 812-3456-7890"
                 />
+                {errors.phone ? <p className="text-xs font-medium text-brand-tertiary">{errors.phone.message}</p> : null}
               </label>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-            <button type="button" className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45" onClick={onSave} disabled={isSaveDisabled}>
-              Save Changes
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button type="submit" className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45" disabled={isSubmitting}>
+                Save Changes
+              </button>
 
-            <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary" onClick={onClose}>
-              Cancel
-            </button>
-          </div>
+              <button type="button" className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary" onClick={onClose}>
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </ModalPortal>
@@ -280,28 +308,35 @@ export function DeleteGroupModal({
 export function GroupEditModal({
   groupCode,
   groupName,
-  codeDraft,
-  nameDraft,
-  codeError,
-  nameError,
-  isSaveDisabled,
-  onCodeChange,
-  onNameChange,
   onClose,
   onSave,
 }: {
   groupCode: string;
   groupName: string;
-  codeDraft: string;
-  nameDraft: string;
-  codeError: string;
-  nameError: string;
-  isSaveDisabled: boolean;
-  onCodeChange: (value: string) => void;
-  onNameChange: (value: string) => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (values: { code: string; name: string }) => { ok: true } | { ok: false; message: string } | Promise<{ ok: true } | { ok: false; message: string }>;
 }) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<{ code: string; name: string }>({
+    resolver: zodResolver(groupEditModalSchema),
+    defaultValues: {
+      code: groupCode,
+      name: groupName,
+    },
+  });
+
+  useEffect(() => {
+    reset({
+      code: groupCode,
+      name: groupName,
+    });
+  }, [groupCode, groupName, reset]);
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
@@ -332,7 +367,21 @@ export function GroupEditModal({
             </button>
           </div>
 
-          <div className="space-y-4 px-5 py-4">
+          <form
+            className="space-y-4 px-5 py-4"
+            onSubmit={handleSubmit(async (values) => {
+              const result = await onSave({
+                code: values.code.trim().toUpperCase(),
+                name: values.name.trim(),
+              });
+              if (!result.ok) {
+                setError("root", {
+                  type: "server",
+                  message: result.message,
+                });
+              }
+            })}
+          >
             <div className="space-y-1">
               <h2 id="group-edit-title" className="text-2xl font-bold tracking-tight text-slate-900">
                 Edit Group
@@ -347,44 +396,42 @@ export function GroupEditModal({
               <input
                 className={modalInputClassName}
                 type="text"
-                value={codeDraft}
-                onChange={(event) => onCodeChange(event.target.value.toUpperCase())}
+                {...register("code")}
                 placeholder={groupCode}
               />
             </label>
-            {codeError ? <p className="text-xs font-medium text-brand-tertiary">{codeError}</p> : null}
+            {errors.code ? <p className="text-xs font-medium text-brand-tertiary">{errors.code.message}</p> : null}
 
             <label className={modalFieldClassName}>
               <span>Group Name</span>
               <input
                 className={modalInputClassName}
                 type="text"
-                value={nameDraft}
-                onChange={(event) => onNameChange(event.target.value)}
+                {...register("name")}
                 placeholder={groupName}
               />
             </label>
-            {nameError ? <p className="text-xs font-medium text-brand-tertiary">{nameError}</p> : null}
-          </div>
+            {errors.name ? <p className="text-xs font-medium text-brand-tertiary">{errors.name.message}</p> : null}
+            {errors.root?.message ? <p className="text-xs font-medium text-brand-tertiary">{errors.root.message}</p> : null}
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-            <button
-              type="button"
-              className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-              onClick={onSave}
-              disabled={isSaveDisabled}
-            >
-              Save Changes
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <button
+                type="submit"
+                className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+                disabled={isSubmitting}
+              >
+                Save Changes
+              </button>
 
-            <button
-              type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-          </div>
+              <button
+                type="button"
+                className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </ModalPortal>
@@ -1241,18 +1288,28 @@ export function EditScheduleModal({
 }
 
 export function NoteModal({
-  form,
-  isSaveDisabled,
-  onChange,
   onClose,
   onSave,
 }: {
-  form: NoteFormState;
-  isSaveDisabled: boolean;
-  onChange: <Key extends keyof NoteFormState>(field: Key, value: NoteFormState[Key]) => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (values: NoteFormState) => void | Promise<void>;
 }) {
+  const {
+    register,
+    watch,
+    setValue,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<NoteFormState>({
+    resolver: zodResolver(noteModalSchema),
+    defaultValues: {
+      text: "",
+      pinned: false,
+    },
+  });
+  const noteText = watch("text");
+  const pinned = watch("pinned");
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
@@ -1289,11 +1346,13 @@ export function NoteModal({
                   className={modalTextareaClassName}
                   rows={8}
                   maxLength={2000}
-                  value={form.text}
-                  onChange={(event) => onChange("text", event.target.value)}
                   placeholder="Write your operational note here..."
+                  {...register("text")}
                 />
-                <div className="text-xs text-slate-500">{form.text.length}/2000</div>
+                <div className="text-xs text-slate-500">{noteText.length}/2000</div>
+                {errors.text ? (
+                  <p className="text-xs font-semibold text-error">{errors.text.message}</p>
+                ) : null}
               </div>
             </label>
 
@@ -1308,8 +1367,8 @@ export function NoteModal({
               <button
                 type="button"
                 className="inline-flex items-center gap-3"
-                onClick={() => onChange("pinned", !form.pinned)}
-                aria-pressed={form.pinned}
+                onClick={() => setValue("pinned", !pinned, { shouldDirty: true })}
+                aria-pressed={pinned}
               >
                 <div className="inline-flex items-center gap-1.5 text-sm text-slate-600">
                   <span className="material-symbols-outlined" aria-hidden="true">
@@ -1318,10 +1377,10 @@ export function NoteModal({
                   <span>Pin to top of group feed</span>
                 </div>
 
-                <span className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${form.pinned ? "bg-primary" : "bg-slate-300"}`}>
+                <span className={`inline-flex h-6 w-11 items-center rounded-full p-0.5 transition ${pinned ? "bg-primary" : "bg-slate-300"}`}>
                   <span
                     className={`h-5 w-5 rounded-full bg-surface-container-lowest shadow-sm transition ${
-                      form.pinned ? "translate-x-5" : "translate-x-0"
+                      pinned ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </span>
@@ -1333,8 +1392,8 @@ export function NoteModal({
             <button
               type="button"
               className="serene-btn-primary gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-              onClick={onSave}
-              disabled={isSaveDisabled}
+              onClick={() => void handleSubmit((values) => void onSave(values))()}
+              disabled={isSubmitting}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 check_circle

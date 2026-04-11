@@ -1,11 +1,16 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 
-export type LoginCredentials = {
-  identifier: string;
-  password: string;
-  rememberSession: boolean;
-};
+const loginSchema = z.object({
+  identifier: z.string().trim().min(1, "Username/email wajib diisi."),
+  password: z.string().min(1, "Password wajib diisi."),
+  rememberSession: z.boolean(),
+});
+
+export type LoginCredentials = z.infer<typeof loginSchema>;
 
 export type DevelopmentLoginAccountHint = {
   label: string;
@@ -25,21 +30,23 @@ export function LoginScreen({
   isSubmitting?: boolean;
   developmentAccounts?: DevelopmentLoginAccountHint[];
 }) {
-  const [credentials, setCredentials] = useState<LoginCredentials>({
-    identifier: "",
-    password: "",
-    rememberSession: false,
-  });
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginCredentials>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      identifier: "",
+      password: "",
+      rememberSession: false,
+    },
+  });
 
   useEffect(() => {
     document.title = "Login | Ghaniya Tour and Travel";
   }, []);
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void onSubmit?.(credentials);
-  };
 
   return (
     <main className="flex min-h-screen bg-surface text-on-surface">
@@ -114,7 +121,7 @@ export function LoginScreen({
           </header>
 
           <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 text-left shadow-ambient">
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-6" onSubmit={handleSubmit((credentials) => void onSubmit?.(credentials))}>
               <label className="block space-y-2" htmlFor="login-identifier">
                 <span className="block text-sm font-semibold text-on-surface-variant">
                   Email or Username
@@ -127,21 +134,20 @@ export function LoginScreen({
                   </span>
                   <input
                     id="login-identifier"
-                    name="identifier"
                     type="text"
                     autoComplete="username"
                     placeholder="e.g. operator@alrawda.com"
-                    value={credentials.identifier}
-                    onChange={(event) =>
-                      setCredentials((current) => ({
-                        ...current,
-                        identifier: event.target.value,
-                      }))
-                    }
+                    {...register("identifier")}
                     disabled={isSubmitting}
+                    aria-invalid={errors.identifier ? "true" : "false"}
                     className="h-12 w-full rounded-lg border border-outline-variant/45 bg-surface-container-low pl-10 pr-4 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/55 focus:border-primary/55 focus:ring-2 focus:ring-primary/20"
                   />
                 </span>
+                {errors.identifier ? (
+                  <p className="text-xs font-semibold text-error" role="alert">
+                    {errors.identifier.message}
+                  </p>
+                ) : null}
               </label>
 
               <label className="block space-y-2" htmlFor="login-password">
@@ -159,18 +165,12 @@ export function LoginScreen({
                   </span>
                   <input
                     id="login-password"
-                    name="password"
                     type={isPasswordVisible ? "text" : "password"}
                     autoComplete="current-password"
                     placeholder="********"
-                    value={credentials.password}
-                    onChange={(event) =>
-                      setCredentials((current) => ({
-                        ...current,
-                        password: event.target.value,
-                      }))
-                    }
+                    {...register("password")}
                     disabled={isSubmitting}
+                    aria-invalid={errors.password ? "true" : "false"}
                     className="h-12 w-full rounded-lg border border-outline-variant/45 bg-surface-container-low pl-10 pr-12 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/55 focus:border-primary/55 focus:ring-2 focus:ring-primary/20"
                   />
                   <button
@@ -185,21 +185,19 @@ export function LoginScreen({
                     </span>
                   </button>
                 </span>
+                {errors.password ? (
+                  <p className="text-xs font-semibold text-error" role="alert">
+                    {errors.password.message}
+                  </p>
+                ) : null}
               </label>
 
               <label className="flex items-center gap-3 text-sm font-medium text-on-surface-variant" htmlFor="login-remember">
                 <input
                   id="login-remember"
-                  name="remember"
                   type="checkbox"
                   className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-0"
-                  checked={credentials.rememberSession}
-                  onChange={(event) =>
-                    setCredentials((current) => ({
-                      ...current,
-                      rememberSession: event.target.checked,
-                    }))
-                  }
+                  {...register("rememberSession")}
                   disabled={isSubmitting}
                 />
                 Keep me logged in

@@ -29,7 +29,8 @@
 - Recommended flow:
   1. Copy `env.production.example` to `.env` on production host.
   2. Set real `DATABASE_URL`, `AUTH_SECRET`, and `CORS_ORIGINS`.
-  3. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
+  3. Keep `TRUST_PROXY=false` unless requests really come through a trusted reverse proxy.
+  4. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
 
 ## Quick Start (Fallback: Memory Mode)
 
@@ -53,17 +54,31 @@
 
 ## Runtime Validation
 
+- Runtime env sekarang dimuat via `@nestjs/config` dan divalidasi terpusat dengan `joi`.
 - `PORT` must be a numeric value between `1` and `65535`.
 - `DATA_SOURCE` must be either `memory` or `prisma`.
 - `DATA_SOURCE=prisma` is mandatory in production (`NODE_ENV=production`).
 - `DATABASE_URL` is required when `DATA_SOURCE=prisma`.
 - `AUTH_SECRET` is required in production and should be a private random value.
+- `CORS_ORIGINS` is required in production and must use explicit origins.
+- `TRUST_PROXY` should stay `false` unless proxy headers are sanitized by trusted infrastructure.
 - `AUTH_BOOTSTRAP_DEFAULT_USERS` controls auto-creation of default auth users on startup in Prisma mode.
   - Defaults to `true` outside production.
   - Defaults to `false` in production.
+- Global API throttling is controlled by:
+  - `THROTTLE_DEFAULT_TTL_MS`
+  - `THROTTLE_DEFAULT_LIMIT`
+  - `THROTTLE_DEFAULT_BLOCK_MS`
 - Development login password defaults can be overridden by:
   - `DEV_AUTH_SUPERADMIN_PASSWORD`
   - `DEV_AUTH_ADMIN_PASSWORD`
+
+## Security Defaults
+
+- `helmet` is enabled globally for HTTP security headers.
+- `Permissions-Policy` is set explicitly for camera, geolocation, and microphone restrictions.
+- `@nestjs/throttler` is enabled globally for API-wide rate limiting.
+- `/api/health` skips global throttling to stay friendly for liveness/readiness probes.
 
 ## Development Login Accounts
 
@@ -86,6 +101,12 @@
 
 - `GET /api/health`
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/session`
+- `GET /api/auth/users`
+- `POST /api/auth/users`
+- `PATCH /api/auth/users/:userId`
+- `PUT /api/auth/users/:userId/password`
 - `GET /api/auth/session`
 - `GET /api/auth/users`
 - `POST /api/auth/users`

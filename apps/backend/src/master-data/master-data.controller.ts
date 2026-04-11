@@ -28,7 +28,7 @@ export class MasterDataController {
 
   @Get("options")
   listOptions(@Query() query: ListMasterDataOptionsDto) {
-    return this.masterDataService.listOptions(query.categoryKey, Boolean(query.includeInactive));
+    return this.masterDataService.listOptions(query.categoryKey, query.includeInactive ?? false);
   }
 
   @Post("options")

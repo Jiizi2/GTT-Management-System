@@ -19,6 +19,11 @@ export type DefaultAuthUserStorageRecord = {
   isActive: boolean;
 };
 
+type DefaultAuthUserPasswordOverrides = {
+  superAdminPassword?: string;
+  adminPassword?: string;
+};
+
 export function normalizeAuthUsername(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -75,21 +80,23 @@ export function mapPrismaRoleToAccessTier(role: AuthUserRole): AuthAccessTier | 
   return null;
 }
 
-export function createDefaultAuthUserSeeds(): DefaultAuthUserSeed[] {
+export function createDefaultAuthUserSeeds(
+  passwordOverrides?: DefaultAuthUserPasswordOverrides,
+): DefaultAuthUserSeed[] {
   const defaults: DefaultAuthUserSeed[] = [
     {
       name: "Dev Super Admin",
       username: "dev.superadmin",
       email: "superadmin.dev@ghaniya.local",
       roleId: "super-admin",
-      password: process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026",
+      password: passwordOverrides?.superAdminPassword?.trim() || "DevSuperAdmin#2026",
     },
     {
       name: "Dev Admin",
       username: "dev.admin",
       email: "admin.dev@ghaniya.local",
       roleId: "admin",
-      password: process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026",
+      password: passwordOverrides?.adminPassword?.trim() || "DevAdmin#2026",
     },
     {
       name: "Operator Admin",
@@ -123,6 +130,19 @@ export function createDefaultAuthUserSeeds(): DefaultAuthUserSeed[] {
 
 export function createDefaultAuthUserStorageRecords(): DefaultAuthUserStorageRecord[] {
   return createDefaultAuthUserSeeds().map((entry) => ({
+    name: entry.name.trim(),
+    username: normalizeAuthUsername(entry.username),
+    email: normalizeAuthEmail(entry.email),
+    role: mapManagedRoleToPrismaRole(entry.roleId),
+    passwordHash: entry.password ? hashAuthPassword(entry.password) : null,
+    isActive: true,
+  }));
+}
+
+export function createDefaultAuthUserStorageRecordsWithOverrides(
+  passwordOverrides?: DefaultAuthUserPasswordOverrides,
+): DefaultAuthUserStorageRecord[] {
+  return createDefaultAuthUserSeeds(passwordOverrides).map((entry) => ({
     name: entry.name.trim(),
     username: normalizeAuthUsername(entry.username),
     email: normalizeAuthEmail(entry.email),

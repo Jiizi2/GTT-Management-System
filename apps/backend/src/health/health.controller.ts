@@ -1,4 +1,7 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { SkipThrottle } from "@nestjs/throttler";
+import { resolveConfiguredDataSource } from "../config/app-config";
 import { Public } from "../auth/auth.public";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -24,12 +27,16 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 
 @Controller("health")
 export class HealthController {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly configService?: ConfigService,
+  ) {}
 
   @Public()
+  @SkipThrottle()
   @Get()
   async check() {
-    const dataSource = (process.env.DATA_SOURCE ?? "memory").toLowerCase();
+    const dataSource = resolveConfiguredDataSource(this.configService);
     const timestamp = new Date().toISOString();
 
     if (dataSource === "prisma") {

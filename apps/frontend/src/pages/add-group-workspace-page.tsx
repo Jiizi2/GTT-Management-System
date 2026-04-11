@@ -1,5 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
@@ -47,6 +50,7 @@ const {
   getRouteFieldConfigByCategory,
   getScheduleTypeOption,
   getStatusByTone,
+  hasIncompleteTransferTrainFields,
   isCityTourActivityType,
   isFlightActivityType,
   isIsoDateValue,
@@ -65,6 +69,200 @@ const {
   createNewGroupAgreementForm,
   createNewGroupRaudhahForm,
 } = Domain;
+
+function createIdentityFormSchema(requireIdentityFields: boolean) {
+  return z
+    .object({
+      groupNumber: requireIdentityFields
+        ? z.string().trim().min(1, "Group number wajib diisi.")
+        : z.string(),
+      groupName: requireIdentityFields
+        ? z.string().trim().min(1, "Group name wajib diisi.")
+        : z.string(),
+      packageType: requireIdentityFields
+        ? z.string().trim().min(1, "Package type wajib diisi.")
+        : z.string(),
+      paxCount: requireIdentityFields
+        ? z
+            .string()
+            .trim()
+            .min(1, "Jumlah pax wajib diisi.")
+            .refine((value) => {
+              const parsed = Number.parseInt(value, 10);
+              return Number.isFinite(parsed) && parsed > 0;
+            }, "Jumlah pax harus lebih dari 0.")
+        : z.string(),
+      totalBusRequired: requireIdentityFields
+        ? z
+            .string()
+            .trim()
+            .min(1, "Total bus wajib diisi.")
+            .refine((value) => {
+              const parsed = Number.parseInt(value, 10);
+              return Number.isFinite(parsed) && parsed > 0;
+            }, "Total bus harus lebih dari 0.")
+        : z.string(),
+      startDate: requireIdentityFields
+        ? z.string().trim().min(1, "Start date wajib diisi.")
+        : z.string(),
+      endDate: requireIdentityFields
+        ? z.string().trim().min(1, "End date wajib diisi.")
+        : z.string(),
+      musyrifName: requireIdentityFields
+        ? z.string().trim().min(1, "Nama musyrif wajib diisi.")
+        : z.string(),
+      musyrifPhone: requireIdentityFields
+        ? z.string().trim().min(1, "Nomor telepon musyrif wajib diisi.")
+        : z.string(),
+    })
+    .superRefine((values, context) => {
+      if (!requireIdentityFields) {
+        return;
+      }
+
+      if (
+        values.startDate.trim() &&
+        values.endDate.trim() &&
+        isIsoDateValue(values.startDate) &&
+        isIsoDateValue(values.endDate) &&
+        values.endDate < values.startDate
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endDate"],
+          message: "End date harus sama atau setelah start date.",
+        });
+      }
+    });
+}
+
+type IdentityFormValues = z.infer<ReturnType<typeof createIdentityFormSchema>>;
+
+const manualScheduleFormBaseSchema = z.object({
+  date: z.string().trim().min(1, "Tanggal aktivitas wajib diisi."),
+  time: z.string(),
+  category: z.string().trim().min(1, "Jenis aktivitas wajib dipilih."),
+  hotelName: z.string(),
+  fromHotelName: z.string(),
+  from: z.string().trim().min(1, "Lokasi asal wajib diisi."),
+  to: z.string().trim().min(1, "Lokasi tujuan wajib diisi."),
+  cityTourCity: z.string(),
+  flightNumber: z.string(),
+  requiresBus: z.boolean(),
+  notes: z.string(),
+  transferByTrain: z.boolean(),
+  trainDepartureTime: z.string(),
+  destinationPickupTime: z.string(),
+  hotelPickupRequestTime: z.string(),
+});
+
+type ManualScheduleValidationValues = {
+  date: string;
+  time: string;
+  category: string;
+  hotelName?: string;
+  fromHotelName?: string;
+  from: string;
+  to: string;
+  cityTourCity: string;
+  flightNumber: string;
+  requiresBus: boolean;
+  notes: string;
+  transferByTrain: boolean;
+  trainDepartureTime: string;
+  destinationPickupTime: string;
+  hotelPickupRequestTime: string;
+};
+
+function validateManualSchedule(
+  values: ManualScheduleValidationValues,
+  context: z.RefinementCtx,
+): void {
+  if (isFlightActivityType(values.category) && !values.flightNumber.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["flightNumber"],
+      message: "Nomor penerbangan wajib diisi.",
+    });
+  }
+
+  const isHotelNameRequired =
+    values.category === "arrival" || values.category === "transfer" || values.category === "departure";
+  if (isHotelNameRequired && !(values.hotelName?.trim() ?? "")) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hotelName"],
+      message: "Nama hotel wajib diisi.",
+    });
+  }
+
+  if (values.category === "departure" && !values.time.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["time"],
+      message: "Jam flight return wajib diisi.",
+    });
+  }
+
+  if (values.category === "departure" && !values.hotelPickupRequestTime.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hotelPickupRequestTime"],
+      message: "Jam pickup hotel wajib diisi.",
+    });
+  }
+
+  if (isCityTourActivityType(values.category) && !values.cityTourCity.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cityTourCity"],
+      message: "Kota city tour wajib dipilih.",
+    });
+  }
+
+  if (hasIncompleteTransferTrainFields(values)) {
+    if (!values.trainDepartureTime.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["trainDepartureTime"],
+        message: "Jam keberangkatan kereta wajib diisi.",
+      });
+    }
+
+    if (!values.destinationPickupTime.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["destinationPickupTime"],
+        message: "Jam pickup di stasiun tujuan wajib diisi.",
+      });
+    }
+  }
+}
+
+const manualScheduleFormSchema = manualScheduleFormBaseSchema.superRefine(validateManualSchedule);
+
+type ManualScheduleFormValues = z.infer<typeof manualScheduleFormSchema>;
+
+const baseTripDraftSchema = manualScheduleFormBaseSchema
+  .omit({
+    hotelName: true,
+    fromHotelName: true,
+  })
+  .extend({
+  hotelName: z.string().optional(),
+  fromHotelName: z.string().optional(),
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  isEnabled: z.boolean(),
+  })
+  .superRefine(validateManualSchedule);
+
+const baseTripFormSchema = z.object({
+  trips: z.array(baseTripDraftSchema),
+});
+
+type BaseTripFormValues = z.infer<typeof baseTripFormSchema>;
 
 export function InputItineraryScreen({
   onSaveGroup,
@@ -86,18 +284,67 @@ export function InputItineraryScreen({
   itineraryPrefill?: ItineraryPrefill | null;
 }) {
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
-  const [groupNumber, setGroupNumber] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [packageType, setPackageType] = useState("");
-  const [paxCount, setPaxCount] = useState("");
-  const [totalBusRequired, setTotalBusRequired] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [musyrifName, setMusyrifName] = useState("");
-  const [musyrifPhone, setMusyrifPhone] = useState("");
+  const identityFormSchema = useMemo(
+    () => createIdentityFormSchema(sectionMode !== "schedule-only"),
+    [sectionMode],
+  );
+  const {
+    register,
+    control,
+    watch,
+    getValues,
+    setValue,
+    formState: { errors: identityErrors },
+  } = useForm<IdentityFormValues>({
+    resolver: zodResolver(identityFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      groupNumber: "",
+      groupName: "",
+      packageType: "",
+      paxCount: "",
+      totalBusRequired: "",
+      startDate: "",
+      endDate: "",
+      musyrifName: "",
+      musyrifPhone: "",
+    },
+  });
+  const {
+    register: registerSchedule,
+    control: scheduleControl,
+    watch: watchSchedule,
+    getValues: getScheduleValues,
+    setValue: setScheduleValue,
+    reset: resetSchedule,
+    handleSubmit: handleSubmitSchedule,
+    formState: { errors: scheduleErrors },
+  } = useForm<ManualScheduleFormValues>({
+    resolver: zodResolver(manualScheduleFormSchema),
+    mode: "onChange",
+    defaultValues: createInitialInputItineraryForm(),
+  });
+  const {
+    control: baseTripControl,
+    watch: watchBaseTrips,
+    getValues: getBaseTripValues,
+    setValue: setBaseTripValue,
+    reset: resetBaseTripForm,
+  } = useForm<BaseTripFormValues>({
+    resolver: zodResolver(baseTripFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      trips: [],
+    },
+  });
+  const { replace: replaceBaseTripFields } = useFieldArray({
+    control: baseTripControl,
+    name: "trips",
+    keyName: "fieldKey",
+  });
   const [itineraryItems, setItineraryItems] = useState<InputItineraryItem[]>([]);
-  const [form, setForm] = useState<InputItineraryFormState>(createInitialInputItineraryForm);
-  const [baseTripDrafts, setBaseTripDrafts] = useState<BaseTripDraft[]>([]);
+  const form = watchSchedule();
+  const baseTripDrafts = watchBaseTrips("trips") ?? [];
   const [baseTripStepIndex, setBaseTripStepIndex] = useState(0);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isScheduleFormVisible, setIsScheduleFormVisible] = useState(false);
@@ -105,6 +352,15 @@ export function InputItineraryScreen({
   const [initializedScheduleSeed, setInitializedScheduleSeed] = useState<string | null>(null);
   const manualFormSuggestedHotelNameRef = useRef("");
   const baseTripSuggestedHotelByIdRef = useRef<Record<string, string>>({});
+  const groupNumber = watch("groupNumber");
+  const groupName = watch("groupName");
+  const packageType = watch("packageType");
+  const paxCount = watch("paxCount");
+  const totalBusRequired = watch("totalBusRequired");
+  const startDate = watch("startDate");
+  const endDate = watch("endDate");
+  const musyrifName = watch("musyrifName");
+  const musyrifPhone = watch("musyrifPhone");
   const {
     isIdentityOnlyMode,
     isScheduleOnlyMode,
@@ -306,18 +562,60 @@ export function InputItineraryScreen({
     return nextDrafts;
   };
 
-  const handleFormChange = <Key extends keyof InputItineraryFormState>(
-    field: Key,
-    value: InputItineraryFormState[Key],
+  const replaceBaseTripDrafts = (drafts: BaseTripDraft[]) => {
+    replaceBaseTripFields(drafts);
+  };
+
+  const updateBaseTripDraftAtIndex = (
+    tripIndex: number,
+    updater: (draft: BaseTripDraft) => BaseTripDraft,
   ) => {
-    setForm((current) => {
-      const draft = { ...current, [field]: value };
-      return applyHotelAutofillForManualForm(draft);
+    const currentTrips = getBaseTripValues("trips");
+    const nextTrips = currentTrips.map((trip, index) =>
+      index === tripIndex ? applyHotelAutofillForBaseTrip(updater(trip)) : trip,
+    );
+    setBaseTripValue("trips", nextTrips, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  const applyManualScheduleDraft = (
+    draft: ManualScheduleFormValues,
+    options?: {
+      shouldDirty?: boolean;
+      shouldValidate?: boolean;
+    },
+  ) => {
+    const nextDraft = applyHotelAutofillForManualForm(draft);
+    const shouldDirty = options?.shouldDirty ?? true;
+    const shouldValidate = options?.shouldValidate ?? true;
+
+    (
+      Object.entries(nextDraft) as Array<
+        [keyof ManualScheduleFormValues, ManualScheduleFormValues[keyof ManualScheduleFormValues]]
+      >
+    ).forEach(([field, value]) => {
+      setScheduleValue(field, value, {
+        shouldDirty,
+        shouldValidate,
+      });
+    });
+  };
+
+  const handleFormChange = <Key extends keyof ManualScheduleFormValues>(
+    field: Key,
+    value: ManualScheduleFormValues[Key],
+  ) => {
+    const current = getScheduleValues();
+    applyManualScheduleDraft({
+      ...current,
+      [field]: value,
     });
   };
 
   const handlePaxCountChange = (value: string) => {
-    setPaxCount(value);
+    setValue("paxCount", value, { shouldDirty: true, shouldValidate: true });
 
     const parsedValue = Number.parseInt(value, 10);
     if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
@@ -325,18 +623,17 @@ export function InputItineraryScreen({
     }
 
     const nextMinimumBusCount = getMinimumBusCountForPax(parsedValue);
-    setTotalBusRequired((currentValue) => {
-      if (!currentValue.trim()) {
-        return String(nextMinimumBusCount);
-      }
-
-      return currentValue;
-    });
+    if (!getValues("totalBusRequired").trim()) {
+      setValue("totalBusRequired", String(nextMinimumBusCount), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
   };
 
   const handleResetForm = () => {
     manualFormSuggestedHotelNameRef.current = "";
-    setForm(createInitialInputItineraryForm());
+    resetSchedule(createInitialInputItineraryForm());
     setEditingItemId(null);
   };
 
@@ -352,7 +649,7 @@ export function InputItineraryScreen({
       effectiveEndDate,
       itineraryPrefill,
     );
-    setBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
+    replaceBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(true);
     setInitializedScheduleSeed(schedulePrefillSeed);
@@ -375,7 +672,7 @@ export function InputItineraryScreen({
 
   const handleCloseBaseTripForm = () => {
     baseTripSuggestedHotelByIdRef.current = {};
-    setBaseTripDrafts([]);
+    resetBaseTripForm({ trips: [] });
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(false);
   };
@@ -413,20 +710,14 @@ export function InputItineraryScreen({
   };
 
   const handleBaseTripChange = <Key extends keyof InputItineraryFormState>(
-    tripId: string,
+    tripIndex: number,
     field: Key,
     value: InputItineraryFormState[Key],
   ) => {
-    setBaseTripDrafts((current) =>
-      current.map((trip) => {
-        if (trip.id !== tripId) {
-          return trip;
-        }
-
-        const draft = { ...trip, [field]: value } as BaseTripDraft;
-        return applyHotelAutofillForBaseTrip(draft);
-      }),
-    );
+    updateBaseTripDraftAtIndex(tripIndex, (trip) => ({
+      ...trip,
+      [field]: value,
+    }));
   };
 
   const handleEditItem = (item: InputItineraryItem) => {
@@ -444,7 +735,8 @@ export function InputItineraryScreen({
     const nextTo = shouldUseSaudiCityDropdown(nextCategory, "to")
       ? normalizeSaudiCityValue(item.to)
       : item.to;
-    setForm(applyHotelAutofillForManualForm({
+    resetSchedule(applyHotelAutofillForManualForm({
+      ...createInitialInputItineraryForm(),
       date: item.date,
       time: item.time,
       category: nextCategory,
@@ -475,39 +767,39 @@ export function InputItineraryScreen({
     }
   };
 
-  const handleSaveItem = () => {
+  const handleSaveItem = handleSubmitSchedule((values) => {
     if (!isGroupReadyForItinerary || isFormDisabled) {
       return;
     }
 
-    const typeOption = getScheduleTypeOption(form.category);
-    const nextFlightNumber = showFlightNumberField ? form.flightNumber.trim() : "";
+    const typeOption = getScheduleTypeOption(values.category);
+    const nextFlightNumber = showFlightNumberField ? values.flightNumber.trim() : "";
     const isHotelNameRequired =
-      form.category === "arrival" || form.category === "transfer" || form.category === "departure";
+      values.category === "arrival" || values.category === "transfer" || values.category === "departure";
     const nextHotelName = isHotelNameRequired
-      ? form.hotelName?.trim() || resolveSuggestedHotelName(form)
+      ? values.hotelName?.trim() || resolveSuggestedHotelName(values)
       : "";
     const nextHotelPickupRequestTime =
-      form.category === "departure" ? form.hotelPickupRequestTime.trim() : "";
-    const isTransferByTrain = isTransferActivityType(form.category) && form.transferByTrain;
-    const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
+      values.category === "departure" ? values.hotelPickupRequestTime.trim() : "";
+    const isTransferByTrain = isTransferActivityType(values.category) && values.transferByTrain;
+    const scheduleTime = isTransferByTrain ? values.trainDepartureTime : values.time;
     const nextItem: InputItineraryItem = {
       id: editingItemId ?? `item-${Date.now()}`,
-      date: form.date,
+      date: values.date,
       time: scheduleTime,
       category: typeOption.cardLabel,
       categoryKey: typeOption.value,
       hotelName: nextHotelName,
-      from: form.from.trim(),
-      to: form.to.trim(),
-      cityTourCity: showCityTourCityField ? form.cityTourCity.trim() : "",
+      from: values.from.trim(),
+      to: values.to.trim(),
+      cityTourCity: showCityTourCityField ? values.cityTourCity.trim() : "",
       flightNumber: nextFlightNumber,
-      requiresBus: isTransferByTrain ? true : form.requiresBus,
-      notes: form.notes.trim(),
+      requiresBus: isTransferByTrain ? true : values.requiresBus,
+      notes: values.notes.trim(),
       icon: typeOption.icon,
       transferByTrain: isTransferByTrain,
-      trainDepartureTime: isTransferByTrain ? form.trainDepartureTime.trim() : "",
-      destinationPickupTime: isTransferByTrain ? form.destinationPickupTime.trim() : "",
+      trainDepartureTime: isTransferByTrain ? values.trainDepartureTime.trim() : "",
+      destinationPickupTime: isTransferByTrain ? values.destinationPickupTime.trim() : "",
       hotelPickupRequestTime: nextHotelPickupRequestTime,
     };
     const nextItems = expandInputTransferTrainItems([nextItem]);
@@ -522,7 +814,7 @@ export function InputItineraryScreen({
     });
 
     handleCloseScheduleForm();
-  };
+  });
 
   const handleSaveBaseTrips = () => {
     if (isBaseTripSaveDisabled) {
@@ -598,7 +890,7 @@ export function InputItineraryScreen({
       effectiveEndDate,
       itineraryPrefill,
     );
-    setBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
+    replaceBaseTripDrafts(seedBaseTripHotelSuggestions(nextBaseTripDrafts));
     setBaseTripStepIndex(0);
     setIsBaseTripFormVisible(true);
     setInitializedScheduleSeed(schedulePrefillSeed);
@@ -611,6 +903,7 @@ export function InputItineraryScreen({
     isScheduleOnlyMode,
     itineraryItems.length,
     itineraryPrefill,
+    replaceBaseTripFields,
     schedulePrefillSeed,
   ]);
 
@@ -696,7 +989,7 @@ export function InputItineraryScreen({
       return;
     }
 
-    const parsedPax = Number.parseInt(paxCount, 10);
+    const parsedPax = Number.parseInt(effectivePaxCountValue, 10);
     const safePax = Number.isFinite(parsedPax) && parsedPax > 0 ? parsedPax : 1;
     const safeTotalBuses = resolveTotalBusCount(safePax, parsedTotalBusRequired);
     const startTimestamp = Date.parse(effectiveStartDate);
@@ -830,11 +1123,13 @@ export function InputItineraryScreen({
               <span>Group Number</span>
               <input
                 type="text"
-                value={groupNumber}
-                onChange={(event) => setGroupNumber(event.target.value)}
+                {...register("groupNumber")}
                 placeholder="e.g. GR-7721-UMA"
                 className={`${inputClassName} text-lg font-semibold tracking-tight`}
               />
+              {identityErrors.groupNumber ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.groupNumber.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -842,10 +1137,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="text"
-                value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
+                {...register("groupName")}
                 placeholder="e.g. Jakarta Umrah March Batch"
               />
+              {identityErrors.groupName ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.groupName.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -853,10 +1150,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="text"
-                value={packageType}
-                onChange={(event) => setPackageType(event.target.value)}
+                {...register("packageType")}
                 placeholder="e.g. Custom VIP Package"
               />
+              {identityErrors.packageType ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.packageType.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -869,6 +1168,9 @@ export function InputItineraryScreen({
                 onChange={(event) => handlePaxCountChange(event.target.value)}
                 placeholder="45"
               />
+              {identityErrors.paxCount ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.paxCount.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -877,10 +1179,12 @@ export function InputItineraryScreen({
                 className={inputClassName}
                 type="number"
                 min={1}
-                value={totalBusRequired}
-                onChange={(event) => setTotalBusRequired(event.target.value)}
+                {...register("totalBusRequired")}
                 placeholder={String(minimumBusCount)}
               />
+              {identityErrors.totalBusRequired ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.totalBusRequired.message}</p>
+              ) : null}
             </label>
 
             <p className={routeHintClassName}>
@@ -895,20 +1199,38 @@ export function InputItineraryScreen({
 
             <label className={fieldClassName}>
               <span>Start Date</span>
-              <DatePickerInput
-                inputClassName={inputClassName}
-                value={startDate}
-                onChange={setStartDate}
+              <Controller
+                name="startDate"
+                control={control}
+                render={({ field }) => (
+                  <DatePickerInput
+                    inputClassName={inputClassName}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
+              {identityErrors.startDate ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.startDate.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
               <span>End Date</span>
-              <DatePickerInput
-                inputClassName={inputClassName}
-                value={endDate}
-                onChange={setEndDate}
+              <Controller
+                name="endDate"
+                control={control}
+                render={({ field }) => (
+                  <DatePickerInput
+                    inputClassName={inputClassName}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
+              {identityErrors.endDate ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.endDate.message}</p>
+              ) : null}
             </label>
           </div>
 
@@ -951,10 +1273,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="text"
-                value={musyrifName}
-                onChange={(event) => setMusyrifName(event.target.value)}
+                {...register("musyrifName")}
                 placeholder="Ustadz Abdul Hakim"
               />
+              {identityErrors.musyrifName ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.musyrifName.message}</p>
+              ) : null}
             </label>
 
             <label className={fieldClassName}>
@@ -962,10 +1286,12 @@ export function InputItineraryScreen({
               <input
                 className={inputClassName}
                 type="tel"
-                value={musyrifPhone}
-                onChange={(event) => setMusyrifPhone(event.target.value)}
+                {...register("musyrifPhone")}
                 placeholder="+62 812-3456-7890"
               />
+              {identityErrors.musyrifPhone ? (
+                <p className="text-xs font-semibold text-error">{identityErrors.musyrifPhone.message}</p>
+              ) : null}
             </label>
           </div>
         </section>
@@ -1243,11 +1569,10 @@ export function InputItineraryScreen({
                               type="checkbox"
                               checked={item.isEnabled}
                               onChange={(event) =>
-                                setBaseTripDrafts((current) =>
-                                  current.map((trip) =>
-                                    trip.id === item.id ? { ...trip, isEnabled: event.target.checked } : trip,
-                                  ),
-                                )
+                                updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
+                                  ...trip,
+                                  isEnabled: event.target.checked,
+                                }))
                               }
                               disabled={!isGroupReadyForItinerary}
                             />
@@ -1262,7 +1587,7 @@ export function InputItineraryScreen({
                           <DatePickerInput
                             inputClassName={inputClassName}
                             value={item.date}
-                            onChange={(nextValue) => handleBaseTripChange(item.id, "date", nextValue)}
+                            onChange={(nextValue) => handleBaseTripChange(currentBaseTripStepIndex, "date", nextValue)}
                             disabled={!isGroupReadyForItinerary || !item.isEnabled}
                           />
                         </label>
@@ -1274,7 +1599,7 @@ export function InputItineraryScreen({
                               inputClassName={inputClassName}
                               value={item.time}
                               onChange={(nextValue) =>
-                                handleBaseTripChange(item.id, "time", nextValue)
+                                handleBaseTripChange(currentBaseTripStepIndex, "time", nextValue)
                               }
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1289,7 +1614,7 @@ export function InputItineraryScreen({
                               type="text"
                               value={item.flightNumber}
                               onChange={(event) =>
-                                handleBaseTripChange(item.id, "flightNumber", event.target.value)
+                                handleBaseTripChange(currentBaseTripStepIndex, "flightNumber", event.target.value)
                               }
                               placeholder="e.g. SV-827"
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
@@ -1305,7 +1630,7 @@ export function InputItineraryScreen({
                               type="text"
                               value={item.hotelName ?? ""}
                               onChange={(event) =>
-                                handleBaseTripChange(item.id, "hotelName", event.target.value)
+                                handleBaseTripChange(currentBaseTripStepIndex, "hotelName", event.target.value)
                               }
                               placeholder="e.g. Swissotel Al Maqam"
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
@@ -1320,7 +1645,7 @@ export function InputItineraryScreen({
                               inputClassName={inputClassName}
                               value={item.hotelPickupRequestTime}
                               onChange={(nextValue) =>
-                                handleBaseTripChange(item.id, "hotelPickupRequestTime", nextValue)
+                                handleBaseTripChange(currentBaseTripStepIndex, "hotelPickupRequestTime", nextValue)
                               }
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1341,7 +1666,7 @@ export function InputItineraryScreen({
                                 className={`${selectClassName} pl-11`}
                                 value={item.cityTourCity}
                                 onChange={(event) =>
-                                  handleBaseTripChange(item.id, "cityTourCity", event.target.value)
+                                  handleBaseTripChange(currentBaseTripStepIndex, "cityTourCity", event.target.value)
                                 }
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               >
@@ -1374,23 +1699,17 @@ export function InputItineraryScreen({
                                 type="checkbox"
                                 checked={item.transferByTrain}
                                 onChange={(event) =>
-                                  setBaseTripDrafts((current) =>
-                                    current.map((trip) =>
-                                      trip.id === item.id
-                                        ? applyHotelAutofillForBaseTrip({
-                                            ...trip,
-                                            transferByTrain: event.target.checked,
-                                            requiresBus: event.target.checked ? true : trip.requiresBus,
-                                            trainDepartureTime: event.target.checked
-                                              ? trip.trainDepartureTime
-                                              : "",
-                                            destinationPickupTime: event.target.checked
-                                              ? trip.destinationPickupTime
-                                              : "",
-                                          })
-                                        : trip,
-                                    ),
-                                  )
+                                  updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
+                                    ...trip,
+                                    transferByTrain: event.target.checked,
+                                    requiresBus: event.target.checked ? true : trip.requiresBus,
+                                    trainDepartureTime: event.target.checked
+                                      ? trip.trainDepartureTime
+                                      : "",
+                                    destinationPickupTime: event.target.checked
+                                      ? trip.destinationPickupTime
+                                      : "",
+                                  }))
                                 }
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               />
@@ -1412,7 +1731,7 @@ export function InputItineraryScreen({
                               <SereneSelect
                                 className={`${selectClassName} pl-11`}
                                 value={item.from}
-                                onChange={(event) => handleBaseTripChange(item.id, "from", event.target.value)}
+                                onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)}
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               >
                                 <option value="">Select city in Saudi</option>
@@ -1428,7 +1747,7 @@ export function InputItineraryScreen({
                               className={inputClassName}
                               type="text"
                               value={item.from}
-                              onChange={(event) => handleBaseTripChange(item.id, "from", event.target.value)}
+                              onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)}
                               placeholder={routeFieldConfigForItem.fromPlaceholder}
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1448,7 +1767,7 @@ export function InputItineraryScreen({
                               <SereneSelect
                                 className={`${selectClassName} pl-11`}
                                 value={item.to}
-                                onChange={(event) => handleBaseTripChange(item.id, "to", event.target.value)}
+                                onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)}
                                 disabled={!isGroupReadyForItinerary || !item.isEnabled}
                               >
                                 <option value="">Select city in Saudi</option>
@@ -1464,7 +1783,7 @@ export function InputItineraryScreen({
                               className={inputClassName}
                               type="text"
                               value={item.to}
-                              onChange={(event) => handleBaseTripChange(item.id, "to", event.target.value)}
+                              onChange={(event) => handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)}
                               placeholder={routeFieldConfigForItem.toPlaceholder}
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             />
@@ -1488,7 +1807,7 @@ export function InputItineraryScreen({
                                   inputClassName={inputClassName}
                                   value={item.trainDepartureTime}
                                   onChange={(nextValue) =>
-                                    handleBaseTripChange(item.id, "trainDepartureTime", nextValue)
+                                    handleBaseTripChange(currentBaseTripStepIndex, "trainDepartureTime", nextValue)
                                   }
                                   disabled={!isGroupReadyForItinerary || !item.isEnabled}
                                 />
@@ -1500,7 +1819,7 @@ export function InputItineraryScreen({
                                   inputClassName={inputClassName}
                                   value={item.destinationPickupTime}
                                   onChange={(nextValue) =>
-                                    handleBaseTripChange(item.id, "destinationPickupTime", nextValue)
+                                    handleBaseTripChange(currentBaseTripStepIndex, "destinationPickupTime", nextValue)
                                   }
                                   disabled={!isGroupReadyForItinerary || !item.isEnabled}
                                 />
@@ -1527,7 +1846,7 @@ export function InputItineraryScreen({
                             type="checkbox"
                             checked={showTransferTrainInputs ? true : item.requiresBus}
                             onChange={(event) =>
-                              handleBaseTripChange(item.id, "requiresBus", event.target.checked)
+                              handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
                             }
                             disabled={!isGroupReadyForItinerary || showTransferTrainInputs || !item.isEnabled}
                           />
@@ -1545,7 +1864,7 @@ export function InputItineraryScreen({
                             rows={2}
                             value={item.notes}
                             onChange={(event) =>
-                              handleBaseTripChange(item.id, "notes", event.target.value)
+                              handleBaseTripChange(currentBaseTripStepIndex, "notes", event.target.value)
                             }
                             placeholder="Enter special instructions or details..."
                             disabled={!isGroupReadyForItinerary || !item.isEnabled}
@@ -1709,6 +2028,8 @@ export function InputItineraryScreen({
 
                   <div className="max-h-[calc(100dvh-12rem)] overflow-y-auto px-4 py-4 sm:px-5">
                     <div className={gridClassName}>
+                <input type="hidden" {...registerSchedule("category")} />
+                <input type="hidden" {...registerSchedule("fromHotelName")} />
                 <div className={wideFieldClassName}>
                   <span>Activity Type</span>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -1721,40 +2042,39 @@ export function InputItineraryScreen({
                             ? "border-primary bg-emerald-50 text-primary"
                             : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
                         }`}
-                        onClick={() =>
-                          setForm((current) => {
-                            const nextCategory = option.value;
-                            const isNextTransfer = isTransferActivityType(nextCategory);
-                            const nextFrom = shouldUseSaudiCityDropdown(nextCategory, "from")
-                              ? normalizeSaudiCityValue(current.from)
-                              : current.from;
-                            const nextTo = shouldUseSaudiCityDropdown(nextCategory, "to")
-                              ? normalizeSaudiCityValue(current.to)
-                              : current.to;
-                            const nextDraft: InputItineraryFormState = {
-                              ...current,
-                              category: nextCategory,
-                              from: nextFrom,
-                              to: nextTo,
-                              cityTourCity: isCityTourActivityType(option.value)
-                                ? current.cityTourCity
-                                : "",
-                              flightNumber: isFlightActivityType(option.value)
-                                ? current.flightNumber
-                                : "",
-                              hotelPickupRequestTime: option.value === "departure"
-                                ? current.hotelPickupRequestTime
-                                : "",
-                              transferByTrain: isNextTransfer ? current.transferByTrain : false,
-                              trainDepartureTime: isNextTransfer ? current.trainDepartureTime : "",
-                              destinationPickupTime: isNextTransfer
-                                ? current.destinationPickupTime
-                                : "",
-                            };
+                        onClick={() => {
+                          const current = getScheduleValues();
+                          const nextCategory = option.value;
+                          const isNextTransfer = isTransferActivityType(nextCategory);
+                          const nextFrom = shouldUseSaudiCityDropdown(nextCategory, "from")
+                            ? normalizeSaudiCityValue(current.from)
+                            : current.from;
+                          const nextTo = shouldUseSaudiCityDropdown(nextCategory, "to")
+                            ? normalizeSaudiCityValue(current.to)
+                            : current.to;
+                          const nextDraft: ManualScheduleFormValues = {
+                            ...current,
+                            category: nextCategory,
+                            from: nextFrom,
+                            to: nextTo,
+                            cityTourCity: isCityTourActivityType(option.value)
+                              ? current.cityTourCity
+                              : "",
+                            flightNumber: isFlightActivityType(option.value)
+                              ? current.flightNumber
+                              : "",
+                            hotelPickupRequestTime: option.value === "departure"
+                              ? current.hotelPickupRequestTime
+                              : "",
+                            transferByTrain: isNextTransfer ? current.transferByTrain : false,
+                            trainDepartureTime: isNextTransfer ? current.trainDepartureTime : "",
+                            destinationPickupTime: isNextTransfer
+                              ? current.destinationPickupTime
+                              : "",
+                          };
 
-                            return applyHotelAutofillForManualForm(nextDraft);
-                          })
-                        }
+                          applyManualScheduleDraft(nextDraft);
+                        }}
                         disabled={!isGroupReadyForItinerary}
                       >
                         <span className="material-symbols-outlined" aria-hidden="true">
@@ -1768,51 +2088,87 @@ export function InputItineraryScreen({
 
                 <label className={fieldClassName}>
                   <span>Date</span>
-                  <DatePickerInput
-                    inputClassName={inputClassName}
-                    value={form.date}
-                    onChange={(nextValue) => handleFormChange("date", nextValue)}
-                    disabled={!isGroupReadyForItinerary}
+                  <Controller
+                    name="date"
+                    control={scheduleControl}
+                    render={({ field }) => (
+                      <DatePickerInput
+                        inputClassName={inputClassName}
+                        value={field.value}
+                        onChange={(nextValue) => handleFormChange("date", nextValue)}
+                        disabled={!isGroupReadyForItinerary}
+                      />
+                    )}
                   />
+                  {scheduleErrors.date ? (
+                    <p className="text-xs font-semibold text-error">{scheduleErrors.date.message}</p>
+                  ) : null}
                 </label>
 
                 {!showTransferTrainFields ? (
                   <label className={fieldClassName}>
                     <span>{form.category === "departure" ? "Flight Return Time" : "Time (Optional)"}</span>
-                    <TimePickerInput
-                      inputClassName={inputClassName}
-                      value={form.time}
-                      onChange={(nextValue) => handleFormChange("time", nextValue)}
-                      disabled={!isGroupReadyForItinerary}
+                    <Controller
+                      name="time"
+                      control={scheduleControl}
+                      render={({ field }) => (
+                        <TimePickerInput
+                          inputClassName={inputClassName}
+                          value={field.value}
+                          onChange={(nextValue) => handleFormChange("time", nextValue)}
+                          disabled={!isGroupReadyForItinerary}
+                        />
+                      )}
                     />
+                    {scheduleErrors.time ? (
+                      <p className="text-xs font-semibold text-error">{scheduleErrors.time.message}</p>
+                    ) : null}
                   </label>
                 ) : null}
 
                 {showFlightNumberField ? (
                   <label className={wideFieldClassName}>
                     <span>Flight Number</span>
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={form.flightNumber}
-                      onChange={(event) => handleFormChange("flightNumber", event.target.value)}
-                      placeholder="e.g. SV-827"
-                      disabled={!isGroupReadyForItinerary}
+                    <Controller
+                      name="flightNumber"
+                      control={scheduleControl}
+                      render={({ field }) => (
+                        <input
+                          className={inputClassName}
+                          type="text"
+                          value={field.value}
+                          onChange={(event) => handleFormChange("flightNumber", event.target.value)}
+                          placeholder="e.g. SV-827"
+                          disabled={!isGroupReadyForItinerary}
+                        />
+                      )}
                     />
+                    {scheduleErrors.flightNumber ? (
+                      <p className="text-xs font-semibold text-error">{scheduleErrors.flightNumber.message}</p>
+                    ) : null}
                   </label>
                 ) : null}
 
                 {showHotelNameField ? (
                   <label className={wideFieldClassName}>
                     <span>Hotel Name</span>
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={form.hotelName ?? ""}
-                      onChange={(event) => handleFormChange("hotelName", event.target.value)}
-                      placeholder="e.g. Pullman Zamzam Madinah"
-                      disabled={!isGroupReadyForItinerary}
+                    <Controller
+                      name="hotelName"
+                      control={scheduleControl}
+                      render={({ field }) => (
+                        <input
+                          className={inputClassName}
+                          type="text"
+                          value={field.value ?? ""}
+                          onChange={(event) => handleFormChange("hotelName", event.target.value)}
+                          placeholder="e.g. Pullman Zamzam Madinah"
+                          disabled={!isGroupReadyForItinerary}
+                        />
+                      )}
                     />
+                    {scheduleErrors.hotelName ? (
+                      <p className="text-xs font-semibold text-error">{scheduleErrors.hotelName.message}</p>
+                    ) : null}
                   </label>
                 ) : null}
 
@@ -1823,33 +2179,51 @@ export function InputItineraryScreen({
                       <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500" aria-hidden="true">
                         location_city
                       </span>
-                      <SereneSelect
-                        className={`${selectClassName} pl-11`}
-                        value={form.cityTourCity}
-                        onChange={(event) => handleFormChange("cityTourCity", event.target.value)}
-                        disabled={!isGroupReadyForItinerary}
-                      >
-                        <option value="">Select city in Saudi</option>
-                      {saudiCityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </SereneSelect>
+                      <Controller
+                        name="cityTourCity"
+                        control={scheduleControl}
+                        render={({ field }) => (
+                          <SereneSelect
+                            className={`${selectClassName} pl-11`}
+                            value={field.value}
+                            onChange={(event) => handleFormChange("cityTourCity", event.target.value)}
+                            disabled={!isGroupReadyForItinerary}
+                          >
+                            <option value="">Select city in Saudi</option>
+                            {saudiCityOptions.map((city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
+                            ))}
+                          </SereneSelect>
+                        )}
+                      />
                     </div>
                     <p className="text-xs text-slate-600">Select the city where the city tour takes place.</p>
+                    {scheduleErrors.cityTourCity ? (
+                      <p className="text-xs font-semibold text-error">{scheduleErrors.cityTourCity.message}</p>
+                    ) : null}
                   </label>
                 ) : null}
 
                 {showDeparturePickupField ? (
                   <label className={wideFieldClassName}>
                     <span>Hotel Pickup Request Time</span>
-                    <TimePickerInput
-                      inputClassName={inputClassName}
-                      value={form.hotelPickupRequestTime}
-                      onChange={(nextValue) => handleFormChange("hotelPickupRequestTime", nextValue)}
-                      disabled={!isGroupReadyForItinerary}
+                    <Controller
+                      name="hotelPickupRequestTime"
+                      control={scheduleControl}
+                      render={({ field }) => (
+                        <TimePickerInput
+                          inputClassName={inputClassName}
+                          value={field.value}
+                          onChange={(nextValue) => handleFormChange("hotelPickupRequestTime", nextValue)}
+                          disabled={!isGroupReadyForItinerary}
+                        />
+                      )}
                     />
+                    {scheduleErrors.hotelPickupRequestTime ? (
+                      <p className="text-xs font-semibold text-error">{scheduleErrors.hotelPickupRequestTime.message}</p>
+                    ) : null}
                   </label>
                 ) : null}
 
@@ -1879,26 +2253,31 @@ export function InputItineraryScreen({
                     </div>
 
                     <label className={checkClassName}>
-                      <input
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
-                        type="checkbox"
-                        checked={form.transferByTrain}
-                        onChange={(event) =>
-                          setForm((current) =>
-                            applyHotelAutofillForManualForm({
-                              ...current,
-                              transferByTrain: event.target.checked,
-                              requiresBus: event.target.checked ? true : current.requiresBus,
-                              trainDepartureTime: event.target.checked
-                                ? current.trainDepartureTime
-                                : "",
-                              destinationPickupTime: event.target.checked
-                                ? current.destinationPickupTime
-                                : "",
-                            }),
-                          )
-                        }
-                        disabled={!isGroupReadyForItinerary}
+                      <Controller
+                        name="transferByTrain"
+                        control={scheduleControl}
+                        render={({ field }) => (
+                          <input
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={(event) => {
+                              const current = getScheduleValues();
+                              applyManualScheduleDraft({
+                                ...current,
+                                transferByTrain: event.target.checked,
+                                requiresBus: event.target.checked ? true : current.requiresBus,
+                                trainDepartureTime: event.target.checked
+                                  ? current.trainDepartureTime
+                                  : "",
+                                destinationPickupTime: event.target.checked
+                                  ? current.destinationPickupTime
+                                  : "",
+                              });
+                            }}
+                            disabled={!isGroupReadyForItinerary}
+                          />
+                        )}
                       />
                       <span>Transfer using High-Speed Train (HHR)</span>
                     </label>
@@ -1915,30 +2294,45 @@ export function InputItineraryScreen({
                       >
                         location_city
                       </span>
-                      <SereneSelect
-                        className={`${selectClassName} pl-11`}
-                        value={form.from}
-                        onChange={(event) => handleFormChange("from", event.target.value)}
-                        disabled={!isGroupReadyForItinerary}
-                      >
-                        <option value="">Select city in Saudi</option>
-                        {saudiCityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </SereneSelect>
+                      <Controller
+                        name="from"
+                        control={scheduleControl}
+                        render={({ field }) => (
+                          <SereneSelect
+                            className={`${selectClassName} pl-11`}
+                            value={field.value}
+                            onChange={(event) => handleFormChange("from", event.target.value)}
+                            disabled={!isGroupReadyForItinerary}
+                          >
+                            <option value="">Select city in Saudi</option>
+                            {saudiCityOptions.map((city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
+                            ))}
+                          </SereneSelect>
+                        )}
+                      />
                     </div>
                   ) : (
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={form.from}
-                      onChange={(event) => handleFormChange("from", event.target.value)}
-                      placeholder={routeFieldConfig.fromPlaceholder}
-                      disabled={!isGroupReadyForItinerary}
+                    <Controller
+                      name="from"
+                      control={scheduleControl}
+                      render={({ field }) => (
+                        <input
+                          className={inputClassName}
+                          type="text"
+                          value={field.value}
+                          onChange={(event) => handleFormChange("from", event.target.value)}
+                          placeholder={routeFieldConfig.fromPlaceholder}
+                          disabled={!isGroupReadyForItinerary}
+                        />
+                      )}
                     />
                   )}
+                  {scheduleErrors.from ? (
+                    <p className="text-xs font-semibold text-error">{scheduleErrors.from.message}</p>
+                  ) : null}
                 </label>
 
                 <label className={fieldClassName}>
@@ -1951,30 +2345,45 @@ export function InputItineraryScreen({
                       >
                         location_city
                       </span>
-                      <SereneSelect
-                        className={`${selectClassName} pl-11`}
-                        value={form.to}
-                        onChange={(event) => handleFormChange("to", event.target.value)}
-                        disabled={!isGroupReadyForItinerary}
-                      >
-                        <option value="">Select city in Saudi</option>
-                        {saudiCityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </SereneSelect>
+                      <Controller
+                        name="to"
+                        control={scheduleControl}
+                        render={({ field }) => (
+                          <SereneSelect
+                            className={`${selectClassName} pl-11`}
+                            value={field.value}
+                            onChange={(event) => handleFormChange("to", event.target.value)}
+                            disabled={!isGroupReadyForItinerary}
+                          >
+                            <option value="">Select city in Saudi</option>
+                            {saudiCityOptions.map((city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
+                            ))}
+                          </SereneSelect>
+                        )}
+                      />
                     </div>
                   ) : (
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={form.to}
-                      onChange={(event) => handleFormChange("to", event.target.value)}
-                      placeholder={routeFieldConfig.toPlaceholder}
-                      disabled={!isGroupReadyForItinerary}
+                    <Controller
+                      name="to"
+                      control={scheduleControl}
+                      render={({ field }) => (
+                        <input
+                          className={inputClassName}
+                          type="text"
+                          value={field.value}
+                          onChange={(event) => handleFormChange("to", event.target.value)}
+                          placeholder={routeFieldConfig.toPlaceholder}
+                          disabled={!isGroupReadyForItinerary}
+                        />
+                      )}
                     />
                   )}
+                  {scheduleErrors.to ? (
+                    <p className="text-xs font-semibold text-error">{scheduleErrors.to.message}</p>
+                  ) : null}
                 </label>
 
                 {routeFieldConfig.helperText ? (
@@ -1990,36 +2399,60 @@ export function InputItineraryScreen({
                     <div className={transferTrainGridClassName}>
                       <label className={fieldClassName}>
                         <span>Train Departure Time</span>
-                        <TimePickerInput
-                          inputClassName={inputClassName}
-                          value={form.trainDepartureTime}
-                          onChange={(nextValue) => handleFormChange("trainDepartureTime", nextValue)}
-                          disabled={!isGroupReadyForItinerary}
+                        <Controller
+                          name="trainDepartureTime"
+                          control={scheduleControl}
+                          render={({ field }) => (
+                            <TimePickerInput
+                              inputClassName={inputClassName}
+                              value={field.value}
+                              onChange={(nextValue) => handleFormChange("trainDepartureTime", nextValue)}
+                              disabled={!isGroupReadyForItinerary}
+                            />
+                          )}
                         />
+                        {scheduleErrors.trainDepartureTime ? (
+                          <p className="text-xs font-semibold text-error">{scheduleErrors.trainDepartureTime.message}</p>
+                        ) : null}
                       </label>
 
                       <label className={fieldClassName}>
                         <span>Destination Station Pickup Time</span>
-                        <TimePickerInput
-                          inputClassName={inputClassName}
-                          value={form.destinationPickupTime}
-                          onChange={(nextValue) =>
-                            handleFormChange("destinationPickupTime", nextValue)
-                          }
-                          disabled={!isGroupReadyForItinerary}
+                        <Controller
+                          name="destinationPickupTime"
+                          control={scheduleControl}
+                          render={({ field }) => (
+                            <TimePickerInput
+                              inputClassName={inputClassName}
+                              value={field.value}
+                              onChange={(nextValue) =>
+                                handleFormChange("destinationPickupTime", nextValue)
+                              }
+                              disabled={!isGroupReadyForItinerary}
+                            />
+                          )}
                         />
+                        {scheduleErrors.destinationPickupTime ? (
+                          <p className="text-xs font-semibold text-error">{scheduleErrors.destinationPickupTime.message}</p>
+                        ) : null}
                       </label>
                     </div>
                   </div>
                 ) : null}
 
                 <label className={checkClassName}>
-                  <input
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
-                    type="checkbox"
-                    checked={showTransferTrainFields ? true : form.requiresBus}
-                    onChange={(event) => handleFormChange("requiresBus", event.target.checked)}
-                    disabled={!isGroupReadyForItinerary || showTransferTrainFields}
+                  <Controller
+                    name="requiresBus"
+                    control={scheduleControl}
+                    render={({ field }) => (
+                      <input
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                        type="checkbox"
+                        checked={showTransferTrainFields ? true : field.value}
+                        onChange={(event) => handleFormChange("requiresBus", event.target.checked)}
+                        disabled={!isGroupReadyForItinerary || showTransferTrainFields}
+                      />
+                    )}
                   />
                   <span>
                     {showTransferTrainFields
@@ -2030,13 +2463,19 @@ export function InputItineraryScreen({
 
                 <label className={wideFieldClassName}>
                   <span>Notes</span>
-                  <textarea
-                    className={textareaClassName}
-                    rows={3}
-                    value={form.notes}
-                    onChange={(event) => handleFormChange("notes", event.target.value)}
-                    placeholder="Enter special instructions or details..."
-                    disabled={!isGroupReadyForItinerary}
+                  <Controller
+                    name="notes"
+                    control={scheduleControl}
+                    render={({ field }) => (
+                      <textarea
+                        className={textareaClassName}
+                        rows={3}
+                        value={field.value}
+                        onChange={(event) => handleFormChange("notes", event.target.value)}
+                        placeholder="Enter special instructions or details..."
+                        disabled={!isGroupReadyForItinerary}
+                      />
+                    )}
                   />
                 </label>
               </div>

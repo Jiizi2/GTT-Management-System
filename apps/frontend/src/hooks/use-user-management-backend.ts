@@ -1,4 +1,5 @@
-import { clearAuthSession, getAuthAccessToken } from "../shared/auth-session";
+import { resolveBackendApiBaseUrl } from "../shared/backend-api-base.js";
+import { clearAuthSession } from "../shared/auth-session.js";
 
 export type BackendManagedUserRole =
   | "super-admin"
@@ -11,6 +12,7 @@ export type BackendManagedUser = {
   name: string;
   email: string;
   roleId: BackendManagedUserRole;
+  hasPassword: boolean;
   updatedAt?: string;
 };
 
@@ -20,34 +22,15 @@ export type UpdateManagedUserPayload = {
   roleId: BackendManagedUserRole;
 };
 
-function resolveBackendApiBaseUrl(): string {
-  const customUrl = (globalThis as { __GTT_API_BASE_URL__?: string }).__GTT_API_BASE_URL__;
-  if (customUrl?.trim()) {
-    return customUrl.trim().replace(/\/+$/, "");
-  }
-
-  const hostname = globalThis.location?.hostname ?? "";
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3001/api";
-  }
-
-  return "/api";
-}
-
-function createAuthorizedHeaders(initialHeaders?: HeadersInit): Headers {
-  const headers = new Headers(initialHeaders);
-  const accessToken = getAuthAccessToken();
-  if (accessToken && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${accessToken}`);
-  }
-
-  return headers;
-}
+export type CreateManagedUserPayload = UpdateManagedUserPayload & {
+  password?: string;
+};
 
 async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(endpoint, {
     ...init,
-    headers: createAuthorizedHeaders(init?.headers),
+    credentials: "include",
+    headers: new Headers(init?.headers),
   });
 
   if (response.status === 401) {
@@ -80,6 +63,7 @@ function mapManagedUser(value: unknown): BackendManagedUser | null {
   const name = typeof record.name === "string" ? record.name.trim() : "";
   const email = typeof record.email === "string" ? record.email.trim().toLowerCase() : "";
   const roleId = resolveRoleId(record.roleId);
+  const hasPassword = record.hasPassword === true;
   const updatedAt = typeof record.updatedAt === "string" ? record.updatedAt.trim() : "";
 
   if (!id || !name || !email) {
@@ -91,6 +75,7 @@ function mapManagedUser(value: unknown): BackendManagedUser | null {
     name,
     email,
     roleId,
+    hasPassword,
     updatedAt: updatedAt || undefined,
   };
 }
@@ -156,7 +141,7 @@ export async function fetchManagedUsersFromBackend({
 }
 
 export async function createManagedUserInBackend(
-  payload: UpdateManagedUserPayload,
+  payload: CreateManagedUserPayload,
 ): Promise<BackendManagedUser> {
   const apiBaseUrl = resolveBackendApiBaseUrl();
   const response = await fetchBackend(`${apiBaseUrl}/auth/users`, {
@@ -168,6 +153,7 @@ export async function createManagedUserInBackend(
       name: payload.name,
       email: payload.email,
       roleId: payload.roleId,
+      password: payload.password?.trim() ? payload.password.trim() : undefined,
     }),
   });
   const responsePayload = await parseResponseJson(response);
@@ -224,4 +210,32 @@ export async function deleteManagedUserInBackend(userId: string): Promise<void> 
   if (!response.ok) {
     throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
   }
+}
+
+export async function setManagedUserPasswordInBackend(
+  userId: string,
+  password: string,
+): Promise<BackendManagedUser> {
+  const apiBaseUrl = resolveBackendApiBaseUrl();
+  const response = await fetchBackend(`${apiBaseUrl}/auth/users/${encodeURIComponent(userId)}/password`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      password: password.trim(),
+    }),
+  });
+  const responsePayload = await parseResponseJson(response);
+
+  if (!response.ok) {
+    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+  }
+
+  const managedUser = mapManagedUser(responsePayload);
+  if (!managedUser) {
+    throw new Error("User password response is invalid.");
+  }
+
+  return managedUser;
 }

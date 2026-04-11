@@ -16,6 +16,7 @@ export type AuthSessionUser = {
 
 export type AuthTokenPayload = AuthSessionUser & {
   exp: number;
+  rememberSession: boolean;
 };
 
 export type AuthLoginResponse = {
@@ -26,10 +27,13 @@ export type AuthLoginResponse = {
   user: AuthSessionUser;
 };
 
+export type AuthBrowserSession = Omit<AuthLoginResponse, "accessToken" | "tokenType">;
+
 export type AuthManagedUser = {
   id: string;
   name: string;
   email: string;
   roleId: AuthManagedUserRole;
+  hasPassword: boolean;
   updatedAt: string;
 };

@@ -1,10 +1,11 @@
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { DatePickerInput } from "./date-time-pickers";
 import { SereneSelect } from "./serene-select";
 import type {
-  AgreementApprovalStatus,
-  GroupRaudhahStatus,
   VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaRaudhahEditFormState,
@@ -17,6 +18,50 @@ const modalInputClassName = "serene-input";
 const modalSelectClassName = "serene-select";
 const modalButtonClassName = "serene-btn-primary";
 const modalCancelButtonClassName = "serene-btn-secondary";
+
+const syarikahModalSchema = z.object({
+  value: z.string().trim().min(1, "Syarikah wajib diisi."),
+});
+
+const visaStatusModalSchema = z.object({
+  value: z.enum(["Draft", "Pending", "Issued"]),
+});
+
+const paymentStatusModalSchema = z.object({
+  value: z.enum(["Paid", "Unpaid", "Partial"]),
+});
+
+const hotelModalSchema = z
+  .object({
+    hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
+    agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
+    pax: z
+      .string()
+      .trim()
+      .min(1, "Total pax wajib diisi.")
+      .refine((value) => {
+        const parsedValue = Number.parseInt(value, 10);
+        return Number.isInteger(parsedValue) && parsedValue > 0;
+      }, "Total pax harus lebih dari 0."),
+    status: z.enum(["Waiting for Approval", "Approved"]),
+    stayStartIso: z.string().trim().min(1, "Stay start date wajib diisi."),
+    stayEndIso: z.string().trim().min(1, "Stay end date wajib diisi."),
+  })
+  .refine((values) => values.stayEndIso >= values.stayStartIso, {
+    path: ["stayEndIso"],
+    message: "Stay end date tidak boleh sebelum stay start date.",
+  });
+
+const raudhahModalSchema = z.object({
+  appointments: z.array(
+    z.object({
+      id: z.string(),
+      dateIso: z.string().trim().min(1, "Appointment date wajib diisi."),
+      status: z.enum(["Free", "After", "Before"]),
+      tasrehPrinted: z.boolean().optional(),
+    }),
+  ),
+});
 
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") {
@@ -95,15 +140,22 @@ function SaveFooter({
   onSave,
   saveLabel,
   isSaveDisabled = false,
+  isSaving = false,
 }: {
   onClose: () => void;
   onSave: () => void;
   saveLabel: string;
   isSaveDisabled?: boolean;
+  isSaving?: boolean;
 }) {
   return (
     <>
-      <button type="button" className={modalButtonClassName} onClick={onSave} disabled={isSaveDisabled}>
+      <button
+        type="button"
+        className={modalButtonClassName}
+        onClick={onSave}
+        disabled={isSaveDisabled || isSaving}
+      >
         <span className="material-symbols-outlined" aria-hidden="true">
           check_circle
         </span>
@@ -118,36 +170,54 @@ function SaveFooter({
 }
 
 export function VisaStatusModal({
-  value,
-  onChange,
+  initialValue,
   onClose,
   onSave,
 }: {
-  value: VisaStatus;
-  onChange: (nextValue: VisaStatus) => void;
+  initialValue: VisaStatus;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (nextValue: VisaStatus) => void | Promise<void>;
 }) {
+  const { control, handleSubmit, formState: { isSubmitting } } = useForm<{ value: VisaStatus }>({
+    resolver: zodResolver(visaStatusModalSchema),
+    defaultValues: {
+      value: initialValue,
+    },
+  });
+
   return (
     <ModalShell
       title="Edit Visa Status"
       description="Update the visa approval status for this group."
       icon="verified_user"
       onClose={onClose}
-      footer={<SaveFooter onClose={onClose} onSave={onSave} saveLabel="Save Changes" />}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() => void handleSubmit(({ value }) => void onSave(value))()}
+          saveLabel="Save Changes"
+          isSaving={isSubmitting}
+        />
+      }
     >
       <label className={modalFieldClassName}>
         <span>Visa Status</span>
         <div className="relative">
-          <SereneSelect
-            className={modalSelectClassName}
-            value={value}
-            onChange={(event) => onChange(event.target.value as VisaStatus)}
-          >
-            <option value="Draft">Draft</option>
-            <option value="Pending">Pending</option>
-            <option value="Issued">Issued</option>
-          </SereneSelect>
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <SereneSelect
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+              >
+                <option value="Draft">Draft</option>
+                <option value="Pending">Pending</option>
+                <option value="Issued">Issued</option>
+              </SereneSelect>
+            )}
+          />
         </div>
       </label>
     </ModalShell>
@@ -155,36 +225,54 @@ export function VisaStatusModal({
 }
 
 export function PaymentStatusModal({
-  value,
-  onChange,
+  initialValue,
   onClose,
   onSave,
 }: {
-  value: VisaPaymentStatus;
-  onChange: (nextValue: VisaPaymentStatus) => void;
+  initialValue: VisaPaymentStatus;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (nextValue: VisaPaymentStatus) => void | Promise<void>;
 }) {
+  const { control, handleSubmit, formState: { isSubmitting } } = useForm<{ value: VisaPaymentStatus }>({
+    resolver: zodResolver(paymentStatusModalSchema),
+    defaultValues: {
+      value: initialValue,
+    },
+  });
+
   return (
     <ModalShell
       title="Edit Payment Status"
       description="Update the payment progress for this group."
       icon="payments"
       onClose={onClose}
-      footer={<SaveFooter onClose={onClose} onSave={onSave} saveLabel="Save Changes" />}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() => void handleSubmit(({ value }) => void onSave(value))()}
+          saveLabel="Save Changes"
+          isSaving={isSubmitting}
+        />
+      }
     >
       <label className={modalFieldClassName}>
         <span>Payment Status</span>
         <div className="relative">
-          <SereneSelect
-            className={modalSelectClassName}
-            value={value}
-            onChange={(event) => onChange(event.target.value as VisaPaymentStatus)}
-          >
-            <option value="Paid">Paid</option>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Partial">Partial</option>
-          </SereneSelect>
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <SereneSelect
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+              >
+                <option value="Paid">Paid</option>
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partial">Partial</option>
+              </SereneSelect>
+            )}
+          />
         </div>
       </label>
     </ModalShell>
@@ -192,18 +280,25 @@ export function PaymentStatusModal({
 }
 
 export function SyarikahModal({
-  value,
-  onChange,
+  initialValue,
   onClose,
   onSave,
-  isSaveDisabled,
 }: {
-  value: string;
-  onChange: (nextValue: string) => void;
+  initialValue: string;
   onClose: () => void;
-  onSave: () => void;
-  isSaveDisabled: boolean;
+  onSave: (nextValue: string) => void | Promise<void>;
 }) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<{ value: string }>({
+    resolver: zodResolver(syarikahModalSchema),
+    defaultValues: {
+      value: initialValue,
+    },
+  });
+
   return (
     <ModalShell
       title="Edit Syarikah"
@@ -213,9 +308,11 @@ export function SyarikahModal({
       footer={
         <SaveFooter
           onClose={onClose}
-          onSave={onSave}
+          onSave={() =>
+            void handleSubmit(({ value }) => void onSave(value.trim()))()
+          }
           saveLabel="Save Changes"
-          isSaveDisabled={isSaveDisabled}
+          isSaving={isSubmitting}
         />
       }
     >
@@ -224,11 +321,11 @@ export function SyarikahModal({
         <input
           className={modalInputClassName}
           type="text"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
           placeholder="e.g. Al-Tayyar"
+          {...register("value")}
         />
       </label>
+      {errors.value ? <p className="text-xs font-medium text-brand-tertiary">{errors.value.message}</p> : null}
     </ModalShell>
   );
 }
@@ -236,25 +333,27 @@ export function SyarikahModal({
 export function VisaHotelModal({
   city,
   mode,
-  value,
-  onChange,
+  initialValue,
   onClose,
   onSave,
-  isSaveDisabled,
 }: {
   city: "makkah" | "madinah";
   mode: "add" | "edit";
-  value: VisaHotelEditFormState;
-  onChange: <Key extends keyof VisaHotelEditFormState>(
-    field: Key,
-    nextValue: VisaHotelEditFormState[Key],
-  ) => void;
+  initialValue: VisaHotelEditFormState;
   onClose: () => void;
-  onSave: () => void;
-  isSaveDisabled: boolean;
+  onSave: (values: VisaHotelEditFormState) => void | Promise<void>;
 }) {
   const cityLabel = city === "makkah" ? "Makkah" : "Madinah";
   const isAddMode = mode === "add";
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<VisaHotelEditFormState>({
+    resolver: zodResolver(hotelModalSchema),
+    defaultValues: initialValue,
+  });
 
   return (
     <ModalShell
@@ -270,9 +369,9 @@ export function VisaHotelModal({
       footer={
         <SaveFooter
           onClose={onClose}
-          onSave={onSave}
+          onSave={() => void handleSubmit((values) => void onSave(values))()}
           saveLabel={isAddMode ? "Add Hotel" : "Save Changes"}
-          isSaveDisabled={isSaveDisabled}
+          isSaving={isSubmitting}
         />
       }
     >
@@ -282,67 +381,94 @@ export function VisaHotelModal({
           <input
             className={modalInputClassName}
             type="text"
-            value={value.hotelName}
-            onChange={(event) => onChange("hotelName", event.target.value)}
             placeholder={`e.g. ${cityLabel} Hotel`}
+            {...register("hotelName")}
           />
         </label>
+        {errors.hotelName ? <p className="text-xs font-medium text-brand-tertiary">{errors.hotelName.message}</p> : null}
 
         <label className={modalFieldClassName}>
           <span>Agreement Number</span>
           <input
             className={modalInputClassName}
             type="text"
-            value={value.agreementNumber}
-            onChange={(event) => onChange("agreementNumber", event.target.value)}
             placeholder="2026xxxxxxxxxxxxx"
+            {...register("agreementNumber")}
           />
         </label>
+        {errors.agreementNumber ? (
+          <p className="text-xs font-medium text-brand-tertiary">{errors.agreementNumber.message}</p>
+        ) : null}
 
         <label className={modalFieldClassName}>
           <span>Total Pax</span>
           <input
             className={modalInputClassName}
             type="number"
-            min={0}
-            value={value.pax}
-            onChange={(event) => onChange("pax", event.target.value)}
+            min={1}
             placeholder="70"
+            {...register("pax")}
           />
         </label>
+        {errors.pax ? <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p> : null}
 
         <label className={modalFieldClassName}>
           <span>Approval Status</span>
           <div className="relative">
-          <SereneSelect
-            className={modalSelectClassName}
-            value={value.status}
-            onChange={(event) => onChange("status", event.target.value as AgreementApprovalStatus)}
-          >
-            <option value="Waiting for Approval">Waiting for Approval</option>
-            <option value="Approved">Approved</option>
-          </SereneSelect>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <SereneSelect
+                  className={modalSelectClassName}
+                  value={field.value}
+                  onChange={(event) => field.onChange(event.target.value)}
+                >
+                  <option value="Waiting for Approval">Waiting for Approval</option>
+                  <option value="Approved">Approved</option>
+                </SereneSelect>
+              )}
+            />
           </div>
         </label>
+        {errors.status ? <p className="text-xs font-medium text-brand-tertiary">{errors.status.message}</p> : null}
 
         <div className="grid gap-3 md:grid-cols-2 md:col-span-2">
           <label className={modalFieldClassName}>
             <span>Stay Start Date</span>
-            <DatePickerInput
-              inputClassName={modalInputClassName}
-              value={value.stayStartIso}
-              onChange={(nextValue) => onChange("stayStartIso", nextValue)}
+            <Controller
+              control={control}
+              name="stayStartIso"
+              render={({ field }) => (
+                <DatePickerInput
+                  inputClassName={modalInputClassName}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
           </label>
+          {errors.stayStartIso ? (
+            <p className="text-xs font-medium text-brand-tertiary">{errors.stayStartIso.message}</p>
+          ) : null}
 
           <label className={modalFieldClassName}>
             <span>Stay End Date</span>
-            <DatePickerInput
-              inputClassName={modalInputClassName}
-              value={value.stayEndIso}
-              onChange={(nextValue) => onChange("stayEndIso", nextValue)}
+            <Controller
+              control={control}
+              name="stayEndIso"
+              render={({ field }) => (
+                <DatePickerInput
+                  inputClassName={modalInputClassName}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
           </label>
+          {errors.stayEndIso ? (
+            <p className="text-xs font-medium text-brand-tertiary">{errors.stayEndIso.message}</p>
+          ) : null}
         </div>
       </div>
     </ModalShell>
@@ -350,26 +476,33 @@ export function VisaHotelModal({
 }
 
 export function VisaRaudhahModal({
-  value,
-  onAddAppointment,
-  onRemoveAppointment,
-  onChangeAppointment,
+  initialValue,
+  appointmentIdPrefix,
+  defaultAppointmentDateIso,
   onClose,
   onSave,
-  isSaveDisabled,
 }: {
-  value: VisaRaudhahEditFormState;
-  onAddAppointment: () => void;
-  onRemoveAppointment: (appointmentId: string) => void;
-  onChangeAppointment: (
-    appointmentId: string,
-    field: "dateIso" | "status",
-    nextValue: string | GroupRaudhahStatus,
-  ) => void;
+  initialValue: VisaRaudhahEditFormState;
+  appointmentIdPrefix: string;
+  defaultAppointmentDateIso: string;
   onClose: () => void;
-  onSave: () => void;
-  isSaveDisabled: boolean;
+  onSave: (values: VisaRaudhahEditFormState) => void | Promise<void>;
 }) {
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<VisaRaudhahEditFormState>({
+    resolver: zodResolver(raudhahModalSchema),
+    defaultValues: initialValue,
+  });
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "appointments",
+    keyName: "fieldId",
+  });
+
   return (
     <ModalShell
       title="Edit Raudhah"
@@ -379,30 +512,32 @@ export function VisaRaudhahModal({
       footer={
         <SaveFooter
           onClose={onClose}
-          onSave={onSave}
+          onSave={() => void handleSubmit((values) => void onSave(values))()}
           saveLabel="Save Changes"
-          isSaveDisabled={isSaveDisabled}
+          isSaving={isSubmitting}
         />
       }
     >
       <div className="space-y-3">
-        {value.appointments.length === 0 ? (
+        {fields.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
             Belum ada target tanggal Raudhah. Klik tombol "Add Date" untuk menambahkan target date.
           </div>
         ) : null}
 
-        {value.appointments.map((appointment, index) => (
+        {fields.map((appointment, index) => (
           <div
-            key={appointment.id}
+            key={appointment.fieldId}
             className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-3"
           >
+            <input type="hidden" {...register(`appointments.${index}.id`)} />
+            <input type="hidden" {...register(`appointments.${index}.tasrehPrinted`)} />
             <div className="mb-2 flex items-center justify-between gap-2">
               <strong className="text-sm text-slate-800">Appointment {index + 1}</strong>
               <button
                 type="button"
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100"
-                onClick={() => onRemoveAppointment(appointment.id)}
+                onClick={() => remove(index)}
                 aria-label={`Remove Raudhah appointment ${index + 1}`}
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -414,33 +549,42 @@ export function VisaRaudhahModal({
             <div className="grid gap-3 md:grid-cols-2">
               <label className={modalFieldClassName}>
                 <span>Appointment Date</span>
-                <DatePickerInput
-                  inputClassName={modalInputClassName}
-                  value={appointment.dateIso}
-                  onChange={(nextValue) =>
-                    onChangeAppointment(appointment.id, "dateIso", nextValue)
-                  }
+                <Controller
+                  control={control}
+                  name={`appointments.${index}.dateIso`}
+                  render={({ field }) => (
+                    <DatePickerInput
+                      inputClassName={modalInputClassName}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
               </label>
+              {errors.appointments?.[index]?.dateIso ? (
+                <p className="text-xs font-medium text-brand-tertiary">
+                  {errors.appointments[index]?.dateIso?.message}
+                </p>
+              ) : null}
 
               <label className={modalFieldClassName}>
                 <span>Appointment Tone</span>
                 <div className="relative">
-                  <SereneSelect
-                    className={modalSelectClassName}
-                    value={appointment.status}
-                    onChange={(event) =>
-                      onChangeAppointment(
-                        appointment.id,
-                        "status",
-                        event.target.value as GroupRaudhahStatus,
-                      )
-                    }
-                  >
-                    <option value="Free">Free / Not Set</option>
-                    <option value="Before">Before 13:00</option>
-                    <option value="After">After 13:00</option>
-                  </SereneSelect>
+                  <Controller
+                    control={control}
+                    name={`appointments.${index}.status`}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className={modalSelectClassName}
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      >
+                        <option value="Free">Free / Not Set</option>
+                        <option value="Before">Before 13:00</option>
+                        <option value="After">After 13:00</option>
+                      </SereneSelect>
+                    )}
+                  />
                 </div>
               </label>
             </div>
@@ -450,7 +594,14 @@ export function VisaRaudhahModal({
         <button
           type="button"
           className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
-          onClick={onAddAppointment}
+          onClick={() =>
+            append({
+              id: `${appointmentIdPrefix}-raudhah-draft-${Date.now().toString(36)}-${fields.length + 1}`,
+              dateIso: defaultAppointmentDateIso,
+              status: "After",
+              tasrehPrinted: false,
+            })
+          }
         >
           <span className="material-symbols-outlined text-base" aria-hidden="true">
             add

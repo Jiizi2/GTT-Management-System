@@ -1,18 +1,22 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
-  createManagedUserInBackend,
-  deleteManagedUserInBackend,
-  fetchManagedUsersFromBackend,
-  updateManagedUserInBackend,
-  type BackendManagedUser,
-} from "../hooks/use-user-management-backend";
-import {
-  fetchMasterDataOptionsFromBackend,
   type MasterDataOption,
 } from "../hooks/use-master-data-backend";
+import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
+import {
+  useCreateManagedUserMutation,
+  useDeleteManagedUserMutation,
+  useManagedUsersQuery,
+  useSetManagedUserPasswordMutation,
+  useUpdateManagedUserMutation,
+} from "../hooks/use-user-management-query";
+import type { BackendManagedUser } from "../hooks/use-user-management-backend";
 
 type RoleId = BackendManagedUser["roleId"];
 
@@ -35,18 +39,7 @@ type UserAccount = {
   name: string;
   email: string;
   roleId: RoleId;
-};
-
-type NewUserFormState = {
-  name: string;
-  email: string;
-  roleId: RoleId;
-};
-
-type EditUserFormState = {
-  name: string;
-  email: string;
-  roleId: RoleId;
+  hasPassword: boolean;
 };
 
 type NoticeState = {
@@ -88,6 +81,109 @@ const roleIdSet = new Set<RoleId>([
   "customer-support",
 ]);
 
+const roleIdSchema = z.enum([
+  "super-admin",
+  "admin",
+  "finance-manager",
+  "customer-support",
+]);
+
+const managedUserFormSchema = z.object({
+  name: z.string().trim().min(1, "Nama wajib diisi."),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email wajib diisi.")
+    .email("Format email tidak valid. Contoh: user@ghaniyatravel.com."),
+  roleId: roleIdSchema,
+});
+
+const optionalManagedUserPasswordSchema = z
+  .string()
+  .trim()
+  .max(1024, "Password terlalu panjang.");
+
+const requiredManagedUserPasswordSchema = z
+  .string()
+  .trim()
+  .min(8, "Password minimal 8 karakter.")
+  .max(1024, "Password terlalu panjang.");
+
+const createManagedUserFormSchema = managedUserFormSchema.extend({
+  password: optionalManagedUserPasswordSchema,
+  confirmPassword: optionalManagedUserPasswordSchema,
+}).superRefine((values, context) => {
+  const password = values.password.trim();
+  const confirmPassword = values.confirmPassword.trim();
+
+  if (!password && !confirmPassword) {
+    return;
+  }
+
+  if (!password) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["password"],
+      message: "Isi password dulu atau kosongkan kedua field password.",
+    });
+    return;
+  }
+
+  if (password.length < 8) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["password"],
+      message: "Password minimal 8 karakter.",
+    });
+  }
+
+  if (!confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password wajib diisi jika password diatur.",
+    });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password tidak sama.",
+    });
+  }
+});
+
+const resetManagedUserPasswordFormSchema = z.object({
+  password: requiredManagedUserPasswordSchema,
+  confirmPassword: optionalManagedUserPasswordSchema,
+}).superRefine((values, context) => {
+  const password = values.password.trim();
+  const confirmPassword = values.confirmPassword.trim();
+
+  if (!confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password wajib diisi.",
+    });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password tidak sama.",
+    });
+  }
+});
+
+type ManagedUserFormValues = z.infer<typeof managedUserFormSchema>;
+type CreateManagedUserFormValues = z.infer<typeof createManagedUserFormSchema>;
+type ResetManagedUserPasswordFormValues = z.infer<typeof resetManagedUserPasswordFormSchema>;
+
 const defaultUserRoleOptions: UserRoleOption[] = defaultRoleCatalog
   .filter((role): role is RoleCatalogItem & { id: RoleId } => roleIdSet.has(role.id as RoleId))
   .map((role, index) => ({
@@ -96,20 +192,6 @@ const defaultUserRoleOptions: UserRoleOption[] = defaultRoleCatalog
     description: role.description,
     sortOrder: index + 1,
   }));
-
-const initialUsers: UserAccount[] = [];
-
-const defaultNewUserForm: NewUserFormState = {
-  name: "",
-  email: "",
-  roleId: defaultUserRoleOptions[0]?.id ?? "admin",
-};
-
-const defaultEditUserForm: EditUserFormState = {
-  name: "",
-  email: "",
-  roleId: defaultUserRoleOptions[0]?.id ?? "admin",
-};
 
 function UserManagementModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") {
@@ -135,8 +217,12 @@ function resolveRoleToneClass(roleId: string): string {
   return "bg-surface-container-high text-on-surface";
 }
 
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+function resolvePasswordToneClass(hasPassword: boolean): string {
+  if (hasPassword) {
+    return "border-primary/20 bg-primary-fixed text-on-primary-fixed";
+  }
+
+  return "border-outline-variant/35 bg-surface-container-lowest text-on-surface-variant";
 }
 
 function isRoleId(value: string): value is RoleId {
@@ -203,6 +289,7 @@ function mapBackendUserToLocal(user: BackendManagedUser): UserAccount {
     name: user.name,
     email: user.email,
     roleId: user.roleId,
+    hasPassword: user.hasPassword,
   };
 }
 
@@ -215,18 +302,34 @@ function extractErrorMessage(error: unknown, fallbackMessage: string): string {
 }
 
 export function UserManagementScreen() {
-  const [users, setUsers] = useState<UserAccount[]>(initialUsers);
-  const [userRoleOptions, setUserRoleOptions] = useState<UserRoleOption[]>(defaultUserRoleOptions);
-  const [roleCatalogItems, setRoleCatalogItems] = useState<RoleCatalogItem[]>(defaultRoleCatalog);
-  const [newUserForm, setNewUserForm] = useState<NewUserFormState>(defaultNewUserForm);
-  const [editUserForm, setEditUserForm] = useState<EditUserFormState>(defaultEditUserForm);
+  const managedUsersQuery = useManagedUsersQuery();
+  const userRoleOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "user-role",
+  });
+  const roleCatalogQuery = useMasterDataOptionsQuery({
+    categoryKey: "role-catalog",
+  });
+  const createManagedUserMutation = useCreateManagedUserMutation();
+  const updateManagedUserMutation = useUpdateManagedUserMutation();
+  const deleteManagedUserMutation = useDeleteManagedUserMutation();
+  const setManagedUserPasswordMutation = useSetManagedUserPasswordMutation();
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [deleteTargetUser, setDeleteTargetUser] = useState<UserAccount | null>(null);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
+  const [passwordTargetUser, setPasswordTargetUser] = useState<UserAccount | null>(null);
+
+  const users = useMemo(
+    () => (managedUsersQuery.data ?? []).map((user) => mapBackendUserToLocal(user)),
+    [managedUsersQuery.data],
+  );
+  const userRoleOptions = useMemo(
+    () => mapUserRoleOptionsFromMasterData(userRoleOptionsQuery.data ?? []),
+    [userRoleOptionsQuery.data],
+  );
+  const roleCatalogItems = useMemo(
+    () => mapRoleCatalogFromMasterData(roleCatalogQuery.data ?? []),
+    [roleCatalogQuery.data],
+  );
 
   const roleCatalogById = useMemo(
     () => new Map(roleCatalogItems.map((role) => [role.id, role] as const)),
@@ -237,112 +340,128 @@ export function UserManagementScreen() {
     () => users.filter((user) => user.roleId === "super-admin").length,
     [users],
   );
+  const totalUsersWithoutPassword = useMemo(
+    () => users.filter((user) => !user.hasPassword).length,
+    [users],
+  );
   const hasActiveRoleOptions = userRoleOptions.length > 0;
+  const defaultRoleId = userRoleOptions[0]?.id ?? "admin";
+
+  const createForm = useForm<CreateManagedUserFormValues>({
+    resolver: zodResolver(createManagedUserFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      roleId: defaultRoleId,
+      password: "",
+      confirmPassword: "",
+    },
+  });
+  const editForm = useForm<ManagedUserFormValues>({
+    resolver: zodResolver(managedUserFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      roleId: defaultRoleId,
+    },
+  });
+  const passwordForm = useForm<ResetManagedUserPasswordFormValues>({
+    resolver: zodResolver(resetManagedUserPasswordFormSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (!notice) {
+      return undefined;
+    }
 
-    void Promise.all([
-      fetchManagedUsersFromBackend({ signal: controller.signal }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "user-role",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "role-catalog",
-        signal: controller.signal,
-      }),
-    ])
-      .then(([backendUsers, userRoleOptionsRows, roleCatalogRows]) => {
-        const nextUserRoleOptions = mapUserRoleOptionsFromMasterData(userRoleOptionsRows);
-        const nextRoleCatalogItems = mapRoleCatalogFromMasterData(roleCatalogRows);
-
-        setUserRoleOptions(nextUserRoleOptions);
-        setRoleCatalogItems(nextRoleCatalogItems);
-        setNewUserForm((current) => {
-          if (nextUserRoleOptions.some((role) => role.id === current.roleId)) {
-            return current;
-          }
-
-          return {
-            ...current,
-            roleId: nextUserRoleOptions[0]?.id ?? "admin",
-          };
-        });
-        setEditUserForm((current) => {
-          if (nextUserRoleOptions.some((role) => role.id === current.roleId)) {
-            return current;
-          }
-
-          return {
-            ...current,
-            roleId: nextUserRoleOptions[0]?.id ?? "admin",
-          };
-        });
-
-        if (backendUsers.length > 0) {
-          setUsers(backendUsers.map((user) => mapBackendUserToLocal(user)));
-        } else {
-          setUsers([]);
-        }
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setUserRoleOptions(defaultUserRoleOptions);
-        setRoleCatalogItems(defaultRoleCatalog);
-        setNotice({
-          tone: "error",
-          message: extractErrorMessage(
-            error,
-            "Gagal memuat daftar user dari backend.",
-          ),
-        });
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsLoadingUsers(false);
-        }
-      });
+    const timeoutId = window.setTimeout(() => {
+      setNotice((current) => (current ? null : current));
+    }, 3200);
 
     return () => {
-      controller.abort();
+      window.clearTimeout(timeoutId);
     };
-  }, []);
+  }, [notice]);
+
+  useEffect(() => {
+    const currentRoleId = createForm.getValues("roleId");
+    if (userRoleOptions.some((role) => role.id === currentRoleId)) {
+      return;
+    }
+
+    createForm.setValue("roleId", defaultRoleId);
+  }, [createForm, defaultRoleId, userRoleOptions]);
+
+  useEffect(() => {
+    if (!editingUser) {
+      editForm.reset({
+        name: "",
+        email: "",
+        roleId: defaultRoleId,
+      });
+      return;
+    }
+
+    editForm.reset({
+      name: editingUser.name,
+      email: editingUser.email,
+      roleId: userRoleOptions.some((role) => role.id === editingUser.roleId)
+        ? editingUser.roleId
+        : defaultRoleId,
+    });
+  }, [defaultRoleId, editForm, editingUser, userRoleOptions]);
+
+  useEffect(() => {
+    if (!passwordTargetUser) {
+      passwordForm.reset({
+        password: "",
+        confirmPassword: "",
+      });
+      return;
+    }
+
+    passwordForm.reset({
+      password: "",
+      confirmPassword: "",
+    });
+  }, [passwordForm, passwordTargetUser]);
 
   const closeEditModal = () => {
     setEditingUser(null);
-    setEditUserForm({
-      ...defaultEditUserForm,
-      roleId: userRoleOptions[0]?.id ?? "admin",
-    });
   };
 
   const closeDeleteModal = () => {
     setDeleteTargetUser(null);
   };
 
+  const closePasswordModal = () => {
+    setPasswordTargetUser(null);
+  };
+
   const openEditModal = (user: UserAccount) => {
     setDeleteTargetUser(null);
+    setPasswordTargetUser(null);
     setEditingUser(user);
-    setEditUserForm({
-      name: user.name,
-      email: user.email,
-      roleId: userRoleOptions.some((role) => role.id === user.roleId)
-        ? user.roleId
-        : (userRoleOptions[0]?.id ?? "admin"),
-    });
   };
 
   const openDeleteModal = (user: UserAccount) => {
     setEditingUser(null);
+    setPasswordTargetUser(null);
     setDeleteTargetUser(user);
   };
 
+  const openPasswordModal = (user: UserAccount) => {
+    setEditingUser(null);
+    setDeleteTargetUser(null);
+    setPasswordTargetUser(user);
+  };
+
   useEffect(() => {
-    if (!editingUser && !deleteTargetUser) {
+    if (!editingUser && !deleteTargetUser && !passwordTargetUser) {
       return undefined;
     }
 
@@ -350,6 +469,7 @@ export function UserManagementScreen() {
       if (event.key === "Escape") {
         closeEditModal();
         closeDeleteModal();
+        closePasswordModal();
       }
     };
 
@@ -357,11 +477,33 @@ export function UserManagementScreen() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [deleteTargetUser, editingUser]);
+  }, [deleteTargetUser, editingUser, passwordTargetUser]);
 
-  const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isCreateSubmitting) {
+  useEffect(() => {
+    if (!managedUsersQuery.error) {
+      return;
+    }
+
+    setNotice({
+      tone: "error",
+      message: extractErrorMessage(managedUsersQuery.error, "Gagal memuat daftar user dari backend."),
+    });
+  }, [managedUsersQuery.error]);
+
+  useEffect(() => {
+    if (!userRoleOptionsQuery.error && !roleCatalogQuery.error) {
+      return;
+    }
+
+    setNotice({
+      tone: "error",
+      message:
+        "Sebagian master data role gagal dimuat. Halaman memakai fallback default sampai backend kembali tersedia.",
+    });
+  }, [roleCatalogQuery.error, userRoleOptionsQuery.error]);
+
+  const handleCreateUser = async (values: CreateManagedUserFormValues) => {
+    if (createManagedUserMutation.isPending) {
       return;
     }
 
@@ -373,25 +515,9 @@ export function UserManagementScreen() {
       return;
     }
 
-    const normalizedName = newUserForm.name.trim();
-    const normalizedEmail = newUserForm.email.trim().toLowerCase();
-
-    if (!normalizedName || !normalizedEmail) {
-      setNotice({
-        tone: "error",
-        message: "Nama dan email wajib diisi sebelum membuat user baru.",
-      });
-      return;
-    }
-
-    if (!isValidEmail(normalizedEmail)) {
-      setNotice({
-        tone: "error",
-        message: "Format email tidak valid. Contoh: user@ghaniyatravel.com.",
-      });
-      return;
-    }
-
+    const normalizedName = values.name.trim();
+    const normalizedEmail = values.email.trim().toLowerCase();
+    const normalizedPassword = values.password.trim();
     const isDuplicateEmail = users.some((user) => user.email.trim().toLowerCase() === normalizedEmail);
 
     if (isDuplicateEmail) {
@@ -402,22 +528,25 @@ export function UserManagementScreen() {
       return;
     }
 
-    setIsCreateSubmitting(true);
     try {
-      const createdFromBackend = await createManagedUserInBackend({
+      await createManagedUserMutation.mutateAsync({
         name: normalizedName,
         email: normalizedEmail,
-        roleId: newUserForm.roleId,
+        roleId: values.roleId,
+        password: normalizedPassword || undefined,
       });
-
-      setUsers((current) => [mapBackendUserToLocal(createdFromBackend), ...current]);
-      setNewUserForm({
-        ...defaultNewUserForm,
-        roleId: userRoleOptions[0]?.id ?? "admin",
+      createForm.reset({
+        name: "",
+        email: "",
+        roleId: defaultRoleId,
+        password: "",
+        confirmPassword: "",
       });
       setNotice({
         tone: "success",
-        message: `User ${normalizedName} berhasil ditambahkan.`,
+        message: normalizedPassword
+          ? `User ${normalizedName} berhasil ditambahkan dengan password awal.`
+          : `User ${normalizedName} berhasil ditambahkan tanpa password awal.`,
       });
     } catch (error: unknown) {
       setNotice({
@@ -427,15 +556,11 @@ export function UserManagementScreen() {
           "User baru gagal dibuat di backend.",
         ),
       });
-    } finally {
-      setIsCreateSubmitting(false);
     }
   };
 
-  const handleSubmitEditUser = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!editingUser || isEditSubmitting) {
+  const handleSubmitEditUser = async (values: ManagedUserFormValues) => {
+    if (!editingUser || updateManagedUserMutation.isPending) {
       return;
     }
 
@@ -447,25 +572,8 @@ export function UserManagementScreen() {
       return;
     }
 
-    const normalizedName = editUserForm.name.trim();
-    const normalizedEmail = editUserForm.email.trim().toLowerCase();
-
-    if (!normalizedName || !normalizedEmail) {
-      setNotice({
-        tone: "error",
-        message: "Nama dan email wajib diisi sebelum menyimpan perubahan user.",
-      });
-      return;
-    }
-
-    if (!isValidEmail(normalizedEmail)) {
-      setNotice({
-        tone: "error",
-        message: "Format email tidak valid. Contoh: user@ghaniyatravel.com.",
-      });
-      return;
-    }
-
+    const normalizedName = values.name.trim();
+    const normalizedEmail = values.email.trim().toLowerCase();
     const isDuplicateEmail = users.some(
       (user) => user.id !== editingUser.id && user.email.trim().toLowerCase() === normalizedEmail,
     );
@@ -478,19 +586,15 @@ export function UserManagementScreen() {
       return;
     }
 
-    setIsEditSubmitting(true);
     try {
-      const updatedFromBackend = await updateManagedUserInBackend(editingUser.id, {
-        name: normalizedName,
-        email: normalizedEmail,
-        roleId: editUserForm.roleId,
+      const updatedFromBackend = await updateManagedUserMutation.mutateAsync({
+        userId: editingUser.id,
+        payload: {
+          name: normalizedName,
+          email: normalizedEmail,
+          roleId: values.roleId,
+        },
       });
-
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === updatedFromBackend.id ? mapBackendUserToLocal(updatedFromBackend) : user,
-        ),
-      );
 
       const selectedRoleLabel = roleCatalogById.get(updatedFromBackend.roleId)?.label ?? "Role";
       setNotice({
@@ -506,21 +610,17 @@ export function UserManagementScreen() {
           "Perubahan user gagal disimpan ke backend.",
         ),
       });
-    } finally {
-      setIsEditSubmitting(false);
     }
   };
 
   const handleConfirmDeleteUser = async () => {
     const targetUser = deleteTargetUser;
-    if (!targetUser || isDeleteSubmitting) {
+    if (!targetUser || deleteManagedUserMutation.isPending) {
       return;
     }
 
-    setIsDeleteSubmitting(true);
     try {
-      await deleteManagedUserInBackend(targetUser.id);
-      setUsers((current) => current.filter((user) => user.id !== targetUser.id));
+      await deleteManagedUserMutation.mutateAsync(targetUser.id);
       setNotice({
         tone: "success",
         message: `User ${targetUser.name} berhasil dihapus.`,
@@ -534,8 +634,37 @@ export function UserManagementScreen() {
           "Penghapusan user gagal di backend.",
         ),
       });
-    } finally {
-      setIsDeleteSubmitting(false);
+    }
+  };
+
+  const handleSubmitManagedUserPassword = async (values: ResetManagedUserPasswordFormValues) => {
+    const targetUser = passwordTargetUser;
+    if (!targetUser || setManagedUserPasswordMutation.isPending) {
+      return;
+    }
+
+    const normalizedPassword = values.password.trim();
+
+    try {
+      const updatedUser = await setManagedUserPasswordMutation.mutateAsync({
+        userId: targetUser.id,
+        password: normalizedPassword,
+      });
+      setNotice({
+        tone: "success",
+        message: updatedUser.hasPassword
+          ? `Password untuk ${targetUser.name} berhasil ${targetUser.hasPassword ? "direset" : "diset"}.`
+          : `Password untuk ${targetUser.name} belum tersimpan.`,
+      });
+      closePasswordModal();
+    } catch (error: unknown) {
+      setNotice({
+        tone: "error",
+        message: extractErrorMessage(
+          error,
+          "Password user gagal diperbarui di backend.",
+        ),
+      });
     }
   };
 
@@ -578,63 +707,124 @@ export function UserManagementScreen() {
                 <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                   Create User
                 </h2>
-                <span className="text-xs font-semibold text-on-surface-variant">
-                  Total user: {isLoadingUsers ? "..." : users.length}
-                </span>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
+                  <span>Total user: {managedUsersQuery.isLoading ? "..." : users.length}</span>
+                  <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
+                  <span>Tanpa password: {managedUsersQuery.isLoading ? "..." : totalUsersWithoutPassword}</span>
+                </div>
               </div>
 
-              <form className="mt-5 grid gap-3 lg:grid-cols-[1.1fr_1.1fr_0.8fr_auto]" onSubmit={handleCreateUser}>
-                <input
-                  className="serene-input"
-                  value={newUserForm.name}
-                  onChange={(event) =>
-                    setNewUserForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  placeholder="Nama lengkap"
-                  aria-label="Nama lengkap user baru"
-                />
-                <input
-                  className="serene-input"
-                  value={newUserForm.email}
-                  onChange={(event) =>
-                    setNewUserForm((current) => ({ ...current, email: event.target.value }))
-                  }
-                  placeholder="email@ghaniyatravel.com"
-                  type="email"
-                  aria-label="Email user baru"
-                />
-                <SereneSelect
-                  className="serene-select"
-                  value={newUserForm.roleId}
-                  onChange={(event) =>
-                    setNewUserForm((current) => ({ ...current, roleId: event.target.value as RoleId }))
-                  }
-                  aria-label="Role user baru"
-                  disabled={!hasActiveRoleOptions}
-                >
-                  {hasActiveRoleOptions ? (
-                    userRoleOptions.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.label}
-                      </option>
-                    ))
+              <form
+                className="mt-5 grid gap-3 2xl:grid-cols-[1.1fr_1.1fr_0.8fr_1fr_1fr_auto]"
+                onSubmit={createForm.handleSubmit((values) => void handleCreateUser(values))}
+              >
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("name")}
+                    placeholder="Nama lengkap"
+                    aria-label="Nama lengkap user baru"
+                  />
+                  {createForm.formState.errors.name ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.name.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("email")}
+                    placeholder="email@ghaniyatravel.com"
+                    type="email"
+                    aria-label="Email user baru"
+                  />
+                  {createForm.formState.errors.email ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.email.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="grid gap-1">
+                  <Controller
+                    name="roleId"
+                    control={createForm.control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select"
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        aria-label="Role user baru"
+                        disabled={!hasActiveRoleOptions}
+                      >
+                        {hasActiveRoleOptions ? (
+                          userRoleOptions.map((role) => (
+                            <option key={role.id} value={role.id}>
+                              {role.label}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="admin">Belum ada role aktif</option>
+                        )}
+                      </SereneSelect>
+                    )}
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("password")}
+                    placeholder="Password awal (opsional)"
+                    type="password"
+                    aria-label="Password awal user baru"
+                    autoComplete="new-password"
+                  />
+                  {createForm.formState.errors.password ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.password.message}
+                    </p>
                   ) : (
-                    <option value="admin">Belum ada role aktif</option>
+                    <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
+                      Kosongkan bila akun dibuat tanpa password awal.
+                    </p>
                   )}
-                </SereneSelect>
+                </div>
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("confirmPassword")}
+                    placeholder="Konfirmasi password"
+                    type="password"
+                    aria-label="Konfirmasi password user baru"
+                    autoComplete="new-password"
+                  />
+                  {createForm.formState.errors.confirmPassword ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.confirmPassword.message}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
+                      Hanya perlu diisi saat kamu menetapkan password awal.
+                    </p>
+                  )}
+                </div>
                 <button
                   type="submit"
-                  className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4"
-                  disabled={isCreateSubmitting || !hasActiveRoleOptions}
+                  className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4 2xl:self-start"
+                  disabled={createManagedUserMutation.isPending || !hasActiveRoleOptions}
                 >
-                  {isCreateSubmitting ? "Menyimpan..." : "Tambah User"}
+                  {createManagedUserMutation.isPending ? "Menyimpan..." : "Tambah User"}
                 </button>
               </form>
               {!hasActiveRoleOptions ? (
                 <p className="mt-3 text-xs font-semibold text-error">
                   Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-3 text-xs font-medium leading-relaxed text-on-surface-variant">
+                  Password hanya menandakan akun sudah diprovision. Akses dashboard tetap mengikuti role dan pembatasan backend.
+                </p>
+              )}
             </div>
 
             <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
@@ -644,13 +834,15 @@ export function UserManagementScreen() {
                 <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                   User Directory
                 </h2>
-                <span className="text-xs font-semibold text-on-surface-variant">
-                  Super Admin aktif: {totalSuperAdmin}
-                </span>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
+                  <span>Super Admin aktif: {totalSuperAdmin}</span>
+                  <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
+                  <span>Belum ada password: {totalUsersWithoutPassword}</span>
+                </div>
               </div>
 
               <div className="mt-5 rounded-2xl border border-outline-variant/35 bg-surface-container-low">
-                {isLoadingUsers ? (
+                {managedUsersQuery.isLoading ? (
                   <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
                     Memuat data user dari backend...
                   </div>
@@ -681,6 +873,13 @@ export function UserManagementScreen() {
                             >
                               {selectedRole?.label ?? "Role"}
                             </span>
+                            <span
+                              className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${resolvePasswordToneClass(
+                                user.hasPassword,
+                              )}`}
+                            >
+                              {user.hasPassword ? "Password Ready" : "No Password"}
+                            </span>
                           </div>
 
                           {selectedRole ? (
@@ -691,6 +890,16 @@ export function UserManagementScreen() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                          <button
+                            type="button"
+                            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                            onClick={() => openPasswordModal(user)}
+                          >
+                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                              password
+                            </span>
+                            {user.hasPassword ? "Reset Password" : "Set Password"}
+                          </button>
                           <button
                             type="button"
                             className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
@@ -796,7 +1005,10 @@ export function UserManagementScreen() {
                 Perbarui nama, email, dan role untuk user ini.
               </p>
 
-              <form className="mt-5 grid gap-3" onSubmit={handleSubmitEditUser}>
+              <form
+                className="mt-5 grid gap-3"
+                onSubmit={editForm.handleSubmit((values) => void handleSubmitEditUser(values))}
+              >
                 <div className="grid gap-1.5">
                   <label className="text-xs font-semibold text-on-surface-variant" htmlFor="edit-user-name">
                     Nama Lengkap
@@ -804,13 +1016,15 @@ export function UserManagementScreen() {
                   <input
                     id="edit-user-name"
                     className="serene-input"
-                    value={editUserForm.name}
-                    onChange={(event) =>
-                      setEditUserForm((current) => ({ ...current, name: event.target.value }))
-                    }
+                    {...editForm.register("name")}
                     placeholder="Nama lengkap"
                     autoFocus
                   />
+                  {editForm.formState.errors.name ? (
+                    <p className="text-xs font-semibold text-error">
+                      {editForm.formState.errors.name.message}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-1.5">
@@ -820,38 +1034,44 @@ export function UserManagementScreen() {
                   <input
                     id="edit-user-email"
                     className="serene-input"
-                    value={editUserForm.email}
-                    onChange={(event) =>
-                      setEditUserForm((current) => ({ ...current, email: event.target.value }))
-                    }
+                    {...editForm.register("email")}
                     placeholder="email@ghaniyatravel.com"
                     type="email"
                   />
+                  {editForm.formState.errors.email ? (
+                    <p className="text-xs font-semibold text-error">
+                      {editForm.formState.errors.email.message}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-1.5">
                   <label className="text-xs font-semibold text-on-surface-variant" htmlFor="edit-user-role">
                     Role
                   </label>
-                  <SereneSelect
-                    id="edit-user-role"
-                    className="serene-select"
-                    value={editUserForm.roleId}
-                    onChange={(event) =>
-                      setEditUserForm((current) => ({ ...current, roleId: event.target.value as RoleId }))
-                    }
-                    disabled={!hasActiveRoleOptions}
-                  >
-                    {hasActiveRoleOptions ? (
-                      userRoleOptions.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.label}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="admin">Belum ada role aktif</option>
+                  <Controller
+                    name="roleId"
+                    control={editForm.control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        id="edit-user-role"
+                        className="serene-select"
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        disabled={!hasActiveRoleOptions}
+                      >
+                        {hasActiveRoleOptions ? (
+                          userRoleOptions.map((role) => (
+                            <option key={role.id} value={role.id}>
+                              {role.label}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="admin">Belum ada role aktif</option>
+                        )}
+                      </SereneSelect>
                     )}
-                  </SereneSelect>
+                  />
                 </div>
                 {!hasActiveRoleOptions ? (
                   <p className="text-xs font-semibold text-error">
@@ -864,16 +1084,122 @@ export function UserManagementScreen() {
                     type="button"
                     className="serene-btn-secondary"
                     onClick={closeEditModal}
-                    disabled={isEditSubmitting}
+                    disabled={updateManagedUserMutation.isPending}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     className="serene-btn-primary"
-                    disabled={isEditSubmitting || !hasActiveRoleOptions}
+                    disabled={updateManagedUserMutation.isPending || !hasActiveRoleOptions}
                   >
-                    {isEditSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                    {updateManagedUserMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </UserManagementModalPortal>
+      ) : null}
+
+      {passwordTargetUser ? (
+        <UserManagementModalPortal>
+          <div
+            className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
+            onClick={closePasswordModal}
+            aria-hidden="true"
+          >
+            <section
+              className="serene-modal-shell w-full max-w-lg p-5 sm:p-6"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${passwordTargetUser.hasPassword ? "Reset" : "Set"} password ${passwordTargetUser.name}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-secondary-container text-on-secondary-container">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  password
+                </span>
+              </div>
+
+              <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">
+                {passwordTargetUser.hasPassword ? "Reset Password" : "Set Password"}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                {passwordTargetUser.hasPassword
+                  ? `Masukkan password baru untuk ${passwordTargetUser.name}.`
+                  : `Buat password awal untuk ${passwordTargetUser.name} agar akun ini siap dipakai.`}
+              </p>
+
+              <div className="mt-4 rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3 text-xs font-medium leading-relaxed text-on-surface-variant">
+                <p className="font-semibold text-on-surface">{passwordTargetUser.email}</p>
+                <p className="mt-1">
+                  Status saat ini: {passwordTargetUser.hasPassword ? "sudah punya password" : "belum punya password"}.
+                </p>
+              </div>
+
+              <form
+                className="mt-5 grid gap-3"
+                onSubmit={passwordForm.handleSubmit((values) => void handleSubmitManagedUserPassword(values))}
+              >
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-on-surface-variant" htmlFor="managed-user-password">
+                    Password Baru
+                  </label>
+                  <input
+                    id="managed-user-password"
+                    className="serene-input"
+                    {...passwordForm.register("password")}
+                    type="password"
+                    placeholder="Minimal 8 karakter"
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                  {passwordForm.formState.errors.password ? (
+                    <p className="text-xs font-semibold text-error">
+                      {passwordForm.formState.errors.password.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-on-surface-variant" htmlFor="managed-user-password-confirm">
+                    Konfirmasi Password
+                  </label>
+                  <input
+                    id="managed-user-password-confirm"
+                    className="serene-input"
+                    {...passwordForm.register("confirmPassword")}
+                    type="password"
+                    placeholder="Ulangi password yang sama"
+                    autoComplete="new-password"
+                  />
+                  {passwordForm.formState.errors.confirmPassword ? (
+                    <p className="text-xs font-semibold text-error">
+                      {passwordForm.formState.errors.confirmPassword.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    className="serene-btn-secondary"
+                    onClick={closePasswordModal}
+                    disabled={setManagedUserPasswordMutation.isPending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="serene-btn-primary"
+                    disabled={setManagedUserPasswordMutation.isPending}
+                  >
+                    {setManagedUserPasswordMutation.isPending
+                      ? "Menyimpan..."
+                      : passwordTargetUser.hasPassword
+                        ? "Reset Password"
+                        : "Simpan Password"}
                   </button>
                 </div>
               </form>
@@ -914,7 +1240,7 @@ export function UserManagementScreen() {
                   type="button"
                   className="serene-btn-secondary"
                   onClick={closeDeleteModal}
-                  disabled={isDeleteSubmitting}
+                  disabled={deleteManagedUserMutation.isPending}
                 >
                   Cancel
                 </button>
@@ -922,12 +1248,12 @@ export function UserManagementScreen() {
                   type="button"
                   className="inline-flex items-center justify-center gap-1.5 rounded-md bg-error-container px-4 py-2 text-sm font-semibold text-on-error-container transition hover:brightness-95"
                   onClick={handleConfirmDeleteUser}
-                  disabled={isDeleteSubmitting}
+                  disabled={deleteManagedUserMutation.isPending}
                 >
                   <span className="material-symbols-outlined text-base" aria-hidden="true">
                     delete
                   </span>
-                  {isDeleteSubmitting ? "Menghapus..." : "Ya, Hapus"}
+                  {deleteManagedUserMutation.isPending ? "Menghapus..." : "Ya, Hapus"}
                 </button>
               </div>
             </section>

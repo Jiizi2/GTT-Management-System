@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
@@ -214,6 +217,194 @@ const inlineHotelInputClassName =
   "h-11 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
 const inlineHotelSelectClassName = "serene-select";
 
+const inlineHotelSchema = z
+  .object({
+    hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
+    agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
+    pax: z
+      .string()
+      .trim()
+      .min(1, "Total pax wajib diisi.")
+      .refine((value) => {
+        const parsedValue = Number.parseInt(value, 10);
+        return Number.isInteger(parsedValue) && parsedValue > 0;
+      }, "Total pax harus lebih dari 0."),
+    status: z.enum(["Waiting for Approval", "Approved"]),
+    stayStartIso: z.string().trim().min(1, "Stay start date wajib diisi."),
+    stayEndIso: z.string().trim().min(1, "Stay end date wajib diisi."),
+  })
+  .refine((values) => values.stayEndIso >= values.stayStartIso, {
+    path: ["stayEndIso"],
+    message: "Stay end date tidak boleh sebelum stay start date.",
+  });
+
+function InlineHotelAgreementForm({
+  title,
+  hotelPlaceholder,
+  initialValue,
+  onCancel,
+  onSave,
+}: {
+  title: string;
+  hotelPlaceholder: string;
+  initialValue: VisaHotelEditFormState;
+  onCancel: () => void;
+  onSave: (values: VisaHotelEditFormState) => void | Promise<void>;
+}) {
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<VisaHotelEditFormState>({
+    resolver: zodResolver(inlineHotelSchema),
+    defaultValues: initialValue,
+  });
+
+  return (
+    <article className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="mb-3 flex items-center gap-2 text-emerald-900">
+        <span className="material-symbols-outlined text-base" aria-hidden="true">
+          add_home_work
+        </span>
+        <h3 className="text-sm font-semibold">{title}</h3>
+      </div>
+
+      <form
+        className="space-y-4"
+        onSubmit={handleSubmit((values) => void onSave(values))}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-1.5">
+            <label className={inlineHotelFieldClassName}>
+              <span>Hotel Name</span>
+              <input
+                type="text"
+                className={inlineHotelInputClassName}
+                placeholder={hotelPlaceholder}
+                {...register("hotelName")}
+              />
+            </label>
+            {errors.hotelName ? (
+              <p className="text-xs font-medium text-brand-tertiary">{errors.hotelName.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-1.5">
+            <label className={inlineHotelFieldClassName}>
+              <span>Agreement Number</span>
+              <input
+                type="text"
+                className={inlineHotelInputClassName}
+                placeholder="2026xxxxxxxxxxxxx"
+                {...register("agreementNumber")}
+              />
+            </label>
+            {errors.agreementNumber ? (
+              <p className="text-xs font-medium text-brand-tertiary">{errors.agreementNumber.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-1.5">
+            <label className={inlineHotelFieldClassName}>
+              <span>Total Pax</span>
+              <input
+                type="number"
+                min={1}
+                className={inlineHotelInputClassName}
+                placeholder="70"
+                {...register("pax")}
+              />
+            </label>
+            {errors.pax ? (
+              <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-1.5">
+            <label className={inlineHotelFieldClassName}>
+              <span>Approval Status</span>
+              <div className="relative">
+                <Controller
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <SereneSelect
+                      className={inlineHotelSelectClassName}
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    >
+                      <option value="Waiting for Approval">Waiting for Approval</option>
+                      <option value="Approved">Approved</option>
+                    </SereneSelect>
+                  )}
+                />
+              </div>
+            </label>
+          </div>
+
+          <div className="grid gap-1.5">
+            <label className={inlineHotelFieldClassName}>
+              <span>Stay Start Date</span>
+              <Controller
+                control={control}
+                name="stayStartIso"
+                render={({ field }) => (
+                  <DatePickerInput
+                    inputClassName={inlineHotelInputClassName}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </label>
+            {errors.stayStartIso ? (
+              <p className="text-xs font-medium text-brand-tertiary">{errors.stayStartIso.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-1.5">
+            <label className={inlineHotelFieldClassName}>
+              <span>Stay End Date</span>
+              <Controller
+                control={control}
+                name="stayEndIso"
+                render={({ field }) => (
+                  <DatePickerInput
+                    inputClassName={inlineHotelInputClassName}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </label>
+            {errors.stayEndIso ? (
+              <p className="text-xs font-medium text-brand-tertiary">{errors.stayEndIso.message}</p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
+            disabled={isSubmitting}
+          >
+            Save Agreement
+          </button>
+        </div>
+      </form>
+    </article>
+  );
+}
+
 export function VisaTrackingDetailScreen({
   row,
   groups,
@@ -249,32 +440,10 @@ export function VisaTrackingDetailScreen({
   const [activeModal, setActiveModal] = useState<
     "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | null
   >(null);
-  const [visaStatusDraft, setVisaStatusDraft] = useState<VisaStatus>(row.visaStatus);
-  const [paymentStatusDraft, setPaymentStatusDraft] = useState<VisaPaymentStatus>(row.paymentStatus);
-  const [syarikahDraft, setSyarikahDraft] = useState("");
   const [hotelCityDraft, setHotelCityDraft] = useState<"makkah" | "madinah">("makkah");
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
   const [hotelDraftId, setHotelDraftId] = useState<string | null>(null);
-  const [hotelDraft, setHotelDraft] = useState<VisaHotelEditFormState>({
-    hotelName: "",
-    agreementNumber: "",
-    pax: "",
-    status: "Waiting for Approval",
-    stayStartIso: "",
-    stayEndIso: "",
-  });
   const [addingHotelCity, setAddingHotelCity] = useState<"makkah" | "madinah" | null>(null);
-  const [addingHotelDraft, setAddingHotelDraft] = useState<VisaHotelEditFormState>({
-    hotelName: "",
-    agreementNumber: "",
-    pax: "",
-    status: "Waiting for Approval",
-    stayStartIso: "",
-    stayEndIso: "",
-  });
-  const [raudhahDraft, setRaudhahDraft] = useState<VisaRaudhahEditFormState>({
-    appointments: [],
-  });
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
   const raudhahCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -450,17 +619,14 @@ export function VisaTrackingDetailScreen({
   };
 
   const openVisaStatusModal = () => {
-    setVisaStatusDraft(row.visaStatus);
     setActiveModal("visa-status");
   };
 
   const openPaymentStatusModal = () => {
-    setPaymentStatusDraft(paymentStatus);
     setActiveModal("payment-status");
   };
 
   const openSyarikahModal = () => {
-    setSyarikahDraft(providerName);
     setActiveModal("syarikah");
   };
 
@@ -473,14 +639,12 @@ export function VisaTrackingDetailScreen({
     setHotelCityDraft(city);
     setHotelDraftMode(mode);
     setHotelDraftId(mode === "edit" ? hotelId ?? null : null);
-    setHotelDraft(buildHotelDraft(city, mode, hotelId));
     setActiveModal("hotel");
   };
 
   const openAddHotelInline = (city: "makkah" | "madinah") => {
     setActiveModal(null);
     setAddingHotelCity(city);
-    setAddingHotelDraft(buildHotelDraft(city, "add"));
   };
 
   const cancelAddHotelInline = () => {
@@ -488,7 +652,6 @@ export function VisaTrackingDetailScreen({
   };
 
   const openRaudhahModal = () => {
-    setRaudhahDraft(buildRaudhahDraft());
     setActiveModal("raudhah");
   };
 
@@ -496,43 +659,42 @@ export function VisaTrackingDetailScreen({
     setActiveModal(null);
   };
 
-  const saveVisaStatus = () => {
-    onUpdateVisaStatus(row.groupCode, visaStatusDraft);
+  const saveVisaStatus = (nextValue: VisaStatus) => {
+    onUpdateVisaStatus(row.groupCode, nextValue);
     closeModal();
   };
 
-  const savePaymentStatus = () => {
-    onUpdatePaymentStatus(row.groupCode, paymentStatusDraft);
-    setPaymentStatus(paymentStatusDraft);
+  const savePaymentStatus = (nextValue: VisaPaymentStatus) => {
+    onUpdatePaymentStatus(row.groupCode, nextValue);
+    setPaymentStatus(nextValue);
     closeModal();
   };
 
-  const saveSyarikah = () => {
-    onUpdateSyarikah(row.groupCode, syarikahDraft);
+  const saveSyarikah = (nextValue: string) => {
+    onUpdateSyarikah(row.groupCode, nextValue);
     closeModal();
   };
 
-  const saveHotel = () => {
+  const saveHotel = (hotel: VisaHotelEditFormState) => {
     onUpdateVisaHotel(
       row.groupCode,
       hotelCityDraft,
-      hotelDraft,
+      hotel,
       hotelDraftMode === "edit" ? hotelDraftId ?? undefined : undefined,
     );
     closeModal();
   };
 
-  const saveRaudhah = () => {
-    onUpdateRaudhahAppointment(row.groupCode, raudhahDraft);
+  const saveRaudhah = (appointment: VisaRaudhahEditFormState) => {
+    onUpdateRaudhahAppointment(row.groupCode, appointment);
     closeModal();
   };
 
-  const saveAddHotelInline = () => {
-    if (!addingHotelCity) {
-      return;
-    }
-
-    onUpdateVisaHotel(row.groupCode, addingHotelCity, addingHotelDraft);
+  const saveAddHotelInline = (
+    city: "makkah" | "madinah",
+    hotel: VisaHotelEditFormState,
+  ) => {
+    onUpdateVisaHotel(row.groupCode, city, hotel);
     setAddingHotelCity(null);
   };
 
@@ -561,69 +723,6 @@ export function VisaTrackingDetailScreen({
       raudhahCopyTimerRef.current = null;
     }, 1600);
   };
-
-  const handleHotelDraftChange = <Key extends keyof VisaHotelEditFormState>(
-    field: Key,
-    nextValue: VisaHotelEditFormState[Key],
-  ) => {
-    setHotelDraft((current) => ({ ...current, [field]: nextValue }));
-  };
-
-  const handleAddRaudhahDraftAppointment = () => {
-    setRaudhahDraft((current) => ({
-      appointments: [
-        ...current.appointments,
-        {
-          id: `${row.groupCode}-raudhah-draft-${Date.now().toString(36)}-${current.appointments.length + 1}`,
-          dateIso: row.departureIso,
-          status: "After",
-          tasrehPrinted: false,
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveRaudhahDraftAppointment = (appointmentId: string) => {
-    setRaudhahDraft((current) => ({
-      appointments: current.appointments.filter((appointment) => appointment.id !== appointmentId),
-    }));
-  };
-
-  const handleRaudhahDraftAppointmentChange = (
-    appointmentId: string,
-    field: "dateIso" | "status",
-    nextValue: string | "Free" | "Before" | "After",
-  ) => {
-    setRaudhahDraft((current) => ({
-      appointments: current.appointments.map((appointment) =>
-        appointment.id === appointmentId
-          ? {
-              ...appointment,
-              [field]: nextValue,
-            }
-          : appointment,
-      ),
-    }));
-  };
-
-  const handleAddingHotelDraftChange = <Key extends keyof VisaHotelEditFormState>(
-    field: Key,
-    nextValue: VisaHotelEditFormState[Key],
-  ) => {
-    setAddingHotelDraft((current) => ({ ...current, [field]: nextValue }));
-  };
-
-  const isAddingHotelDraftSaveDisabled =
-    !addingHotelDraft.hotelName.trim() ||
-    !addingHotelDraft.agreementNumber.trim() ||
-    !addingHotelDraft.pax.trim() ||
-    Number.parseInt(addingHotelDraft.pax, 10) <= 0 ||
-    !addingHotelDraft.stayStartIso.trim() ||
-    !addingHotelDraft.stayEndIso.trim() ||
-    addingHotelDraft.stayEndIso < addingHotelDraft.stayStartIso;
-  const isRaudhahDraftSaveDisabled = raudhahDraft.appointments.some(
-    (appointment) => !appointment.dateIso.trim(),
-  );
 
   useEffect(() => {
     setPaymentStatus(row.paymentStatus);
@@ -850,105 +949,14 @@ export function VisaTrackingDetailScreen({
           </div>
 
           {addingHotelCity === "makkah" ? (
-            <article className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="mb-3 flex items-center gap-2 text-emerald-900">
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  add_home_work
-                </span>
-                <h3 className="text-sm font-semibold">New Makkah Agreement</h3>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className={inlineHotelFieldClassName}>
-                  <span>Hotel Name</span>
-                  <input
-                    type="text"
-                    className={inlineHotelInputClassName}
-                    value={addingHotelDraft.hotelName}
-                    onChange={(event) => handleAddingHotelDraftChange("hotelName", event.target.value)}
-                    placeholder="e.g. Swissotel Al Maqam"
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Agreement Number</span>
-                  <input
-                    type="text"
-                    className={inlineHotelInputClassName}
-                    value={addingHotelDraft.agreementNumber}
-                    onChange={(event) => handleAddingHotelDraftChange("agreementNumber", event.target.value)}
-                    placeholder="2026xxxxxxxxxxxxx"
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Total Pax</span>
-                  <input
-                    type="number"
-                    min={1}
-                    className={inlineHotelInputClassName}
-                    value={addingHotelDraft.pax}
-                    onChange={(event) => handleAddingHotelDraftChange("pax", event.target.value)}
-                    placeholder={totalPax.toString()}
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Approval Status</span>
-                  <div className="relative">
-                    <SereneSelect
-                      className={inlineHotelSelectClassName}
-                      value={addingHotelDraft.status}
-                      onChange={(event) =>
-                        handleAddingHotelDraftChange(
-                          "status",
-                          event.target.value as VisaHotelEditFormState["status"],
-                        )
-                      }
-                    >
-                      <option value="Waiting for Approval">Waiting for Approval</option>
-                      <option value="Approved">Approved</option>
-                    </SereneSelect>
-                  </div>
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Stay Start Date</span>
-                  <DatePickerInput
-                    inputClassName={inlineHotelInputClassName}
-                    value={addingHotelDraft.stayStartIso}
-                    onChange={(nextValue) => handleAddingHotelDraftChange("stayStartIso", nextValue)}
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Stay End Date</span>
-                  <DatePickerInput
-                    inputClassName={inlineHotelInputClassName}
-                    value={addingHotelDraft.stayEndIso}
-                    onChange={(nextValue) => handleAddingHotelDraftChange("stayEndIso", nextValue)}
-                  />
-                </label>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
-                  onClick={cancelAddHotelInline}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
-                  onClick={saveAddHotelInline}
-                  disabled={isAddingHotelDraftSaveDisabled}
-                >
-                  Save Agreement
-                </button>
-              </div>
-            </article>
+            <InlineHotelAgreementForm
+              key="makkah-add-agreement"
+              title="New Makkah Agreement"
+              hotelPlaceholder="e.g. Swissotel Al Maqam"
+              initialValue={buildHotelDraft("makkah", "add")}
+              onCancel={cancelAddHotelInline}
+              onSave={(hotel) => saveAddHotelInline("makkah", hotel)}
+            />
           ) : null}
 
           <div className={`mt-4 inline-flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium ${getCitySummaryClasses(makkahMissing > 0)}`}>
@@ -1062,105 +1070,14 @@ export function VisaTrackingDetailScreen({
           </div>
 
           {addingHotelCity === "madinah" ? (
-            <article className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="mb-3 flex items-center gap-2 text-emerald-900">
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  add_home_work
-                </span>
-                <h3 className="text-sm font-semibold">New Madinah Agreement</h3>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className={inlineHotelFieldClassName}>
-                  <span>Hotel Name</span>
-                  <input
-                    type="text"
-                    className={inlineHotelInputClassName}
-                    value={addingHotelDraft.hotelName}
-                    onChange={(event) => handleAddingHotelDraftChange("hotelName", event.target.value)}
-                    placeholder="e.g. Pullman Zamzam Madinah"
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Agreement Number</span>
-                  <input
-                    type="text"
-                    className={inlineHotelInputClassName}
-                    value={addingHotelDraft.agreementNumber}
-                    onChange={(event) => handleAddingHotelDraftChange("agreementNumber", event.target.value)}
-                    placeholder="2026xxxxxxxxxxxxx"
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Total Pax</span>
-                  <input
-                    type="number"
-                    min={1}
-                    className={inlineHotelInputClassName}
-                    value={addingHotelDraft.pax}
-                    onChange={(event) => handleAddingHotelDraftChange("pax", event.target.value)}
-                    placeholder={totalPax.toString()}
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Approval Status</span>
-                  <div className="relative">
-                    <SereneSelect
-                      className={inlineHotelSelectClassName}
-                      value={addingHotelDraft.status}
-                      onChange={(event) =>
-                        handleAddingHotelDraftChange(
-                          "status",
-                          event.target.value as VisaHotelEditFormState["status"],
-                        )
-                      }
-                    >
-                      <option value="Waiting for Approval">Waiting for Approval</option>
-                      <option value="Approved">Approved</option>
-                    </SereneSelect>
-                  </div>
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Stay Start Date</span>
-                  <DatePickerInput
-                    inputClassName={inlineHotelInputClassName}
-                    value={addingHotelDraft.stayStartIso}
-                    onChange={(nextValue) => handleAddingHotelDraftChange("stayStartIso", nextValue)}
-                  />
-                </label>
-
-                <label className={inlineHotelFieldClassName}>
-                  <span>Stay End Date</span>
-                  <DatePickerInput
-                    inputClassName={inlineHotelInputClassName}
-                    value={addingHotelDraft.stayEndIso}
-                    onChange={(nextValue) => handleAddingHotelDraftChange("stayEndIso", nextValue)}
-                  />
-                </label>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
-                  onClick={cancelAddHotelInline}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
-                  onClick={saveAddHotelInline}
-                  disabled={isAddingHotelDraftSaveDisabled}
-                >
-                  Save Agreement
-                </button>
-              </div>
-            </article>
+            <InlineHotelAgreementForm
+              key="madinah-add-agreement"
+              title="New Madinah Agreement"
+              hotelPlaceholder="e.g. Pullman Zamzam Madinah"
+              initialValue={buildHotelDraft("madinah", "add")}
+              onCancel={cancelAddHotelInline}
+              onSave={(hotel) => saveAddHotelInline("madinah", hotel)}
+            />
           ) : null}
 
           <div className={`mt-4 inline-flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium ${getCitySummaryClasses(madinahMissing > 0)}`}>
@@ -1306,7 +1223,6 @@ export function VisaTrackingDetailScreen({
             onClick={() => {
               const nextStatus = paymentStatus === "Paid" ? "Unpaid" : "Paid";
               setPaymentStatus(nextStatus);
-              setPaymentStatusDraft(nextStatus);
               onUpdatePaymentStatus(row.groupCode, nextStatus);
             }}
           >
@@ -1318,8 +1234,7 @@ export function VisaTrackingDetailScreen({
 
       {activeModal === "visa-status" ? (
         <VisaStatusModal
-          value={visaStatusDraft}
-          onChange={(nextValue) => setVisaStatusDraft(nextValue)}
+          initialValue={row.visaStatus}
           onClose={closeModal}
           onSave={saveVisaStatus}
         />
@@ -1327,8 +1242,7 @@ export function VisaTrackingDetailScreen({
 
       {activeModal === "payment-status" ? (
         <PaymentStatusModal
-          value={paymentStatusDraft}
-          onChange={(nextValue) => setPaymentStatusDraft(nextValue)}
+          initialValue={paymentStatus}
           onClose={closeModal}
           onSave={savePaymentStatus}
         />
@@ -1336,11 +1250,9 @@ export function VisaTrackingDetailScreen({
 
       {activeModal === "syarikah" ? (
         <SyarikahModal
-          value={syarikahDraft}
-          onChange={(nextValue) => setSyarikahDraft(nextValue)}
+          initialValue={providerName}
           onClose={closeModal}
           onSave={saveSyarikah}
-          isSaveDisabled={!syarikahDraft.trim()}
         />
       ) : null}
 
@@ -1348,31 +1260,19 @@ export function VisaTrackingDetailScreen({
         <VisaHotelModal
           city={hotelCityDraft}
           mode={hotelDraftMode}
-          value={hotelDraft}
-          onChange={handleHotelDraftChange}
+          initialValue={buildHotelDraft(hotelCityDraft, hotelDraftMode, hotelDraftId ?? undefined)}
           onClose={closeModal}
           onSave={saveHotel}
-          isSaveDisabled={
-            !hotelDraft.hotelName.trim() ||
-            !hotelDraft.agreementNumber.trim() ||
-            !hotelDraft.pax.trim() ||
-            Number.parseInt(hotelDraft.pax, 10) <= 0 ||
-            !hotelDraft.stayStartIso.trim() ||
-            !hotelDraft.stayEndIso.trim() ||
-            hotelDraft.stayEndIso < hotelDraft.stayStartIso
-          }
         />
       ) : null}
 
       {activeModal === "raudhah" ? (
         <VisaRaudhahModal
-          value={raudhahDraft}
-          onAddAppointment={handleAddRaudhahDraftAppointment}
-          onRemoveAppointment={handleRemoveRaudhahDraftAppointment}
-          onChangeAppointment={handleRaudhahDraftAppointmentChange}
+          initialValue={buildRaudhahDraft()}
+          appointmentIdPrefix={row.groupCode}
+          defaultAppointmentDateIso={row.departureIso}
           onClose={closeModal}
           onSave={saveRaudhah}
-          isSaveDisabled={isRaudhahDraftSaveDisabled}
         />
       ) : null}
 

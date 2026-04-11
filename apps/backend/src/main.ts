@@ -1,48 +1,67 @@
-import "dotenv/config";
 import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import helmet from "helmet";
+import type { RuntimeDataSource } from "./runtime-config";
 import { AppModule } from "./app.module";
-import { resolveRuntimeConfig, resolveStartupErrorMessage } from "./runtime-config";
+import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
+import { resolveStartupErrorMessage } from "./runtime-config";
 
-const DEFAULT_CORS_ORIGINS = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-
-function resolveCorsOrigins(rawOrigins: string | undefined): string[] {
-  const parsed = (rawOrigins ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-
-  if (parsed.length === 0) {
-    return DEFAULT_CORS_ORIGINS;
-  }
-
-  return Array.from(new Set(parsed));
-}
+type CorsOriginCallback = (error: Error | null, allow?: boolean) => void;
+type HeaderResponse = {
+  setHeader: (name: string, value: string) => void;
+};
+type NextHandler = () => void;
 
 async function bootstrap(): Promise<void> {
-  const { port, dataSource } = resolveRuntimeConfig(process.env);
-  const corsOrigins = resolveCorsOrigins(process.env.CORS_ORIGINS);
-  const allowAllOrigins = corsOrigins.includes("*");
-  const corsSummary = allowAllOrigins ? "*" : `${corsOrigins.length} origins`;
   const app = await NestFactory.create(AppModule, {
-    cors: {
-      origin: (origin, callback) => {
-        if (!origin || allowAllOrigins || corsOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
+    logger: ["error", "warn", "log"],
+  });
+  const configService = app.get(ConfigService);
+  const port = configService.getOrThrow<number>("PORT");
+  const dataSource = configService.getOrThrow<RuntimeDataSource>("DATA_SOURCE");
+  const corsOrigins = resolveCorsOrigins(configService.get<string>("CORS_ORIGINS"));
+  const corsSummary = `${corsOrigins.length} origins`;
 
-        callback(new Error("CORS origin is not allowed."), false);
-      },
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginOpenerPolicy: { policy: "same-origin" },
+      crossOriginResourcePolicy: { policy: "same-origin" },
+      permittedCrossDomainPolicies: { permittedPolicies: "none" },
+      referrerPolicy: { policy: "no-referrer" },
+      xFrameOptions: { action: "deny" },
+    }),
+  );
+
+  const httpServer = app.getHttpAdapter().getInstance() as {
+    disable?: (name: string) => void;
+  };
+  httpServer.disable?.("x-powered-by");
+
+  app.enableCors({
+    origin: (origin: string | undefined, callback: CorsOriginCallback) => {
+      if (!origin || isOriginAllowed(origin, corsOrigins)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(
+        new Error(
+          `CORS origin is not allowed: '${origin}'. Allowed origins: ${corsOrigins.join(", ")}`,
+        ),
+        false,
+      );
     },
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
+
+  app.use((_: unknown, response: HeaderResponse, next: NextHandler) => {
+    response.setHeader("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+    next();
   });
 
   app.setGlobalPrefix("api");

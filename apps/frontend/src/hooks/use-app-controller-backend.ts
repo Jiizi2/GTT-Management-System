@@ -23,7 +23,8 @@ import type {
   VisaStatus,
   VisaTrackingRow,
 } from "../shared/app-domain";
-import { clearAuthSession, getAuthAccessToken } from "../shared/auth-session";
+import { resolveBackendApiBaseUrl } from "../shared/backend-api-base";
+import { clearAuthSession } from "../shared/auth-session";
 
 type BackendCreateGroupPayload = {
   code: string;
@@ -230,34 +231,11 @@ type BackendGroupRecord = {
   }> | null;
 };
 
-function resolveBackendApiBaseUrl(): string {
-  const customUrl = (globalThis as { __GTT_API_BASE_URL__?: string }).__GTT_API_BASE_URL__;
-  if (customUrl?.trim()) {
-    return customUrl.trim().replace(/\/+$/, "");
-  }
-
-  const hostname = globalThis.location?.hostname ?? "";
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3001/api";
-  }
-
-  return "/api";
-}
-
-function createAuthorizedHeaders(initialHeaders?: HeadersInit): Headers {
-  const headers = new Headers(initialHeaders);
-  const accessToken = getAuthAccessToken();
-  if (accessToken && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${accessToken}`);
-  }
-
-  return headers;
-}
-
 async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(endpoint, {
     ...init,
-    headers: createAuthorizedHeaders(init?.headers),
+    credentials: "include",
+    headers: new Headers(init?.headers),
   });
 
   if (response.status === 401) {

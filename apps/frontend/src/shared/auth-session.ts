@@ -2,9 +2,10 @@ import type { SessionAccessTier } from "./app-domain.js";
 
 export const AUTH_STATE_CHANGED_EVENT = "gtt-auth-state-changed";
 
-const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v1";
-const AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
-const SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
+const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v2";
+const LEGACY_AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v1";
+const LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
+const LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
 
 export type AuthSessionUser = {
   id: string;
@@ -15,8 +16,6 @@ export type AuthSessionUser = {
 };
 
 export type AuthSession = {
-  accessToken: string;
-  tokenType: "Bearer";
   expiresAt: string;
   rememberSession: boolean;
   user: AuthSessionUser;
@@ -64,13 +63,11 @@ export function coerceAuthSession(value: unknown): AuthSession | null {
   }
 
   const record = value as Record<string, unknown>;
-  const accessToken = typeof record.accessToken === "string" ? record.accessToken.trim() : "";
-  const tokenType = record.tokenType === "Bearer" ? "Bearer" : null;
   const expiresAt = typeof record.expiresAt === "string" ? record.expiresAt.trim() : "";
   const rememberSession = Boolean(record.rememberSession);
   const user = coerceAuthSessionUser(record.user);
 
-  if (!accessToken || !tokenType || !expiresAt || !user) {
+  if (!expiresAt || !user) {
     return null;
   }
 
@@ -80,29 +77,70 @@ export function coerceAuthSession(value: unknown): AuthSession | null {
   }
 
   return {
-    accessToken,
-    tokenType,
     expiresAt: expiresAtDate.toISOString(),
     rememberSession,
     user,
   };
 }
 
-function readRawPersistedSession(): string | null {
-  if (typeof window === "undefined") {
+function readStorageValue(
+  storage: Storage | undefined,
+  key: string,
+): string | null {
+  if (!storage) {
     return null;
   }
 
   try {
-    return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+    return storage.getItem(key);
   } catch {
     return null;
   }
 }
 
+function clearStorageValue(storage: Storage | undefined, key: string): void {
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Ignore storage errors in restricted browser contexts.
+  }
+}
+
+function getWindowStorage(): { local?: Storage; session?: Storage } {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  return {
+    local: window.localStorage,
+    session: window.sessionStorage,
+  };
+}
+
+function readRawPersistedSession(): string | null {
+  const storage = getWindowStorage();
+  return (
+    readStorageValue(storage.session, AUTH_SESSION_STORAGE_KEY) ??
+    readStorageValue(storage.local, AUTH_SESSION_STORAGE_KEY) ??
+    readStorageValue(storage.local, LEGACY_AUTH_SESSION_STORAGE_KEY)
+  );
+}
+
+function purgeLegacyAuthStorage(): void {
+  const storage = getWindowStorage();
+  clearStorageValue(storage.local, LEGACY_AUTH_SESSION_STORAGE_KEY);
+  clearStorageValue(storage.local, LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY);
+  clearStorageValue(storage.local, LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY);
+}
+
 export function readPersistedAuthSession(): AuthSession | null {
   const raw = readRawPersistedSession();
   if (!raw) {
+    purgeLegacyAuthStorage();
     return null;
   }
 
@@ -127,11 +165,6 @@ export function readPersistedAuthSession(): AuthSession | null {
   }
 }
 
-export function getAuthAccessToken(): string | null {
-  const session = readPersistedAuthSession();
-  return session?.accessToken ?? null;
-}
-
 export function persistAuthSession(session: AuthSession): void {
   if (typeof window === "undefined") {
     return;
@@ -142,10 +175,15 @@ export function persistAuthSession(session: AuthSession): void {
     throw new Error("Cannot persist invalid auth session.");
   }
 
+  purgeLegacyAuthStorage();
+  clearStorageValue(window.localStorage, AUTH_SESSION_STORAGE_KEY);
+  clearStorageValue(window.sessionStorage, AUTH_SESSION_STORAGE_KEY);
+
   try {
-    window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
-    window.localStorage.setItem(AUTH_ACCESS_TOKEN_STORAGE_KEY, normalizedSession.accessToken);
-    window.localStorage.setItem(SESSION_ACCESS_TIER_STORAGE_KEY, normalizedSession.user.accessTier);
+    const storageTarget = normalizedSession.rememberSession
+      ? window.localStorage
+      : window.sessionStorage;
+    storageTarget.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
   } catch {
     // Ignore storage errors in restricted browser contexts.
   }
@@ -158,10 +196,10 @@ export function clearAuthSession(): void {
     return;
   }
 
+  purgeLegacyAuthStorage();
   try {
     window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
-    window.localStorage.removeItem(AUTH_ACCESS_TOKEN_STORAGE_KEY);
-    window.localStorage.removeItem(SESSION_ACCESS_TIER_STORAGE_KEY);
+    window.sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
   } catch {
     // Ignore storage errors in restricted browser contexts.
   }

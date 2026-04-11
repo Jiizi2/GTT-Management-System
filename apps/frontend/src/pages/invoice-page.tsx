@@ -1,5 +1,8 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
@@ -8,15 +11,15 @@ import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useThemeMode } from "../theme/theme-provider";
 import {
-  createInvoiceInBackend,
-  fetchInvoiceBackendDataSource,
   type BackendInvoiceClient,
   type BackendInvoiceRow,
-  fetchInvoiceClientsFromBackend,
-  fetchInvoicesFromBackend,
-  updateInvoiceInBackend,
 } from "../hooks/use-invoice-backend";
-import { fetchMasterDataOptionsFromBackend } from "../hooks/use-master-data-backend";
+import {
+  useCreateInvoiceMutation,
+  useInvoiceDashboardQuery,
+  useUpdateInvoiceMutation,
+} from "../hooks/use-invoice-query";
+import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { exportInvoicePdf } from "./invoice-export";
 
 const INVOICE_PAGE_SIZE = 8;
@@ -81,6 +84,43 @@ const defaultInvoiceStatusOptions: InvoiceStatusOption[] = [
   { value: "Overdue", label: "Overdue" },
   { value: "Cancelled", label: "Cancelled" },
 ];
+
+const invoiceDraftItemSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  pax: z.number(),
+  currency: z.enum(["IDR", "USD", "SAR"]),
+  unitPrice: z.number(),
+});
+
+const invoiceWorkspaceFormSchema = z
+  .object({
+    issueDateIso: z.string().trim().min(1, "Select issue date before saving invoice."),
+    dueDateIso: z.string().trim().min(1, "Select due date before saving invoice."),
+    invoiceStatus: z.string(),
+    issuingOffice: z.string(),
+    selectedClientId: z.string().trim().min(1, "Select a client before saving invoice."),
+    manualClientName: z.string(),
+    selectedGroupCode: z.string(),
+    address: z.string(),
+    bankAccount: z.string(),
+    notes: z.string(),
+    items: z.array(invoiceDraftItemSchema),
+  })
+  .superRefine((values, context) => {
+    if (
+      values.selectedClientId === MANUAL_CLIENT_OPTION_ID &&
+      values.manualClientName.trim().length === 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["manualClientName"],
+        message: "Isi nama client manual terlebih dulu.",
+      });
+    }
+  });
+
+type InvoiceWorkspaceFormValues = z.infer<typeof invoiceWorkspaceFormSchema>;
 
 const packageBaseRateMap: Array<{
   keyword: string;
@@ -324,6 +364,26 @@ function createEmptyDraftItems(): InvoiceDraftItem[] {
   ];
 }
 
+function createInitialInvoiceDraftItems(
+  initialInvoice: InvoiceWorkspaceInitialData | null,
+): InvoiceDraftItem[] {
+  if (!initialInvoice) {
+    return createEmptyDraftItems();
+  }
+
+  return [
+    {
+      id: "line-1",
+      description: initialInvoice.groupCode
+        ? `Invoice for Group ${initialInvoice.groupCode}`
+        : `Invoice ${initialInvoice.invoiceNumber}`,
+      pax: 1,
+      currency: "IDR",
+      unitPrice: Math.max(0, Math.round(initialInvoice.amount)),
+    },
+  ];
+}
+
 function mapMasterDataToSelectOptions(options: Array<{ value: string; label: string; isActive: boolean }>): SelectOption[] {
   return options
     .filter((option) => option.isActive)
@@ -393,6 +453,39 @@ function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceIni
     amount: Math.max(0, Math.round(row.amount)),
     status: row.status,
   };
+}
+
+function resolveInvoiceWorkspaceValidationMessage(
+  errors: FieldErrors<InvoiceWorkspaceFormValues>,
+): string | null {
+  const candidateMessages = [
+    errors.issueDateIso?.message,
+    errors.dueDateIso?.message,
+    errors.selectedClientId?.message,
+    errors.manualClientName?.message,
+    errors.issuingOffice?.message,
+    errors.invoiceStatus?.message,
+    errors.bankAccount?.message,
+  ];
+
+  for (const candidate of candidateMessages) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function normalizeInvoiceDraftItems(items: InvoiceDraftItem[]): InvoiceDraftItem[] {
+  return items
+    .map((item) => ({
+      ...item,
+      description: item.description.trim(),
+      pax: Math.max(0, Math.round(item.pax)),
+      unitPrice: Math.max(0, Math.round(item.unitPrice)),
+    }))
+    .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
 }
 
 function viewInvoicePdfFromRow({
@@ -515,27 +608,65 @@ function CreateInvoiceWorkspace({
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
+  const createInvoiceMutation = useCreateInvoiceMutation();
+  const updateInvoiceMutation = useUpdateInvoiceMutation();
   const isEditMode = mode === "edit";
   const resolvedInitialInvoice = isEditMode ? initialInvoice ?? null : null;
-  const [issueDateIso, setIssueDateIso] = useState(
-    () => resolvedInitialInvoice?.issuedDateIso ?? "",
-  );
-  const [dueDateIso, setDueDateIso] = useState(
-    () => resolvedInitialInvoice?.dueDateIso ?? "",
-  );
-  const [invoiceStatus, setInvoiceStatus] = useState<InvoiceStatus | "">(
-    () => resolvedInitialInvoice?.status ?? (isEditMode ? invoiceStatusOptions[0]?.value ?? "" : ""),
-  );
-  const [issuingOffice, setIssuingOffice] = useState(
-    () => (isEditMode ? issuingOfficeOptions[0]?.value ?? "" : ""),
-  );
-  const [selectedClientId, setSelectedClientId] = useState(
-    () => resolvedInitialInvoice?.clientId ?? "",
-  );
-  const [manualClientName, setManualClientName] = useState("");
-  const [selectedGroupCode, setSelectedGroupCode] = useState(
-    () => resolvedInitialInvoice?.groupCode ?? "",
-  );
+  const initialClientId = resolvedInitialInvoice?.clientId ?? "";
+  const resolvedInitialClientName = resolvedInitialInvoice?.clientName.trim() ?? "";
+  const hasResolvedInitialClient = initialClientId
+    ? clients.some((client) => client.id === initialClientId)
+    : false;
+  const hasResolvedInitialManualClient =
+    Boolean(resolvedInitialInvoice) &&
+    !hasResolvedInitialClient &&
+    resolvedInitialClientName.length > 0;
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors: formErrors },
+  } = useForm<InvoiceWorkspaceFormValues>({
+    resolver: zodResolver(invoiceWorkspaceFormSchema),
+    mode: "onChange",
+    defaultValues: {
+      issueDateIso: resolvedInitialInvoice?.issuedDateIso ?? "",
+      dueDateIso: resolvedInitialInvoice?.dueDateIso ?? "",
+      invoiceStatus:
+        resolvedInitialInvoice?.status ?? (isEditMode ? invoiceStatusOptions[0]?.value ?? "" : ""),
+      issuingOffice: isEditMode ? issuingOfficeOptions[0]?.value ?? "" : "",
+      selectedClientId: resolvedInitialInvoice
+        ? hasResolvedInitialClient
+          ? initialClientId
+          : hasResolvedInitialManualClient
+            ? MANUAL_CLIENT_OPTION_ID
+            : ""
+        : "",
+      manualClientName: hasResolvedInitialManualClient ? resolvedInitialClientName : "",
+      selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
+      address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
+      bankAccount: isEditMode ? bankDisbursementOptions[0]?.value ?? "" : "",
+      notes: "",
+      items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
+    },
+  });
+  const dueDateIso = watch("dueDateIso");
+  const invoiceStatus = watch("invoiceStatus") as InvoiceStatus | "";
+  const issuingOffice = watch("issuingOffice");
+  const selectedClientId = watch("selectedClientId");
+  const selectedGroupCode = watch("selectedGroupCode");
+  const address = watch("address");
+  const bankAccount = watch("bankAccount");
+  const items = watch("items");
+  const { fields: itemFields, append: appendItem, remove: removeItemFromForm } = useFieldArray({
+    control,
+    name: "items",
+    keyName: "fieldKey",
+  });
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId],
@@ -549,30 +680,8 @@ function CreateInvoiceWorkspace({
     () => buildNextInvoiceNumber(existingInvoiceNumbers, extractYearFromIsoDate(dueDateIso)),
     [existingInvoiceNumbers, dueDateIso],
   );
-  const [items, setItems] = useState<InvoiceDraftItem[]>(() =>
-    resolvedInitialInvoice
-      ? [
-          {
-            id: "line-1",
-            description: resolvedInitialInvoice.groupCode
-              ? `Invoice for Group ${resolvedInitialInvoice.groupCode}`
-              : `Invoice ${resolvedInitialInvoice.invoiceNumber}`,
-            pax: 1,
-            currency: "IDR",
-            unitPrice: Math.max(0, Math.round(resolvedInitialInvoice.amount)),
-          },
-        ]
-      : createEmptyDraftItems(),
-  );
-  const [address, setAddress] = useState(
-    () => resolvedInitialInvoice?.clientName ?? "",
-  );
-  const [bankAccount, setBankAccount] = useState(
-    () => (isEditMode ? bankDisbursementOptions[0]?.value ?? "" : ""),
-  );
   const [usdToIdr, setUsdToIdr] = useState(15_845);
   const [sarToIdr, setSarToIdr] = useState(4_225);
-  const [notes, setNotes] = useState("");
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -589,8 +698,8 @@ function CreateInvoiceWorkspace({
       return;
     }
 
-    setSelectedClientId(clients[0].id);
-  }, [isEditMode, selectedClient, selectedClientId, clients]);
+    setValue("selectedClientId", clients[0].id);
+  }, [isEditMode, selectedClient, selectedClientId, clients, setValue]);
 
   useEffect(() => {
     if (!isEditMode || isManualClientSelected) {
@@ -598,42 +707,42 @@ function CreateInvoiceWorkspace({
     }
 
     if (!selectedClient) {
-      setAddress("");
+      setValue("address", "");
       return;
     }
 
     if (selectedClient.groupCode && !selectedGroupCode) {
-      setSelectedGroupCode(selectedClient.groupCode);
+      setValue("selectedGroupCode", selectedClient.groupCode);
     }
 
     if (!address.trim()) {
-      setAddress(selectedClient.name);
+      setValue("address", selectedClient.name);
     }
-  }, [selectedClient, selectedGroupCode, isEditMode, isManualClientSelected, address]);
+  }, [selectedClient, selectedGroupCode, isEditMode, isManualClientSelected, address, setValue]);
 
   useEffect(() => {
     if (!isEditMode || issuingOffice.trim() || issuingOfficeOptions.length === 0) {
       return;
     }
 
-    setIssuingOffice(issuingOfficeOptions[0].value);
-  }, [isEditMode, issuingOffice, issuingOfficeOptions]);
+    setValue("issuingOffice", issuingOfficeOptions[0].value);
+  }, [isEditMode, issuingOffice, issuingOfficeOptions, setValue]);
 
   useEffect(() => {
     if (!isEditMode || invoiceStatus || invoiceStatusOptions.length === 0) {
       return;
     }
 
-    setInvoiceStatus(invoiceStatusOptions[0].value);
-  }, [isEditMode, invoiceStatus, invoiceStatusOptions]);
+    setValue("invoiceStatus", invoiceStatusOptions[0].value);
+  }, [isEditMode, invoiceStatus, invoiceStatusOptions, setValue]);
 
   useEffect(() => {
     if (!isEditMode || bankAccount.trim() || bankDisbursementOptions.length === 0) {
       return;
     }
 
-    setBankAccount(bankDisbursementOptions[0].value);
-  }, [isEditMode, bankAccount, bankDisbursementOptions]);
+    setValue("bankAccount", bankDisbursementOptions[0].value);
+  }, [isEditMode, bankAccount, bankDisbursementOptions, setValue]);
 
   useEffect(() => {
     if (!saveFeedback) {
@@ -677,39 +786,30 @@ function CreateInvoiceWorkspace({
     const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
     rowCounterRef.current += 1;
 
-    setItems((current) => [
-      ...current,
-      {
-        id: nextId,
-        description: "",
-        pax: Math.max(1, selectedGroup?.pax ?? 1),
-        currency: "IDR",
-        unitPrice: 0,
-      },
-    ]);
-  };
-
-  const updateItem = <K extends keyof InvoiceDraftItem>(
-    itemId: string,
-    key: K,
-    value: InvoiceDraftItem[K],
-  ) => {
-    setItems((current) =>
-      current.map((item) => (item.id === itemId ? { ...item, [key]: value } : item)),
-    );
-  };
-
-  const removeItem = (itemId: string) => {
-    setItems((current) => {
-      if (current.length <= 1) {
-        return current;
-      }
-
-      return current.filter((item) => item.id !== itemId);
+    appendItem({
+      id: nextId,
+      description: "",
+      pax: Math.max(1, selectedGroup?.pax ?? 1),
+      currency: "IDR",
+      unitPrice: 0,
     });
   };
 
-  const handleSaveDraft = async () => {
+  const removeItem = (index: number) => {
+    if (itemFields.length <= 1) {
+      return;
+    }
+
+    removeItemFromForm(index);
+  };
+
+  const handleWorkspaceValidationError = (errors: FieldErrors<InvoiceWorkspaceFormValues>) => {
+    setSaveFeedback(
+      resolveInvoiceWorkspaceValidationMessage(errors) ?? "Periksa kembali data invoice sebelum disimpan.",
+    );
+  };
+
+  const handleSaveDraft = handleSubmit(async (values) => {
     if (isEditMode || isWorkspaceBusy) {
       return;
     }
@@ -719,55 +819,37 @@ function CreateInvoiceWorkspace({
       return;
     }
 
-    const normalizedManualClientName = manualClientName.trim();
-    if (isManualClientSelected && normalizedManualClientName.length === 0) {
-      setSaveFeedback("Isi nama client manual terlebih dulu.");
-      return;
-    }
-
-    if (!isManualClientSelected && !selectedClient) {
+    const isUsingManualClient = values.selectedClientId === MANUAL_CLIENT_OPTION_ID;
+    const resolvedSelectedClient = isUsingManualClient
+      ? null
+      : clients.find((client) => client.id === values.selectedClientId) ?? null;
+    const normalizedManualClientName = values.manualClientName.trim();
+    if (!isUsingManualClient && !resolvedSelectedClient) {
       setSaveFeedback("Select a client before saving draft.");
       return;
     }
 
-    if (!issueDateIso.trim()) {
-      setSaveFeedback("Select issue date before saving draft.");
-      return;
-    }
-
-    if (!dueDateIso.trim()) {
-      setSaveFeedback("Select due date before saving draft.");
-      return;
-    }
-
-    const normalizedItems = items
-      .map((item) => ({
-        ...item,
-        description: item.description.trim(),
-        pax: Math.max(0, Math.round(item.pax)),
-        unitPrice: Math.max(0, Math.round(item.unitPrice)),
-      }))
-      .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
-
+    const normalizedItems = normalizeInvoiceDraftItems(values.items);
     if (normalizedItems.length === 0) {
       setSaveFeedback("Add at least one valid package item first.");
       return;
     }
 
     const linkedGroupCode =
-      selectedGroupCode.trim() || (isManualClientSelected ? "" : selectedClient?.groupCode ?? "");
+      values.selectedGroupCode.trim() || (isUsingManualClient ? "" : resolvedSelectedClient?.groupCode ?? "");
 
+    clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
     setIsSavingDraft(true);
     try {
-      const savedInvoice = await createInvoiceInBackend({
-        clientId: isManualClientSelected ? undefined : selectedClient?.id,
-        clientName: isManualClientSelected ? normalizedManualClientName : undefined,
+      const savedInvoice = await createInvoiceMutation.mutateAsync({
+        clientId: isUsingManualClient ? undefined : resolvedSelectedClient?.id,
+        clientName: isUsingManualClient ? normalizedManualClientName : undefined,
         groupCode: linkedGroupCode || undefined,
-        issuedDateIso: issueDateIso,
-        dueDateIso,
+        issuedDateIso: values.issueDateIso,
+        dueDateIso: values.dueDateIso,
         amount: totalPayable,
-        status: invoiceStatus || "Pending",
-        notes,
+        status: values.invoiceStatus ? (values.invoiceStatus as InvoiceStatus) : "Pending",
+        notes: values.notes,
       });
 
       onCreate(savedInvoice, "draft");
@@ -778,9 +860,9 @@ function CreateInvoiceWorkspace({
     } finally {
       setIsSavingDraft(false);
     }
-  };
+  }, handleWorkspaceValidationError);
 
-  const handleSubmitInvoice = async () => {
+  const handleSubmitInvoice = handleSubmit(async (values) => {
     if (isWorkspaceBusy) {
       return;
     }
@@ -794,84 +876,81 @@ function CreateInvoiceWorkspace({
       return;
     }
 
-    const normalizedManualClientName = manualClientName.trim();
-    if (isManualClientSelected && normalizedManualClientName.length === 0) {
-      setSaveFeedback("Isi nama client manual terlebih dulu.");
-      return;
-    }
-
-    if (!isManualClientSelected && !selectedClient) {
+    const isUsingManualClient = values.selectedClientId === MANUAL_CLIENT_OPTION_ID;
+    const resolvedSelectedClient = isUsingManualClient
+      ? null
+      : clients.find((client) => client.id === values.selectedClientId) ?? null;
+    const normalizedManualClientName = values.manualClientName.trim();
+    if (!isUsingManualClient && !resolvedSelectedClient) {
       setSaveFeedback(
         isEditMode ? "Select a client before saving invoice changes." : "Select a client before generating invoice.",
       );
       return;
     }
 
-    if (!issueDateIso.trim()) {
-      setSaveFeedback("Select issue date before saving invoice.");
-      return;
-    }
-
-    if (!dueDateIso.trim()) {
-      setSaveFeedback("Select due date before saving invoice.");
-      return;
-    }
-
-    if (!invoiceStatus) {
+    if (!values.invoiceStatus) {
+      setError("invoiceStatus", {
+        type: "manual",
+        message: "Select invoice status before saving invoice.",
+      });
       setSaveFeedback("Select invoice status before saving invoice.");
       return;
     }
 
-    if (!issuingOffice.trim()) {
+    if (!values.issuingOffice.trim()) {
+      setError("issuingOffice", {
+        type: "manual",
+        message: "Select issuing office before saving invoice.",
+      });
       setSaveFeedback("Select issuing office before saving invoice.");
       return;
     }
 
-    if (!bankAccount.trim()) {
+    if (!values.bankAccount.trim()) {
+      setError("bankAccount", {
+        type: "manual",
+        message: "Select bank account before saving invoice.",
+      });
       setSaveFeedback("Select bank account before saving invoice.");
       return;
     }
 
-    const normalizedItems = items
-      .map((item) => ({
-        ...item,
-        description: item.description.trim(),
-        pax: Math.max(0, Math.round(item.pax)),
-        unitPrice: Math.max(0, Math.round(item.unitPrice)),
-      }))
-      .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
-
+    clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
+    const normalizedItems = normalizeInvoiceDraftItems(values.items);
     if (normalizedItems.length === 0) {
       setSaveFeedback("Add at least one valid package item first.");
       return;
     }
 
     const linkedGroupCode =
-      selectedGroupCode.trim() || (isManualClientSelected ? "" : selectedClient?.groupCode ?? "");
+      values.selectedGroupCode.trim() || (isUsingManualClient ? "" : resolvedSelectedClient?.groupCode ?? "");
     const preOpenedPdfWindow = openPendingInvoicePdfWindow();
 
     setIsSubmitting(true);
     try {
       const savedInvoice = isEditMode && resolvedInitialInvoice
-        ? await updateInvoiceInBackend(resolvedInitialInvoice.id, {
-            clientId: isManualClientSelected ? undefined : selectedClient?.id,
-            clientName: isManualClientSelected ? normalizedManualClientName : undefined,
-            groupCode: linkedGroupCode ?? "",
-            issuedDateIso: issueDateIso,
-            dueDateIso,
-            amount: totalPayable,
-            status: invoiceStatus,
-            notes,
+        ? await updateInvoiceMutation.mutateAsync({
+            invoiceId: resolvedInitialInvoice.id,
+            payload: {
+              clientId: isUsingManualClient ? undefined : resolvedSelectedClient?.id,
+              clientName: isUsingManualClient ? normalizedManualClientName : undefined,
+              groupCode: linkedGroupCode || undefined,
+              issuedDateIso: values.issueDateIso,
+              dueDateIso: values.dueDateIso,
+              amount: totalPayable,
+              status: values.invoiceStatus as InvoiceStatus,
+              notes: values.notes,
+            },
           })
-        : await createInvoiceInBackend({
-            clientId: isManualClientSelected ? undefined : selectedClient?.id,
-            clientName: isManualClientSelected ? normalizedManualClientName : undefined,
+        : await createInvoiceMutation.mutateAsync({
+            clientId: isUsingManualClient ? undefined : resolvedSelectedClient?.id,
+            clientName: isUsingManualClient ? normalizedManualClientName : undefined,
             groupCode: linkedGroupCode || undefined,
-            issuedDateIso: issueDateIso,
-            dueDateIso,
+            issuedDateIso: values.issueDateIso,
+            dueDateIso: values.dueDateIso,
             amount: totalPayable,
-            status: invoiceStatus,
-            notes,
+            status: values.invoiceStatus as InvoiceStatus,
+            notes: values.notes,
           });
 
       const printableItems = normalizedItems.map((item) => {
@@ -895,15 +974,15 @@ function CreateInvoiceWorkspace({
 
       const exported = exportInvoicePdf({
         invoiceNumber: savedInvoice.invoiceNumber,
-        issueDateIso,
-        dueDateIso,
-        statusLabel: invoiceStatus,
-        issuingOffice,
+        issueDateIso: values.issueDateIso,
+        dueDateIso: values.dueDateIso,
+        statusLabel: values.invoiceStatus as InvoiceStatus,
+        issuingOffice: values.issuingOffice,
         clientName: savedInvoice.clientName,
         clientCode: linkedGroupCode || savedInvoice.groupCode || savedInvoice.clientLabel,
-        address: address.trim(),
-        bankAccountLabel: resolveBankAccountLabel(bankAccount, bankDisbursementOptions),
-        notes: notes.trim(),
+        address: values.address.trim(),
+        bankAccountLabel: resolveBankAccountLabel(values.bankAccount, bankDisbursementOptions),
+        notes: values.notes.trim(),
         usdToIdr,
         sarToIdr,
         subtotalIdr,
@@ -942,7 +1021,7 @@ function CreateInvoiceWorkspace({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, handleWorkspaceValidationError);
 
   const handleSubmitButtonClick = () => {
     if (isEditMode && invoiceStatus === "Cancelled") {
@@ -1079,11 +1158,20 @@ function CreateInvoiceWorkspace({
                     <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                       Issue Date
                     </span>
-                    <DatePickerInput
-                      inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                      value={issueDateIso}
-                      onChange={setIssueDateIso}
+                    <Controller
+                      name="issueDateIso"
+                      control={control}
+                      render={({ field }) => (
+                        <DatePickerInput
+                          inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
+                    {formErrors.issueDateIso ? (
+                      <p className="text-xs font-semibold text-error">{formErrors.issueDateIso.message}</p>
+                    ) : null}
                   </label>
                 </div>
 
@@ -1091,47 +1179,80 @@ function CreateInvoiceWorkspace({
                   <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                     Due Date
                   </span>
-                  <DatePickerInput
-                    inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                    value={dueDateIso}
-                    onChange={setDueDateIso}
+                  <Controller
+                    name="dueDateIso"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePickerInput
+                        inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    )}
                   />
+                  {formErrors.dueDateIso ? (
+                    <p className="text-xs font-semibold text-error">{formErrors.dueDateIso.message}</p>
+                  ) : null}
                 </label>
 
                 <label className="space-y-1">
                   <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                     Issuing Office
                   </span>
-                  <SereneSelect
-                    className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
-                    value={issuingOffice}
-                    onChange={(event) => setIssuingOffice(event.target.value)}
-                  >
-                    <option value="">Select office</option>
-                    {issuingOfficeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SereneSelect>
+                  <Controller
+                    name="issuingOffice"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
+                        value={field.value}
+                        onChange={(event) => {
+                          clearErrors("issuingOffice");
+                          field.onChange(event.target.value);
+                        }}
+                      >
+                        <option value="">Select office</option>
+                        {issuingOfficeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </SereneSelect>
+                    )}
+                  />
+                  {formErrors.issuingOffice ? (
+                    <p className="text-xs font-semibold text-error">{formErrors.issuingOffice.message}</p>
+                  ) : null}
                 </label>
 
                 <label className="space-y-1">
                   <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                     Invoice Status
                   </span>
-                  <SereneSelect
-                    className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
-                    value={invoiceStatus}
-                    onChange={(event) => setInvoiceStatus(event.target.value as InvoiceStatus | "")}
-                  >
-                    <option value="">Select status</option>
-                    {invoiceStatusOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SereneSelect>
+                  <Controller
+                    name="invoiceStatus"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
+                        value={field.value}
+                        onChange={(event) => {
+                          clearErrors("invoiceStatus");
+                          field.onChange(event.target.value);
+                        }}
+                      >
+                        <option value="">Select status</option>
+                        {invoiceStatusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </SereneSelect>
+                    )}
+                  />
+                  {formErrors.invoiceStatus ? (
+                    <p className="text-xs font-semibold text-error">{formErrors.invoiceStatus.message}</p>
+                  ) : null}
                 </label>
               </div>
             </article>
@@ -1149,25 +1270,35 @@ function CreateInvoiceWorkspace({
                   <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                     Client Name
                   </span>
-                  <SereneSelect
-                    className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
-                    value={selectedClientId}
-                    onChange={(event) => {
-                      const nextClientId = event.target.value;
-                      setSelectedClientId(nextClientId);
-                      if (nextClientId !== MANUAL_CLIENT_OPTION_ID) {
-                        setManualClientName("");
-                      }
-                    }}
-                  >
-                    <option value="">Select client</option>
-                    <option value={MANUAL_CLIENT_OPTION_ID}>Other</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
-                    ))}
-                  </SereneSelect>
+                  <Controller
+                    name="selectedClientId"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
+                        value={field.value}
+                        onChange={(event) => {
+                          const nextClientId = event.target.value;
+                          clearErrors(["selectedClientId", "manualClientName"]);
+                          field.onChange(nextClientId);
+                          if (nextClientId !== MANUAL_CLIENT_OPTION_ID) {
+                            setValue("manualClientName", "");
+                          }
+                        }}
+                      >
+                        <option value="">Select client</option>
+                        <option value={MANUAL_CLIENT_OPTION_ID}>Other</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name}
+                          </option>
+                        ))}
+                      </SereneSelect>
+                    )}
+                  />
+                  {formErrors.selectedClientId ? (
+                    <p className="text-xs font-semibold text-error">{formErrors.selectedClientId.message}</p>
+                  ) : null}
                 </label>
 
                 {isManualClientSelected ? (
@@ -1178,10 +1309,9 @@ function CreateInvoiceWorkspace({
                     <input
                       type="text"
                       className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                      value={manualClientName}
-                      onChange={(event) => setManualClientName(event.target.value)}
                       list="invoice-manual-client-suggestions"
                       placeholder="Type client name..."
+                      {...register("manualClientName")}
                     />
                     {manualClientNameSuggestions.length > 0 ? (
                       <datalist id="invoice-manual-client-suggestions">
@@ -1190,6 +1320,9 @@ function CreateInvoiceWorkspace({
                         ))}
                       </datalist>
                     ) : null}
+                    {formErrors.manualClientName ? (
+                      <p className="text-xs font-semibold text-error">{formErrors.manualClientName.message}</p>
+                    ) : null}
                   </label>
                 ) : null}
 
@@ -1197,18 +1330,24 @@ function CreateInvoiceWorkspace({
                   <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                     Linked Group (Optional)
                   </span>
-                  <SereneSelect
-                    className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
-                    value={selectedGroupCode}
-                    onChange={(event) => setSelectedGroupCode(event.target.value)}
-                  >
-                    <option value="">No linked group</option>
-                    {groups.map((group) => (
-                      <option key={group.code} value={group.code}>
-                        {group.code} - {group.name}
-                      </option>
-                    ))}
-                  </SereneSelect>
+                  <Controller
+                    name="selectedGroupCode"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      >
+                        <option value="">No linked group</option>
+                        {groups.map((group) => (
+                          <option key={group.code} value={group.code}>
+                            {group.code} - {group.name}
+                          </option>
+                        ))}
+                      </SereneSelect>
+                    )}
+                  />
                 </label>
 
                 <label className="space-y-1">
@@ -1218,9 +1357,8 @@ function CreateInvoiceWorkspace({
                   <input
                     type="text"
                     className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                    value={address}
-                    onChange={(event) => setAddress(event.target.value)}
                     placeholder="Primary business address..."
+                    {...register("address")}
                   />
                 </label>
               </div>
@@ -1276,7 +1414,8 @@ function CreateInvoiceWorkspace({
                 </thead>
 
                 <tbody className="divide-y divide-outline-variant/15">
-                  {items.map((item, index) => {
+                  {itemFields.map((itemField, index) => {
+                    const item = items[index] ?? itemField;
                     const lineSubtotal = Math.max(0, item.pax) * Math.max(0, item.unitPrice);
                     const lineSubtotalIdr = convertToIdr({
                       amount: lineSubtotal,
@@ -1289,7 +1428,7 @@ function CreateInvoiceWorkspace({
                         ? "-"
                         : `${item.currency} ${formatNumberInput(lineSubtotal)}`;
                     return (
-                      <tr key={item.id} className="transition hover:bg-surface-container-low/45">
+                      <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
                         <td className="px-5 py-3 text-xs font-bold text-on-surface">
                           {String(index + 1).padStart(2, "0")}
                         </td>
@@ -1298,9 +1437,7 @@ function CreateInvoiceWorkspace({
                             type="text"
                             className="w-full border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0"
                             value={item.description}
-                            onChange={(event) =>
-                              updateItem(item.id, "description", event.target.value)
-                            }
+                            onChange={(event) => setValue(`items.${index}.description`, event.target.value)}
                           />
                         </td>
                         <td className="px-5 py-3">
@@ -1310,9 +1447,8 @@ function CreateInvoiceWorkspace({
                             className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
                             value={item.pax}
                             onChange={(event) =>
-                              updateItem(
-                                item.id,
-                                "pax",
+                              setValue(
+                                `items.${index}.pax`,
                                 Math.max(0, Number.parseInt(event.target.value || "0", 10)),
                               )
                             }
@@ -1324,7 +1460,7 @@ function CreateInvoiceWorkspace({
                               className="serene-select h-auto min-w-[72px] border-none bg-transparent p-0 text-xs font-bold text-on-surface shadow-none"
                               value={item.currency}
                               onChange={(event) =>
-                                updateItem(item.id, "currency", event.target.value as InvoiceDraftCurrency)
+                                setValue(`items.${index}.currency`, event.target.value as InvoiceDraftCurrency)
                               }
                             >
                               <option value="IDR">IDR</option>
@@ -1336,7 +1472,7 @@ function CreateInvoiceWorkspace({
                               className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
                               value={formatNumberInput(item.unitPrice)}
                               onChange={(event) =>
-                                updateItem(item.id, "unitPrice", parseNumberInput(event.target.value))
+                                setValue(`items.${index}.unitPrice`, parseNumberInput(event.target.value))
                               }
                             />
                           </div>
@@ -1352,7 +1488,7 @@ function CreateInvoiceWorkspace({
                             type="button"
                             className="inline-flex h-7 w-7 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
                             aria-label={`Delete row ${index + 1}`}
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(index)}
                           >
                             <span className="material-symbols-outlined text-base" aria-hidden="true">
                               delete
@@ -1374,18 +1510,30 @@ function CreateInvoiceWorkspace({
                   Bank Disbursement
                 </h3>
                 <div className="space-y-3">
-                  <SereneSelect
-                    className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
-                    value={bankAccount}
-                    onChange={(event) => setBankAccount(event.target.value)}
-                  >
-                    <option value="">Select bank account</option>
-                    {bankDisbursementOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </SereneSelect>
+                  <Controller
+                    name="bankAccount"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
+                        value={field.value}
+                        onChange={(event) => {
+                          clearErrors("bankAccount");
+                          field.onChange(event.target.value);
+                        }}
+                      >
+                        <option value="">Select bank account</option>
+                        {bankDisbursementOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </SereneSelect>
+                    )}
+                  />
+                  {formErrors.bankAccount ? (
+                    <p className="text-xs font-semibold text-error">{formErrors.bankAccount.message}</p>
+                  ) : null}
                   <div className={bankDisbursementHintClassName}>
                     <span className="material-symbols-outlined mt-0.5 text-sm text-primary" aria-hidden="true">
                       info
@@ -1453,8 +1601,7 @@ function CreateInvoiceWorkspace({
                   id="invoice-notes"
                   className="h-[92px] w-full resize-none rounded-xl border border-primary/15 bg-surface-container-lowest p-3 text-sm leading-relaxed text-on-surface outline-none ring-0 placeholder:italic placeholder:text-on-surface-variant/55 focus:ring-2 focus:ring-primary/25 xl:h-auto xl:min-h-0 xl:flex-1"
                   placeholder="Terms, installments, or group specifics..."
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
+                  {...register("notes")}
                 />
               </article>
             </div>
@@ -1609,132 +1756,65 @@ export function InvoiceScreen({
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
-  const [invoiceRows, setInvoiceRows] = useState<InvoiceRow[]>([]);
-  const [invoiceClients, setInvoiceClients] = useState<InvoiceClientOption[]>([]);
-  const [issuingOfficeOptions, setIssuingOfficeOptions] = useState<SelectOption[]>(
-    defaultIssuingOfficeOptions,
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const invoiceDashboardQuery = useInvoiceDashboardQuery();
+  const issuingOfficeOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "invoice-issuing-office",
+  });
+  const invoiceStatusOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "invoice-status",
+  });
+  const bankDisbursementOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "bank-disbursement",
+  });
+  const invoiceClientNameOptionsQuery = useMasterDataOptionsQuery({
+    categoryKey: "invoice-client-name",
+  });
+  const issuingOfficeOptions = useMemo(() => {
+    const resolved = mapMasterDataToSelectOptions(issuingOfficeOptionsQuery.data ?? []).map((option) => ({
+      value: option.label,
+      label: option.label,
+    }));
+    return resolved.length > 0 ? resolved : defaultIssuingOfficeOptions;
+  }, [issuingOfficeOptionsQuery.data]);
+  const invoiceStatusOptions = useMemo(() => {
+    const resolved = mapMasterDataToInvoiceStatusOptions(invoiceStatusOptionsQuery.data ?? []);
+    return resolved.length > 0 ? resolved : defaultInvoiceStatusOptions;
+  }, [invoiceStatusOptionsQuery.data]);
+  const bankDisbursementOptions = useMemo(() => {
+    const resolved = mapMasterDataToSelectOptions(bankDisbursementOptionsQuery.data ?? []);
+    return resolved.length > 0 ? resolved : defaultBankDisbursementOptions;
+  }, [bankDisbursementOptionsQuery.data]);
+  const manualClientNameSuggestions = useMemo(
+    () => mapMasterDataToClientSuggestions(invoiceClientNameOptionsQuery.data ?? []),
+    [invoiceClientNameOptionsQuery.data],
   );
-  const [invoiceStatusOptions, setInvoiceStatusOptions] = useState<InvoiceStatusOption[]>(
-    defaultInvoiceStatusOptions,
+  const isInvoiceBackendAvailable = invoiceDashboardQuery.data?.dataSource === "prisma";
+  const isInvoiceDataLoading = invoiceDashboardQuery.isLoading;
+  const invoiceClients = useMemo<InvoiceClientOption[]>(
+    () => (isInvoiceBackendAvailable ? invoiceDashboardQuery.data?.clients ?? [] : []),
+    [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
   );
-  const [bankDisbursementOptions, setBankDisbursementOptions] = useState<SelectOption[]>(
-    defaultBankDisbursementOptions,
+  const invoiceRows = useMemo<InvoiceRow[]>(
+    () => (isInvoiceBackendAvailable ? invoiceDashboardQuery.data?.rows ?? [] : []),
+    [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
   );
-  const [manualClientNameSuggestions, setManualClientNameSuggestions] = useState<string[]>([]);
-  const [isInvoiceBackendAvailable, setIsInvoiceBackendAvailable] = useState(false);
-  const [isInvoiceDataLoading, setIsInvoiceDataLoading] = useState(true);
-  const [listFeedback, setListFeedback] = useState<string | null>(null);
+  const systemFeedback = useMemo(() => {
+    if (invoiceDashboardQuery.error) {
+      return "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.";
+    }
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setIsInvoiceDataLoading(true);
+    if (invoiceDashboardQuery.data?.dataSource && invoiceDashboardQuery.data.dataSource !== "prisma") {
+      return "Backend invoice terhubung tetapi masih DATA_SOURCE=memory. Ubah ke DATA_SOURCE=prisma agar Save Draft dan Generate Invoice tersimpan ke database.";
+    }
 
-    void Promise.all([
-      fetchInvoiceBackendDataSource({ signal: controller.signal }),
-      fetchInvoiceClientsFromBackend({ signal: controller.signal }),
-      fetchInvoicesFromBackend({ signal: controller.signal }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "invoice-issuing-office",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "invoice-status",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "bank-disbursement",
-        signal: controller.signal,
-      }),
-      fetchMasterDataOptionsFromBackend({
-        categoryKey: "invoice-client-name",
-        signal: controller.signal,
-      }),
-    ])
-      .then(
-        ([
-          invoiceDataSource,
-          clientRows,
-          invoiceRowsResponse,
-          issuingOfficeRows,
-          invoiceStatusRows,
-          bankDisbursementRows,
-          invoiceClientNameRows,
-        ]) => {
-        if (controller.signal.aborted) {
-          return;
-        }
+    if (isInvoiceBackendAvailable && invoiceClients.length === 0) {
+      return "Backend invoice terhubung, tetapi daftar client invoice masih kosong. Jalankan seed database lalu refresh halaman.";
+    }
 
-        const nextIssuingOfficeOptions = mapMasterDataToSelectOptions(issuingOfficeRows).map(
-          (option) => ({
-            value: option.label,
-            label: option.label,
-          }),
-        );
-        const nextInvoiceStatusOptions = mapMasterDataToInvoiceStatusOptions(invoiceStatusRows);
-        const nextBankDisbursementOptions = mapMasterDataToSelectOptions(bankDisbursementRows);
-        const nextManualClientSuggestions = mapMasterDataToClientSuggestions(invoiceClientNameRows);
-
-        setIssuingOfficeOptions(
-          nextIssuingOfficeOptions.length > 0 ? nextIssuingOfficeOptions : defaultIssuingOfficeOptions,
-        );
-        setInvoiceStatusOptions(
-          nextInvoiceStatusOptions.length > 0 ? nextInvoiceStatusOptions : defaultInvoiceStatusOptions,
-        );
-        setBankDisbursementOptions(
-          nextBankDisbursementOptions.length > 0
-            ? nextBankDisbursementOptions
-            : defaultBankDisbursementOptions,
-        );
-        setManualClientNameSuggestions(nextManualClientSuggestions);
-
-        if (invoiceDataSource !== "prisma") {
-          setInvoiceClients([]);
-          setInvoiceRows([]);
-          setIsInvoiceBackendAvailable(false);
-          setListFeedback(
-            "Backend invoice terhubung tetapi masih DATA_SOURCE=memory. Ubah ke DATA_SOURCE=prisma agar Save Draft dan Generate Invoice tersimpan ke database.",
-          );
-          return;
-        }
-
-        const sortedClients = [...clientRows].sort((left, right) => left.sortOrder - right.sortOrder);
-        setInvoiceClients(sortedClients);
-        setInvoiceRows(sortInvoiceRows(invoiceRowsResponse));
-        setIsInvoiceBackendAvailable(true);
-        setListFeedback(
-          sortedClients.length === 0
-            ? "Backend invoice terhubung, tetapi daftar client invoice masih kosong. Jalankan seed database lalu refresh halaman."
-            : null,
-        );
-        },
-      )
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setInvoiceClients([]);
-        setInvoiceRows([]);
-        setIssuingOfficeOptions(defaultIssuingOfficeOptions);
-        setInvoiceStatusOptions(defaultInvoiceStatusOptions);
-        setBankDisbursementOptions(defaultBankDisbursementOptions);
-        setManualClientNameSuggestions([]);
-        setIsInvoiceBackendAvailable(false);
-        setListFeedback(
-          "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.",
-        );
-        console.warn("Invoice backend fetch failed. Invoice generation is disabled.", error);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsInvoiceDataLoading(false);
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+    return null;
+  }, [invoiceClients.length, invoiceDashboardQuery.data, invoiceDashboardQuery.error, isInvoiceBackendAvailable]);
+  const visibleFeedback = actionFeedback ?? systemFeedback;
 
   const normalizedQuery = query.trim().toLowerCase();
   const searchedRows = invoiceRows.filter((row) => {
@@ -1811,13 +1891,13 @@ export function InvoiceScreen({
   const handleViewPdf = (row: InvoiceRow) => {
     const exported = viewInvoicePdfFromRow({ row, groups });
     if (!exported) {
-      setListFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+      setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
     }
   };
 
   const handleOpenEditInvoice = (row: InvoiceRow) => {
     if (!isInvoiceBackendAvailable) {
-      setListFeedback("Backend invoice/database belum terhubung. Edit invoice dinonaktifkan.");
+      setActionFeedback("Backend invoice/database belum terhubung. Edit invoice dinonaktifkan.");
       return;
     }
 
@@ -1826,18 +1906,18 @@ export function InvoiceScreen({
   };
 
   useEffect(() => {
-    if (!listFeedback) {
+    if (!actionFeedback) {
       return undefined;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setListFeedback((current) => (current ? null : current));
+      setActionFeedback((current) => (current ? null : current));
     }, 2400);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [listFeedback]);
+  }, [actionFeedback]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1873,15 +1953,8 @@ export function InvoiceScreen({
         existingInvoiceNumbers={invoiceRows.map((row) => row.invoiceNumber)}
         onBack={() => setWorkspaceMode("list")}
         onCreate={(invoice, action) => {
-          setInvoiceRows((current) => {
-            const normalizedCreatedNumber = invoice.invoiceNumber.trim().toUpperCase();
-            const nextRows = current.filter(
-              (entry) => entry.invoiceNumber.trim().toUpperCase() !== normalizedCreatedNumber,
-            );
-            return sortInvoiceRows([invoice, ...nextRows]);
-          });
           setWorkspaceMode("list");
-          setListFeedback(
+          setActionFeedback(
             action === "draft"
               ? `Draft invoice ${invoice.invoiceNumber} saved to database.`
               : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
@@ -1920,14 +1993,9 @@ export function InvoiceScreen({
           // no-op on edit mode
         }}
         onUpdate={(invoice) => {
-          setInvoiceRows((current) =>
-            sortInvoiceRows(
-              current.map((entry) => (entry.id === invoice.id ? invoice : entry)),
-            ),
-          );
           setWorkspaceMode("list");
           setEditingInvoice(null);
-          setListFeedback(`Invoice ${invoice.invoiceNumber} berhasil diupdate.`);
+          setActionFeedback(`Invoice ${invoice.invoiceNumber} berhasil diupdate.`);
         }}
       />
     );
@@ -1935,7 +2003,7 @@ export function InvoiceScreen({
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      {listFeedback ? (
+      {visibleFeedback ? (
         <section
           className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-ambient"
           role="status"
@@ -1944,7 +2012,7 @@ export function InvoiceScreen({
           <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
             check_circle
           </span>
-          <p className="text-sm font-semibold">{listFeedback}</p>
+          <p className="text-sm font-semibold">{visibleFeedback}</p>
         </section>
       ) : null}
       {isInvoiceDataLoading ? (

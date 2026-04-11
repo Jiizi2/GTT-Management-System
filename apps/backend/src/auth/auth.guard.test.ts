@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
 import type { ExecutionContext } from "@nestjs/common";
+import { AUTH_COOKIE_NAME } from "./auth-cookie";
 import { AuthGuard } from "./auth.guard";
 import type { AuthService } from "./auth.service";
 import type { AuthTokenPayload } from "./auth.types";
@@ -9,7 +10,12 @@ import type { AuthTokenPayload } from "./auth.types";
 type GuardRequest = {
   headers?: {
     authorization?: string;
+    cookie?: string;
+    origin?: string;
+    host?: string;
   };
+  method?: string;
+  protocol?: string;
   authUser?: AuthTokenPayload;
 };
 
@@ -46,7 +52,19 @@ async function runCase(name: string, fn: () => void): Promise<void> {
   console.log(`PASS ${name}`);
 }
 
-function testAllowsPublicRouteWithoutAuthorizationHeader(): void {
+function createResolvedUser(): AuthTokenPayload {
+  return {
+    id: "dev-super-admin",
+    name: "Dev Super Admin",
+    username: "dev.superadmin",
+    email: "superadmin.dev@ghaniya.local",
+    accessTier: "super-admin",
+    exp: 4_200_000_000,
+    rememberSession: false,
+  };
+}
+
+function testAllowsPublicRouteWithoutAuthentication(): void {
   const guard = new AuthGuard(
     createReflectorMock(true),
     createAuthServiceMock(() => {
@@ -58,11 +76,11 @@ function testAllowsPublicRouteWithoutAuthorizationHeader(): void {
   assert.equal(result, true);
 }
 
-function testRejectsMissingAuthorizationHeader(): void {
+function testRejectsMissingAuthentication(): void {
   const guard = new AuthGuard(
     createReflectorMock(false),
     createAuthServiceMock(() => {
-      throw new Error("verifyAccessToken should not be called without header.");
+      throw new Error("verifyAccessToken should not be called without credentials.");
     }),
   );
   const request: GuardRequest = {};
@@ -71,7 +89,7 @@ function testRejectsMissingAuthorizationHeader(): void {
     () => guard.canActivate(createExecutionContext(request)),
     (error: unknown) => {
       assert.equal(error instanceof UnauthorizedException, true);
-      assert.match((error as Error).message, /Authorization header is required/i);
+      assert.match((error as Error).message, /Authentication is required/i);
       return true;
     },
   );
@@ -102,14 +120,7 @@ function testRejectsNonBearerAuthorizationHeader(): void {
 
 function testVerifiesBearerTokenAndAttachesAuthUser(): void {
   let capturedToken = "";
-  const resolvedUser: AuthTokenPayload = {
-    id: "dev-super-admin",
-    name: "Dev Super Admin",
-    username: "dev.superadmin",
-    email: "superadmin.dev@ghaniya.local",
-    accessTier: "super-admin",
-    exp: 4_200_000_000,
-  };
+  const resolvedUser = createResolvedUser();
 
   const guard = new AuthGuard(
     createReflectorMock(false),
@@ -128,6 +139,80 @@ function testVerifiesBearerTokenAndAttachesAuthUser(): void {
   assert.equal(result, true);
   assert.equal(capturedToken, "token-value-123");
   assert.deepEqual(request.authUser, resolvedUser);
+}
+
+function testVerifiesCookieTokenOnSafeMethod(): void {
+  let capturedToken = "";
+  const resolvedUser = createResolvedUser();
+
+  const guard = new AuthGuard(
+    createReflectorMock(false),
+    createAuthServiceMock((token) => {
+      capturedToken = token;
+      return resolvedUser;
+    }),
+  );
+  const request: GuardRequest = {
+    method: "GET",
+    headers: {
+      cookie: `${AUTH_COOKIE_NAME}=cookie-token-123`,
+    },
+  };
+
+  const result = guard.canActivate(createExecutionContext(request));
+  assert.equal(result, true);
+  assert.equal(capturedToken, "cookie-token-123");
+  assert.deepEqual(request.authUser, resolvedUser);
+}
+
+function testRejectsCookieWriteWithoutTrustedOrigin(): void {
+  const guard = new AuthGuard(
+    createReflectorMock(false),
+    createAuthServiceMock(() => createResolvedUser()),
+  );
+  const request: GuardRequest = {
+    method: "POST",
+    headers: {
+      cookie: `${AUTH_COOKIE_NAME}=cookie-token-123`,
+      host: "localhost:3001",
+    },
+  };
+
+  assert.throws(
+    () => guard.canActivate(createExecutionContext(request)),
+    (error: unknown) => {
+      assert.equal(error instanceof ForbiddenException, true);
+      assert.match(
+        (error as Error).message,
+        /Origin header is required for cookie-authenticated write requests/i,
+      );
+      return true;
+    },
+  );
+}
+
+function testAllowsCookieWriteWithTrustedOrigin(): void {
+  let capturedToken = "";
+  const guard = new AuthGuard(
+    createReflectorMock(false),
+    createAuthServiceMock((token) => {
+      capturedToken = token;
+      return createResolvedUser();
+    }),
+  );
+  const request: GuardRequest = {
+    method: "POST",
+    protocol: "http",
+    headers: {
+      cookie: `${AUTH_COOKIE_NAME}=cookie-token-456`,
+      origin: "http://localhost:3001",
+      host: "localhost:3001",
+    },
+  };
+
+  const result = guard.canActivate(createExecutionContext(request));
+  assert.equal(result, true);
+  assert.equal(capturedToken, "cookie-token-456");
 }
 
 function testPropagatesVerifyAccessTokenFailure(): void {
@@ -154,10 +239,13 @@ function testPropagatesVerifyAccessTokenFailure(): void {
 }
 
 async function main(): Promise<void> {
-  await runCase("auth guard allows public route", testAllowsPublicRouteWithoutAuthorizationHeader);
-  await runCase("auth guard rejects missing authorization", testRejectsMissingAuthorizationHeader);
+  await runCase("auth guard allows public route", testAllowsPublicRouteWithoutAuthentication);
+  await runCase("auth guard rejects missing authentication", testRejectsMissingAuthentication);
   await runCase("auth guard rejects non-bearer authorization", testRejectsNonBearerAuthorizationHeader);
-  await runCase("auth guard verifies token and sets authUser", testVerifiesBearerTokenAndAttachesAuthUser);
+  await runCase("auth guard verifies bearer token and sets authUser", testVerifiesBearerTokenAndAttachesAuthUser);
+  await runCase("auth guard verifies cookie token on safe method", testVerifiesCookieTokenOnSafeMethod);
+  await runCase("auth guard rejects cookie write without origin", testRejectsCookieWriteWithoutTrustedOrigin);
+  await runCase("auth guard allows cookie write with trusted origin", testAllowsCookieWriteWithTrustedOrigin);
   await runCase("auth guard propagates verify error", testPropagatesVerifyAccessTokenFailure);
 }
 

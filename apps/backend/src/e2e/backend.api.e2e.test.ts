@@ -2,7 +2,6 @@ import "reflect-metadata";
 import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { AppModule } from "../app.module";
 
 type StartedServer = {
   baseUrl: string;
@@ -13,7 +12,7 @@ const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.supe
 const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_PASSWORD?.trim() || "DevSuperAdmin#2026";
 
-let activeAccessToken: string | null = null;
+let activeAuthCookie: string | null = null;
 
 function buildUniqueGroupCode(): string {
   const timeFragment = Date.now().toString().slice(-8);
@@ -48,6 +47,7 @@ async function startBackendServer(): Promise<StartedServer> {
   let app: INestApplication | null = null;
 
   try {
+    const { AppModule } = await import("../app.module.js");
     app = await NestFactory.create(AppModule, { cors: true, logger: false });
     app.setGlobalPrefix("api");
     app.useGlobalPipes(
@@ -83,10 +83,20 @@ async function requestJson(
   baseUrl: string,
   path: string,
   init?: RequestInit,
-): Promise<{ status: number; json: unknown; text: string }> {
+): Promise<{ status: number; json: unknown; text: string; headers: Headers }> {
   const headers = new Headers(init?.headers);
-  if (activeAccessToken && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${activeAccessToken}`);
+  const method = init?.method?.trim().toUpperCase() ?? "GET";
+  if (activeAuthCookie && !headers.has("cookie")) {
+    headers.set("cookie", activeAuthCookie);
+  }
+  if (
+    activeAuthCookie &&
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    !headers.has("origin")
+  ) {
+    headers.set("origin", baseUrl);
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -108,6 +118,7 @@ async function requestJson(
     status: response.status,
     json,
     text,
+    headers: response.headers,
   };
 }
 
@@ -125,10 +136,15 @@ async function authenticateDevSession(baseUrl: string): Promise<void> {
   });
 
   assert.equal(loginResponse.status, 200, `Auth login failed: ${loginResponse.text}`);
-  const accessToken =
-    (loginResponse.json as { accessToken?: unknown })?.accessToken;
-  assert.equal(typeof accessToken, "string", "Auth login should return accessToken.");
-  activeAccessToken = accessToken as string;
+  assert.equal(
+    typeof (loginResponse.json as { user?: unknown })?.user,
+    "object",
+    "Auth login should return a browser session payload.",
+  );
+  const setCookie = loginResponse.headers.get("set-cookie") ?? "";
+  const cookieHeader = setCookie.split(";")[0]?.trim() ?? "";
+  assert.notEqual(cookieHeader, "", "Auth login should return a session cookie.");
+  activeAuthCookie = cookieHeader;
 }
 
 type GroupRecord = {
@@ -646,7 +662,99 @@ async function testBackendApiFlow(): Promise<void> {
     const afterDeleteResponse = await requestJson(server.baseUrl, `/api/groups/${groupCode}`);
     assert.equal(afterDeleteResponse.status, 404, "Deleted group should return 404.");
   } finally {
-    activeAccessToken = null;
+    activeAuthCookie = null;
+    await server.shutdown();
+  }
+}
+
+async function testManagedUserPasswordHttpFlow(): Promise<void> {
+  const server = await startBackendServer();
+  const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 10_000)
+    .toString()
+    .padStart(4, "0")}`;
+  const managedUserEmail = `http.admin.${uniqueSuffix}@example.com`;
+
+  try {
+    await authenticateDevSession(server.baseUrl);
+
+    const createResponse = await requestJson(server.baseUrl, "/api/auth/users", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "HTTP Managed Admin",
+        email: managedUserEmail,
+        roleId: "admin",
+      }),
+    });
+    assert.equal(createResponse.status, 201, `Create managed user failed: ${createResponse.text}`);
+    const createdUser = createResponse.json as {
+      id?: string;
+      hasPassword?: boolean;
+    };
+    assert.equal(typeof createdUser.id, "string", `Expected managed user id: ${createResponse.text}`);
+    assert.equal(createdUser.hasPassword, false, `Expected hasPassword=false: ${createResponse.text}`);
+
+    const setPasswordResponse = await requestJson(
+      server.baseUrl,
+      `/api/auth/users/${encodeURIComponent(createdUser.id ?? "")}/password`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          password: "ManagedHttp#2026",
+        }),
+      },
+    );
+    assert.equal(
+      setPasswordResponse.status,
+      200,
+      `Set managed user password failed: ${setPasswordResponse.text}`,
+    );
+    assert.equal(
+      (setPasswordResponse.json as { hasPassword?: boolean }).hasPassword,
+      true,
+      `Expected hasPassword=true after reset: ${setPasswordResponse.text}`,
+    );
+
+    const usersResponse = await requestJson(server.baseUrl, "/api/auth/users");
+    assert.equal(usersResponse.status, 200, `List managed users failed: ${usersResponse.text}`);
+    const users = ensureArray<{ id?: string; hasPassword?: boolean }>(
+      usersResponse.json,
+      "Managed user list should be an array.",
+    );
+    const updatedUser = users.find((entry) => entry.id === createdUser.id);
+    assert.equal(Boolean(updatedUser), true, "Expected created managed user in list.");
+    assert.equal(updatedUser?.hasPassword, true, "Expected listed user to reflect hasPassword=true.");
+
+    const logoutResponse = await requestJson(server.baseUrl, "/api/auth/logout", {
+      method: "POST",
+    });
+    assert.equal(logoutResponse.status, 204, `Logout failed: ${logoutResponse.text}`);
+    activeAuthCookie = null;
+
+    const loginResponse = await requestJson(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: managedUserEmail,
+        password: "ManagedHttp#2026",
+        rememberSession: false,
+      }),
+    });
+    assert.equal(loginResponse.status, 200, `Managed user login failed: ${loginResponse.text}`);
+    assert.equal(
+      (loginResponse.json as { user?: { accessTier?: string } })?.user?.accessTier,
+      "admin",
+      `Expected managed user access tier in login response: ${loginResponse.text}`,
+    );
+  } finally {
+    activeAuthCookie = null;
     await server.shutdown();
   }
 }
@@ -1256,13 +1364,14 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
 
     await cleanupAllGroups(server.baseUrl);
   } finally {
-    activeAccessToken = null;
+    activeAuthCookie = null;
     await server.shutdown();
   }
 }
 
 async function main(): Promise<void> {
   await runCase("backend api e2e flow", testBackendApiFlow);
+  await runCase("backend managed user password http flow", testManagedUserPasswordHttpFlow);
   await runCase(
     "backend comprehensive add-group overview invoice raudhah flow",
     testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow,

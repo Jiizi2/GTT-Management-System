@@ -49,12 +49,21 @@ Aturan penting:
 Alur umum:
 
 1. User login di frontend (`/api/auth/login`).
-2. Backend mengembalikan Bearer token.
-3. Token disimpan di browser (localStorage) dan dipakai untuk request berikutnya.
-4. Frontend memanggil endpoint `/api/*` untuk sync data.
+2. Backend menyimpan token akses pada cookie `HttpOnly` dan mengembalikan snapshot sesi aman ke frontend.
+3. Frontend hanya menyimpan snapshot sesi non-sensitif untuk restore UX, lalu memverifikasi ulang lewat `/api/auth/session`.
+4. Request frontend ke `/api/*` dikirim dengan `credentials: "include"`.
 5. Backend menyimpan/ambil data dari:
    - mode `memory` (default, non-persisten), atau
    - mode `prisma` (persisten ke PostgreSQL).
+
+Hardening yang sekarang aktif:
+
+- security headers dasar di bootstrap backend,
+- cookie auth `HttpOnly` + `SameSite=Lax`,
+- proteksi CSRF berbasis origin untuk request write yang memakai cookie,
+- login rate limiting,
+- larangan bootstrap default auth users di production,
+- validasi secret produksi yang lebih ketat.
 
 Polanya bersifat optimistic di frontend:
 
@@ -87,4 +96,3 @@ Suite yang tersedia:
 - UI e2e frontend (Playwright) dengan backend yang dijalankan saat test.
 
 Pipeline CI di repo juga menggabungkan check + test + build sesuai release flow.
-
