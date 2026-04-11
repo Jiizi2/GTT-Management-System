@@ -1,5 +1,5 @@
 import { Suspense, lazy, useMemo } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { buildVisaTrackingRowsFromGroups } from "../shared/app-domain";
 import { buildDashboardPath } from "../shared/app-route";
 import type { AppController } from "../hooks/use-app-controller";
@@ -61,6 +61,7 @@ export function AppMainContent({
 }: {
   controller: AppController;
 }) {
+  const location = useLocation();
   const freshSelectedVisaRow = useMemo(
     () =>
       controller.selectedVisaRow
@@ -72,7 +73,9 @@ export function AppMainContent({
   );
 
   return (
-    <Suspense fallback={<ScreenLoadingFallback />}>
+    // Reset the revealed route boundary on navigation so lazy-loaded screens
+    // do not keep the previous page visible while the next chunk is loading.
+    <Suspense key={`${location.pathname}${location.search}`} fallback={<ScreenLoadingFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
         <Route

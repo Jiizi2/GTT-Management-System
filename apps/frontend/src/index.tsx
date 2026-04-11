@@ -29,7 +29,7 @@ const queryClient = new QueryClient({
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter unstable_useTransitions={false}>
         <ThemeProvider>
           <App />
         </ThemeProvider>

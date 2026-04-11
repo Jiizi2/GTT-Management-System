@@ -455,6 +455,23 @@ test("navigates between main screens from sidebar", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Visa Tracking" })).toBeVisible();
 });
 
+test("shows loading state instead of keeping the previous screen during lazy route navigation", async ({ page }) => {
+  await openApp(page);
+
+  await page.route("**/chunks/*", async (route) => {
+    await sleep(1_000);
+    await route.continue();
+  });
+
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
+
+  await page.getByRole("button", { name: "H-1 Checklist" }).click();
+
+  await expect(page.getByText("Loading screen...")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "H-1 Checklist" })).toBeVisible();
+});
+
 test("creates a new group from workspace flow", async ({ page }) => {
   await openApp(page);
 
