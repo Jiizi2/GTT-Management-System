@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { operatorAvatar, sidebarAccountItem, sidebarItems } from "../shared/app-domain";
+import { sidebarAccountItem, sidebarItems } from "../shared/app-domain";
 import type { NavId, SessionAccessTier } from "../shared/app-domain";
 
 function SidebarModalPortal({ children }: { children: ReactNode }) {
@@ -14,6 +14,7 @@ function SidebarModalPortal({ children }: { children: ReactNode }) {
 export function AppSidebar({
   activeNav,
   sessionAccessTier,
+  sessionUserName,
   isCollapsed,
   onNavigate,
   onOpenNewGroup,
@@ -22,12 +23,15 @@ export function AppSidebar({
 }: {
   activeNav: NavId;
   sessionAccessTier: SessionAccessTier;
+  sessionUserName: string;
   isCollapsed: boolean;
   onNavigate: (navId: NavId) => void;
   onOpenNewGroup: () => void;
   onToggleCollapse: () => void;
   onLogout: () => void;
 }) {
+  const accountDisplayName = sessionUserName.trim() || "Operator";
+  const accountAccessLabel = sessionAccessTier === "super-admin" ? "Super Admin" : "Admin";
   const primaryNavItems = sidebarItems.filter(
     (item) => item.id === "overview" || item.id === "checklist" || item.id === "visa",
   );
@@ -195,18 +199,20 @@ export function AppSidebar({
             title={isCollapsed ? sidebarAccountItem.label : undefined}
             aria-label="Open Profile"
           >
-            <div className="h-10 w-10 overflow-hidden rounded-full bg-surface-container-high">
-              <img src={operatorAvatar} alt="Operator Admin" className="h-full w-full object-cover" />
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant/70">
+              <span className="material-symbols-outlined text-[1.7rem] leading-none" aria-hidden="true">
+                account_circle
+              </span>
             </div>
 
             {!isCollapsed ? (
               <>
                 <div className="min-w-0 flex-1">
                   <strong className="block truncate text-[0.92rem] font-semibold leading-tight text-on-surface">
-                    Operator Admin
+                    {accountDisplayName}
                   </strong>
                   <span className="mt-0.5 block truncate text-[0.72rem] font-medium text-on-surface-variant/75">
-                    Full Access
+                    {accountAccessLabel}
                   </span>
                 </div>
 

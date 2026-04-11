@@ -314,6 +314,7 @@ export function UserManagementScreen() {
   const deleteManagedUserMutation = useDeleteManagedUserMutation();
   const setManagedUserPasswordMutation = useSetManagedUserPasswordMutation();
   const [notice, setNotice] = useState<NoticeState | null>(null);
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [deleteTargetUser, setDeleteTargetUser] = useState<UserAccount | null>(null);
   const [passwordTargetUser, setPasswordTargetUser] = useState<UserAccount | null>(null);
@@ -372,6 +373,23 @@ export function UserManagementScreen() {
       confirmPassword: "",
     },
   });
+  const createRoleId = createForm.watch("roleId");
+  const selectedCreateRole = useMemo(() => {
+    const selectedRoleOption = userRoleOptions.find((role) => role.id === createRoleId);
+    const selectedRoleCatalog = roleCatalogById.get(createRoleId);
+
+    if (!selectedRoleOption && !selectedRoleCatalog) {
+      return null;
+    }
+
+    return {
+      label: selectedRoleOption?.label ?? selectedRoleCatalog?.label ?? "Role",
+      description: selectedRoleOption?.description || selectedRoleCatalog?.description || "",
+      permissions: selectedRoleCatalog?.permissions ?? [],
+    };
+  }, [createRoleId, roleCatalogById, userRoleOptions]);
+  const isAnyOverlayOpen =
+    isCreateDrawerOpen || Boolean(editingUser) || Boolean(deleteTargetUser) || Boolean(passwordTargetUser);
 
   useEffect(() => {
     if (!notice) {
@@ -430,6 +448,10 @@ export function UserManagementScreen() {
     });
   }, [passwordForm, passwordTargetUser]);
 
+  const closeCreateDrawer = () => {
+    setIsCreateDrawerOpen(false);
+  };
+
   const closeEditModal = () => {
     setEditingUser(null);
   };
@@ -442,31 +464,42 @@ export function UserManagementScreen() {
     setPasswordTargetUser(null);
   };
 
+  const openCreateDrawer = () => {
+    setEditingUser(null);
+    setDeleteTargetUser(null);
+    setPasswordTargetUser(null);
+    setIsCreateDrawerOpen(true);
+  };
+
   const openEditModal = (user: UserAccount) => {
+    setIsCreateDrawerOpen(false);
     setDeleteTargetUser(null);
     setPasswordTargetUser(null);
     setEditingUser(user);
   };
 
   const openDeleteModal = (user: UserAccount) => {
+    setIsCreateDrawerOpen(false);
     setEditingUser(null);
     setPasswordTargetUser(null);
     setDeleteTargetUser(user);
   };
 
   const openPasswordModal = (user: UserAccount) => {
+    setIsCreateDrawerOpen(false);
     setEditingUser(null);
     setDeleteTargetUser(null);
     setPasswordTargetUser(user);
   };
 
   useEffect(() => {
-    if (!editingUser && !deleteTargetUser && !passwordTargetUser) {
+    if (!isCreateDrawerOpen && !editingUser && !deleteTargetUser && !passwordTargetUser) {
       return undefined;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        closeCreateDrawer();
         closeEditModal();
         closeDeleteModal();
         closePasswordModal();
@@ -477,7 +510,20 @@ export function UserManagementScreen() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [deleteTargetUser, editingUser, passwordTargetUser]);
+  }, [deleteTargetUser, editingUser, isCreateDrawerOpen, passwordTargetUser]);
+
+  useEffect(() => {
+    if (!isAnyOverlayOpen || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isAnyOverlayOpen]);
 
   useEffect(() => {
     if (!managedUsersQuery.error) {
@@ -542,6 +588,7 @@ export function UserManagementScreen() {
         password: "",
         confirmPassword: "",
       });
+      closeCreateDrawer();
       setNotice({
         tone: "success",
         message: normalizedPassword
@@ -703,126 +750,66 @@ export function UserManagementScreen() {
 
           <section className="overflow-hidden rounded-3xl border border-outline-variant/35 bg-surface-container-lowest shadow-ambient">
             <div className="p-5 sm:p-7 lg:p-9">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                  Create User
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
-                  <span>Total user: {managedUsersQuery.isLoading ? "..." : users.length}</span>
-                  <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
-                  <span>Tanpa password: {managedUsersQuery.isLoading ? "..." : totalUsersWithoutPassword}</span>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
+                      Create User
+                    </h2>
+                    <p className="mt-2 text-sm font-medium text-on-surface-variant">
+                      Tambah akun baru lewat panel samping.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="serene-btn-primary inline-flex min-h-[46px] w-full items-center justify-center gap-1.5 px-5 sm:w-auto"
+                    onClick={openCreateDrawer}
+                    disabled={!hasActiveRoleOptions}
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      person_add
+                    </span>
+                    Tambah User
+                  </button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Total User
+                    </p>
+                    <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
+                      {managedUsersQuery.isLoading ? "..." : users.length}
+                    </p>
+                  </article>
+
+                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Tanpa Password
+                    </p>
+                    <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
+                      {managedUsersQuery.isLoading ? "..." : totalUsersWithoutPassword}
+                    </p>
+                  </article>
+
+                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Role Aktif
+                    </p>
+                    <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
+                      {userRoleOptions.length}
+                    </p>
+                  </article>
                 </div>
               </div>
-
-              <form
-                className="mt-5 grid gap-3 2xl:grid-cols-[1.1fr_1.1fr_0.8fr_1fr_1fr_auto]"
-                onSubmit={createForm.handleSubmit((values) => void handleCreateUser(values))}
-              >
-                <div className="grid gap-1">
-                  <input
-                    className="serene-input"
-                    {...createForm.register("name")}
-                    placeholder="Nama lengkap"
-                    aria-label="Nama lengkap user baru"
-                  />
-                  {createForm.formState.errors.name ? (
-                    <p className="text-xs font-semibold text-error">
-                      {createForm.formState.errors.name.message}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="grid gap-1">
-                  <input
-                    className="serene-input"
-                    {...createForm.register("email")}
-                    placeholder="email@ghaniyatravel.com"
-                    type="email"
-                    aria-label="Email user baru"
-                  />
-                  {createForm.formState.errors.email ? (
-                    <p className="text-xs font-semibold text-error">
-                      {createForm.formState.errors.email.message}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="grid gap-1">
-                  <Controller
-                    name="roleId"
-                    control={createForm.control}
-                    render={({ field }) => (
-                      <SereneSelect
-                        className="serene-select"
-                        value={field.value}
-                        onChange={(event) => field.onChange(event.target.value)}
-                        aria-label="Role user baru"
-                        disabled={!hasActiveRoleOptions}
-                      >
-                        {hasActiveRoleOptions ? (
-                          userRoleOptions.map((role) => (
-                            <option key={role.id} value={role.id}>
-                              {role.label}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="admin">Belum ada role aktif</option>
-                        )}
-                      </SereneSelect>
-                    )}
-                  />
-                </div>
-                <div className="grid gap-1">
-                  <input
-                    className="serene-input"
-                    {...createForm.register("password")}
-                    placeholder="Password awal (opsional)"
-                    type="password"
-                    aria-label="Password awal user baru"
-                    autoComplete="new-password"
-                  />
-                  {createForm.formState.errors.password ? (
-                    <p className="text-xs font-semibold text-error">
-                      {createForm.formState.errors.password.message}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
-                      Kosongkan bila akun dibuat tanpa password awal.
-                    </p>
-                  )}
-                </div>
-                <div className="grid gap-1">
-                  <input
-                    className="serene-input"
-                    {...createForm.register("confirmPassword")}
-                    placeholder="Konfirmasi password"
-                    type="password"
-                    aria-label="Konfirmasi password user baru"
-                    autoComplete="new-password"
-                  />
-                  {createForm.formState.errors.confirmPassword ? (
-                    <p className="text-xs font-semibold text-error">
-                      {createForm.formState.errors.confirmPassword.message}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
-                      Hanya perlu diisi saat kamu menetapkan password awal.
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4 2xl:self-start"
-                  disabled={createManagedUserMutation.isPending || !hasActiveRoleOptions}
-                >
-                  {createManagedUserMutation.isPending ? "Menyimpan..." : "Tambah User"}
-                </button>
-              </form>
               {!hasActiveRoleOptions ? (
                 <p className="mt-3 text-xs font-semibold text-error">
                   Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
                 </p>
               ) : (
                 <p className="mt-3 text-xs font-medium leading-relaxed text-on-surface-variant">
-                  Password hanya menandakan akun sudah diprovision. Akses dashboard tetap mengikuti role dan pembatasan backend.
+                  Password awal opsional. Hak akses tetap mengikuti role.
                 </p>
               )}
             </div>
@@ -978,12 +965,287 @@ export function UserManagementScreen() {
           </section>
         </div>
 
+      {isCreateDrawerOpen ? (
+        <UserManagementModalPortal>
+          <div
+            className="serene-modal-overlay fixed inset-0 z-[160] flex items-stretch justify-end"
+            onClick={closeCreateDrawer}
+          >
+            <section
+              className="ml-auto flex h-full w-full max-w-2xl flex-col border-l border-outline-variant/35 bg-surface-container-lowest shadow-float"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Tambah user baru"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-outline-variant/25 px-5 py-5 sm:px-6">
+                <div className="min-w-0">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-fixed text-primary">
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      person_add
+                    </span>
+                  </div>
+
+                  <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">
+                    Tambah User Baru
+                  </h3>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-on-surface-variant">
+                    Isi identitas user, pilih role, lalu tentukan apakah akun perlu password awal atau cukup dibuat dulu.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary hover:text-primary"
+                  onClick={closeCreateDrawer}
+                  aria-label="Close create user drawer"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Total User
+                    </p>
+                    <p className="mt-2 text-xl font-black tracking-tight text-on-surface">
+                      {managedUsersQuery.isLoading ? "..." : users.length}
+                    </p>
+                  </article>
+
+                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Super Admin
+                    </p>
+                    <p className="mt-2 text-xl font-black tracking-tight text-on-surface">{totalSuperAdmin}</p>
+                  </article>
+
+                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Belum Password
+                    </p>
+                    <p className="mt-2 text-xl font-black tracking-tight text-on-surface">
+                      {totalUsersWithoutPassword}
+                    </p>
+                  </article>
+                </div>
+
+                <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+                  <form
+                    id="create-managed-user-form"
+                    className="grid gap-4"
+                    onSubmit={createForm.handleSubmit((values) => void handleCreateUser(values))}
+                  >
+                    <div className="grid gap-1.5">
+                      <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-name">
+                        Nama Lengkap
+                      </label>
+                      <input
+                        id="create-user-name"
+                        className="serene-input"
+                        {...createForm.register("name")}
+                        placeholder="Nama lengkap"
+                        aria-label="Nama lengkap user baru"
+                        autoFocus
+                      />
+                      {createForm.formState.errors.name ? (
+                        <p className="text-xs font-semibold text-error">
+                          {createForm.formState.errors.name.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-email">
+                        Email
+                      </label>
+                      <input
+                        id="create-user-email"
+                        className="serene-input"
+                        {...createForm.register("email")}
+                        placeholder="email@ghaniyatravel.com"
+                        type="email"
+                        aria-label="Email user baru"
+                      />
+                      {createForm.formState.errors.email ? (
+                        <p className="text-xs font-semibold text-error">
+                          {createForm.formState.errors.email.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-role">
+                        Role
+                      </label>
+                      <Controller
+                        name="roleId"
+                        control={createForm.control}
+                        render={({ field }) => (
+                          <SereneSelect
+                            id="create-user-role"
+                            className="serene-select"
+                            value={field.value}
+                            onChange={(event) => field.onChange(event.target.value)}
+                            aria-label="Role user baru"
+                            disabled={!hasActiveRoleOptions}
+                          >
+                            {hasActiveRoleOptions ? (
+                              userRoleOptions.map((role) => (
+                                <option key={role.id} value={role.id}>
+                                  {role.label}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="admin">Belum ada role aktif</option>
+                            )}
+                          </SereneSelect>
+                        )}
+                      />
+                    </div>
+
+                    <div className="rounded-3xl border border-outline-variant/35 bg-surface-container-low p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">
+                          lock
+                        </span>
+                        <h4 className="text-sm font-bold text-on-surface">Provision Password</h4>
+                      </div>
+
+                      <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                        Kosongkan dua field berikut bila akun cukup dibuat dulu dan password akan diatur belakangan.
+                      </p>
+
+                      <div className="mt-4 grid gap-4">
+                        <div className="grid gap-1.5">
+                          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-password">
+                            Password Awal
+                          </label>
+                          <input
+                            id="create-user-password"
+                            className="serene-input"
+                            {...createForm.register("password")}
+                            placeholder="Password awal (opsional)"
+                            type="password"
+                            aria-label="Password awal user baru"
+                            autoComplete="new-password"
+                          />
+                          {createForm.formState.errors.password ? (
+                            <p className="text-xs font-semibold text-error">
+                              {createForm.formState.errors.password.message}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
+                              Minimal 8 karakter bila password awal ingin langsung diaktifkan.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="grid gap-1.5">
+                          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-confirm-password">
+                            Konfirmasi Password
+                          </label>
+                          <input
+                            id="create-user-confirm-password"
+                            className="serene-input"
+                            {...createForm.register("confirmPassword")}
+                            placeholder="Konfirmasi password"
+                            type="password"
+                            aria-label="Konfirmasi password user baru"
+                            autoComplete="new-password"
+                          />
+                          {createForm.formState.errors.confirmPassword ? (
+                            <p className="text-xs font-semibold text-error">
+                              {createForm.formState.errors.confirmPassword.message}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
+                              Hanya perlu diisi saat kamu menetapkan password awal.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {!hasActiveRoleOptions ? (
+                      <p className="text-xs font-semibold text-error">
+                        Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
+                      </p>
+                    ) : null}
+                  </form>
+
+                  <aside className="rounded-3xl border border-outline-variant/35 bg-surface-container-low p-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                      Ringkasan Akses
+                    </p>
+                    <h4 className="mt-2 text-lg font-bold text-on-surface">
+                      {selectedCreateRole?.label ?? "Pilih role"}
+                    </h4>
+                    <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                      {selectedCreateRole?.description ||
+                        "Role menentukan area dashboard dan level akses yang akan dimiliki user baru."}
+                    </p>
+
+                    {selectedCreateRole && selectedCreateRole.permissions.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {selectedCreateRole.permissions.map((permission) => (
+                          <span
+                            key={permission}
+                            className="inline-flex rounded-md border border-outline-variant/35 bg-surface-container-lowest px-2 py-1 text-[10px] font-black tracking-[0.08em] text-on-surface-variant"
+                          >
+                            {permission}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 rounded-2xl border border-outline-variant/35 bg-surface-container-lowest px-4 py-3 text-xs leading-relaxed text-on-surface-variant">
+                      <p className="font-semibold text-on-surface">Provisioning note</p>
+                      <p className="mt-1">
+                        Password hanya menandakan akun sudah diprovision. Hak akses tetap mengikuti role dan pembatasan backend.
+                      </p>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+
+              <div className="border-t border-outline-variant/25 px-5 py-4 sm:px-6">
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    className="serene-btn-secondary"
+                    onClick={closeCreateDrawer}
+                    disabled={createManagedUserMutation.isPending}
+                  >
+                    Tutup
+                  </button>
+                  <button
+                    type="submit"
+                    form="create-managed-user-form"
+                    className="serene-btn-primary inline-flex items-center justify-center gap-1.5"
+                    disabled={createManagedUserMutation.isPending || !hasActiveRoleOptions}
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      person_add
+                    </span>
+                    {createManagedUserMutation.isPending ? "Menyimpan..." : "Tambah User"}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </UserManagementModalPortal>
+      ) : null}
+
       {editingUser ? (
         <UserManagementModalPortal>
           <div
             className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
             onClick={closeEditModal}
-            aria-hidden="true"
           >
             <section
               className="serene-modal-shell w-full max-w-xl p-5 sm:p-6"
@@ -1107,7 +1369,6 @@ export function UserManagementScreen() {
           <div
             className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
             onClick={closePasswordModal}
-            aria-hidden="true"
           >
             <section
               className="serene-modal-shell w-full max-w-lg p-5 sm:p-6"
@@ -1213,7 +1474,6 @@ export function UserManagementScreen() {
           <div
             className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
             onClick={closeDeleteModal}
-            aria-hidden="true"
           >
             <section
               className="serene-modal-shell w-full max-w-md p-5 sm:p-6"

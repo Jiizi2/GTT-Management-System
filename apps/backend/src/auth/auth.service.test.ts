@@ -192,9 +192,9 @@ async function testManagedUsersCrudRulesInMemoryMode(): Promise<void> {
       const listedUsers = await service.listManagedUsers();
       assert.deepEqual(
         listedUsers.map((user) => user.name),
-        ["Hadi Support", "Mila Finance", "Operator Admin"],
+        ["Dev Admin", "Dev Super Admin"],
       );
-      assert.equal(listedUsers.every((user) => user.hasPassword === false), true);
+      assert.equal(listedUsers.every((user) => user.hasPassword === true), true);
 
       const created = await service.createManagedUser({
         name: "  Rina Ops  ",
@@ -206,22 +206,22 @@ async function testManagedUsersCrudRulesInMemoryMode(): Promise<void> {
       assert.equal(created.roleId, "customer-support");
       assert.equal(created.hasPassword, false);
 
-      const updated = await service.updateManagedUser("usr-2", {
-        name: "  Mila Operations  ",
-        email: "MILA.OPS@GHANIYATRAVEL.COM",
+      const updated = await service.updateManagedUser("dev-admin", {
+        name: "  Dev Admin Ops  ",
+        email: "ADMIN.DEV@GHANIYA.LOCAL",
         roleId: "admin",
       });
-      assert.equal(updated.name, "Mila Operations");
-      assert.equal(updated.email, "mila.ops@ghaniyatravel.com");
+      assert.equal(updated.name, "Dev Admin Ops");
+      assert.equal(updated.email, "admin.dev@ghaniya.local");
       assert.equal(updated.roleId, "admin");
       assert.equal(Number.isNaN(Date.parse(updated.updatedAt)), false);
 
       await assertRejectsWithMessage(
         () =>
-          service.updateManagedUser("usr-3", {
-            name: "Hadi Support",
-            email: "operator.admin@ghaniyatravel.com",
-            roleId: "customer-support",
+          service.updateManagedUser("dev-super-admin", {
+            name: "Dev Super Admin",
+            email: "admin.dev@ghaniya.local",
+            roleId: "super-admin",
           }),
         ConflictException,
         /already used by another user/i,
@@ -231,7 +231,7 @@ async function testManagedUsersCrudRulesInMemoryMode(): Promise<void> {
         () =>
           service.createManagedUser({
             name: "Duplicate",
-            email: "operator.admin@ghaniyatravel.com",
+            email: "admin.dev@ghaniya.local",
             roleId: "admin",
           }),
         ConflictException,
@@ -278,12 +278,12 @@ async function testManagedUserPasswordProvisioningInMemoryMode(): Promise<void> 
       });
       assert.equal(createdLogin.user.accessTier, "admin");
 
-      const reset = await service.setManagedUserPassword("usr-1", "Operator#2026");
+      const reset = await service.setManagedUserPassword("dev-admin", "DevAdminReset#2026");
       assert.equal(reset.hasPassword, true);
 
       const resetLogin = await service.login({
-        identifier: "operator.admin@ghaniyatravel.com",
-        password: "Operator#2026",
+        identifier: "admin.dev@ghaniya.local",
+        password: "DevAdminReset#2026",
       });
       assert.equal(resetLogin.user.accessTier, "admin");
     });

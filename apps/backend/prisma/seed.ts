@@ -10,10 +10,21 @@ import {
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
-import { createDefaultAuthUserStorageRecords } from "../src/auth/auth-default-users";
+import {
+  createDefaultAuthUserStorageRecordsWithOverrides,
+  requireDefaultAuthUserPasswordOverrides,
+} from "../src/auth/auth-default-users";
+import { resolveConfiguredNodeEnv, resolveConfiguredString } from "../src/config/app-config";
 import { DEFAULT_MASTER_DATA_OPTIONS } from "../src/master-data/master-data.defaults";
 
 const prisma = new PrismaClient();
+
+function assertSeedAllowedInCurrentEnvironment(): void {
+  const nodeEnv = resolveConfiguredNodeEnv(undefined);
+  if (nodeEnv === "production") {
+    throw new Error("Refusing to run Prisma seed while NODE_ENV=production.");
+  }
+}
 
 async function resetData(): Promise<void> {
   await prisma.masterDataOption.deleteMany();
@@ -73,7 +84,11 @@ async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): 
 }
 
 async function seedAuthUsers(): Promise<void> {
-  const defaultUsers = createDefaultAuthUserStorageRecords();
+  const passwordOverrides = requireDefaultAuthUserPasswordOverrides({
+    superAdminPassword: resolveConfiguredString(undefined, "DEV_AUTH_SUPERADMIN_PASSWORD"),
+    adminPassword: resolveConfiguredString(undefined, "DEV_AUTH_ADMIN_PASSWORD"),
+  });
+  const defaultUsers = createDefaultAuthUserStorageRecordsWithOverrides(passwordOverrides);
   if (defaultUsers.length === 0) {
     return;
   }
@@ -1261,6 +1276,8 @@ async function seedInvoices({ resetDataFirst }: { resetDataFirst: boolean }): Pr
 }
 
 async function main(): Promise<void> {
+  assertSeedAllowedInCurrentEnvironment();
+
   const resetDataFirst = process.env.SEED_RESET?.toLowerCase() === "true";
 
   if (resetDataFirst) {

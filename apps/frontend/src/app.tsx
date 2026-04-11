@@ -51,12 +51,12 @@ function RestoringSessionScreen() {
 
 function DashboardWorkspaceShell({
   onLogout,
-  sessionAccessTier,
+  sessionUser,
 }: {
   onLogout: () => void;
-  sessionAccessTier: AuthSession["user"]["accessTier"];
+  sessionUser: AuthSession["user"];
 }) {
-  const controller = useAppController(sessionAccessTier);
+  const controller = useAppController(sessionUser.accessTier);
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const shouldShowFloatingThemeToggle = !(
     controller.activeNav === "overview" ||
@@ -105,6 +105,7 @@ function DashboardWorkspaceShell({
       <AppSidebar
         activeNav={controller.activeNav}
         sessionAccessTier={controller.sessionAccessTier}
+        sessionUserName={sessionUser.name}
         isCollapsed={controller.isSidebarCollapsed}
         onNavigate={controller.handleNavigate}
         onOpenNewGroup={controller.handleOpenNewGroup}
@@ -236,7 +237,7 @@ export function App() {
           authSession ? (
             <DashboardWorkspaceShell
               onLogout={handleLogout}
-              sessionAccessTier={authSession.user.accessTier}
+              sessionUser={authSession.user}
             />
           ) : (
             <Navigate to={buildLoginPath()} replace />

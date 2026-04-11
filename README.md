@@ -10,6 +10,7 @@ Monorepo ini berisi aplikasi operasional perjalanan/umrah dengan dua aplikasi ut
 - [Aplikasi secara umum](docs/application-overview.md)
 - [Frontend](docs/frontend.md)
 - [Backend](docs/backend.md)
+- [QA](docs/qa.md)
 - [Release flow](docs/release-flow.md)
 
 ## Stack Utama
@@ -57,7 +58,10 @@ docker compose up -d
 ```env
 PORT=3001
 DATA_SOURCE=prisma
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/gtt_ops?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:6543/gtt_ops?schema=public"
+AUTH_BOOTSTRAP_DEFAULT_USERS="true"
+DEV_AUTH_SUPERADMIN_PASSWORD="DevSuperAdmin#2026"
+DEV_AUTH_ADMIN_PASSWORD="DevAdmin#2026"
 ```
 
 3. Generate client, migrate, dan seed:
@@ -80,5 +84,7 @@ npm run dev:backend
 - `npm run test` -> unit test semua workspace.
 - `npm run build` -> build semua workspace.
 - `npm run verify` -> check + test + build.
+- `npm run qa` -> QA cepat lokal: verify + frontend smoke + backend API e2e.
+- `npm run qa:full` -> QA penuh: `qa` + backend Prisma integration + frontend Playwright e2e.
 - `npm run test:integration` -> integration test backend (butuh DB).
 - `npm run test:e2e:frontend` -> e2e frontend + backend build.

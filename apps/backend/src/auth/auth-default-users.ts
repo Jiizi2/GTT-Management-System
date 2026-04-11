@@ -24,6 +24,37 @@ type DefaultAuthUserPasswordOverrides = {
   adminPassword?: string;
 };
 
+function normalizeOptionalPassword(value: string | undefined): string | null {
+  const normalized = value?.trim() ?? "";
+  return normalized || null;
+}
+
+export function requireDefaultAuthUserPasswordOverrides(
+  passwordOverrides?: DefaultAuthUserPasswordOverrides,
+): Required<DefaultAuthUserPasswordOverrides> {
+  const superAdminPassword = normalizeOptionalPassword(passwordOverrides?.superAdminPassword);
+  const adminPassword = normalizeOptionalPassword(passwordOverrides?.adminPassword);
+  if (!superAdminPassword || !adminPassword) {
+    const missingVariables: string[] = [];
+    if (!superAdminPassword) {
+      missingVariables.push("DEV_AUTH_SUPERADMIN_PASSWORD");
+    }
+
+    if (!adminPassword) {
+      missingVariables.push("DEV_AUTH_ADMIN_PASSWORD");
+    }
+
+    throw new Error(
+      `${missingVariables.join(" and ")} must be set before seeding or bootstrapping Prisma auth users.`,
+    );
+  }
+
+  return {
+    superAdminPassword,
+    adminPassword,
+  };
+}
+
 export function normalizeAuthUsername(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -89,35 +120,14 @@ export function createDefaultAuthUserSeeds(
       username: "dev.superadmin",
       email: "superadmin.dev@ghaniya.local",
       roleId: "super-admin",
-      password: passwordOverrides?.superAdminPassword?.trim() || "DevSuperAdmin#2026",
+      password: normalizeOptionalPassword(passwordOverrides?.superAdminPassword),
     },
     {
       name: "Dev Admin",
       username: "dev.admin",
       email: "admin.dev@ghaniya.local",
       roleId: "admin",
-      password: passwordOverrides?.adminPassword?.trim() || "DevAdmin#2026",
-    },
-    {
-      name: "Operator Admin",
-      username: "operator.admin",
-      email: "operator.admin@ghaniyatravel.com",
-      roleId: "admin",
-      password: null,
-    },
-    {
-      name: "Mila Finance",
-      username: "mila.finance",
-      email: "mila.finance@ghaniyatravel.com",
-      roleId: "finance-manager",
-      password: null,
-    },
-    {
-      name: "Hadi Support",
-      username: "hadi.support",
-      email: "hadi.support@ghaniyatravel.com",
-      roleId: "customer-support",
-      password: null,
+      password: normalizeOptionalPassword(passwordOverrides?.adminPassword),
     },
   ];
 
@@ -129,14 +139,9 @@ export function createDefaultAuthUserSeeds(
 }
 
 export function createDefaultAuthUserStorageRecords(): DefaultAuthUserStorageRecord[] {
-  return createDefaultAuthUserSeeds().map((entry) => ({
-    name: entry.name.trim(),
-    username: normalizeAuthUsername(entry.username),
-    email: normalizeAuthEmail(entry.email),
-    role: mapManagedRoleToPrismaRole(entry.roleId),
-    passwordHash: entry.password ? hashAuthPassword(entry.password) : null,
-    isActive: true,
-  }));
+  return createDefaultAuthUserStorageRecordsWithOverrides(
+    requireDefaultAuthUserPasswordOverrides(),
+  );
 }
 
 export function createDefaultAuthUserStorageRecordsWithOverrides(

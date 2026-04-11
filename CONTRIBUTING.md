@@ -11,11 +11,13 @@ To separate development-ready vs production-ready code:
 5. Promote to production by Pull Request from `develop` into `master` (or `main`).
 6. Merge only through Pull Request review.
 
-GitHub Actions now supports this flow:
-- CI runs on PR/push for `develop`, `master`, and `main`.
-- Dev artifact is built from `develop`.
-- Production artifact is built from `master`/`main`.
-- `PR Workflow Guard` fails if a push commit to protected branches is not linked to a merged PR.
+For now, verification is manual. Run the checks you need locally before opening or merging a Pull Request:
+
+- `npm run qa`
+- `npm run qa:full`
+- `npm run verify`
+- `npm run test:integration`
+- `npm run test:e2e:frontend`
 
 ## Local push guard
 
@@ -26,12 +28,3 @@ Enable it once per clone:
 ```bash
 git config core.hooksPath .githooks
 ```
-
-## GitHub-side guard (for private/free repo fallback)
-
-If native branch protection is unavailable, `.github/workflows/pr-workflow-guard.yml` provides a fallback check:
-
-- Runs on push to `develop`, `master`, and `main`.
-- Fails when a commit is not associated with a merged PR into that branch.
-
-Note: this does not prevent the push itself. It provides immediate CI failure signal until branch protection can be enabled.
