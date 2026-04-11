@@ -1,12 +1,15 @@
+import type { GroupFetchProjection } from "../hooks/use-app-controller-backend";
+
 export const authQueryKeys = {
   session: ["auth", "session"] as const,
 };
 
 export const groupQueryKeys = {
   all: ["groups"] as const,
-  list: ["groups", "list"] as const,
+  list: (projection: GroupFetchProjection) => ["groups", "list", projection] as const,
   searchRoot: ["groups", "search"] as const,
-  search: (query: string) => ["groups", "search", query] as const,
+  search: (query: string, projection: GroupFetchProjection) =>
+    ["groups", "search", projection, query] as const,
 };
 
 export const masterDataQueryKeys = {

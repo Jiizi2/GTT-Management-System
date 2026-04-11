@@ -100,11 +100,13 @@ export type MemoryAuditLog = {
 };
 
 export type GroupListFilter = "all" | "not-issued" | "missing-hotel" | "unpaid";
+export type GroupResponseProjection = "summary" | "detail";
 
 export type FindAllOptions = {
   page?: number;
   pageSize?: number;
   filter?: string;
+  projection?: GroupResponseProjection;
 };
 
 export type PaginatedGroupList<T> = {

@@ -26,6 +26,8 @@ import type {
 import { resolveBackendApiBaseUrl } from "../shared/backend-api-base";
 import { clearAuthSession } from "../shared/auth-session";
 
+export type GroupFetchProjection = "summary" | "detail";
+
 type BackendCreateGroupPayload = {
   code: string;
   name: string;
@@ -1101,15 +1103,20 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
 export async function fetchGroupsFromBackend({
   signal,
   query,
+  projection = "detail",
 }: {
   signal?: AbortSignal;
   query?: string;
+  projection?: GroupFetchProjection;
 } = {}): Promise<GroupData[]> {
   const apiBaseUrl = resolveBackendApiBaseUrl();
   const searchParams = new URLSearchParams();
   const normalizedQuery = query?.trim() ?? "";
   if (normalizedQuery.length > 0) {
     searchParams.set("q", normalizedQuery);
+  }
+  if (projection) {
+    searchParams.set("projection", projection);
   }
   const endpoint = searchParams.size > 0 ? `${apiBaseUrl}/groups?${searchParams.toString()}` : `${apiBaseUrl}/groups`;
   const response = await fetchBackend(endpoint, {

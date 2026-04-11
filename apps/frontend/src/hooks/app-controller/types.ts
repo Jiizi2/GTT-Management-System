@@ -26,6 +26,7 @@ export type SyncFeedback = {
 
 export type AppController = {
   groupRecords: GroupData[];
+  isGroupRecordsLoading: boolean;
   sessionAccessTier: SessionAccessTier;
   activeNav: NavId;
   query: string;

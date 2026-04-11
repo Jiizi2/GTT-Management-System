@@ -72,11 +72,11 @@ export class AuthController {
     },
   ) {
     const rateLimitKeys = this.authLoginRateLimiter.resolveKeys(payload.identifier, request);
-    this.authLoginRateLimiter.assertAllowed(rateLimitKeys);
+    await this.authLoginRateLimiter.assertAllowed(rateLimitKeys);
 
     try {
       const loginResponse = await this.authService.login(payload);
-      this.authLoginRateLimiter.registerSuccess(rateLimitKeys);
+      await this.authLoginRateLimiter.registerSuccess(rateLimitKeys);
       response.setHeader("Cache-Control", "no-store, private");
       response.setHeader(
         "Set-Cookie",
@@ -94,7 +94,7 @@ export class AuthController {
       return toBrowserSession(loginResponse);
     } catch (error: unknown) {
       if (error instanceof UnauthorizedException) {
-        this.authLoginRateLimiter.registerFailure(rateLimitKeys);
+        await this.authLoginRateLimiter.registerFailure(rateLimitKeys);
       }
 
       throw error;

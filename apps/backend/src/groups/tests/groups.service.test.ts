@@ -6,9 +6,9 @@ import {
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
-import { CreateGroupDto } from "./dto/create-group.dto";
-import { GroupsService } from "./groups.service";
-import { PrismaService } from "../prisma/prisma.service";
+import { CreateGroupDto } from "../dto/create-group.dto";
+import { GroupsService } from "../groups.service";
+import { PrismaService } from "../../prisma/prisma.service";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {
   const previous = process.env.DATA_SOURCE;
@@ -121,6 +121,10 @@ async function testSearchFilterPagination(): Promise<void> {
     assert.equal(Array.isArray(searched), true);
     assert.equal((searched as unknown[]).length, 1);
 
+    const normalizedCodeSearch = await service.findAll("g102");
+    assert.equal(Array.isArray(normalizedCodeSearch), true);
+    assert.equal((normalizedCodeSearch as Array<{ code?: string }>)[0]?.code, "G-102");
+
     const unpaid = await service.findAll(undefined, { filter: "unpaid" });
     assert.equal(Array.isArray(unpaid), true);
     assert.equal((unpaid as unknown[]).length, 2);
@@ -128,6 +132,17 @@ async function testSearchFilterPagination(): Promise<void> {
     const missingHotel = await service.findAll(undefined, { filter: "missing-hotel" });
     assert.equal(Array.isArray(missingHotel), true);
     assert.equal((missingHotel as unknown[]).length, 2);
+
+    const summaryList = (await service.findAll(undefined, {
+      projection: "summary",
+    })) as Array<Record<string, unknown>>;
+    assert.equal(summaryList.length, 3);
+    const summaryGroup = summaryList.find((group) => group.code === "G-101");
+    assert.ok(summaryGroup);
+    assert.equal(Object.prototype.hasOwnProperty.call(summaryGroup, "itinerary"), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(summaryGroup, "notes"), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(summaryGroup, "visaSetup"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(summaryGroup, "checklistAssignments"), false);
   } finally {
     restore();
   }
@@ -222,7 +237,7 @@ async function testItineraryCrudWithAudit(): Promise<void> {
     };
     assert.equal(afterRemove.itinerary.length, 0);
 
-    const logs = service.listAuditLogs("G-201");
+    const logs = await service.listAuditLogs("G-201");
     const actions = logs.map((entry) => entry.action);
     assert.equal(actions.includes("itinerary.added"), true);
     assert.equal(actions.includes("itinerary.updated"), true);

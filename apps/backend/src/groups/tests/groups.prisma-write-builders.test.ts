@@ -9,8 +9,8 @@ import {
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
-import { CreateGroupDto } from "./dto/create-group.dto";
-import { buildGroupCreateData, buildGroupReplaceData } from "./groups.prisma-write-builders";
+import { CreateGroupDto } from "../dto/create-group.dto";
+import { buildGroupCreateData, buildGroupReplaceData } from "../groups.prisma-write-builders";
 
 function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto {
   return {
@@ -120,6 +120,10 @@ function testTrimAndDefaultMappings(): void {
   assert.equal(createDataAny.name, "Builder Test Group");
   assert.equal(createDataAny.status, "Active");
   assert.equal(createDataAny.packageName, "Standard Gold");
+  assert.equal(
+    createDataAny.searchDocument,
+    "g trim gtrim builder test group buildertestgroup active standard gold standardgold",
+  );
   assert.equal((createDataAny.arrivalDate as Date).toISOString().slice(0, 10), "2026-04-10");
   assert.equal((createDataAny.returnDate as Date).toISOString().slice(0, 10), "2026-04-18");
   assert.equal(createDataAny.musyrif.create.name, "Ust. Trim");
@@ -255,6 +259,10 @@ function testReplaceNullifiesChecklistItineraryLinks(): void {
 
   assert.equal(createData.checklistAssignments.create[0].itineraryItemId, "legacy-itinerary-id");
   assert.equal(replaceData.checklistAssignments.create[0].itineraryItemId, null);
+  assert.equal(
+    replaceData.searchDocument,
+    "g links glinks builder test group buildertestgroup active standard gold standardgold",
+  );
 }
 
 async function main(): Promise<void> {

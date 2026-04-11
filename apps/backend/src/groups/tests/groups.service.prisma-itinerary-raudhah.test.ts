@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { GroupRaudhahStatus, Prisma } from "@prisma/client";
-import type { PrismaService } from "../prisma/prisma.service";
-import { GroupsService } from "./groups.service";
+import type { PrismaService } from "../../prisma/prisma.service";
+import { GroupsService } from "../groups.service";
 
 function createPrismaGroupsService(prismaMock: PrismaService): { service: GroupsService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "prisma";
+  const prismaRecord = prismaMock as unknown as Record<string, unknown>;
+  prismaRecord.groupAuditLog ??= {
+    create: async () => ({}),
+    findMany: async () => [],
+  };
   const service = new GroupsService(prismaMock);
 
   return {
