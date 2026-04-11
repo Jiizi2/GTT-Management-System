@@ -16,6 +16,11 @@ type StartedFrontendServer = {
   close: () => Promise<void>;
 };
 
+type LoginUiCredentials = {
+  identifier: string;
+  password: string;
+};
+
 type NestLikeApplication = {
   enableCors: (options?: Record<string, unknown>) => void;
   setGlobalPrefix: (prefix: string) => void;
@@ -34,8 +39,18 @@ const backendDistEntry = path.resolve(backendDir, "dist", "app.module.js");
 let backendServer: StartedBackendServer | null = null;
 let frontendServer: StartedFrontendServer | null = null;
 
-const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.superadmin";
-const DEV_AUTH_PASSWORD = process.env.DEV_AUTH_PASSWORD?.trim() || "DevSuperAdmin#2026";
+const DEV_SUPERADMIN_IDENTIFIER =
+  process.env.DEV_AUTH_SUPERADMIN_IDENTIFIER?.trim() ||
+  process.env.DEV_AUTH_IDENTIFIER?.trim() ||
+  "dev.superadmin";
+const DEV_SUPERADMIN_PASSWORD =
+  process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() ||
+  process.env.DEV_AUTH_PASSWORD?.trim() ||
+  "DevSuperAdmin#2026";
+const DEV_ADMIN_IDENTIFIER = process.env.DEV_AUTH_ADMIN_IDENTIFIER?.trim() || "dev.admin";
+const DEV_ADMIN_PASSWORD =
+  process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() ||
+  "DevAdmin#2026";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -203,7 +218,7 @@ async function startFrontendStaticServer(): Promise<StartedFrontendServer> {
   };
 }
 
-function restoreEnvVar(key: "PORT" | "DATA_SOURCE", previousValue: string | undefined): void {
+function restoreEnvVar(key: "PORT" | "DATA_SOURCE" | "CORS_ORIGINS", previousValue: string | undefined): void {
   if (previousValue === undefined) {
     delete process.env[key];
     return;
@@ -212,14 +227,16 @@ function restoreEnvVar(key: "PORT" | "DATA_SOURCE", previousValue: string | unde
   process.env[key] = previousValue;
 }
 
-async function startBackendApiServer(): Promise<StartedBackendServer> {
+async function startBackendApiServer(frontendOrigin: string): Promise<StartedBackendServer> {
   const previousPort = process.env.PORT;
   const previousDataSource = process.env.DATA_SOURCE;
+  const previousCorsOrigins = process.env.CORS_ORIGINS;
   const port = await allocatePort();
   const host = "127.0.0.1";
   const apiBaseUrl = `http://${host}:${port}/api`;
   process.env.PORT = String(port);
   process.env.DATA_SOURCE = "memory";
+  process.env.CORS_ORIGINS = frontendOrigin;
 
   const require = createRequire(import.meta.url);
   require("reflect-metadata");
@@ -255,6 +272,7 @@ async function startBackendApiServer(): Promise<StartedBackendServer> {
     }
     restoreEnvVar("PORT", previousPort);
     restoreEnvVar("DATA_SOURCE", previousDataSource);
+    restoreEnvVar("CORS_ORIGINS", previousCorsOrigins);
     throw error;
   }
 
@@ -266,11 +284,18 @@ async function startBackendApiServer(): Promise<StartedBackendServer> {
       }
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("DATA_SOURCE", previousDataSource);
+      restoreEnvVar("CORS_ORIGINS", previousCorsOrigins);
     },
   };
 }
 
-async function openApp(page: Page): Promise<void> {
+async function openApp(
+  page: Page,
+  credentials: LoginUiCredentials = {
+    identifier: DEV_SUPERADMIN_IDENTIFIER,
+    password: DEV_SUPERADMIN_PASSWORD,
+  },
+): Promise<void> {
   if (!backendServer || !frontendServer) {
     throw new Error("E2E servers were not started.");
   }
@@ -284,19 +309,35 @@ async function openApp(page: Page): Promise<void> {
     waitUntil: "networkidle",
   });
 
-  await loginViaUi(page);
+  await loginViaUi(page, credentials);
 }
 
-async function loginViaUi(page: Page): Promise<void> {
+async function loginViaUi(
+  page: Page,
+  credentials: LoginUiCredentials = {
+    identifier: DEV_SUPERADMIN_IDENTIFIER,
+    password: DEV_SUPERADMIN_PASSWORD,
+  },
+): Promise<void> {
   const loginButton = page.getByRole("button", { name: "Login to Dashboard" });
   if ((await loginButton.count()) === 0) {
     return;
   }
 
-  await page.getByLabel("Email or Username").fill(DEV_AUTH_IDENTIFIER);
-  await page.locator("#login-password").fill(DEV_AUTH_PASSWORD);
+  await page.getByLabel("Email or Username").fill(credentials.identifier);
+  await page.locator("#login-password").fill(credentials.password);
   await loginButton.click();
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
+}
+
+async function logoutViaUi(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Logout" }).click();
+  const logoutDialog = page.locator(".serene-modal-shell").filter({
+    hasText: "kembali ke halaman login",
+  }).first();
+  await expect(logoutDialog).toBeVisible();
+  await logoutDialog.locator("button:has-text('Logout')").click();
+  await expect(page.getByRole("button", { name: "Login to Dashboard" })).toBeVisible();
 }
 
 type OverlayRectSnapshot = {
@@ -427,8 +468,8 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
 test.beforeAll(async () => {
   await access(path.resolve(frontendDistDir, "index.html"));
   await access(backendDistEntry);
-  backendServer = await startBackendApiServer();
   frontendServer = await startFrontendStaticServer();
+  backendServer = await startBackendApiServer(frontendServer.baseUrl);
 });
 
 test.afterAll(async () => {
@@ -537,6 +578,82 @@ test("uses full-viewport modal overlays in group detail and profile", async ({ p
 
   await page.getByRole("button", { name: "Change", exact: true }).click();
   expectOverlayCoversViewport(await getVisibleModalOverlayRect(page));
+});
+
+test("super-admin provisions managed user passwords and admin stays restricted from user management", async ({ page }) => {
+  await openApp(page);
+
+  await page.getByRole("button", { name: "User Management" }).click();
+  await expect(page.getByRole("heading", { name: "User Management" })).toBeVisible();
+
+  const suffix = buildUniqueSuffix();
+  const managedUserName = `QA Admin ${suffix}`;
+  const managedUserEmail = `qa.admin.${suffix}@ghaniyatravel.com`;
+  const initialPassword = `QaInit#${suffix}`;
+  const resetPassword = `QaReset#${suffix}`;
+  const createUserForm = page.locator("form").first();
+
+  await page.getByLabel("Nama lengkap user baru").fill(managedUserName);
+  await page.getByLabel("Email user baru").fill(managedUserEmail);
+  await page.getByLabel("Role user baru").click();
+  await page.getByRole("option", { name: "Admin", exact: true }).click();
+  await createUserForm.evaluate((form) => {
+    (form as HTMLFormElement).requestSubmit();
+  });
+
+  const managedUserCard = page.locator("div.border-b").filter({ hasText: managedUserEmail }).first();
+  await expect(managedUserCard).toBeVisible();
+  await expect(managedUserCard.getByText(managedUserName)).toBeVisible();
+  await expect(managedUserCard.getByText("No Password")).toBeVisible();
+  await managedUserCard.getByRole("button", { name: "Set Password" }).click();
+
+  const setPasswordDialog = page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail }).first();
+  await expect(setPasswordDialog).toBeVisible();
+  await setPasswordDialog.getByLabel("Password Baru").fill(initialPassword);
+  await setPasswordDialog.getByLabel("Konfirmasi Password").fill(initialPassword);
+  await setPasswordDialog.locator("button:has-text('Simpan Password')").click();
+
+  await expect(setPasswordDialog).toBeHidden();
+  await expect(managedUserCard.getByText("Password Ready")).toBeVisible();
+
+  await managedUserCard.getByRole("button", { name: "Reset Password" }).click();
+  const resetPasswordDialog = page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail }).first();
+  await expect(resetPasswordDialog).toBeVisible();
+  await resetPasswordDialog.getByLabel("Password Baru").fill(resetPassword);
+  await resetPasswordDialog.getByLabel("Konfirmasi Password").fill(resetPassword);
+  await resetPasswordDialog.locator("button:has-text('Reset Password')").click();
+
+  await expect(resetPasswordDialog).toBeHidden();
+
+  await logoutViaUi(page);
+
+  await page.getByLabel("Email or Username").fill(managedUserEmail);
+  await page.locator("#login-password").fill(initialPassword);
+  await page.getByRole("button", { name: "Login to Dashboard" }).click();
+  await expect(page.getByText("Invalid username/email or password.")).toBeVisible();
+
+  await loginViaUi(page, {
+    identifier: managedUserEmail,
+    password: resetPassword,
+  });
+
+  await page.goto(`${frontendServer?.baseUrl ?? ""}/user-management`, {
+    waitUntil: "networkidle",
+  });
+  await expect(page).toHaveURL(/\/overview$/);
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "User Management" })).toHaveCount(0);
+
+  await logoutViaUi(page);
+  await loginViaUi(page, {
+    identifier: DEV_ADMIN_IDENTIFIER,
+    password: DEV_ADMIN_PASSWORD,
+  });
+  await page.goto(`${frontendServer?.baseUrl ?? ""}/user-management`, {
+    waitUntil: "networkidle",
+  });
+  await expect(page).toHaveURL(/\/overview$/);
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
 });
 
 test("deletes a group from group detail", async ({ page }) => {

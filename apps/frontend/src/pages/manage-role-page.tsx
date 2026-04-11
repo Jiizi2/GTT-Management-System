@@ -13,6 +13,7 @@ import {
   useCreateManagedUserMutation,
   useDeleteManagedUserMutation,
   useManagedUsersQuery,
+  useSetManagedUserPasswordMutation,
   useUpdateManagedUserMutation,
 } from "../hooks/use-user-management-query";
 import type { BackendManagedUser } from "../hooks/use-user-management-backend";
@@ -38,6 +39,7 @@ type UserAccount = {
   name: string;
   email: string;
   roleId: RoleId;
+  hasPassword: boolean;
 };
 
 type NoticeState = {
@@ -96,7 +98,91 @@ const managedUserFormSchema = z.object({
   roleId: roleIdSchema,
 });
 
+const optionalManagedUserPasswordSchema = z
+  .string()
+  .trim()
+  .max(1024, "Password terlalu panjang.");
+
+const requiredManagedUserPasswordSchema = z
+  .string()
+  .trim()
+  .min(8, "Password minimal 8 karakter.")
+  .max(1024, "Password terlalu panjang.");
+
+const createManagedUserFormSchema = managedUserFormSchema.extend({
+  password: optionalManagedUserPasswordSchema,
+  confirmPassword: optionalManagedUserPasswordSchema,
+}).superRefine((values, context) => {
+  const password = values.password.trim();
+  const confirmPassword = values.confirmPassword.trim();
+
+  if (!password && !confirmPassword) {
+    return;
+  }
+
+  if (!password) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["password"],
+      message: "Isi password dulu atau kosongkan kedua field password.",
+    });
+    return;
+  }
+
+  if (password.length < 8) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["password"],
+      message: "Password minimal 8 karakter.",
+    });
+  }
+
+  if (!confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password wajib diisi jika password diatur.",
+    });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password tidak sama.",
+    });
+  }
+});
+
+const resetManagedUserPasswordFormSchema = z.object({
+  password: requiredManagedUserPasswordSchema,
+  confirmPassword: optionalManagedUserPasswordSchema,
+}).superRefine((values, context) => {
+  const password = values.password.trim();
+  const confirmPassword = values.confirmPassword.trim();
+
+  if (!confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password wajib diisi.",
+    });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Konfirmasi password tidak sama.",
+    });
+  }
+});
+
 type ManagedUserFormValues = z.infer<typeof managedUserFormSchema>;
+type CreateManagedUserFormValues = z.infer<typeof createManagedUserFormSchema>;
+type ResetManagedUserPasswordFormValues = z.infer<typeof resetManagedUserPasswordFormSchema>;
 
 const defaultUserRoleOptions: UserRoleOption[] = defaultRoleCatalog
   .filter((role): role is RoleCatalogItem & { id: RoleId } => roleIdSet.has(role.id as RoleId))
@@ -129,6 +215,14 @@ function resolveRoleToneClass(roleId: string): string {
   }
 
   return "bg-surface-container-high text-on-surface";
+}
+
+function resolvePasswordToneClass(hasPassword: boolean): string {
+  if (hasPassword) {
+    return "border-primary/20 bg-primary-fixed text-on-primary-fixed";
+  }
+
+  return "border-outline-variant/35 bg-surface-container-lowest text-on-surface-variant";
 }
 
 function isRoleId(value: string): value is RoleId {
@@ -195,6 +289,7 @@ function mapBackendUserToLocal(user: BackendManagedUser): UserAccount {
     name: user.name,
     email: user.email,
     roleId: user.roleId,
+    hasPassword: user.hasPassword,
   };
 }
 
@@ -217,9 +312,11 @@ export function UserManagementScreen() {
   const createManagedUserMutation = useCreateManagedUserMutation();
   const updateManagedUserMutation = useUpdateManagedUserMutation();
   const deleteManagedUserMutation = useDeleteManagedUserMutation();
+  const setManagedUserPasswordMutation = useSetManagedUserPasswordMutation();
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [deleteTargetUser, setDeleteTargetUser] = useState<UserAccount | null>(null);
+  const [passwordTargetUser, setPasswordTargetUser] = useState<UserAccount | null>(null);
 
   const users = useMemo(
     () => (managedUsersQuery.data ?? []).map((user) => mapBackendUserToLocal(user)),
@@ -243,15 +340,21 @@ export function UserManagementScreen() {
     () => users.filter((user) => user.roleId === "super-admin").length,
     [users],
   );
+  const totalUsersWithoutPassword = useMemo(
+    () => users.filter((user) => !user.hasPassword).length,
+    [users],
+  );
   const hasActiveRoleOptions = userRoleOptions.length > 0;
   const defaultRoleId = userRoleOptions[0]?.id ?? "admin";
 
-  const createForm = useForm<ManagedUserFormValues>({
-    resolver: zodResolver(managedUserFormSchema),
+  const createForm = useForm<CreateManagedUserFormValues>({
+    resolver: zodResolver(createManagedUserFormSchema),
     defaultValues: {
       name: "",
       email: "",
       roleId: defaultRoleId,
+      password: "",
+      confirmPassword: "",
     },
   });
   const editForm = useForm<ManagedUserFormValues>({
@@ -260,6 +363,13 @@ export function UserManagementScreen() {
       name: "",
       email: "",
       roleId: defaultRoleId,
+    },
+  });
+  const passwordForm = useForm<ResetManagedUserPasswordFormValues>({
+    resolver: zodResolver(resetManagedUserPasswordFormSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
     },
   });
 
@@ -305,6 +415,21 @@ export function UserManagementScreen() {
     });
   }, [defaultRoleId, editForm, editingUser, userRoleOptions]);
 
+  useEffect(() => {
+    if (!passwordTargetUser) {
+      passwordForm.reset({
+        password: "",
+        confirmPassword: "",
+      });
+      return;
+    }
+
+    passwordForm.reset({
+      password: "",
+      confirmPassword: "",
+    });
+  }, [passwordForm, passwordTargetUser]);
+
   const closeEditModal = () => {
     setEditingUser(null);
   };
@@ -313,18 +438,30 @@ export function UserManagementScreen() {
     setDeleteTargetUser(null);
   };
 
+  const closePasswordModal = () => {
+    setPasswordTargetUser(null);
+  };
+
   const openEditModal = (user: UserAccount) => {
     setDeleteTargetUser(null);
+    setPasswordTargetUser(null);
     setEditingUser(user);
   };
 
   const openDeleteModal = (user: UserAccount) => {
     setEditingUser(null);
+    setPasswordTargetUser(null);
     setDeleteTargetUser(user);
   };
 
+  const openPasswordModal = (user: UserAccount) => {
+    setEditingUser(null);
+    setDeleteTargetUser(null);
+    setPasswordTargetUser(user);
+  };
+
   useEffect(() => {
-    if (!editingUser && !deleteTargetUser) {
+    if (!editingUser && !deleteTargetUser && !passwordTargetUser) {
       return undefined;
     }
 
@@ -332,6 +469,7 @@ export function UserManagementScreen() {
       if (event.key === "Escape") {
         closeEditModal();
         closeDeleteModal();
+        closePasswordModal();
       }
     };
 
@@ -339,7 +477,7 @@ export function UserManagementScreen() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [deleteTargetUser, editingUser]);
+  }, [deleteTargetUser, editingUser, passwordTargetUser]);
 
   useEffect(() => {
     if (!managedUsersQuery.error) {
@@ -364,7 +502,7 @@ export function UserManagementScreen() {
     });
   }, [roleCatalogQuery.error, userRoleOptionsQuery.error]);
 
-  const handleCreateUser = async (values: ManagedUserFormValues) => {
+  const handleCreateUser = async (values: CreateManagedUserFormValues) => {
     if (createManagedUserMutation.isPending) {
       return;
     }
@@ -379,6 +517,7 @@ export function UserManagementScreen() {
 
     const normalizedName = values.name.trim();
     const normalizedEmail = values.email.trim().toLowerCase();
+    const normalizedPassword = values.password.trim();
     const isDuplicateEmail = users.some((user) => user.email.trim().toLowerCase() === normalizedEmail);
 
     if (isDuplicateEmail) {
@@ -394,15 +533,20 @@ export function UserManagementScreen() {
         name: normalizedName,
         email: normalizedEmail,
         roleId: values.roleId,
+        password: normalizedPassword || undefined,
       });
       createForm.reset({
         name: "",
         email: "",
         roleId: defaultRoleId,
+        password: "",
+        confirmPassword: "",
       });
       setNotice({
         tone: "success",
-        message: `User ${normalizedName} berhasil ditambahkan.`,
+        message: normalizedPassword
+          ? `User ${normalizedName} berhasil ditambahkan dengan password awal.`
+          : `User ${normalizedName} berhasil ditambahkan tanpa password awal.`,
       });
     } catch (error: unknown) {
       setNotice({
@@ -493,6 +637,37 @@ export function UserManagementScreen() {
     }
   };
 
+  const handleSubmitManagedUserPassword = async (values: ResetManagedUserPasswordFormValues) => {
+    const targetUser = passwordTargetUser;
+    if (!targetUser || setManagedUserPasswordMutation.isPending) {
+      return;
+    }
+
+    const normalizedPassword = values.password.trim();
+
+    try {
+      const updatedUser = await setManagedUserPasswordMutation.mutateAsync({
+        userId: targetUser.id,
+        password: normalizedPassword,
+      });
+      setNotice({
+        tone: "success",
+        message: updatedUser.hasPassword
+          ? `Password untuk ${targetUser.name} berhasil ${targetUser.hasPassword ? "direset" : "diset"}.`
+          : `Password untuk ${targetUser.name} belum tersimpan.`,
+      });
+      closePasswordModal();
+    } catch (error: unknown) {
+      setNotice({
+        tone: "error",
+        message: extractErrorMessage(
+          error,
+          "Password user gagal diperbarui di backend.",
+        ),
+      });
+    }
+  };
+
   return (
     <>
       <div className="mx-auto max-w-7xl space-y-6 px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-8">
@@ -532,13 +707,15 @@ export function UserManagementScreen() {
                 <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                   Create User
                 </h2>
-                <span className="text-xs font-semibold text-on-surface-variant">
-                  Total user: {managedUsersQuery.isLoading ? "..." : users.length}
-                </span>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
+                  <span>Total user: {managedUsersQuery.isLoading ? "..." : users.length}</span>
+                  <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
+                  <span>Tanpa password: {managedUsersQuery.isLoading ? "..." : totalUsersWithoutPassword}</span>
+                </div>
               </div>
 
               <form
-                className="mt-5 grid gap-3 lg:grid-cols-[1.1fr_1.1fr_0.8fr_auto]"
+                className="mt-5 grid gap-3 2xl:grid-cols-[1.1fr_1.1fr_0.8fr_1fr_1fr_auto]"
                 onSubmit={createForm.handleSubmit((values) => void handleCreateUser(values))}
               >
                 <div className="grid gap-1">
@@ -593,9 +770,47 @@ export function UserManagementScreen() {
                     )}
                   />
                 </div>
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("password")}
+                    placeholder="Password awal (opsional)"
+                    type="password"
+                    aria-label="Password awal user baru"
+                    autoComplete="new-password"
+                  />
+                  {createForm.formState.errors.password ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.password.message}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
+                      Kosongkan bila akun dibuat tanpa password awal.
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-1">
+                  <input
+                    className="serene-input"
+                    {...createForm.register("confirmPassword")}
+                    placeholder="Konfirmasi password"
+                    type="password"
+                    aria-label="Konfirmasi password user baru"
+                    autoComplete="new-password"
+                  />
+                  {createForm.formState.errors.confirmPassword ? (
+                    <p className="text-xs font-semibold text-error">
+                      {createForm.formState.errors.confirmPassword.message}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/75">
+                      Hanya perlu diisi saat kamu menetapkan password awal.
+                    </p>
+                  )}
+                </div>
                 <button
                   type="submit"
-                  className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4"
+                  className="serene-btn-primary min-h-[44px] whitespace-nowrap px-4 2xl:self-start"
                   disabled={createManagedUserMutation.isPending || !hasActiveRoleOptions}
                 >
                   {createManagedUserMutation.isPending ? "Menyimpan..." : "Tambah User"}
@@ -605,7 +820,11 @@ export function UserManagementScreen() {
                 <p className="mt-3 text-xs font-semibold text-error">
                   Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-3 text-xs font-medium leading-relaxed text-on-surface-variant">
+                  Password hanya menandakan akun sudah diprovision. Akses dashboard tetap mengikuti role dan pembatasan backend.
+                </p>
+              )}
             </div>
 
             <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
@@ -615,9 +834,11 @@ export function UserManagementScreen() {
                 <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
                   User Directory
                 </h2>
-                <span className="text-xs font-semibold text-on-surface-variant">
-                  Super Admin aktif: {totalSuperAdmin}
-                </span>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
+                  <span>Super Admin aktif: {totalSuperAdmin}</span>
+                  <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
+                  <span>Belum ada password: {totalUsersWithoutPassword}</span>
+                </div>
               </div>
 
               <div className="mt-5 rounded-2xl border border-outline-variant/35 bg-surface-container-low">
@@ -652,6 +873,13 @@ export function UserManagementScreen() {
                             >
                               {selectedRole?.label ?? "Role"}
                             </span>
+                            <span
+                              className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${resolvePasswordToneClass(
+                                user.hasPassword,
+                              )}`}
+                            >
+                              {user.hasPassword ? "Password Ready" : "No Password"}
+                            </span>
                           </div>
 
                           {selectedRole ? (
@@ -662,6 +890,16 @@ export function UserManagementScreen() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                          <button
+                            type="button"
+                            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                            onClick={() => openPasswordModal(user)}
+                          >
+                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                              password
+                            </span>
+                            {user.hasPassword ? "Reset Password" : "Set Password"}
+                          </button>
                           <button
                             type="button"
                             className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
@@ -856,6 +1094,112 @@ export function UserManagementScreen() {
                     disabled={updateManagedUserMutation.isPending || !hasActiveRoleOptions}
                   >
                     {updateManagedUserMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </UserManagementModalPortal>
+      ) : null}
+
+      {passwordTargetUser ? (
+        <UserManagementModalPortal>
+          <div
+            className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
+            onClick={closePasswordModal}
+            aria-hidden="true"
+          >
+            <section
+              className="serene-modal-shell w-full max-w-lg p-5 sm:p-6"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${passwordTargetUser.hasPassword ? "Reset" : "Set"} password ${passwordTargetUser.name}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-secondary-container text-on-secondary-container">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  password
+                </span>
+              </div>
+
+              <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">
+                {passwordTargetUser.hasPassword ? "Reset Password" : "Set Password"}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                {passwordTargetUser.hasPassword
+                  ? `Masukkan password baru untuk ${passwordTargetUser.name}.`
+                  : `Buat password awal untuk ${passwordTargetUser.name} agar akun ini siap dipakai.`}
+              </p>
+
+              <div className="mt-4 rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3 text-xs font-medium leading-relaxed text-on-surface-variant">
+                <p className="font-semibold text-on-surface">{passwordTargetUser.email}</p>
+                <p className="mt-1">
+                  Status saat ini: {passwordTargetUser.hasPassword ? "sudah punya password" : "belum punya password"}.
+                </p>
+              </div>
+
+              <form
+                className="mt-5 grid gap-3"
+                onSubmit={passwordForm.handleSubmit((values) => void handleSubmitManagedUserPassword(values))}
+              >
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-on-surface-variant" htmlFor="managed-user-password">
+                    Password Baru
+                  </label>
+                  <input
+                    id="managed-user-password"
+                    className="serene-input"
+                    {...passwordForm.register("password")}
+                    type="password"
+                    placeholder="Minimal 8 karakter"
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                  {passwordForm.formState.errors.password ? (
+                    <p className="text-xs font-semibold text-error">
+                      {passwordForm.formState.errors.password.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-semibold text-on-surface-variant" htmlFor="managed-user-password-confirm">
+                    Konfirmasi Password
+                  </label>
+                  <input
+                    id="managed-user-password-confirm"
+                    className="serene-input"
+                    {...passwordForm.register("confirmPassword")}
+                    type="password"
+                    placeholder="Ulangi password yang sama"
+                    autoComplete="new-password"
+                  />
+                  {passwordForm.formState.errors.confirmPassword ? (
+                    <p className="text-xs font-semibold text-error">
+                      {passwordForm.formState.errors.confirmPassword.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    className="serene-btn-secondary"
+                    onClick={closePasswordModal}
+                    disabled={setManagedUserPasswordMutation.isPending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="serene-btn-primary"
+                    disabled={setManagedUserPasswordMutation.isPending}
+                  >
+                    {setManagedUserPasswordMutation.isPending
+                      ? "Menyimpan..."
+                      : passwordTargetUser.hasPassword
+                        ? "Reset Password"
+                        : "Simpan Password"}
                   </button>
                 </div>
               </form>

@@ -3,8 +3,10 @@ import {
   createManagedUserInBackend,
   deleteManagedUserInBackend,
   fetchManagedUsersFromBackend,
+  setManagedUserPasswordInBackend,
   updateManagedUserInBackend,
   type BackendManagedUser,
+  type CreateManagedUserPayload,
   type UpdateManagedUserPayload,
 } from "./use-user-management-backend";
 import { userManagementQueryKeys } from "../shared/query-keys";
@@ -23,7 +25,7 @@ export function useCreateManagedUserMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: UpdateManagedUserPayload) => createManagedUserInBackend(payload),
+    mutationFn: (payload: CreateManagedUserPayload) => createManagedUserInBackend(payload),
     retry: false,
     onSuccess: (createdUser) => {
       queryClient.setQueryData<BackendManagedUser[]>(
@@ -66,6 +68,28 @@ export function useDeleteManagedUserMutation() {
       queryClient.setQueryData<BackendManagedUser[]>(
         userManagementQueryKeys.users,
         (currentUsers = []) => currentUsers.filter((user) => user.id !== userId),
+      );
+    },
+  });
+}
+
+export function useSetManagedUserPasswordMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      userId,
+      password,
+    }: {
+      userId: string;
+      password: string;
+    }) => setManagedUserPasswordInBackend(userId, password),
+    retry: false,
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData<BackendManagedUser[]>(
+        userManagementQueryKeys.users,
+        (currentUsers = []) =>
+          currentUsers.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
       );
     },
   });
