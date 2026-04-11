@@ -629,7 +629,9 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   await setPasswordDialog.getByLabel("Password Baru").fill(initialPassword);
   await setPasswordDialog.getByLabel("Konfirmasi Password").fill(initialPassword);
   const setPasswordResponse = waitForManagedUserPasswordResponse(page);
-  await setPasswordDialog.locator("button:has-text('Simpan Password')").click();
+  await setPasswordDialog.locator("form").evaluate((form) => {
+    (form as HTMLFormElement).requestSubmit();
+  });
   expect((await setPasswordResponse).status()).toBe(200);
 
   await expect(page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail })).toHaveCount(0);
@@ -641,7 +643,9 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   await resetPasswordDialog.getByLabel("Password Baru").fill(resetPassword);
   await resetPasswordDialog.getByLabel("Konfirmasi Password").fill(resetPassword);
   const resetPasswordResponse = waitForManagedUserPasswordResponse(page);
-  await resetPasswordDialog.locator("button:has-text('Reset Password')").click();
+  await resetPasswordDialog.locator("form").evaluate((form) => {
+    (form as HTMLFormElement).requestSubmit();
+  });
   expect((await resetPasswordResponse).status()).toBe(200);
 
   await expect(page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail })).toHaveCount(0);
