@@ -340,6 +340,22 @@ async function logoutViaUi(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Login to Dashboard" })).toBeVisible();
 }
 
+function isManagedUserPasswordPath(url: string): boolean {
+  try {
+    return /\/api\/auth\/users\/[^/]+\/password$/.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+async function waitForManagedUserPasswordResponse(page: Page): Promise<void> {
+  await page.waitForResponse((response) => (
+    response.request().method() === "PUT" &&
+    response.status() === 200 &&
+    isManagedUserPasswordPath(response.url())
+  ));
+}
+
 type OverlayRectSnapshot = {
   top: number;
   left: number;
@@ -611,9 +627,11 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   await expect(setPasswordDialog).toBeVisible();
   await setPasswordDialog.getByLabel("Password Baru").fill(initialPassword);
   await setPasswordDialog.getByLabel("Konfirmasi Password").fill(initialPassword);
+  const setPasswordResponse = waitForManagedUserPasswordResponse(page);
   await setPasswordDialog.locator("button:has-text('Simpan Password')").click();
+  await setPasswordResponse;
 
-  await expect(setPasswordDialog).toBeHidden();
+  await expect(page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail })).toHaveCount(0);
   await expect(managedUserCard.getByText("Password Ready")).toBeVisible();
 
   await managedUserCard.getByRole("button", { name: "Reset Password" }).click();
@@ -621,9 +639,11 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   await expect(resetPasswordDialog).toBeVisible();
   await resetPasswordDialog.getByLabel("Password Baru").fill(resetPassword);
   await resetPasswordDialog.getByLabel("Konfirmasi Password").fill(resetPassword);
+  const resetPasswordResponse = waitForManagedUserPasswordResponse(page);
   await resetPasswordDialog.locator("button:has-text('Reset Password')").click();
+  await resetPasswordResponse;
 
-  await expect(resetPasswordDialog).toBeHidden();
+  await expect(page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail })).toHaveCount(0);
 
   await logoutViaUi(page);
 
