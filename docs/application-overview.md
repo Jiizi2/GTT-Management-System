@@ -95,4 +95,4 @@ Suite yang tersedia:
 - API e2e backend.
 - UI e2e frontend (Playwright) dengan backend yang dijalankan saat test.
 
-Pipeline CI di repo juga menggabungkan check + test + build sesuai release flow.
+Semua check + test + build saat ini dijalankan manual dari lokal sesuai release flow.
