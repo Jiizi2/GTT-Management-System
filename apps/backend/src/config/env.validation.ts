@@ -19,6 +19,7 @@ const ENVIRONMENT_SCHEMA = Joi.object({
     .trim()
     .valid("trace", "debug", "info", "warn", "error", "fatal", "silent")
     .optional(),
+  HTTP_LOG_SUCCESS: Joi.boolean().truthy("true").falsy("false").optional(),
   AUTH_COOKIE_DOMAIN: Joi.string().trim().pattern(COOKIE_DOMAIN_PATTERN).allow("").optional(),
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1_000).default(60_000),
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
@@ -26,6 +27,11 @@ const ENVIRONMENT_SCHEMA = Joi.object({
   THROTTLE_DEFAULT_TTL_MS: Joi.number().integer().min(1_000).default(60_000),
   THROTTLE_DEFAULT_LIMIT: Joi.number().integer().min(1).default(120),
   THROTTLE_DEFAULT_BLOCK_MS: Joi.number().integer().min(1_000).default(60_000),
+  RUNTIME_RETENTION_ENABLED: Joi.boolean().truthy("true").falsy("false").default(true),
+  RUNTIME_RETENTION_INTERVAL_MS: Joi.number().integer().min(60_000).default(3_600_000),
+  GROUP_AUDIT_LOG_RETENTION_DAYS: Joi.number().integer().min(1).default(180),
+  AUTH_LOGIN_RATE_LIMIT_RETENTION_DAYS: Joi.number().integer().min(1).default(14),
+  APP_THROTTLE_BUCKET_RETENTION_DAYS: Joi.number().integer().min(1).default(14),
   DEV_AUTH_SUPERADMIN_PASSWORD: Joi.string().allow("").optional(),
   DEV_AUTH_ADMIN_PASSWORD: Joi.string().allow("").optional(),
 }).unknown(true);
@@ -40,6 +46,7 @@ type ValidatedEnvironment = {
   CORS_ORIGINS?: string;
   TRUST_PROXY?: boolean;
   LOG_LEVEL?: string;
+  HTTP_LOG_SUCCESS?: boolean;
   AUTH_COOKIE_DOMAIN?: string;
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: number;
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: number;
@@ -47,6 +54,11 @@ type ValidatedEnvironment = {
   THROTTLE_DEFAULT_TTL_MS: number;
   THROTTLE_DEFAULT_LIMIT: number;
   THROTTLE_DEFAULT_BLOCK_MS: number;
+  RUNTIME_RETENTION_ENABLED: boolean;
+  RUNTIME_RETENTION_INTERVAL_MS: number;
+  GROUP_AUDIT_LOG_RETENTION_DAYS: number;
+  AUTH_LOGIN_RATE_LIMIT_RETENTION_DAYS: number;
+  APP_THROTTLE_BUCKET_RETENTION_DAYS: number;
   DEV_AUTH_SUPERADMIN_PASSWORD?: string;
   DEV_AUTH_ADMIN_PASSWORD?: string;
 };

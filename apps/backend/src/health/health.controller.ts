@@ -1,10 +1,12 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiServiceUnavailableResponse, ApiTags } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import { resolveConfiguredDataSource } from "../config/app-config";
 import { Public } from "../auth/auth.public";
+import { ApiErrorResponseDto } from "../http/api-error-response.dto";
 import { PrismaService } from "../prisma/prisma.service";
+import { HealthResponseDto } from "./dto/health-response.dto";
 
 const HEALTH_CHECK_TIMEOUT_MS = 1_500;
 
@@ -37,6 +39,18 @@ export class HealthController {
   @Public()
   @SkipThrottle()
   @Get()
+  @ApiOperation({
+    summary: "Health check backend",
+    description: "Mengembalikan status backend dan status koneksi database saat DATA_SOURCE=prisma.",
+  })
+  @ApiOkResponse({
+    description: "Backend sehat dan siap menerima request.",
+    type: HealthResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description: "Backend hidup tetapi database tidak merespons.",
+    type: ApiErrorResponseDto,
+  })
   async check() {
     const dataSource = resolveConfiguredDataSource(this.configService);
     const timestamp = new Date().toISOString();

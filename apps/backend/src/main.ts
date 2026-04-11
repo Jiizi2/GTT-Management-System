@@ -6,8 +6,8 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { Logger, PinoLogger } from "nestjs-pino";
 import { AUTH_COOKIE_NAME } from "./auth/auth-cookie";
-import type { RuntimeDataSource } from "./runtime-config";
 import { AppModule } from "./app.module";
+import { ApiExceptionFilter } from "./http/api-exception.filter";
 import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
 import { resolveStartupErrorMessage } from "./runtime-config";
 
@@ -16,19 +16,38 @@ type HeaderResponse = {
   setHeader: (name: string, value: string) => void;
 };
 type NextHandler = () => void;
+type StartupSummary = {
+  port: number;
+  docsUrl: string;
+  dataSource: string;
+};
+
+const VISIBLE_INFO_LOG_LEVELS = new Set(["trace", "debug", "info"]);
+
+function resolveApplicationLogLevel(configService: ConfigService): string {
+  const nodeEnv = (configService.get<string>("NODE_ENV") ?? "development").toLowerCase();
+  return (
+    configService.get<string>("LOG_LEVEL") ??
+    (nodeEnv === "production" ? "info" : "warn")
+  ).toLowerCase();
+}
+
+function printStartupSummary(summary: StartupSummary): void {
+  console.info(
+    `[backend] listening on http://localhost:${summary.port}/api | docs: ${summary.docsUrl} | data source: ${summary.dataSource}`,
+  );
+}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
   app.useLogger(app.get(Logger));
-  const bootstrapLogger = app.get(PinoLogger);
+  const bootstrapLogger = await app.resolve(PinoLogger);
   bootstrapLogger.setContext("Bootstrap");
   const configService = app.get(ConfigService);
   const port = configService.getOrThrow<number>("PORT");
-  const dataSource = configService.getOrThrow<RuntimeDataSource>("DATA_SOURCE");
   const corsOrigins = resolveCorsOrigins(configService.get<string>("CORS_ORIGINS"));
-  const corsSummary = `${corsOrigins.length} origins`;
 
   app.use(
     helmet({
@@ -78,6 +97,7 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
     }),
   );
+  app.useGlobalFilters(new ApiExceptionFilter());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle("GTT Backend API")
@@ -114,15 +134,18 @@ async function bootstrap(): Promise<void> {
   });
 
   await app.listen(port);
+  const startupSummary: StartupSummary = {
+    port,
+    docsUrl: `http://localhost:${port}/api/docs`,
+    dataSource: configService.get<string>("DATA_SOURCE") ?? "memory",
+  };
   bootstrapLogger.info(
-    {
-      dataSource,
-      corsOrigins: corsSummary,
-      apiUrl: `http://localhost:${port}/api`,
-      docsUrl: `http://localhost:${port}/api/docs`,
-    },
-    "Backend API ready",
+    startupSummary,
+    "Backend server is ready.",
   );
+  if (!VISIBLE_INFO_LOG_LEVELS.has(resolveApplicationLogLevel(configService))) {
+    printStartupSummary(startupSummary);
+  }
 }
 
 bootstrap().catch((error: unknown) => {
