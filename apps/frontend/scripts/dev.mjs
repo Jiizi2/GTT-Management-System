@@ -1,10 +1,13 @@
 import * as esbuild from "esbuild";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { watch } from "node:fs";
 import { copyFile, mkdir, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeRuntimeConfigFile } from "./runtime-config.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +20,7 @@ const tailwindCliFile = path.join(appDir, "..", "..", "node_modules", "tailwindc
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? "4173");
 const displayHost = host === "127.0.0.1" ? "localhost" : host;
+const backendProxyOrigin = process.env.GTT_DEV_BACKEND_ORIGIN?.trim() || "http://127.0.0.1:3001";
 let shuttingDown = false;
 let httpServer = null;
 
@@ -64,9 +68,55 @@ function normalizeRequestPath(rawUrl) {
   return decodedPath === "/" ? "/index.html" : decodedPath;
 }
 
+function isApiRequestPath(pathname) {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+async function proxyApiRequest(request, response) {
+  const targetUrl = new URL(request.url ?? "/", backendProxyOrigin);
+  const proxyRequest = (targetUrl.protocol === "https:" ? httpsRequest : httpRequest)(targetUrl, {
+    method: request.method,
+    headers: {
+      ...request.headers,
+      host: targetUrl.host,
+    },
+  });
+
+  proxyRequest.on("response", (proxyResponse) => {
+    response.statusCode = proxyResponse.statusCode ?? 502;
+    for (const [headerName, headerValue] of Object.entries(proxyResponse.headers)) {
+      if (headerValue === undefined) {
+        continue;
+      }
+
+      response.setHeader(headerName, headerValue);
+    }
+
+    proxyResponse.pipe(response);
+  });
+
+  proxyRequest.on("error", (error) => {
+    response.statusCode = 502;
+    response.setHeader("content-type", "application/json; charset=utf-8");
+    response.end(
+      JSON.stringify({
+        message: `Failed to reach backend at ${backendProxyOrigin}: ${error.message}`,
+      }),
+    );
+  });
+
+  request.pipe(proxyRequest);
+}
+
 async function startSpaServer() {
   const server = createServer(async (request, response) => {
     const normalizedPath = normalizeRequestPath(request.url);
+
+    if (isApiRequestPath(normalizedPath)) {
+      await proxyApiRequest(request, response);
+      return;
+    }
+
     const relativePath = normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
     const requestedPath = path.resolve(distDir, `.${relativePath}`);
 
@@ -149,6 +199,7 @@ const ctx = await esbuild.context({
 });
 
 await ensurePublicFiles();
+await writeRuntimeConfigFile(distDir);
 const tailwindWatcher = spawn(
   process.execPath,
   [tailwindCliFile, "-c", "tailwind.config.cjs", "-i", "src/styles.css", "-o", "dist/index.css", "--watch"],
@@ -177,6 +228,7 @@ const publicWatcher = watch(publicDir, { recursive: true }, async () => {
 });
 
 console.log(`Frontend dev server running at http://${displayHost}:${port}`);
+console.log(`Proxying /api requests to ${backendProxyOrigin}`);
 console.log("Watching src, CSS, and public/ assets for changes. Press Ctrl+C to stop.");
 
 async function shutdown() {
