@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { AgreementApprovalStatus, AgreementCity } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
-import { GroupsService } from "../groups.service";
+import { GroupsService } from "../application/groups.service";
 
 function createPrismaService(prismaMock: PrismaService): { service: GroupsService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;

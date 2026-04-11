@@ -10,7 +10,10 @@ import {
   VisaStatus,
 } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
-import { buildGroupCreateData, buildGroupReplaceData } from "../groups.prisma-write-builders";
+import {
+  buildGroupCreateData,
+  buildGroupReplaceData,
+} from "../infrastructure/groups.prisma-write-builders";
 
 function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto {
   return {

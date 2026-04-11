@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../../config/app-config";
+import { createStructuredLogger } from "../../logging/create-structured-logger";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
 import type { CreateGroupDto } from "../dto/create-group.dto";
@@ -30,6 +31,7 @@ export class GroupsService {
   private readonly dataSource: "memory" | "prisma";
   private readonly memoryGroups: MemoryGroupRecord[] = createDefaultMemoryGroups();
   private readonly auditLogs: MemoryAuditLog[] = [];
+  private readonly logger = createStructuredLogger(GroupsService.name);
   private readonly queryService: GroupsQueryService;
   private readonly commandService: GroupsCommandService;
 
@@ -64,6 +66,10 @@ export class GroupsService {
       code: payload.code.trim().toUpperCase(),
       name: payload.name.trim(),
     });
+    this.logMutation("group.created", created, {
+      packageName: payload.packageName.trim(),
+      pax: payload.pax,
+    });
     return created;
   }
 
@@ -72,6 +78,10 @@ export class GroupsService {
     await this.writeAuditLog("group.replaced", "group", replaced, {
       idOrCode,
       code: payload.code.trim().toUpperCase(),
+    });
+    this.logMutation("group.replaced", replaced, {
+      idOrCode,
+      packageName: payload.packageName.trim(),
     });
     return replaced;
   }
@@ -82,6 +92,10 @@ export class GroupsService {
       idOrCode,
       updatedFields: Object.keys(payload),
     });
+    this.logMutation("group.updated", updated, {
+      idOrCode,
+      updatedFields: Object.keys(payload),
+    });
     return updated;
   }
 
@@ -89,6 +103,9 @@ export class GroupsService {
     const existing = await this.queryService.findOneByIdOrCode(idOrCode);
     await this.commandService.remove(idOrCode);
     await this.writeAuditLog("group.deleted", "group", existing, {
+      idOrCode,
+    });
+    this.logMutation("group.deleted", existing, {
       idOrCode,
     });
   }
@@ -102,6 +119,10 @@ export class GroupsService {
     await this.writeAuditLog("itinerary.added", "itinerary", updated, {
       idOrCode,
       title: payload.title?.trim() || undefined,
+      category: payload.category.trim(),
+    });
+    this.logMutation("itinerary.added", updated, {
+      idOrCode,
       category: payload.category.trim(),
     });
     return updated;
@@ -118,12 +139,21 @@ export class GroupsService {
       itemId,
       title: payload.title?.trim() || undefined,
     });
+    this.logMutation("itinerary.updated", updated, {
+      idOrCode,
+      itemId,
+      category: payload.category.trim(),
+    });
     return updated;
   }
 
   async removeItineraryItem(idOrCode: string, itemId: string): Promise<unknown> {
     const updated = await this.commandService.removeItineraryItem(idOrCode, itemId);
     await this.writeAuditLog("itinerary.deleted", "itinerary", updated, {
+      idOrCode,
+      itemId,
+    });
+    this.logMutation("itinerary.deleted", updated, {
       idOrCode,
       itemId,
     });
@@ -136,6 +166,10 @@ export class GroupsService {
       idOrCode,
       city: payload.city,
       agreementNumber: payload.agreementNumber.trim(),
+    });
+    this.logMutation("visa.hotel.added", updated, {
+      idOrCode,
+      city: payload.city,
     });
     return updated;
   }
@@ -152,12 +186,21 @@ export class GroupsService {
       city: payload.city,
       agreementNumber: payload.agreementNumber.trim(),
     });
+    this.logMutation("visa.hotel.updated", updated, {
+      idOrCode,
+      hotelId,
+      city: payload.city,
+    });
     return updated;
   }
 
   async removeVisaHotelAgreement(idOrCode: string, hotelId: string): Promise<unknown> {
     const updated = await this.commandService.removeVisaHotelAgreement(idOrCode, hotelId);
     await this.writeAuditLog("visa.hotel.deleted", "visaHotelAgreement", updated, {
+      idOrCode,
+      hotelId,
+    });
+    this.logMutation("visa.hotel.deleted", updated, {
       idOrCode,
       hotelId,
     });
@@ -175,6 +218,11 @@ export class GroupsService {
       status: payload.status,
       tasrehPrinted: payload.tasrehPrinted ?? false,
     });
+    this.logMutation("visa.raudhah.upserted", updated, {
+      idOrCode,
+      date: payload.date,
+      status: payload.status ?? "FREE",
+    });
     return updated;
   }
 
@@ -191,6 +239,12 @@ export class GroupsService {
       scheduledTime: confirmed.scheduledTime,
       slotCount: confirmed.drivers.length,
     });
+    this.logMutation("checklist.driver.confirmed", confirmed, {
+      idOrCode,
+      assignmentId: confirmed.id,
+      slotCount: confirmed.drivers.length,
+      requiredBusCount: confirmed.requiredBusCount,
+    });
     return confirmed;
   }
 
@@ -206,7 +260,29 @@ export class GroupsService {
       activity: payload.activity?.trim(),
       scheduledTime: resetResult.scheduledTime,
     });
+    this.logMutation("checklist.driver.reset", resetResult, {
+      idOrCode,
+      assignmentId: resetResult.id,
+      scheduledTime: resetResult.scheduledTime,
+    });
     return resetResult;
+  }
+
+  private logMutation(
+    action: string,
+    group: unknown,
+    details: Record<string, unknown>,
+  ): void {
+    this.logger.info(
+      {
+        action,
+        dataSource: this.dataSource,
+        groupCode: extractGroupCode(group),
+        groupId: extractGroupId(group),
+        ...details,
+      },
+      "Groups mutation completed.",
+    );
   }
 
   private async writeAuditLog(
