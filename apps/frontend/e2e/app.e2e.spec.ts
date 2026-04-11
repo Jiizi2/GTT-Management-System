@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Response } from "@playwright/test";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { access, readFile } from "node:fs/promises";
@@ -348,12 +348,13 @@ function isManagedUserPasswordPath(url: string): boolean {
   }
 }
 
-async function waitForManagedUserPasswordResponse(page: Page): Promise<void> {
-  await page.waitForResponse((response) => (
+async function waitForManagedUserPasswordResponse(page: Page): Promise<Response> {
+  return page.waitForResponse((response) => (
     response.request().method() === "PUT" &&
-    response.status() === 200 &&
     isManagedUserPasswordPath(response.url())
-  ));
+  ), {
+    timeout: 30_000,
+  });
 }
 
 type OverlayRectSnapshot = {
@@ -629,7 +630,7 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   await setPasswordDialog.getByLabel("Konfirmasi Password").fill(initialPassword);
   const setPasswordResponse = waitForManagedUserPasswordResponse(page);
   await setPasswordDialog.locator("button:has-text('Simpan Password')").click();
-  await setPasswordResponse;
+  expect((await setPasswordResponse).status()).toBe(200);
 
   await expect(page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail })).toHaveCount(0);
   await expect(managedUserCard.getByText("Password Ready")).toBeVisible();
@@ -641,7 +642,7 @@ test("super-admin provisions managed user passwords and admin stays restricted f
   await resetPasswordDialog.getByLabel("Konfirmasi Password").fill(resetPassword);
   const resetPasswordResponse = waitForManagedUserPasswordResponse(page);
   await resetPasswordDialog.locator("button:has-text('Reset Password')").click();
-  await resetPasswordResponse;
+  expect((await resetPasswordResponse).status()).toBe(200);
 
   await expect(page.locator(".serene-modal-shell").filter({ hasText: managedUserEmail })).toHaveCount(0);
 
