@@ -4,9 +4,9 @@ import {
   ConflictException,
   NotFoundException,
 } from "@nestjs/common";
-import type { PrismaService } from "../prisma/prisma.service";
-import type { CreateGroupDto } from "./dto/create-group.dto";
-import { GroupsService } from "./groups.service";
+import type { PrismaService } from "../../prisma/prisma.service";
+import type { CreateGroupDto } from "../dto/create-group.dto";
+import { GroupsService } from "../groups.service";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {
   const previous = process.env.DATA_SOURCE;
@@ -256,17 +256,17 @@ async function testAuditLogFilteringAndPaginationBounds(): Promise<void> {
       },
     });
 
-    const limitedLogs = service.listAuditLogs(undefined, 2);
+    const limitedLogs = await service.listAuditLogs(undefined, 2);
     assert.equal(limitedLogs.length, 2);
 
-    const groupLogs = service.listAuditLogs("edge-901");
+    const groupLogs = await service.listAuditLogs("edge-901");
     assert.equal(groupLogs.length >= 3, true);
     assert.equal(groupLogs.every((entry) => entry.groupCode === "EDGE-901"), true);
 
-    const unknownLogs = service.listAuditLogs("EDGE-UNKNOWN");
+    const unknownLogs = await service.listAuditLogs("EDGE-UNKNOWN");
     assert.equal(unknownLogs.length, 0);
 
-    const noLimitWhenInvalid = service.listAuditLogs("EDGE-901", -1);
+    const noLimitWhenInvalid = await service.listAuditLogs("EDGE-901", -1);
     assert.equal(noLimitWhenInvalid.length, groupLogs.length);
 
     await service.create(

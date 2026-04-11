@@ -13,6 +13,7 @@ import type {
   AgreementApprovalStatus,
   GroupAgreementHotel,
   GroupData,
+  NavId,
   GroupRaudhahAppointment,
   GroupVisaSetup,
   VisaHotelEditFormState,
@@ -30,10 +31,12 @@ import {
   getVisaAgreementValidationError,
   replaceGroupInBackend,
   sortHotelsByStayStart,
+  type GroupFetchProjection,
 } from "../use-app-controller-backend";
 import type { OverviewStatCard, SyncFeedback } from "./types";
 
 type UseDashboardGroupRecordsOptions = {
+  activeNav: NavId;
   query: string;
   isActiveOnly: boolean;
   selectedGroupCode: string | null;
@@ -104,7 +107,54 @@ function formatPeakTripDayLabel(isoDate: string): string {
   });
 }
 
+function routeUsesGroupRecords({
+  activeNav,
+  selectedGroupCode,
+  selectedVisaGroupCode,
+}: {
+  activeNav: NavId;
+  selectedGroupCode: string | null;
+  selectedVisaGroupCode: string | null;
+}): boolean {
+  if (selectedGroupCode || selectedVisaGroupCode) {
+    return true;
+  }
+
+  return (
+    activeNav === "overview" ||
+    activeNav === "new-group" ||
+    activeNav === "checklist" ||
+    activeNav === "visa" ||
+    activeNav === "invoice" ||
+    activeNav === "raudhah-reminder"
+  );
+}
+
+function resolveRequestedGroupProjection({
+  activeNav,
+  selectedGroupCode,
+  selectedVisaGroupCode,
+}: {
+  activeNav: NavId;
+  selectedGroupCode: string | null;
+  selectedVisaGroupCode: string | null;
+}): GroupFetchProjection {
+  if (
+    selectedGroupCode ||
+    selectedVisaGroupCode ||
+    activeNav === "checklist" ||
+    activeNav === "visa" ||
+    activeNav === "invoice" ||
+    activeNav === "raudhah-reminder"
+  ) {
+    return "detail";
+  }
+
+  return "summary";
+}
+
 export function useDashboardGroupRecords({
+  activeNav,
   query,
   isActiveOnly,
   selectedGroupCode,
@@ -117,14 +167,27 @@ export function useDashboardGroupRecords({
 }: UseDashboardGroupRecordsOptions) {
   const queryClient = useQueryClient();
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
+  const [groupRecordsProjection, setGroupRecordsProjection] =
+    useState<GroupFetchProjection>("detail");
   const deferredQuery = useDeferredValue(query);
   const normalizedQuery = deferredQuery.trim().toLowerCase();
   const groupRecordsRef = useRef(groupRecords);
   const handledGroupsQueryErrorRef = useRef(0);
   const handledSearchQueryErrorRef = useRef(0);
+  const usesGroupRecords = routeUsesGroupRecords({
+    activeNav,
+    selectedGroupCode,
+    selectedVisaGroupCode,
+  });
+  const requestedProjection = resolveRequestedGroupProjection({
+    activeNav,
+    selectedGroupCode,
+    selectedVisaGroupCode,
+  });
+  const shouldUseRemoteSearch = usesGroupRecords && requestedProjection === "summary";
 
-  const groupsQuery = useGroupsQuery();
-  const searchQuery = useGroupsSearchQuery(normalizedQuery);
+  const groupsQuery = useGroupsQuery(requestedProjection, usesGroupRecords);
+  const searchQuery = useGroupsSearchQuery(normalizedQuery, "summary", shouldUseRemoteSearch);
   const createGroupMutation = useMutation({
     mutationFn: (group: GroupData) => createGroupInBackend(group),
     retry: false,
@@ -140,9 +203,10 @@ export function useDashboardGroupRecords({
   });
 
   const syncGroupRecords = useCallback(
-    (nextGroupRecords: GroupData[]) => {
+    (nextGroupRecords: GroupData[], projection: GroupFetchProjection) => {
       setGroupRecords(nextGroupRecords);
-      queryClient.setQueryData(groupQueryKeys.list, nextGroupRecords);
+      setGroupRecordsProjection(projection);
+      queryClient.setQueryData(groupQueryKeys.list(projection), nextGroupRecords);
     },
     [queryClient],
   );
@@ -151,12 +215,12 @@ export function useDashboardGroupRecords({
     (updater: (current: GroupData[]) => GroupData[]) => {
       setGroupRecords((current) => {
         const next = updater(current);
-        queryClient.setQueryData(groupQueryKeys.list, next);
+        queryClient.setQueryData(groupQueryKeys.list(requestedProjection), next);
         return next;
       });
       void queryClient.invalidateQueries({ queryKey: groupQueryKeys.searchRoot });
     },
-    [queryClient],
+    [queryClient, requestedProjection],
   );
 
   useEffect(() => {
@@ -168,10 +232,14 @@ export function useDashboardGroupRecords({
       return;
     }
 
-    syncGroupRecords(groupsQuery.data);
-  }, [groupsQuery.data, syncGroupRecords]);
+    syncGroupRecords(groupsQuery.data, requestedProjection);
+  }, [groupsQuery.data, requestedProjection, syncGroupRecords]);
 
   useEffect(() => {
+    if (!usesGroupRecords) {
+      return;
+    }
+
     if (
       !groupsQuery.isError ||
       groupsQuery.errorUpdatedAt === 0 ||
@@ -191,7 +259,7 @@ export function useDashboardGroupRecords({
       return;
     }
 
-    syncGroupRecords([]);
+    syncGroupRecords([], requestedProjection);
     showSyncFeedback(
       "error",
       "Backend tidak terhubung. Data tidak bisa dimuat dari database.",
@@ -201,11 +269,17 @@ export function useDashboardGroupRecords({
     groupsQuery.error,
     groupsQuery.errorUpdatedAt,
     groupsQuery.isError,
+    requestedProjection,
     showSyncFeedback,
     syncGroupRecords,
+    usesGroupRecords,
   ]);
 
   useEffect(() => {
+    if (!shouldUseRemoteSearch) {
+      return;
+    }
+
     if (
       !searchQuery.isError ||
       searchQuery.errorUpdatedAt === 0 ||
@@ -222,17 +296,25 @@ export function useDashboardGroupRecords({
         searchQuery.error,
       );
     }
-  }, [allowLocalFallback, searchQuery.error, searchQuery.errorUpdatedAt, searchQuery.isError]);
+  }, [
+    allowLocalFallback,
+    searchQuery.error,
+    searchQuery.errorUpdatedAt,
+    searchQuery.isError,
+    shouldUseRemoteSearch,
+  ]);
 
   const syncGroupsFromBackendOrClear = useCallback(async () => {
     try {
-      const backendGroups = await fetchGroupsFromBackend();
-      syncGroupRecords(backendGroups);
+      const backendGroups = await fetchGroupsFromBackend({
+        projection: requestedProjection,
+      });
+      syncGroupRecords(backendGroups, requestedProjection);
     } catch (error: unknown) {
-      syncGroupRecords([]);
+      syncGroupRecords([], requestedProjection);
       console.warn("Failed to restore group state from backend.", error);
     }
-  }, [syncGroupRecords]);
+  }, [requestedProjection, syncGroupRecords]);
 
   const runBackendSync = useCallback(
     ({
@@ -248,8 +330,7 @@ export function useDashboardGroupRecords({
     }) => {
       void task
         .then(() => {
-          void queryClient.invalidateQueries({ queryKey: groupQueryKeys.list });
-          void queryClient.invalidateQueries({ queryKey: groupQueryKeys.searchRoot });
+          void queryClient.invalidateQueries({ queryKey: groupQueryKeys.all });
           if (showSuccess) {
             showSyncFeedback("success", successMessage);
           }
@@ -268,26 +349,30 @@ export function useDashboardGroupRecords({
     [allowLocalFallback, queryClient, showSyncFeedback, syncGroupsFromBackendOrClear],
   );
 
-  const remoteSearchMatches = normalizedQuery ? (searchQuery.data ?? null) : null;
+  const isWaitingForDetailedRecords =
+    usesGroupRecords && requestedProjection === "detail" && groupRecordsProjection !== "detail";
+  const visibleGroupRecords = isWaitingForDetailedRecords ? [] : groupRecords;
+  const remoteSearchMatches =
+    normalizedQuery && shouldUseRemoteSearch ? (searchQuery.data ?? null) : null;
 
   const groupRecordsByCode = useMemo(
     () =>
       new Map(
-        groupRecords.map((group) => [
+        visibleGroupRecords.map((group) => [
           group.code.toUpperCase(),
           group,
         ]),
       ),
-    [groupRecords],
+    [visibleGroupRecords],
   );
 
   const filteredGroups = useMemo(() => {
     const sourceGroups = normalizedQuery
-      ? (remoteSearchMatches ?? groupRecords).map((group) => {
+      ? (remoteSearchMatches ?? visibleGroupRecords).map((group) => {
           const localVersion = groupRecordsByCode.get(group.code.toUpperCase());
           return localVersion ?? group;
         })
-      : groupRecords;
+      : visibleGroupRecords;
 
     return sourceGroups.filter((group) => {
       if (isActiveOnly && group.tone !== "active") {
@@ -302,9 +387,12 @@ export function useDashboardGroupRecords({
         value.toLowerCase().includes(normalizedQuery),
       );
     });
-  }, [groupRecords, groupRecordsByCode, isActiveOnly, normalizedQuery, remoteSearchMatches]);
+  }, [groupRecordsByCode, isActiveOnly, normalizedQuery, remoteSearchMatches, visibleGroupRecords]);
 
-  const visaTrackingRows = useMemo(() => buildVisaTrackingRowsFromGroups(groupRecords), [groupRecords]);
+  const visaTrackingRows = useMemo(
+    () => buildVisaTrackingRowsFromGroups(visibleGroupRecords),
+    [visibleGroupRecords],
+  );
 
   const selectedVisaRow = useMemo(() => {
     if (!selectedVisaGroupCode) {
@@ -321,17 +409,17 @@ export function useDashboardGroupRecords({
   const selectedGroup = useMemo(
     () =>
       selectedGroupCode
-        ? groupRecords.find(
+        ? visibleGroupRecords.find(
             (group) => group.code.trim().toUpperCase() === selectedGroupCode.trim().toUpperCase(),
           ) ?? null
         : null,
-    [groupRecords, selectedGroupCode],
+    [selectedGroupCode, visibleGroupRecords],
   );
 
   const { weekStartIso, weekEndIso } = useMemo(() => getCurrentWeekIsoRange(), []);
 
   const overviewMetrics = useMemo(() => {
-    const activeGroups = groupRecords.filter((group) => group.tone === "active");
+    const activeGroups = visibleGroupRecords.filter((group) => group.tone === "active");
     const activePilgrims = activeGroups.reduce((total, group) => total + group.pax, 0);
     let totalTripsThisWeek = 0;
     let groupsArrivingThisWeek = 0;
@@ -390,7 +478,7 @@ export function useDashboardGroupRecords({
           ? `Peak day: ${formatPeakTripDayLabel(peakTripDateIso)} (${peakTripCount} trips).`
           : "No trips scheduled this week.",
     };
-  }, [groupRecords, weekEndIso, weekStartIso]);
+  }, [visibleGroupRecords, weekEndIso, weekStartIso]);
 
   const statCards = useMemo<OverviewStatCard[]>(
     () => [
@@ -913,7 +1001,8 @@ export function useDashboardGroupRecords({
   );
 
   return {
-    groupRecords,
+    groupRecords: visibleGroupRecords,
+    isGroupRecordsLoading: isWaitingForDetailedRecords,
     filteredGroups,
     statCards,
     summaryMessage,

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type { PrismaService } from "../prisma/prisma.service";
-import type { CreateGroupDto } from "./dto/create-group.dto";
-import { GroupsService } from "./groups.service";
+import type { PrismaService } from "../../prisma/prisma.service";
+import type { CreateGroupDto } from "../dto/create-group.dto";
+import { GroupsService } from "../groups.service";
 
 type PrismaGroupRecord = {
   id: string;
@@ -22,6 +22,11 @@ type PrismaFindFirstArgs = {
 function createPrismaGroupsService(prismaMock: PrismaService): { service: GroupsService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "prisma";
+  const prismaRecord = prismaMock as unknown as Record<string, unknown>;
+  prismaRecord.groupAuditLog ??= {
+    create: async () => ({}),
+    findMany: async () => [],
+  };
   const service = new GroupsService(prismaMock);
 
   return {
@@ -113,11 +118,15 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
       assert.equal(created.code, "GRP-CREATE");
       assert.ok(createPayload);
       const data = (createPayload as {
-        data: { code?: string; name?: string; packageName?: string };
+        data: { code?: string; name?: string; packageName?: string; searchDocument?: string };
       }).data;
       assert.equal(data.code, "GRP-CREATE");
       assert.equal(data.name, "Group Create");
       assert.equal(data.packageName, "Premium Package");
+      assert.equal(
+        data.searchDocument,
+        "grp create grpcreate group create groupcreate active premium package premiumpackage",
+      );
     } finally {
       restore();
     }
@@ -434,6 +443,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           code?: string;
           name?: string;
           status?: string;
+          searchDocument?: string;
           arrivalDate?: Date;
           returnDate?: Date;
           packageName?: string;
@@ -445,6 +455,10 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       assert.equal(data.name, "Updated Group");
       assert.equal(data.status, "Active");
       assert.equal(data.packageName, "Premium");
+      assert.equal(
+        data.searchDocument,
+        "grp new grpnew updated group updatedgroup active premium",
+      );
       assert.equal(data.durationDays, 10);
       assert.equal(data.arrivalDate?.toISOString().slice(0, 10), "2026-04-11");
       assert.equal(data.returnDate?.toISOString().slice(0, 10), "2026-04-19");

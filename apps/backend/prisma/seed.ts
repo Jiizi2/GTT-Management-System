@@ -15,6 +15,7 @@ import {
   requireDefaultAuthUserPasswordOverrides,
 } from "../src/auth/auth-default-users";
 import { resolveConfiguredNodeEnv, resolveConfiguredString } from "../src/config/app-config";
+import { buildGroupSearchDocument } from "../src/groups/groups.search-document";
 import { DEFAULT_MASTER_DATA_OPTIONS } from "../src/master-data/master-data.defaults";
 
 const prisma = new PrismaClient();
@@ -27,6 +28,8 @@ function assertSeedAllowedInCurrentEnvironment(): void {
 }
 
 async function resetData(): Promise<void> {
+  await prisma.authLoginRateLimitBucket.deleteMany();
+  await prisma.groupAuditLog.deleteMany();
   await prisma.masterDataOption.deleteMany();
   await prisma.authUser.deleteMany();
   await prisma.invoice.deleteMany();
@@ -159,6 +162,25 @@ function requireGroupId(groupCode: string, groupIdByCode: Map<string, string>): 
   return matched;
 }
 
+function withGroupSearchDocument<
+  T extends {
+    data: {
+      code: string;
+      name: string;
+      status: string;
+      packageName: string;
+    };
+  },
+>(args: T): T {
+  return {
+    ...args,
+    data: {
+      ...args.data,
+      searchDocument: buildGroupSearchDocument(args.data),
+    },
+  };
+}
+
 async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Promise<void> {
   const existingCount = await prisma.group.count();
   if (existingCount > 0 && !resetDataFirst) {
@@ -221,7 +243,7 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
   const overviewFullTripReturnIso = toIsoDateOnly(overviewFullTripReturnDate);
   const overviewFullTripHMinusOneIso = toIsoDateOnly(overviewFullTripHMinusOneDate);
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001001",
       name: "Sample Umrah Group",
@@ -407,9 +429,9 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         ],
       },
     },
-  });
+  }));
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001002",
       name: "Issued Paid Train Group",
@@ -545,9 +567,9 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         ],
       },
     },
-  });
+  }));
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001003",
       name: "Draft Visa Missing Hotel Group",
@@ -634,9 +656,9 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         ],
       },
     },
-  });
+  }));
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001004",
       name: "Inactive Archive Group",
@@ -658,9 +680,9 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         ],
       },
     },
-  });
+  }));
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001005",
       name: "Overview Arrival Only Group",
@@ -752,9 +774,9 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         },
       },
     },
-  });
+  }));
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001006",
       name: "Overview Arrival Departure Group",
@@ -887,9 +909,9 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         ],
       },
     },
-  });
+  }));
 
-  await prisma.group.create({
+  await prisma.group.create(withGroupSearchDocument({
     data: {
       code: "9017001007",
       name: "Overview Full Trip Group",
@@ -1097,7 +1119,7 @@ async function seedGroups({ resetDataFirst }: { resetDataFirst: boolean }): Prom
         ],
       },
     },
-  });
+  }));
 
   console.log("Seeded groups: 9017001001, 9017001002, 9017001003, 9017001004, 9017001005, 9017001006, 9017001007");
 }

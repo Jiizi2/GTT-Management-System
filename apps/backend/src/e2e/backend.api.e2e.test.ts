@@ -1116,6 +1116,19 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(fullTripCategories.includes("Departure"), true);
     assert.equal(fullTripCategories.filter((category) => category === "City Tour").length, 2);
 
+    const normalizedSearchQuery = groupCodes.arrivalDeparture.toLowerCase().replace(/-/g, " ");
+    const normalizedSearchCodes = ensureArray<GroupRecord>(
+      (await requestJson(server.baseUrl, `/api/groups?q=${encodeURIComponent(normalizedSearchQuery)}`)).json,
+      "normalized search payload should be array.",
+    )
+      .map((group) => group.code ?? "")
+      .filter((code) => code.length > 0);
+    assertSameCodeSet(
+      normalizedSearchCodes,
+      [groupCodes.arrivalDeparture],
+      "Expected normalized search to match arrival-departure group by spaced code.",
+    );
+
     const notIssuedCodes = ensureArray<GroupRecord>(
       (await requestJson(server.baseUrl, "/api/groups?filter=not-issued")).json,
       "not-issued payload should be array.",

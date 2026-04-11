@@ -62,6 +62,13 @@ export function AppMainContent({
   controller: AppController;
 }) {
   const location = useLocation();
+  const requiresDetailedGroupRecords =
+    controller.selectedGroupCode !== null ||
+    controller.selectedVisaGroupCode !== null ||
+    controller.activeNav === "checklist" ||
+    controller.activeNav === "visa" ||
+    controller.activeNav === "invoice" ||
+    controller.activeNav === "raudhah-reminder";
   const freshSelectedVisaRow = useMemo(
     () =>
       controller.selectedVisaRow
@@ -71,6 +78,10 @@ export function AppMainContent({
         : null,
     [controller.groupRecords, controller.selectedVisaRow],
   );
+
+  if (controller.isGroupRecordsLoading && requiresDetailedGroupRecords) {
+    return <ScreenLoadingFallback />;
+  }
 
   return (
     // Reset the revealed route boundary on navigation so lazy-loaded screens

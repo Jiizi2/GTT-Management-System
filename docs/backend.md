@@ -33,6 +33,7 @@ Implementasi:
 - Guard tetap menerima header `Authorization: Bearer <token>` untuk kompatibilitas internal/test.
 - Token diverifikasi di `AuthService` (HMAC signed token).
 - Request write yang terautentikasi via cookie harus datang dari origin tepercaya (proteksi CSRF berbasis origin).
+- Login rate limiter memakai memory untuk `DATA_SOURCE=memory`, dan bucket persisten di PostgreSQL untuk `DATA_SOURCE=prisma` agar tidak reset saat restart backend.
 
 Route public:
 
@@ -112,7 +113,9 @@ Aturan khusus:
 ## Groups
 
 - `GET /api/groups`
-  - query opsional: `q`, `page`, `pageSize`, `filter`
+  - query opsional: `q`, `page`, `pageSize`, `filter`, `projection`
+  - `q` memakai `searchDocument` ter-normalisasi untuk code, name, status, dan package name
+  - di PostgreSQL, pencarian dibantu index trigram pada `Group.searchDocument`
 - `GET /api/groups/audit-logs`
   - query opsional: `groupCode`, `limit`
 - `GET /api/groups/:idOrCode`
@@ -150,9 +153,11 @@ Aturan khusus:
 Skema Prisma utama:
 
 - Auth: `AuthUser`
+- Security/runtime: `AuthLoginRateLimitBucket`
 - Master data: `MasterDataOption`
 - Operasional grup:
-  - `Group`, `Musyrif`, `NextActivity`, `GroupTimelineItem`, `ItineraryItem`, `GroupNote`
+  - `Group`, `GroupAuditLog`, `Musyrif`, `NextActivity`, `GroupTimelineItem`, `ItineraryItem`, `GroupNote`
+    - `Group.searchDocument` menyimpan string pencarian ter-normalisasi untuk query `q`
   - `VisaSetup`, `VisaHotelAgreement`, `RaudhahAppointment`
   - `ChecklistAssignment`, `ChecklistDriver`
 - Invoice:

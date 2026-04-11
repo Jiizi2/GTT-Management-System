@@ -81,6 +81,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
   } = useDashboardSyncFeedback();
   const routeState = useDashboardRouteState(sessionAccessTier);
   const groupRecordsState = useDashboardGroupRecords({
+    activeNav: routeState.activeNav,
     query,
     isActiveOnly,
     selectedGroupCode: routeState.selectedGroupCode,
@@ -102,6 +103,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
 
   return {
     groupRecords: groupRecordsState.groupRecords,
+    isGroupRecordsLoading: groupRecordsState.isGroupRecordsLoading,
     sessionAccessTier,
     activeNav: routeState.activeNav,
     query,

@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { NotFoundException } from "@nestjs/common";
 import { ChecklistAssignmentStatus, Prisma, VisaPaymentStatus, VisaStatus } from "@prisma/client";
-import type { PrismaService } from "../prisma/prisma.service";
-import { GroupsService } from "./groups.service";
+import type { PrismaService } from "../../prisma/prisma.service";
+import { GroupsService } from "../groups.service";
 
 function createPrismaGroupsService(prismaMock: PrismaService): { service: GroupsService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "prisma";
+  const prismaRecord = prismaMock as unknown as Record<string, unknown>;
+  prismaRecord.groupAuditLog ??= {
+    create: async () => ({}),
+    findMany: async () => [],
+  };
   const service = new GroupsService(prismaMock);
 
   return {
@@ -120,13 +125,14 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
       assert.ok(where);
       assert.equal(where?.AND.length, 2);
 
-      const queryCondition = where?.AND[0] as {
-        OR: Array<{
-          code?: { contains: string; mode: string };
+      const queryCondition = where?.AND[0] as unknown as {
+        AND: Array<{
+          searchDocument?: { contains: string; mode: string };
         }>;
       };
-      assert.equal(queryCondition.OR[0].code?.contains, "grp");
-      assert.equal(queryCondition.OR[0].code?.mode, "insensitive");
+      assert.equal(queryCondition.AND.length, 1);
+      assert.equal(queryCondition.AND[0].searchDocument?.contains, "grp");
+      assert.equal(queryCondition.AND[0].searchDocument?.mode, "insensitive");
 
       const filterCondition = where?.AND[1] as {
         OR: Array<{
@@ -142,6 +148,83 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
         ).visaStatus.not,
         VisaStatus.ISSUED,
       );
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let summaryFindManyArgs: Record<string, unknown> | null = null;
+    const prismaMock = {
+      group: {
+        findMany: async (args: Record<string, unknown>) => {
+          summaryFindManyArgs = args;
+          return [{ id: "grp-summary", code: "GRP-SUMMARY" }];
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      const summaryItems = (await service.findAll(undefined, {
+        projection: "summary",
+      })) as Array<{ code?: string }>;
+      assert.equal(summaryItems.length, 1);
+      assert.equal(summaryItems[0].code, "GRP-SUMMARY");
+      assert.ok(summaryFindManyArgs);
+      const summarySelect = (summaryFindManyArgs as { select?: Record<string, unknown> }).select ?? {};
+      assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "itinerary"), true);
+      assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "notes"), true);
+      assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "visaSetup"), false);
+      assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "checklistAssignments"), false);
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let searchFindManyArgs: Record<string, unknown> | null = null;
+    const prismaMock = {
+      group: {
+        findMany: async (args: Record<string, unknown>) => {
+          searchFindManyArgs = args;
+          return [];
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await service.findAll("grp-101 vip");
+      const searchWhere = (searchFindManyArgs as unknown as {
+        where?: {
+          AND: Array<{
+            AND?: Array<{ searchDocument: { contains: string; mode: string } }>;
+          }>;
+        };
+      }).where;
+      assert.ok(searchWhere);
+      const tokenCondition = searchWhere?.AND[0];
+      assert.deepEqual(tokenCondition?.AND, [
+        {
+          searchDocument: {
+            contains: "grp",
+            mode: "insensitive",
+          },
+        },
+        {
+          searchDocument: {
+            contains: "101",
+            mode: "insensitive",
+          },
+        },
+        {
+          searchDocument: {
+            contains: "vip",
+            mode: "insensitive",
+          },
+        },
+      ]);
     } finally {
       restore();
     }
@@ -736,10 +819,68 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
   }
 }
 
+async function testPrismaListAuditLogsReadsPersistentEntries(): Promise<void> {
+  let findManyArgs: Record<string, unknown> | null = null;
+  const prismaMock = {
+    groupAuditLog: {
+      create: async () => ({}),
+      findMany: async (args: Record<string, unknown>) => {
+        findManyArgs = args;
+        return [
+          {
+            id: "audit-1",
+            groupCode: "GRP-PRISMA",
+            action: "group.updated",
+            entity: "group",
+            payload: {
+              idOrCode: "GRP-PRISMA",
+              updatedFields: ["name"],
+            },
+            createdAt: new Date("2026-05-21T10:00:00.000Z"),
+          },
+        ];
+      },
+    },
+  } as unknown as PrismaService;
+
+  const { service, restore } = createPrismaGroupsService(prismaMock);
+  try {
+    const logs = await service.listAuditLogs(" grp-prisma ", 5);
+    assert.ok(findManyArgs);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].groupCode, "GRP-PRISMA");
+    assert.equal(logs[0].action, "group.updated");
+    assert.deepEqual(logs[0].payload, {
+      idOrCode: "GRP-PRISMA",
+      updatedFields: ["name"],
+    });
+    assert.deepEqual(findManyArgs, {
+      where: {
+        groupCode: "GRP-PRISMA",
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5,
+      select: {
+        id: true,
+        groupCode: true,
+        action: true,
+        entity: true,
+        payload: true,
+        createdAt: true,
+      },
+    });
+  } finally {
+    restore();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase("groups prisma findAll where + pagination branches", testPrismaFindAllWhereAndPaginationBranches);
   await runCase("groups prisma confirm checklist driver paths", testPrismaConfirmChecklistDriverPaths);
   await runCase("groups prisma reset checklist driver paths", testPrismaResetChecklistDriverPaths);
+  await runCase("groups prisma listAuditLogs reads persistent entries", testPrismaListAuditLogsReadsPersistentEntries);
 }
 
 void main().catch((error: unknown) => {
