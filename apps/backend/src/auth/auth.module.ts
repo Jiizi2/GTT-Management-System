@@ -1,12 +1,14 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD, Reflector } from "@nestjs/core";
+import { JwtModule } from "@nestjs/jwt";
 import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
 import { AuthLoginRateLimiter } from "./auth-login-rate-limiter";
 import { AuthService } from "./auth.service";
 
 @Module({
+  imports: [JwtModule.register({})],
   controllers: [AuthController],
   providers: [
     AuthLoginRateLimiter,

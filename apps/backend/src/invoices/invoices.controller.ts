@@ -9,10 +9,14 @@ import {
   Patch,
   Post,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
 import { InvoicesService } from "./invoices.service";
 
+@ApiTags("Invoices")
+@ApiBearerAuth("access-token")
+@ApiCookieAuth("auth-cookie")
 @Controller("invoices")
 export class InvoicesController {
   constructor(@Inject(InvoicesService) private readonly invoicesService: InvoicesService) {}

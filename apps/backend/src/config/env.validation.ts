@@ -15,6 +15,10 @@ const ENVIRONMENT_SCHEMA = Joi.object({
   AUTH_BOOTSTRAP_DEFAULT_USERS: Joi.boolean().truthy("true").falsy("false").optional(),
   CORS_ORIGINS: Joi.string().trim().allow("").optional(),
   TRUST_PROXY: Joi.boolean().truthy("true").falsy("false").optional(),
+  LOG_LEVEL: Joi.string()
+    .trim()
+    .valid("trace", "debug", "info", "warn", "error", "fatal", "silent")
+    .optional(),
   AUTH_COOKIE_DOMAIN: Joi.string().trim().pattern(COOKIE_DOMAIN_PATTERN).allow("").optional(),
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1_000).default(60_000),
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
@@ -35,6 +39,7 @@ type ValidatedEnvironment = {
   AUTH_BOOTSTRAP_DEFAULT_USERS?: boolean;
   CORS_ORIGINS?: string;
   TRUST_PROXY?: boolean;
+  LOG_LEVEL?: string;
   AUTH_COOKIE_DOMAIN?: string;
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: number;
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: number;

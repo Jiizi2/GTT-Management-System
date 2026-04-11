@@ -2,7 +2,10 @@ import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
+import { Logger, PinoLogger } from "nestjs-pino";
+import { AUTH_COOKIE_NAME } from "./auth/auth-cookie";
 import type { RuntimeDataSource } from "./runtime-config";
 import { AppModule } from "./app.module";
 import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
@@ -16,8 +19,11 @@ type NextHandler = () => void;
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
-    logger: ["error", "warn", "log"],
+    bufferLogs: true,
   });
+  app.useLogger(app.get(Logger));
+  const bootstrapLogger = app.get(PinoLogger);
+  bootstrapLogger.setContext("Bootstrap");
   const configService = app.get(ConfigService);
   const port = configService.getOrThrow<number>("PORT");
   const dataSource = configService.getOrThrow<RuntimeDataSource>("DATA_SOURCE");
@@ -73,9 +79,49 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle("GTT Backend API")
+    .setDescription("Operational backend API for auth, groups, invoices, master data, and health.")
+    .setVersion("1.0")
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Bearer token for internal clients and testing flows.",
+      },
+      "access-token",
+    )
+    .addCookieAuth(
+      AUTH_COOKIE_NAME,
+      {
+        type: "apiKey",
+        in: "cookie",
+        description: "HttpOnly browser session cookie used by the dashboard frontend.",
+      },
+      "auth-cookie",
+    )
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup("docs", app, swaggerDocument, {
+    useGlobalPrefix: true,
+    explorer: true,
+    customSiteTitle: "GTT Backend API Docs",
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+    jsonDocumentUrl: "docs/json",
+  });
+
   await app.listen(port);
-  console.log(
-    `Backend API ready on http://localhost:${port}/api (dataSource=${dataSource}, cors=${corsSummary})`,
+  bootstrapLogger.info(
+    {
+      dataSource,
+      corsOrigins: corsSummary,
+      apiUrl: `http://localhost:${port}/api`,
+      docsUrl: `http://localhost:${port}/api/docs`,
+    },
+    "Backend API ready",
   );
 }
 

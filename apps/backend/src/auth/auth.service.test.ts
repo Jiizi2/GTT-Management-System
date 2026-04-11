@@ -155,9 +155,17 @@ async function testVerifyTokenRejectsTamperedSignatureAndExpiredToken(): Promise
         const [header, payload, signature] = response.accessToken.split(".");
         assert.equal(Boolean(header && payload && signature), true);
 
-        const tamperedPayload = payload.endsWith("A")
-          ? `${payload.slice(0, -1)}B`
-          : `${payload.slice(0, -1)}A`;
+        const decodedPayload = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Record<
+          string,
+          unknown
+        >;
+        const tamperedPayload = Buffer.from(
+          JSON.stringify({
+            ...decodedPayload,
+            rememberSession: !(decodedPayload.rememberSession === true),
+          }),
+          "utf8",
+        ).toString("base64url");
         assert.throws(
           () => service.verifyAccessToken(`${header}.${tamperedPayload}.${signature}`),
           (error: unknown) => {

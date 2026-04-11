@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query } from "@nestjs/common";
+import { ApiBearerAuth, ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
 import { UpdateGroupDto } from "../dto/update-group.dto";
@@ -15,6 +16,9 @@ function normalizeGroupProjection(rawProjection?: string): GroupResponseProjecti
   return rawProjection?.trim().toLowerCase() === "summary" ? "summary" : "detail";
 }
 
+@ApiTags("Groups")
+@ApiBearerAuth("access-token")
+@ApiCookieAuth("auth-cookie")
 @Controller("groups")
 export class GroupsController {
   constructor(@Inject(GroupsService) private readonly groupsService: GroupsService) {}

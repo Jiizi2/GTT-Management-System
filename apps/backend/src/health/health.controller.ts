@@ -1,5 +1,6 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { ApiTags } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import { resolveConfiguredDataSource } from "../config/app-config";
 import { Public } from "../auth/auth.public";
@@ -25,6 +26,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+@ApiTags("Health")
 @Controller("health")
 export class HealthController {
   constructor(
