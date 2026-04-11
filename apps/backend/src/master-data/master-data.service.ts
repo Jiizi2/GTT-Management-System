@@ -10,6 +10,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource, resolveConfiguredNodeEnv } from "../config/app-config";
+import { createStructuredLogger } from "../logging/create-structured-logger";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   DEFAULT_MASTER_DATA_OPTIONS,
@@ -155,6 +156,7 @@ function mapDefaultOptionToMemory(option: MasterDataSeedOption, index: number): 
 export class MasterDataService {
   private readonly dataSource: "memory" | "prisma";
   private readonly nodeEnv: string;
+  private readonly logger = createStructuredLogger(MasterDataService.name);
   private readonly memoryOptions = DEFAULT_MASTER_DATA_OPTIONS.map((option, index) =>
     mapDefaultOptionToMemory(option, index),
   );
@@ -252,6 +254,11 @@ export class MasterDataService {
           },
         });
 
+        this.logMutation("master-data.created", {
+          optionId: created.id,
+          categoryKey: normalizedCategoryKey,
+          value: normalizedValue,
+        });
         return this.mapPrismaOption(created);
       } catch (error: unknown) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -290,6 +297,11 @@ export class MasterDataService {
       updatedAtIso: nowIso,
     };
     this.memoryOptions.push(created);
+    this.logMutation("master-data.created", {
+      optionId: created.id,
+      categoryKey: normalizedCategoryKey,
+      value: normalizedValue,
+    });
 
     return this.mapMemoryOption(created);
   }
@@ -361,6 +373,11 @@ export class MasterDataService {
         },
       });
 
+      this.logMutation("master-data.updated", {
+        optionId: updated.id,
+        categoryKey: updated.categoryKey,
+        value: updated.value,
+      });
       return this.mapPrismaOption(updated);
     }
 
@@ -404,6 +421,11 @@ export class MasterDataService {
       updatedAtIso: new Date().toISOString(),
     };
     this.memoryOptions[targetIndex] = next;
+    this.logMutation("master-data.updated", {
+      optionId: next.id,
+      categoryKey: next.categoryKey,
+      value: next.value,
+    });
 
     return this.mapMemoryOption(next);
   }
@@ -643,8 +665,11 @@ export class MasterDataService {
         }
 
         this.prismaReadFallbackReason = "missing-table";
-        console.warn(
-          "MasterDataOption table was not found. Falling back to in-memory master data defaults for read operations.",
+        this.logger.warn(
+          {
+            reason: "missing-table",
+          },
+          "Master data storage fell back to in-memory reads because the Prisma table is missing.",
         );
         return;
       }
@@ -655,8 +680,11 @@ export class MasterDataService {
         }
 
         this.prismaReadFallbackReason = "missing-client";
-        console.warn(
-          "Prisma client does not include MasterDataOption model. Falling back to in-memory master data defaults for read operations.",
+        this.logger.warn(
+          {
+            reason: "missing-client",
+          },
+          "Master data storage fell back to in-memory reads because the Prisma client is outdated.",
         );
         return;
       }
@@ -694,5 +722,16 @@ export class MasterDataService {
         },
       });
     }
+  }
+
+  private logMutation(action: string, details: Record<string, unknown>): void {
+    this.logger.info(
+      {
+        action,
+        dataSource: this.dataSource,
+        ...details,
+      },
+      "Master data mutation completed.",
+    );
   }
 }

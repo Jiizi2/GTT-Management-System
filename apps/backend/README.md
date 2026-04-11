@@ -23,6 +23,8 @@
      - PowerShell: `$env:SEED_RESET="true"; npm run db:seed --workspace backend`
 8. Start backend:
    - `npm run dev:backend`
+9. Open API docs:
+   - `http://localhost:3001/api/docs`
 
 ## Production Env Template
 
@@ -32,6 +34,7 @@
   2. Set real `DATABASE_URL`, `AUTH_SECRET`, and `CORS_ORIGINS`.
   3. Keep `TRUST_PROXY=false` unless requests really come through a trusted reverse proxy.
   4. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
+  5. Keep runtime cleanup enabled unless you intentionally externalize retention management.
 
 ## Quick Start (Fallback: Memory Mode)
 
@@ -52,6 +55,8 @@
   - `npm run test:integration --workspace backend`
 - API e2e test (memory mode):
   - `npm run test:api --workspace backend`
+- Vitest + Supertest smoke/API docs test:
+  - `npm run test:vitest --workspace backend`
 
 ## Runtime Validation
 
@@ -63,6 +68,10 @@
 - `AUTH_SECRET` is required in production and should be a private random value.
 - `CORS_ORIGINS` is required in production and must use explicit origins.
 - `TRUST_PROXY` should stay `false` unless proxy headers are sanitized by trusted infrastructure.
+- `LOG_LEVEL` defaults to `warn` in non-production and `info` in production.
+- `HTTP_LOG_SUCCESS` controls whether successful HTTP requests are printed.
+  - Defaults to `false` in non-production to keep the terminal quieter.
+  - Defaults to `true` in production.
 - `AUTH_BOOTSTRAP_DEFAULT_USERS` controls auto-creation of default auth users on startup in Prisma mode.
   - Defaults to `false` until explicitly set to `true`.
   - Requires `DEV_AUTH_SUPERADMIN_PASSWORD` and `DEV_AUTH_ADMIN_PASSWORD` when enabled.
@@ -70,6 +79,12 @@
   - `THROTTLE_DEFAULT_TTL_MS`
   - `THROTTLE_DEFAULT_LIMIT`
   - `THROTTLE_DEFAULT_BLOCK_MS`
+- Runtime retention cleanup is controlled by:
+  - `RUNTIME_RETENTION_ENABLED`
+  - `RUNTIME_RETENTION_INTERVAL_MS`
+  - `GROUP_AUDIT_LOG_RETENTION_DAYS`
+  - `AUTH_LOGIN_RATE_LIMIT_RETENTION_DAYS`
+  - `APP_THROTTLE_BUCKET_RETENTION_DAYS`
 - Development login password defaults can be overridden by:
   - `DEV_AUTH_SUPERADMIN_PASSWORD`
   - `DEV_AUTH_ADMIN_PASSWORD`
@@ -80,6 +95,11 @@
 - `Permissions-Policy` is set explicitly for camera, geolocation, and microphone restrictions.
 - `@nestjs/throttler` is enabled globally for API-wide rate limiting.
 - `/api/health` skips global throttling to stay friendly for liveness/readiness probes.
+- Successful HTTP requests are muted by default in non-production; warnings and errors still appear.
+- HTTP logs are sanitized to keep request/response metadata minimal and avoid leaking headers or cookies.
+- Development logs are rendered as concise single-line summaries so method, path, status, and duration stay readable without flooding the terminal.
+- API errors now use a consistent JSON envelope with `ok`, `statusCode`, `error`, `message`, `path`, `timestamp`, and `requestId`.
+- Stale runtime rows such as audit logs and rate-limit buckets are cleaned on an interval in Prisma mode.
 
 ## Development Login Accounts
 
@@ -97,6 +117,8 @@
 ## API Base URL
 
 - `http://localhost:3001/api`
+- Swagger UI: `http://localhost:3001/api/docs`
+- OpenAPI JSON: `http://localhost:3001/api/docs/json`
 
 ## Initial Endpoints
 

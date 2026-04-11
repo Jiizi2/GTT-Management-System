@@ -3,7 +3,7 @@ import { BadRequestException, ConflictException, NotFoundException } from "@nest
 import { Prisma } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
-import { GroupsService } from "../groups.service";
+import { GroupsService } from "../application/groups.service";
 
 type PrismaGroupRecord = {
   id: string;

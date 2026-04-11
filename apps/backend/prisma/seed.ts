@@ -28,6 +28,7 @@ function assertSeedAllowedInCurrentEnvironment(): void {
 }
 
 async function resetData(): Promise<void> {
+  await prisma.appThrottleBucket.deleteMany();
   await prisma.authLoginRateLimitBucket.deleteMany();
   await prisma.groupAuditLog.deleteMany();
   await prisma.masterDataOption.deleteMany();

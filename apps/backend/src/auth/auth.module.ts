@@ -5,6 +5,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
 import { AuthLoginRateLimiter } from "./auth-login-rate-limiter";
+import { AuthRolesGuard } from "./auth-roles.guard";
 import { AuthService } from "./auth.service";
 
 @Module({
@@ -21,6 +22,10 @@ import { AuthService } from "./auth.service";
         configService: ConfigService,
       ) => new AuthGuard(reflector, authService, configService),
       inject: [Reflector, AuthService, ConfigService],
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AuthRolesGuard,
     },
   ],
   exports: [AuthService],

@@ -7,7 +7,7 @@ import {
   VisaStatus,
 } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
-import { GroupsService } from "../groups.service";
+import { GroupsService } from "../application/groups.service";
 import { PrismaService } from "../../prisma/prisma.service";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {

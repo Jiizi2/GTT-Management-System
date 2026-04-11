@@ -75,7 +75,8 @@ Variabel penting:
 - `AUTH_SECRET` (wajib dan minimal 32 karakter di production)
 - `CORS_ORIGINS`
 - `TRUST_PROXY` (opsional; default `false`, aktifkan hanya jika backend berada di balik reverse proxy tepercaya)
-- `LOG_LEVEL` (opsional; default `debug` di non-production, `info` di production)
+- `LOG_LEVEL` (opsional; default `warn` di non-production, `info` di production)
+- `HTTP_LOG_SUCCESS` (opsional; default `false` di non-production, `true` di production)
 - `AUTH_COOKIE_DOMAIN` (opsional; default host-only cookie)
 - login rate limit env (`AUTH_LOGIN_RATE_LIMIT_*`)
 - global throttle env (`THROTTLE_DEFAULT_*`)
@@ -97,6 +98,7 @@ Aturan khusus:
 - Tidak memerlukan database.
 - Data disimpan in-memory (non-persisten).
 - Berguna untuk dev cepat dan e2e lokal.
+- Global throttling juga memakai storage in-memory pada mode ini.
 
 ### `prisma`
 
@@ -104,6 +106,7 @@ Aturan khusus:
 - Data persisten.
 - Mendukung migration, seeding, dan operasi produksi.
 - Khusus master data: bila model/tabel `MasterDataOption` belum sinkron, backend hanya boleh fallback ke default in-memory pada `development`/`test`. Di `production`, backend akan fail-fast agar deployment drift tidak tersembunyi.
+- Global throttling otomatis memakai bucket persisten `AppThrottleBucket` saat Prisma siap. Pada `development`/`test`, backend boleh fallback ke memory bila model / tabel bucket throttle belum sinkron. Di `production`, backend akan fail-fast agar drift migrasi tidak tersembunyi.
 
 ## 6. Endpoint API
 
@@ -178,6 +181,7 @@ Skema Prisma utama:
 
 - Auth: `AuthUser`
 - Security/runtime: `AuthLoginRateLimitBucket`
+- Global throttle/runtime: `AppThrottleBucket`
 - Master data: `MasterDataOption`
 - Operasional grup:
   - `Group`, `GroupAuditLog`, `Musyrif`, `NextActivity`, `GroupTimelineItem`, `ItineraryItem`, `GroupNote`
@@ -219,11 +223,26 @@ Command dari root:
 - `npm run test --workspace backend` -> unit test backend.
 - `npm run test:integration --workspace backend` -> integration Prisma.
 - `npm run test:api --workspace backend` -> API e2e backend.
-- `npm run test:vitest --workspace backend` -> runner baru berbasis `vitest + supertest` untuk HTTP/integration test yang lebih nyaman dikembangkan bertahap.
+- `npm run test:vitest --workspace backend` -> runner berbasis `vitest + supertest` untuk HTTP/OpenAPI smoke test yang lebih nyaman dikembangkan bertahap.
 
 ## 10. Logging dan Tracing
 
 - Request log sekarang memakai `nestjs-pino` dengan output terstruktur.
 - Setiap request menerima header `x-request-id` dan id yang sama ikut muncul di log, sehingga tracing antar request/error lebih mudah.
-- Header sensitif seperti `Authorization`, `Cookie`, dan `Set-Cookie` sudah di-redact dari log request/response.
+- Log HTTP disanitasi agar tidak membawa header, cookie, query, body, atau detail response yang berlebihan.
 - Di development/test, log dirender lebih nyaman dibaca lewat `pino-pretty`; di production tetap output JSON terstruktur.
+- Secara default, level log non-production adalah `warn`, sehingga terminal hanya menampilkan warning/error kecuali dioverride manual.
+- Secara default, request sukses tidak dicetak di non-production agar terminal tidak terlalu ramai; warning/error tetap muncul.
+- `GET /api/health` di-skip dari auto request logging.
+- Service inti sekarang juga menulis business log terstruktur untuk event penting seperti `auth.login.succeeded`, `auth.user.*`, `group.*`, `itinerary.*`, `visa.*`, `checklist.driver.*`, `invoice.*`, dan `master-data.*`.
+- Business log sengaja membawa identifier operasional seperti `groupCode`, `invoiceNumber`, `userId`, `categoryKey`, dan `dataSource`, tetapi tidak mencetak cookie / bearer token.
+
+## 11. Catatan Refactor Groups
+
+- Struktur modul `groups` sekarang domain-first di dalam modul:
+  - `http/`
+  - `application/`
+  - `domain/`
+  - `infrastructure/`
+- Test aktif untuk `groups` sekarang ada di `src/groups/tests/`.
+- Root shim lama modul `groups` sudah tidak lagi dipakai oleh import internal/test aktif. Jika beberapa file shim masih terlihat di filesystem lokal, mereka aman dibersihkan manual setelah memastikan worktree Anda sudah sinkron.

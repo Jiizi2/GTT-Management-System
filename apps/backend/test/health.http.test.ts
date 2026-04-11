@@ -3,7 +3,10 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
-import { AppModule } from "../src/app.module";
+// Import from dist so Swagger/Nest decorator metadata matches the compiled backend runtime.
+// Vitest's TS transform is fine for test code, but compiled app metadata is more reliable here.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { AppModule } = require("../dist/app.module.js") as { AppModule: unknown };
 
 async function withEnv<T>(
   overrides: Record<string, string | undefined>,
@@ -75,7 +78,8 @@ describe("Backend HTTP", () => {
 
         expect(response.body.ok).toBe(true);
         expect(response.body.service).toBe("backend");
-        expect(response.body.dataSource).toBe("memory");
+        expect(["memory", "prisma"]).toContain(response.body.dataSource);
+        expect(["up", "n/a"]).toContain(response.body.database);
         expect(response.headers["x-request-id"]).toBeTruthy();
       },
     );

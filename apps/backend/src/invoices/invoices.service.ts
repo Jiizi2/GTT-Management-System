@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import { ConfigService } from "@nestjs/config";
 import { InvoiceStatus, Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../config/app-config";
+import { createStructuredLogger } from "../logging/create-structured-logger";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
@@ -227,6 +228,7 @@ function getTrimmedString(value: unknown): string {
 @Injectable()
 export class InvoicesService {
   private readonly dataSource: "memory" | "prisma";
+  private readonly logger = createStructuredLogger(InvoicesService.name);
   private readonly memoryInvoiceClients: MemoryInvoiceClient[] = [
     {
       id: randomUUID(),
@@ -272,19 +274,21 @@ export class InvoicesService {
   }
 
   async create(payload: CreateInvoiceDto): Promise<InvoiceListItem> {
-    if (this.dataSource === "prisma") {
-      return this.createWithPrisma(payload);
-    }
-
-    return this.createInMemory(payload);
+    const created =
+      this.dataSource === "prisma"
+        ? await this.createWithPrisma(payload)
+        : this.createInMemory(payload);
+    this.logInvoiceMutation("invoice.created", created);
+    return created;
   }
 
   async update(id: string, payload: UpdateInvoiceDto): Promise<InvoiceListItem> {
-    if (this.dataSource === "prisma") {
-      return this.updateWithPrisma(id, payload);
-    }
-
-    return this.updateInMemory(id, payload);
+    const updated =
+      this.dataSource === "prisma"
+        ? await this.updateWithPrisma(id, payload)
+        : this.updateInMemory(id, payload);
+    this.logInvoiceMutation("invoice.updated", updated);
+    return updated;
   }
 
   private resolveClientForCreateInMemory(payload: CreateInvoiceDto): MemoryInvoiceClient {
@@ -390,6 +394,17 @@ export class InvoicesService {
             groupId: true,
           },
         });
+
+        this.logger.info(
+          {
+            action: "invoice-client.created",
+            dataSource: this.dataSource,
+            clientId: createdClient.id,
+            clientName,
+            sortOrder: nextSortOrder,
+          },
+          "Invoice client created.",
+        );
 
         return {
           id: createdClient.id,
@@ -923,5 +938,21 @@ export class InvoicesService {
 
     const nextSerial = this.resolveNextSerial(records.map((entry) => entry.invoiceNumber));
     return buildInvoiceNumber(year, nextSerial);
+  }
+
+  private logInvoiceMutation(action: string, invoice: InvoiceListItem): void {
+    this.logger.info(
+      {
+        action,
+        dataSource: this.dataSource,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        clientId: invoice.clientId,
+        groupCode: invoice.groupCode,
+        status: invoice.status,
+        amount: invoice.amount,
+      },
+      "Invoice mutation completed.",
+    );
   }
 }

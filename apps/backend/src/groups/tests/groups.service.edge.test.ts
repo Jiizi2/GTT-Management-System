@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
-import { GroupsService } from "../groups.service";
+import { GroupsService } from "../application/groups.service";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {
   const previous = process.env.DATA_SOURCE;
