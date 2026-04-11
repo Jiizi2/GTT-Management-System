@@ -15,6 +15,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { ApiBearerAuth, ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import {
   resolveAuthCookieRuntimeConfig,
@@ -44,6 +45,7 @@ function toBrowserSession(response: AuthLoginResponse): AuthBrowserSession {
 }
 
 @Controller("auth")
+@ApiTags("Auth")
 export class AuthController {
   private readonly authCookieRuntimeConfig: AuthCookieRuntimeConfig;
 
@@ -102,6 +104,8 @@ export class AuthController {
   }
 
   @Get("session")
+  @ApiBearerAuth("access-token")
+  @ApiCookieAuth("auth-cookie")
   getSession(
     @Res({ passthrough: true }) response: ResponseLike,
     @Req()
@@ -138,6 +142,8 @@ export class AuthController {
   }
 
   @Get("users")
+  @ApiBearerAuth("access-token")
+  @ApiCookieAuth("auth-cookie")
   async listManagedUsers(
     @Req()
     request: {
@@ -155,6 +161,8 @@ export class AuthController {
 
   @Post("users")
   @HttpCode(201)
+  @ApiBearerAuth("access-token")
+  @ApiCookieAuth("auth-cookie")
   async createManagedUser(
     @Body() payload: CreateManagedUserDto,
     @Req()
@@ -177,6 +185,8 @@ export class AuthController {
   }
 
   @Patch("users/:userId")
+  @ApiBearerAuth("access-token")
+  @ApiCookieAuth("auth-cookie")
   async updateManagedUser(
     @Param("userId") userId: string,
     @Body() payload: UpdateManagedUserDto,
@@ -199,6 +209,8 @@ export class AuthController {
   }
 
   @Put("users/:userId/password")
+  @ApiBearerAuth("access-token")
+  @ApiCookieAuth("auth-cookie")
   async setManagedUserPassword(
     @Param("userId") userId: string,
     @Body() payload: SetManagedUserPasswordDto,
@@ -218,6 +230,8 @@ export class AuthController {
 
   @Delete("users/:userId")
   @HttpCode(204)
+  @ApiBearerAuth("access-token")
+  @ApiCookieAuth("auth-cookie")
   async deleteManagedUser(
     @Param("userId") userId: string,
     @Req()

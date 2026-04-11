@@ -10,6 +10,8 @@ Dokumen ini menjelaskan arsitektur backend, mode data, endpoint API, dan operasi
 - ORM: Prisma
 - Database: PostgreSQL (untuk mode `prisma`)
 - Security middleware: `helmet`
+- Logging: `nestjs-pino` + `pino`
+- API docs: `@nestjs/swagger`
 - Global rate limiting: `@nestjs/throttler`
 - Prefix API global: `/api`
 
@@ -31,9 +33,20 @@ Implementasi:
 - Guard global (`AuthGuard`) dipasang lewat `APP_GUARD`.
 - Browser session sekarang memakai cookie `HttpOnly` + `SameSite=Lax`.
 - Guard tetap menerima header `Authorization: Bearer <token>` untuk kompatibilitas internal/test.
-- Token diverifikasi di `AuthService` (HMAC signed token).
+- Token ditandatangani dan diverifikasi di `AuthService` memakai `@nestjs/jwt` dengan JWT HS256.
 - Request write yang terautentikasi via cookie harus datang dari origin tepercaya (proteksi CSRF berbasis origin).
 - Login rate limiter memakai memory untuk `DATA_SOURCE=memory`, dan bucket persisten di PostgreSQL untuk `DATA_SOURCE=prisma` agar tidak reset saat restart backend.
+
+Lifecycle token auth custom:
+
+- Format token: `base64url(header).base64url(payload).base64url(signature)` dengan header `{ alg: "HS256", typ: "JWT" }`.
+- Payload saat ini berisi: `id`, `name`, `username`, `email`, `accessTier`, `exp`, `rememberSession`.
+- Expiry default: 12 jam.
+- Expiry untuk `rememberSession=true`: 14 hari.
+- Invalidation saat `POST /api/auth/logout`: backend hanya menghapus cookie browser; tidak ada server-side revocation list untuk token yang sudah terbit.
+- Implikasi operasional: jika token bocor dan belum expired, token tetap valid sampai `exp` tercapai atau `AUTH_SECRET` diganti.
+- Rotasi secret: mengganti `AUTH_SECRET` lalu restart backend akan menginvalidasi semua session/token aktif, karena saat ini hanya ada satu secret aktif dan belum ada mekanisme multi-key / `kid`.
+- JWT sekarang sudah memakai library standar, tetapi invalidation/revocation tetap masih sederhana dan berbasis expiry + rotasi secret.
 
 Route public:
 
@@ -62,6 +75,7 @@ Variabel penting:
 - `AUTH_SECRET` (wajib dan minimal 32 karakter di production)
 - `CORS_ORIGINS`
 - `TRUST_PROXY` (opsional; default `false`, aktifkan hanya jika backend berada di balik reverse proxy tepercaya)
+- `LOG_LEVEL` (opsional; default `debug` di non-production, `info` di production)
 - `AUTH_COOKIE_DOMAIN` (opsional; default host-only cookie)
 - login rate limit env (`AUTH_LOGIN_RATE_LIMIT_*`)
 - global throttle env (`THROTTLE_DEFAULT_*`)
@@ -89,8 +103,15 @@ Aturan khusus:
 - Menggunakan PostgreSQL melalui Prisma.
 - Data persisten.
 - Mendukung migration, seeding, dan operasi produksi.
+- Khusus master data: bila model/tabel `MasterDataOption` belum sinkron, backend hanya boleh fallback ke default in-memory pada `development`/`test`. Di `production`, backend akan fail-fast agar deployment drift tidak tersembunyi.
 
 ## 6. Endpoint API
+
+## OpenAPI / Swagger
+
+- UI dokumentasi tersedia di `GET /api/docs`
+- Dokumen JSON tersedia di `GET /api/docs/json`
+- Dokumentasi dihasilkan langsung dari controller dan DTO backend, sehingga perubahan route / payload akan ikut tercermin di OpenAPI document
 
 ## Health
 
@@ -147,6 +168,9 @@ Aturan khusus:
 - `GET /api/master-data/options`
 - `POST /api/master-data/options` (super-admin)
 - `PATCH /api/master-data/options/:optionId` (super-admin)
+- Catatan runtime:
+  - `development` / `test`: read boleh fallback ke default in-memory jika Prisma client atau tabel `MasterDataOption` belum siap.
+  - `production`: tidak ada fallback read; backend mengembalikan error server yang meminta sinkronisasi `db:generate` / `db:migrate`.
 
 ## 7. Database dan Domain Model
 
@@ -195,3 +219,11 @@ Command dari root:
 - `npm run test --workspace backend` -> unit test backend.
 - `npm run test:integration --workspace backend` -> integration Prisma.
 - `npm run test:api --workspace backend` -> API e2e backend.
+- `npm run test:vitest --workspace backend` -> runner baru berbasis `vitest + supertest` untuk HTTP/integration test yang lebih nyaman dikembangkan bertahap.
+
+## 10. Logging dan Tracing
+
+- Request log sekarang memakai `nestjs-pino` dengan output terstruktur.
+- Setiap request menerima header `x-request-id` dan id yang sama ikut muncul di log, sehingga tracing antar request/error lebih mudah.
+- Header sensitif seperti `Authorization`, `Cookie`, dan `Set-Cookie` sudah di-redact dari log request/response.
+- Di development/test, log dirender lebih nyaman dibaca lewat `pino-pretty`; di production tetap output JSON terstruktur.

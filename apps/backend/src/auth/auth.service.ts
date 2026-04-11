@@ -6,8 +6,8 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
 import { AuthUserRole, Prisma } from "@prisma/client";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   resolveConfiguredBoolean,
   resolveConfiguredDataSource,
@@ -50,16 +50,11 @@ type AuthManagedUserRecord = {
 };
 
 const TOKEN_TYPE = "Bearer" as const;
-const HEADER_TEMPLATE = { alg: "HS256", typ: "JWT" };
 const DEFAULT_AUTH_SECRET = "gtt-dev-auth-secret-please-change-in-production";
 const MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH = 32;
 
 const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
 const REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 14;
-
-function base64UrlEncodeJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
-}
 
 function decodeBase64UrlJson(value: string): unknown {
   const decoded = Buffer.from(value, "base64url").toString("utf8");
@@ -113,6 +108,15 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
     exp,
     rememberSession,
   };
+}
+
+function isStandardJwtHeader(value: unknown): value is { alg: "HS256"; typ: "JWT" } {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return record.alg === "HS256" && record.typ === "JWT";
 }
 
 function resolveAuthSecret(configService?: ConfigService): string {
@@ -209,6 +213,7 @@ export class AuthService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     private readonly configService?: ConfigService,
+    private readonly jwtService: JwtService = new JwtService(),
   ) {
     this.authSecret = resolveAuthSecret(this.configService);
     this.dataSource = resolveConfiguredDataSource(this.configService);
@@ -231,18 +236,7 @@ export class AuthService {
       throw new UnauthorizedException("Invalid access token format.");
     }
 
-    const [encodedHeader, encodedPayload, providedSignature] = tokenParts;
-    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-    const expectedSignature = this.createSignature(unsignedToken);
-    const providedSignatureBuffer = Buffer.from(providedSignature, "utf8");
-    const expectedSignatureBuffer = Buffer.from(expectedSignature, "utf8");
-
-    if (
-      providedSignatureBuffer.length !== expectedSignatureBuffer.length ||
-      !timingSafeEqual(providedSignatureBuffer, expectedSignatureBuffer)
-    ) {
-      throw new UnauthorizedException("Invalid access token signature.");
-    }
+    const [encodedHeader, encodedPayload] = tokenParts;
 
     let headerJson: unknown;
     let payloadJson: unknown;
@@ -253,13 +247,23 @@ export class AuthService {
       throw new UnauthorizedException("Invalid access token payload.");
     }
 
-    if (!headerJson || typeof headerJson !== "object") {
+    if (!isStandardJwtHeader(headerJson)) {
       throw new UnauthorizedException("Invalid access token header.");
     }
 
     const tokenPayload = parseAuthTokenPayload(payloadJson);
     if (!tokenPayload) {
       throw new UnauthorizedException("Invalid access token claims.");
+    }
+
+    try {
+      this.jwtService.verify(token, {
+        secret: this.authSecret,
+        algorithms: ["HS256"],
+        ignoreExpiration: true,
+      });
+    } catch {
+      throw new UnauthorizedException("Invalid access token signature.");
     }
 
     const nowEpochSeconds = Math.floor(Date.now() / 1000);
@@ -325,17 +329,15 @@ export class AuthService {
   }
 
   private signToken(payload: AuthTokenPayload): string {
-    const encodedHeader = base64UrlEncodeJson(HEADER_TEMPLATE);
-    const encodedPayload = base64UrlEncodeJson(payload);
-    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-    const signature = this.createSignature(unsignedToken);
-    return `${unsignedToken}.${signature}`;
-  }
-
-  private createSignature(unsignedToken: string): string {
-    return createHmac("sha256", this.authSecret)
-      .update(unsignedToken, "utf8")
-      .digest("base64url");
+    return this.jwtService.sign(payload, {
+      secret: this.authSecret,
+      algorithm: "HS256",
+      noTimestamp: true,
+      header: {
+        alg: "HS256",
+        typ: "JWT",
+      },
+    });
   }
 
   private toManagedUser(user: AuthManagedUserRecord): AuthManagedUser {

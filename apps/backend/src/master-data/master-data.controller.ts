@@ -11,12 +11,16 @@ import {
   Req,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import type { AuthTokenPayload } from "../auth/auth.types";
 import { CreateMasterDataOptionDto } from "./dto/create-master-data-option.dto";
 import { ListMasterDataOptionsDto } from "./dto/list-master-data-options.dto";
 import { UpdateMasterDataOptionDto } from "./dto/update-master-data-option.dto";
 import { MasterDataService } from "./master-data.service";
 
+@ApiTags("Master Data")
+@ApiBearerAuth("access-token")
+@ApiCookieAuth("auth-cookie")
 @Controller("master-data")
 export class MasterDataController {
   constructor(@Inject(MasterDataService) private readonly masterDataService: MasterDataService) {}

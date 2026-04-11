@@ -3,12 +3,13 @@ import {
   BadRequestException,
   ConflictException,
   Inject,
+  InternalServerErrorException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
-import { resolveConfiguredDataSource } from "../config/app-config";
+import { resolveConfiguredDataSource, resolveConfiguredNodeEnv } from "../config/app-config";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   DEFAULT_MASTER_DATA_OPTIONS,
@@ -153,6 +154,7 @@ function mapDefaultOptionToMemory(option: MasterDataSeedOption, index: number): 
 @Injectable()
 export class MasterDataService {
   private readonly dataSource: "memory" | "prisma";
+  private readonly nodeEnv: string;
   private readonly memoryOptions = DEFAULT_MASTER_DATA_OPTIONS.map((option, index) =>
     mapDefaultOptionToMemory(option, index),
   );
@@ -164,6 +166,7 @@ export class MasterDataService {
     private readonly configService?: ConfigService,
   ) {
     this.dataSource = resolveConfiguredDataSource(this.configService);
+    this.nodeEnv = resolveConfiguredNodeEnv(this.configService);
   }
 
   async listCategories(): Promise<MasterDataCategorySummary[]> {
@@ -541,6 +544,10 @@ export class MasterDataService {
     return this.dataSource === "prisma" && this.prismaReadFallbackReason === null;
   }
 
+  private shouldAllowPrismaReadFallback(): boolean {
+    return this.nodeEnv !== "production";
+  }
+
   private assertPrismaStorageWritable(): void {
     if (this.prismaReadFallbackReason === null) {
       return;
@@ -553,6 +560,20 @@ export class MasterDataService {
     }
 
     throw new BadRequestException(
+      "Tabel MasterDataOption belum ada di database. Jalankan `npm run db:migrate:backend`, lalu restart backend.",
+    );
+  }
+
+  private createPrismaReadUnavailableError(
+    reason: "missing-table" | "missing-client",
+  ): InternalServerErrorException {
+    if (reason === "missing-client") {
+      return new InternalServerErrorException(
+        "Prisma client belum memuat model MasterDataOption. Jalankan `npm run db:generate --workspace backend`, lalu restart backend.",
+      );
+    }
+
+    return new InternalServerErrorException(
       "Tabel MasterDataOption belum ada di database. Jalankan `npm run db:migrate:backend`, lalu restart backend.",
     );
   }
@@ -617,6 +638,10 @@ export class MasterDataService {
       this.prismaSeedPromise = null;
 
       if (isMasterDataTableMissingError(error)) {
+        if (!this.shouldAllowPrismaReadFallback()) {
+          throw this.createPrismaReadUnavailableError("missing-table");
+        }
+
         this.prismaReadFallbackReason = "missing-table";
         console.warn(
           "MasterDataOption table was not found. Falling back to in-memory master data defaults for read operations.",
@@ -625,6 +650,10 @@ export class MasterDataService {
       }
 
       if (isMasterDataModelMissingError(error)) {
+        if (!this.shouldAllowPrismaReadFallback()) {
+          throw this.createPrismaReadUnavailableError("missing-client");
+        }
+
         this.prismaReadFallbackReason = "missing-client";
         console.warn(
           "Prisma client does not include MasterDataOption model. Falling back to in-memory master data defaults for read operations.",
