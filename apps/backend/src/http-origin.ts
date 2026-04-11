@@ -15,6 +15,10 @@ type ClientIpCarrier = {
   };
 };
 
+type ResolveClientIpOptions = {
+  trustProxyHeaders?: boolean;
+};
+
 const DEFAULT_CORS_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -55,14 +59,19 @@ function normalizeIpCandidate(value: string | null | undefined): string {
   return normalizedWithoutPort.toLowerCase();
 }
 
-export function resolveClientIp(request: ClientIpCarrier): string {
-  const forwardedHeader = readHeaderValue(request.headers, "x-forwarded-for");
-  const forwardedIp = forwardedHeader
-    .split(",")
-    .map((segment) => normalizeIpCandidate(segment))
-    .find((segment) => segment.length > 0);
-  if (forwardedIp) {
-    return forwardedIp;
+export function resolveClientIp(
+  request: ClientIpCarrier,
+  options?: ResolveClientIpOptions,
+): string {
+  if (options?.trustProxyHeaders) {
+    const forwardedHeader = readHeaderValue(request.headers, "x-forwarded-for");
+    const forwardedIp = forwardedHeader
+      .split(",")
+      .map((segment) => normalizeIpCandidate(segment))
+      .find((segment) => segment.length > 0);
+    if (forwardedIp) {
+      return forwardedIp;
+    }
   }
 
   const directIp = normalizeIpCandidate(request.ip);

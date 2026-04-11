@@ -106,6 +106,11 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
       assert.equal(items.length, 1);
       assert.equal(items[0].code, "GRP-1");
       assert.equal(findManyCalls.length, 1);
+      assert.equal(
+        Boolean((findManyCalls[0] as { select?: unknown }).select),
+        true,
+        "Expected Prisma groups list query to use an explicit select shape.",
+      );
 
       const where = (findManyCalls[0] as {
         where?: {
@@ -179,6 +184,11 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
       assert.ok(findManyArgs);
       assert.equal((findManyArgs as { skip: number }).skip, 3);
       assert.equal((findManyArgs as { take: number }).take, 3);
+      assert.equal(
+        Boolean((findManyArgs as { select?: unknown }).select),
+        true,
+        "Expected paginated Prisma groups list query to use an explicit select shape.",
+      );
 
       const where = countWhere as {
         AND: Array<{

@@ -9,17 +9,26 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   Res,
   UnauthorizedException,
 } from "@nestjs/common";
-import { serializeAuthCookie, serializeExpiredAuthCookie } from "./auth-cookie";
+import { ConfigService } from "@nestjs/config";
+import { SkipThrottle } from "@nestjs/throttler";
+import {
+  resolveAuthCookieRuntimeConfig,
+  serializeAuthCookie,
+  serializeExpiredAuthCookie,
+  type AuthCookieRuntimeConfig,
+} from "./auth-cookie";
 import { AuthService } from "./auth.service";
 import { AuthLoginRateLimiter } from "./auth-login-rate-limiter";
 import { LoginDto } from "./dto/login.dto";
 import type { AuthBrowserSession, AuthLoginResponse, AuthTokenPayload } from "./auth.types";
 import { Public } from "./auth.public";
 import { CreateManagedUserDto } from "./dto/create-managed-user.dto";
+import { SetManagedUserPasswordDto } from "./dto/set-managed-user-password.dto";
 import { UpdateManagedUserDto } from "./dto/update-managed-user.dto";
 
 type ResponseLike = {
@@ -36,12 +45,18 @@ function toBrowserSession(response: AuthLoginResponse): AuthBrowserSession {
 
 @Controller("auth")
 export class AuthController {
+  private readonly authCookieRuntimeConfig: AuthCookieRuntimeConfig;
+
   constructor(
     @Inject(AuthService) private readonly authService: AuthService,
     @Inject(AuthLoginRateLimiter) private readonly authLoginRateLimiter: AuthLoginRateLimiter,
-  ) {}
+    private readonly configService?: ConfigService,
+  ) {
+    this.authCookieRuntimeConfig = resolveAuthCookieRuntimeConfig(this.configService);
+  }
 
   @Public()
+  @SkipThrottle()
   @Post("login")
   @HttpCode(200)
   async login(
@@ -74,7 +89,7 @@ export class AuthController {
               (new Date(loginResponse.expiresAt).getTime() - Date.now()) / 1000,
             ),
           ),
-        }),
+        }, this.authCookieRuntimeConfig),
       );
       return toBrowserSession(loginResponse);
     } catch (error: unknown) {
@@ -114,11 +129,12 @@ export class AuthController {
   }
 
   @Public()
+  @SkipThrottle()
   @Post("logout")
   @HttpCode(204)
   logout(@Res({ passthrough: true }) response: ResponseLike): void {
     response.setHeader("Cache-Control", "no-store, private");
-    response.setHeader("Set-Cookie", serializeExpiredAuthCookie());
+    response.setHeader("Set-Cookie", serializeExpiredAuthCookie(this.authCookieRuntimeConfig));
   }
 
   @Get("users")
@@ -156,6 +172,7 @@ export class AuthController {
       name: payload.name,
       email: payload.email,
       roleId: payload.roleId,
+      password: payload.password,
     });
   }
 
@@ -179,6 +196,24 @@ export class AuthController {
       email: payload.email,
       roleId: payload.roleId,
     });
+  }
+
+  @Put("users/:userId/password")
+  async setManagedUserPassword(
+    @Param("userId") userId: string,
+    @Body() payload: SetManagedUserPasswordDto,
+    @Req()
+    request: {
+      authUser?: AuthTokenPayload;
+    },
+  ) {
+    const authUser = request.authUser;
+    if (!authUser) {
+      throw new UnauthorizedException("Session is not available.");
+    }
+
+    this.assertSuperAdminAccess(authUser);
+    return this.authService.setManagedUserPassword(userId, payload.password);
   }
 
   @Delete("users/:userId")

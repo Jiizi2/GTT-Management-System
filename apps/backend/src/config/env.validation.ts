@@ -14,6 +14,7 @@ const ENVIRONMENT_SCHEMA = Joi.object({
   AUTH_SECRET: Joi.string().allow("").optional(),
   AUTH_BOOTSTRAP_DEFAULT_USERS: Joi.boolean().truthy("true").falsy("false").optional(),
   CORS_ORIGINS: Joi.string().trim().allow("").optional(),
+  TRUST_PROXY: Joi.boolean().truthy("true").falsy("false").optional(),
   AUTH_COOKIE_DOMAIN: Joi.string().trim().pattern(COOKIE_DOMAIN_PATTERN).allow("").optional(),
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1_000).default(60_000),
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
@@ -33,6 +34,7 @@ type ValidatedEnvironment = {
   AUTH_SECRET?: string;
   AUTH_BOOTSTRAP_DEFAULT_USERS?: boolean;
   CORS_ORIGINS?: string;
+  TRUST_PROXY?: boolean;
   AUTH_COOKIE_DOMAIN?: string;
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: number;
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: number;
@@ -66,6 +68,11 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
   resolveCorsOrigins(validated.CORS_ORIGINS);
 
   if (validated.NODE_ENV === "production") {
+    const corsOrigins = validated.CORS_ORIGINS?.trim() ?? "";
+    if (!corsOrigins) {
+      throw new Error("CORS_ORIGINS is required in production.");
+    }
+
     const authSecret = validated.AUTH_SECRET?.trim() ?? "";
     if (!authSecret) {
       throw new Error("AUTH_SECRET is required in production.");

@@ -22,7 +22,7 @@ import {
 } from "./dto/group-operations.dto";
 import { ConfirmChecklistDriverDto } from "./dto/confirm-checklist-driver.dto";
 import { ResetChecklistDriverDto } from "./dto/reset-checklist-driver.dto";
-import { groupInclude } from "./groups.prisma-include";
+import { groupReadSelection } from "./groups.prisma-include";
 import { resolveItineraryTitle } from "./groups-itinerary-title";
 import {
   type ChecklistAssignmentSyncResult,
@@ -2041,7 +2041,7 @@ export class GroupsService {
     if (!pageState) {
       return this.prisma.group.findMany({
         where,
-        include: groupInclude,
+        select: groupReadSelection,
         orderBy: {
           createdAt: "desc",
         },
@@ -2052,7 +2052,7 @@ export class GroupsService {
       this.prisma.group.count({ where }),
       this.prisma.group.findMany({
         where,
-        include: groupInclude,
+        select: groupReadSelection,
         orderBy: {
           createdAt: "desc",
         },
@@ -2074,7 +2074,7 @@ export class GroupsService {
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
       },
-      include: groupInclude,
+      select: groupReadSelection,
     });
 
     if (!group) {
@@ -2090,7 +2090,7 @@ export class GroupsService {
     try {
       return await this.prisma.group.create({
         data: buildGroupCreateData(payload, normalizedCode),
-        include: groupInclude,
+        select: groupReadSelection,
       });
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -2197,7 +2197,7 @@ export class GroupsService {
       const replaced = await tx.group.update({
         where: { id: current.id },
         data: buildGroupReplaceData(payload, normalizedCode),
-        include: groupInclude,
+        select: groupReadSelection,
       });
 
       if (checklistSortOrderHints.size === 0) {
@@ -2247,7 +2247,7 @@ export class GroupsService {
         where: {
           id: current.id,
         },
-        include: groupInclude,
+        select: groupReadSelection,
       });
     });
   }
@@ -2302,7 +2302,7 @@ export class GroupsService {
         packageName: payload.packageName?.trim(),
         durationDays: payload.durationDays,
       },
-      include: groupInclude,
+      select: groupReadSelection,
     });
   }
 

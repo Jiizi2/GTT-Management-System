@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsString, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import type { AuthManagedUserRole } from "../auth.types";
 
 const MANAGED_USER_ROLE_VALUES: AuthManagedUserRole[] = [
@@ -20,4 +20,10 @@ export class CreateManagedUserDto {
 
   @IsIn(MANAGED_USER_ROLE_VALUES)
   roleId!: AuthManagedUserRole;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(1024)
+  password?: string;
 }

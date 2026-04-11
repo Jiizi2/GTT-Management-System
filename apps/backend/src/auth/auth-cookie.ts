@@ -1,3 +1,5 @@
+import { ConfigService } from "@nestjs/config";
+import { resolveConfiguredNodeEnv, resolveConfiguredString } from "../config/app-config";
 import { readHeaderValue } from "../http-origin";
 
 export const AUTH_COOKIE_NAME = "gtt_auth_session";
@@ -5,14 +7,19 @@ export const AUTH_COOKIE_NAME = "gtt_auth_session";
 const EXPIRED_COOKIE_DATE = "Thu, 01 Jan 1970 00:00:00 GMT";
 const COOKIE_DOMAIN_PATTERN = /^\.?[a-z0-9-]+(\.[a-z0-9-]+)*$/i;
 
-function isProductionEnvironment(): boolean {
-  return process.env.NODE_ENV?.trim().toLowerCase() === "production";
-}
+export type AuthCookieRuntimeConfig = {
+  cookieDomain?: string;
+  isProduction: boolean;
+};
 
-function resolveCookieDomain(): string | undefined {
-  const normalized = process.env.AUTH_COOKIE_DOMAIN?.trim().toLowerCase() ?? "";
+export function resolveAuthCookieRuntimeConfig(
+  configService?: ConfigService,
+): AuthCookieRuntimeConfig {
+  const normalized = (resolveConfiguredString(configService, "AUTH_COOKIE_DOMAIN") ?? "").toLowerCase();
   if (!normalized) {
-    return undefined;
+    return {
+      isProduction: resolveConfiguredNodeEnv(configService) === "production",
+    };
   }
 
   if (
@@ -23,14 +30,17 @@ function resolveCookieDomain(): string | undefined {
     !COOKIE_DOMAIN_PATTERN.test(normalized)
   ) {
     throw new Error(
-      `Invalid AUTH_COOKIE_DOMAIN value '${process.env.AUTH_COOKIE_DOMAIN}'. Expected a bare cookie domain.`,
+      `Invalid AUTH_COOKIE_DOMAIN value '${resolveConfiguredString(configService, "AUTH_COOKIE_DOMAIN")}'. Expected a bare cookie domain.`,
     );
   }
 
-  return normalized;
+  return {
+    isProduction: resolveConfiguredNodeEnv(configService) === "production",
+    cookieDomain: normalized,
+  };
 }
 
-function buildCookieBaseParts(): string[] {
+function buildCookieBaseParts(runtimeConfig: AuthCookieRuntimeConfig): string[] {
   const parts = [
     "Path=/",
     "HttpOnly",
@@ -38,13 +48,12 @@ function buildCookieBaseParts(): string[] {
     "Priority=High",
   ];
 
-  if (isProductionEnvironment()) {
+  if (runtimeConfig.isProduction) {
     parts.push("Secure");
   }
 
-  const cookieDomain = resolveCookieDomain();
-  if (cookieDomain) {
-    parts.push(`Domain=${cookieDomain}`);
+  if (runtimeConfig.cookieDomain) {
+    parts.push(`Domain=${runtimeConfig.cookieDomain}`);
   }
 
   return parts;
@@ -54,10 +63,10 @@ export function serializeAuthCookie(args: {
   accessToken: string;
   rememberSession: boolean;
   maxAgeSeconds: number;
-}): string {
+}, runtimeConfig: AuthCookieRuntimeConfig): string {
   const parts = [
     `${AUTH_COOKIE_NAME}=${encodeURIComponent(args.accessToken)}`,
-    ...buildCookieBaseParts(),
+    ...buildCookieBaseParts(runtimeConfig),
   ];
 
   if (args.rememberSession) {
@@ -69,10 +78,10 @@ export function serializeAuthCookie(args: {
   return parts.join("; ");
 }
 
-export function serializeExpiredAuthCookie(): string {
+export function serializeExpiredAuthCookie(runtimeConfig: AuthCookieRuntimeConfig): string {
   return [
     `${AUTH_COOKIE_NAME}=`,
-    ...buildCookieBaseParts(),
+    ...buildCookieBaseParts(runtimeConfig),
     "Max-Age=0",
     `Expires=${EXPIRED_COOKIE_DATE}`,
   ].join("; ");

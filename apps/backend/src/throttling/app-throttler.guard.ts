@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
+import { resolveConfiguredBoolean } from "../config/app-config";
 import { resolveClientIp } from "../http-origin";
 
 @Injectable()
@@ -15,6 +16,8 @@ export class AppThrottlerGuard extends ThrottlerGuard {
                 typeof req.socket.remoteAddress === "string" ? req.socket.remoteAddress : null,
             }
           : undefined,
+    }, {
+      trustProxyHeaders: resolveConfiguredBoolean(undefined, "TRUST_PROXY") === true,
     });
   }
 }

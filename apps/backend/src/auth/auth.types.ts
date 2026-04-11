@@ -34,5 +34,6 @@ export type AuthManagedUser = {
   name: string;
   email: string;
   roleId: AuthManagedUserRole;
+  hasPassword: boolean;
   updatedAt: string;
 };

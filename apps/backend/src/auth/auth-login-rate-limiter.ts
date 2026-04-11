@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Inject, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { resolveConfiguredNumber } from "../config/app-config";
+import { resolveConfiguredBoolean, resolveConfiguredNumber } from "../config/app-config";
 import { resolveClientIp } from "../http-origin";
 
 type LoginRateLimitBucket = {
@@ -14,6 +14,7 @@ type LoginRateLimiterOptions = {
   maxAttempts: number;
   lockMs: number;
   now: () => number;
+  trustProxyHeaders: boolean;
 };
 
 type LoginRequestLike = {
@@ -55,6 +56,7 @@ export class AuthLoginRateLimiter {
   private readonly maxAttempts: number;
   private readonly lockMs: number;
   private readonly now: () => number;
+  private readonly trustProxyHeaders: boolean;
   private readonly buckets = new Map<string, LoginRateLimitBucket>();
 
   constructor(
@@ -94,10 +96,15 @@ export class AuthLoginRateLimiter {
         ),
       );
     this.now = options?.now ?? (() => Date.now());
+    this.trustProxyHeaders =
+      options?.trustProxyHeaders ??
+      resolveConfiguredBoolean(this.configService, "TRUST_PROXY") === true;
   }
 
   resolveKeys(identifier: string, request: LoginRequestLike): LoginRateLimiterKeySet {
-    const clientIp = resolveClientIp(request);
+    const clientIp = resolveClientIp(request, {
+      trustProxyHeaders: this.trustProxyHeaders,
+    });
     const normalizedIdentifier = normalizeIdentifier(identifier);
 
     return {

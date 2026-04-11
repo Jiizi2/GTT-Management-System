@@ -7,7 +7,7 @@ async function runCase(name: string, fn: () => void): Promise<void> {
   console.log(`PASS ${name}`);
 }
 
-function testResolveKeysUsesForwardedIpAndNormalizedIdentifier(): void {
+function testResolveKeysUsesDirectIpWhenProxyTrustIsDisabled(): void {
   const limiter = new AuthLoginRateLimiter({
     windowMs: 10_000,
     maxAttempts: 3,
@@ -16,6 +16,27 @@ function testResolveKeysUsesForwardedIpAndNormalizedIdentifier(): void {
   });
 
   const keys = limiter.resolveKeys(" Admin.User@Example.Com ", {
+    ip: "198.51.100.7",
+    headers: {
+      "x-forwarded-for": "203.0.113.10, 10.0.0.20",
+    },
+  });
+
+  assert.equal(keys.ipKey, "ip:198.51.100.7");
+  assert.equal(keys.principalKey, "principal:198.51.100.7|admin.user@example.com");
+}
+
+function testResolveKeysUsesForwardedIpWhenProxyTrustIsEnabled(): void {
+  const limiter = new AuthLoginRateLimiter({
+    windowMs: 10_000,
+    maxAttempts: 3,
+    lockMs: 1_000,
+    now: () => 0,
+    trustProxyHeaders: true,
+  });
+
+  const keys = limiter.resolveKeys(" Admin.User@Example.Com ", {
+    ip: "198.51.100.7",
     headers: {
       "x-forwarded-for": "203.0.113.10, 10.0.0.20",
     },
@@ -93,8 +114,12 @@ function testIpLevelLockAppliesAcrossDifferentIdentifiers(): void {
 
 async function main(): Promise<void> {
   await runCase(
-    "auth login limiter resolves forwarded ip and identifier",
-    testResolveKeysUsesForwardedIpAndNormalizedIdentifier,
+    "auth login limiter prefers direct ip when proxy trust is disabled",
+    testResolveKeysUsesDirectIpWhenProxyTrustIsDisabled,
+  );
+  await runCase(
+    "auth login limiter resolves forwarded ip when proxy trust is enabled",
+    testResolveKeysUsesForwardedIpWhenProxyTrustIsEnabled,
   );
   await runCase(
     "auth login limiter locks and unlocks by cooldown",

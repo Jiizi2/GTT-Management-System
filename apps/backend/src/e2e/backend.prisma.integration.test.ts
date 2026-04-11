@@ -209,6 +209,16 @@ async function cleanupCreatedRecordsByPrefix(clientNamePrefix: string): Promise<
   });
 }
 
+async function cleanupManagedUsersByEmailPrefix(emailPrefix: string): Promise<void> {
+  await prisma.authUser.deleteMany({
+    where: {
+      email: {
+        startsWith: emailPrefix,
+      },
+    },
+  });
+}
+
 async function testPrismaIntegrationFlow(): Promise<void> {
   const server = await startBackendServerWithPrisma();
   const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)
@@ -416,11 +426,118 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
   }
 }
 
+async function testPrismaManagedUserPasswordFlow(): Promise<void> {
+  const server = await startBackendServerWithPrisma();
+  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)
+    .toString()
+    .padStart(4, "0")}`;
+  const emailPrefix = `managed.integration.${uniqueSuffix}`;
+  const managedUserEmail = `${emailPrefix}@example.com`;
+
+  try {
+    await authenticateDevSession(server.baseUrl);
+
+    const createResponse = await requestJson(server.baseUrl, "/api/auth/users", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Prisma Managed Admin",
+        email: managedUserEmail,
+        roleId: "admin",
+      }),
+    });
+    assert.equal(createResponse.status, 201, `Create managed user failed: ${createResponse.text}`);
+    const createdUser = createResponse.json as {
+      id?: string;
+      hasPassword?: boolean;
+    };
+    assert.equal(typeof createdUser.id, "string", `Expected managed user id: ${createResponse.text}`);
+    assert.equal(createdUser.hasPassword, false, `Expected hasPassword=false: ${createResponse.text}`);
+
+    const setPasswordResponse = await requestJson(
+      server.baseUrl,
+      `/api/auth/users/${encodeURIComponent(createdUser.id ?? "")}/password`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          password: "PrismaManaged#2026",
+        }),
+      },
+    );
+    assert.equal(
+      setPasswordResponse.status,
+      200,
+      `Set managed user password failed: ${setPasswordResponse.text}`,
+    );
+    assert.equal(
+      (setPasswordResponse.json as { hasPassword?: boolean }).hasPassword,
+      true,
+      `Expected hasPassword=true after reset: ${setPasswordResponse.text}`,
+    );
+
+    const logoutResponse = await requestJson(server.baseUrl, "/api/auth/logout", {
+      method: "POST",
+    });
+    assert.equal(logoutResponse.status, 204, `Logout failed: ${logoutResponse.text}`);
+    activeAuthCookie = null;
+
+    const loginResponse = await requestJson(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: managedUserEmail,
+        password: "PrismaManaged#2026",
+        rememberSession: false,
+      }),
+    });
+    assert.equal(loginResponse.status, 200, `Managed user login failed: ${loginResponse.text}`);
+    assert.equal(
+      (loginResponse.json as { user?: { accessTier?: string } })?.user?.accessTier,
+      "admin",
+      `Expected managed user access tier in login response: ${loginResponse.text}`,
+    );
+    const setCookie = loginResponse.headers.get("set-cookie") ?? "";
+    const cookieHeader = setCookie.split(";")[0]?.trim() ?? "";
+    assert.notEqual(cookieHeader, "", "Managed user login should return a session cookie.");
+    activeAuthCookie = cookieHeader;
+
+    const sessionResponse = await requestJson(server.baseUrl, "/api/auth/session");
+    assert.equal(sessionResponse.status, 200, `Fetch auth session failed: ${sessionResponse.text}`);
+    assert.equal(
+      (sessionResponse.json as { user?: { email?: string } })?.user?.email,
+      managedUserEmail,
+      `Expected auth session email in response: ${sessionResponse.text}`,
+    );
+
+    const forbiddenUsersResponse = await requestJson(server.baseUrl, "/api/auth/users");
+    assert.equal(
+      forbiddenUsersResponse.status,
+      403,
+      `Expected admin-managed account to be blocked from user management: ${forbiddenUsersResponse.text}`,
+    );
+  } finally {
+    activeAuthCookie = null;
+    await cleanupManagedUsersByEmailPrefix(emailPrefix);
+    await server.shutdown();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase("backend prisma integration flow", testPrismaIntegrationFlow);
   await runCase(
     "backend prisma concurrent invoice create flow",
     testPrismaConcurrentInvoiceCreateFlow,
+  );
+  await runCase(
+    "backend prisma managed user password flow",
+    testPrismaManagedUserPasswordFlow,
   );
 }
 

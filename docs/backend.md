@@ -60,6 +60,7 @@ Variabel penting:
 - `NODE_ENV`
 - `AUTH_SECRET` (wajib dan minimal 32 karakter di production)
 - `CORS_ORIGINS`
+- `TRUST_PROXY` (opsional; default `false`, aktifkan hanya jika backend berada di balik reverse proxy tepercaya)
 - `AUTH_COOKIE_DOMAIN` (opsional; default host-only cookie)
 - login rate limit env (`AUTH_LOGIN_RATE_LIMIT_*`)
 - global throttle env (`THROTTLE_DEFAULT_*`)
@@ -68,7 +69,8 @@ Aturan khusus:
 
 - `NODE_ENV=production` mewajibkan `DATA_SOURCE=prisma`.
 - `AUTH_BOOTSTRAP_DEFAULT_USERS=true` ditolak di production.
-- `CORS_ORIGINS` harus diisi origin eksplisit; wildcard `*` tidak didukung untuk mode cookie auth.
+- `CORS_ORIGINS` wajib diisi origin eksplisit di production; wildcard `*` tidak didukung untuk mode cookie auth.
+- `TRUST_PROXY=true` hanya boleh dipakai jika header proxy benar-benar disanitasi oleh reverse proxy tepercaya.
 
 ## 5. Mode Data
 
@@ -99,7 +101,10 @@ Aturan khusus:
 - `GET /api/auth/session`
 - `GET /api/auth/users`
 - `POST /api/auth/users`
+  - bisa menerima password awal opsional agar akun langsung aktif
 - `PATCH /api/auth/users/:userId`
+- `PUT /api/auth/users/:userId/password`
+  - set/reset password managed user
 - `DELETE /api/auth/users/:userId`
 
 ## Groups

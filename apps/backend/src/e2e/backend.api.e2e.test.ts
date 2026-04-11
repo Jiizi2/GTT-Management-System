@@ -667,6 +667,98 @@ async function testBackendApiFlow(): Promise<void> {
   }
 }
 
+async function testManagedUserPasswordHttpFlow(): Promise<void> {
+  const server = await startBackendServer();
+  const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 10_000)
+    .toString()
+    .padStart(4, "0")}`;
+  const managedUserEmail = `http.admin.${uniqueSuffix}@example.com`;
+
+  try {
+    await authenticateDevSession(server.baseUrl);
+
+    const createResponse = await requestJson(server.baseUrl, "/api/auth/users", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "HTTP Managed Admin",
+        email: managedUserEmail,
+        roleId: "admin",
+      }),
+    });
+    assert.equal(createResponse.status, 201, `Create managed user failed: ${createResponse.text}`);
+    const createdUser = createResponse.json as {
+      id?: string;
+      hasPassword?: boolean;
+    };
+    assert.equal(typeof createdUser.id, "string", `Expected managed user id: ${createResponse.text}`);
+    assert.equal(createdUser.hasPassword, false, `Expected hasPassword=false: ${createResponse.text}`);
+
+    const setPasswordResponse = await requestJson(
+      server.baseUrl,
+      `/api/auth/users/${encodeURIComponent(createdUser.id ?? "")}/password`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          password: "ManagedHttp#2026",
+        }),
+      },
+    );
+    assert.equal(
+      setPasswordResponse.status,
+      200,
+      `Set managed user password failed: ${setPasswordResponse.text}`,
+    );
+    assert.equal(
+      (setPasswordResponse.json as { hasPassword?: boolean }).hasPassword,
+      true,
+      `Expected hasPassword=true after reset: ${setPasswordResponse.text}`,
+    );
+
+    const usersResponse = await requestJson(server.baseUrl, "/api/auth/users");
+    assert.equal(usersResponse.status, 200, `List managed users failed: ${usersResponse.text}`);
+    const users = ensureArray<{ id?: string; hasPassword?: boolean }>(
+      usersResponse.json,
+      "Managed user list should be an array.",
+    );
+    const updatedUser = users.find((entry) => entry.id === createdUser.id);
+    assert.equal(Boolean(updatedUser), true, "Expected created managed user in list.");
+    assert.equal(updatedUser?.hasPassword, true, "Expected listed user to reflect hasPassword=true.");
+
+    const logoutResponse = await requestJson(server.baseUrl, "/api/auth/logout", {
+      method: "POST",
+    });
+    assert.equal(logoutResponse.status, 204, `Logout failed: ${logoutResponse.text}`);
+    activeAuthCookie = null;
+
+    const loginResponse = await requestJson(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: managedUserEmail,
+        password: "ManagedHttp#2026",
+        rememberSession: false,
+      }),
+    });
+    assert.equal(loginResponse.status, 200, `Managed user login failed: ${loginResponse.text}`);
+    assert.equal(
+      (loginResponse.json as { user?: { accessTier?: string } })?.user?.accessTier,
+      "admin",
+      `Expected managed user access tier in login response: ${loginResponse.text}`,
+    );
+  } finally {
+    activeAuthCookie = null;
+    await server.shutdown();
+  }
+}
+
 async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise<void> {
   const server = await startBackendServer();
   const todayIso = toIsoDateOnly(new Date());
@@ -1279,6 +1371,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
 
 async function main(): Promise<void> {
   await runCase("backend api e2e flow", testBackendApiFlow);
+  await runCase("backend managed user password http flow", testManagedUserPasswordHttpFlow);
   await runCase(
     "backend comprehensive add-group overview invoice raudhah flow",
     testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow,

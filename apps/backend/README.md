@@ -29,7 +29,8 @@
 - Recommended flow:
   1. Copy `env.production.example` to `.env` on production host.
   2. Set real `DATABASE_URL`, `AUTH_SECRET`, and `CORS_ORIGINS`.
-  3. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
+  3. Keep `TRUST_PROXY=false` unless requests really come through a trusted reverse proxy.
+  4. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
 
 ## Quick Start (Fallback: Memory Mode)
 
@@ -59,6 +60,8 @@
 - `DATA_SOURCE=prisma` is mandatory in production (`NODE_ENV=production`).
 - `DATABASE_URL` is required when `DATA_SOURCE=prisma`.
 - `AUTH_SECRET` is required in production and should be a private random value.
+- `CORS_ORIGINS` is required in production and must use explicit origins.
+- `TRUST_PROXY` should stay `false` unless proxy headers are sanitized by trusted infrastructure.
 - `AUTH_BOOTSTRAP_DEFAULT_USERS` controls auto-creation of default auth users on startup in Prisma mode.
   - Defaults to `true` outside production.
   - Defaults to `false` in production.
@@ -98,6 +101,12 @@
 
 - `GET /api/health`
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/session`
+- `GET /api/auth/users`
+- `POST /api/auth/users`
+- `PATCH /api/auth/users/:userId`
+- `PUT /api/auth/users/:userId/password`
 - `GET /api/auth/session`
 - `GET /api/auth/users`
 - `POST /api/auth/users`

@@ -194,6 +194,7 @@ async function testManagedUsersCrudRulesInMemoryMode(): Promise<void> {
         listedUsers.map((user) => user.name),
         ["Hadi Support", "Mila Finance", "Operator Admin"],
       );
+      assert.equal(listedUsers.every((user) => user.hasPassword === false), true);
 
       const created = await service.createManagedUser({
         name: "  Rina Ops  ",
@@ -203,6 +204,7 @@ async function testManagedUsersCrudRulesInMemoryMode(): Promise<void> {
       assert.equal(created.name, "Rina Ops");
       assert.equal(created.email, "rina.ops@ghaniyatravel.com");
       assert.equal(created.roleId, "customer-support");
+      assert.equal(created.hasPassword, false);
 
       const updated = await service.updateManagedUser("usr-2", {
         name: "  Mila Operations  ",
@@ -257,12 +259,47 @@ async function testManagedUsersCrudRulesInMemoryMode(): Promise<void> {
   });
 }
 
+async function testManagedUserPasswordProvisioningInMemoryMode(): Promise<void> {
+  await withDataSource("memory", async () => {
+    await withAuthSecret("unit-test-secret", async () => {
+      const service = createMemoryAuthService();
+
+      const created = await service.createManagedUser({
+        name: "  Rina Access  ",
+        email: "Rina.Access@GhaniyaTravel.com",
+        roleId: "admin",
+        password: "RinaAccess#2026",
+      });
+      assert.equal(created.hasPassword, true);
+
+      const createdLogin = await service.login({
+        identifier: "rina.access@ghaniyatravel.com",
+        password: "RinaAccess#2026",
+      });
+      assert.equal(createdLogin.user.accessTier, "admin");
+
+      const reset = await service.setManagedUserPassword("usr-1", "Operator#2026");
+      assert.equal(reset.hasPassword, true);
+
+      const resetLogin = await service.login({
+        identifier: "operator.admin@ghaniyatravel.com",
+        password: "Operator#2026",
+      });
+      assert.equal(resetLogin.user.accessTier, "admin");
+    });
+  });
+}
+
 async function main(): Promise<void> {
   await runCase("auth login and token verification", testLoginAndTokenVerificationWithDefaultLifetime);
   await runCase("auth remembered session lifetime", testLoginWithEmailAndRememberedSessionLifetime);
   await runCase("auth invalid credentials rejection", testLoginRejectsInvalidCredentials);
   await runCase("auth token tamper and expiry validation", testVerifyTokenRejectsTamperedSignatureAndExpiredToken);
   await runCase("managed users memory CRUD validation", testManagedUsersCrudRulesInMemoryMode);
+  await runCase(
+    "managed user password provisioning in memory mode",
+    testManagedUserPasswordProvisioningInMemoryMode,
+  );
 }
 
 void main().catch((error: unknown) => {
