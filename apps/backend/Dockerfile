@@ -9,8 +9,6 @@ COPY apps/frontend/package.json apps/frontend/package.json
 RUN npm ci
 
 COPY . .
-
-RUN npm run db:generate:backend
 RUN npm run build:backend
 
 FROM node:20-alpine AS runtime

@@ -5,7 +5,7 @@
   "type": "commonjs",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run db:generate && tsc -p tsconfig.json",
     "predev": "node scripts/release-dev-port.js",
     "dev": "node scripts/dev.js",
     "start": "node dist/main.js",
