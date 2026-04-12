@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as Domain from "../shared/app-domain";
+import * as GroupDomain from "../features/groups/domain";
 import {
   DeleteConfirmModal,
   DeleteGroupModal,
@@ -41,7 +41,7 @@ const {
   normalizeAgreementCityKey,
   parseTimeForInput,
   shouldShowFridayCityTourWarning,
-} = Domain;
+} = GroupDomain;
 
 function resolveItinerarySortTimestamp(item: ItineraryItem): number {
   const trimmedIsoDate = item.isoDate?.trim() ?? "";

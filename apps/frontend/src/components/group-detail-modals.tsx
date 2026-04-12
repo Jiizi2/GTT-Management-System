@@ -3,7 +3,7 @@ import { useEffect, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import * as Domain from "../shared/app-domain";
+import * as GroupDomain from "../features/groups/domain";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
 import { SereneSelect } from "./serene-select";
 import { useSaudiCityOptions } from "../hooks/use-saudi-city-options";
@@ -23,7 +23,7 @@ const {
   normalizeSaudiCityValue,
   saudiCityOptions: defaultSaudiCityOptions,
   scheduleTypeOptions,
-} = Domain;
+} = GroupDomain;
 
 const modalFieldClassName =
   "serene-field";

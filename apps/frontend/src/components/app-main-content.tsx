@@ -1,6 +1,6 @@
 import { Suspense, lazy, useMemo } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { buildVisaTrackingRowsFromGroups } from "../shared/app-domain";
+import { buildVisaTrackingRowsFromGroups } from "../features/visa/domain";
 import { buildDashboardPath } from "../shared/app-route";
 import type { AppController } from "../hooks/use-app-controller";
 

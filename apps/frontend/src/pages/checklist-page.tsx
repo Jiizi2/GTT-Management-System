@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import * as Domain from "../shared/app-domain";
+import * as GroupDomain from "../features/groups/domain";
 import type {
   ChecklistDriverAssignment,
   ChecklistDriverDraft,
@@ -19,7 +19,7 @@ const {
   formatChecklistCopyDate,
   formatScheduleTime,
   getChecklistDayLabel,
-} = Domain;
+} = GroupDomain;
 
 const CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY = "gtt-h1-checklist-confirmed-drivers-v1";
 

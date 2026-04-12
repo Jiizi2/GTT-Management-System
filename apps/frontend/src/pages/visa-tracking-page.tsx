@@ -1,19 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import * as Domain from "../shared/app-domain";
-import type {
-  AgreementApprovalStatus,
-  GroupData,
-  GroupRaudhahStatus,
-  VisaFilterId,
-  VisaTrackingRow,
-} from "../shared/app-domain";
-import { PaginationControls } from "../components/pagination-controls";
-import { SereneSelect } from "../components/serene-select";
-import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { useThemeMode } from "../theme/theme-provider";
-import { exportVisaTrackingReportPdf } from "./visa-tracking-export";
-
-const {
+import {
   buildVisaTrackingRowsFromGroups,
   formatVisaShortDate,
   getGroupAgreementHotelsByCity,
@@ -22,8 +8,20 @@ const {
   resolveValidRaudhahAppointments,
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
-  VISA_PAGE_SIZE,
-} = Domain;
+} from "../features/visa/domain";
+import type {
+  AgreementApprovalStatus,
+  GroupData,
+  GroupRaudhahStatus,
+  VisaFilterId,
+  VisaTrackingRow,
+} from "../shared/app-domain";
+import { VISA_PAGE_SIZE } from "../shared/app-domain";
+import { PaginationControls } from "../components/pagination-controls";
+import { SereneSelect } from "../components/serene-select";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { useThemeMode } from "../theme/theme-provider";
+import { exportVisaTrackingReportPdf } from "./visa-tracking-export";
 
 function getFilterChipClasses(isActive: boolean, isDarkMode: boolean): string {
   if (isActive) {

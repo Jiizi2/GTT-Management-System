@@ -1,4 +1,4 @@
-import * as Domain from "../shared/app-domain";
+import * as GroupDomain from "../features/groups/domain";
 import type { GroupData } from "../shared/app-domain";
 
 const {
@@ -9,7 +9,7 @@ const {
   parseDisplayDateToIso,
   parseTimeForInput,
   resolveTotalBusCount,
-} = Domain;
+} = GroupDomain;
 
 type GroupItineraryItem = GroupData["itinerary"][number];
 type ItineraryPreviewState = "past" | "next" | "upcoming";

@@ -15,12 +15,27 @@ Dokumen ini menjelaskan arsitektur frontend, alur state, integrasi API, dan comm
 Direktori utama:
 
 - `src/app.tsx`: root app routes + auth gate + layout desktop/mobile.
+- `src/features/groups/*`: boundary feature untuk groups, workspace itinerary, query groups, dan controller dashboard group records.
+  - `domain.ts`: facade groups untuk consumer feature.
+  - `options.ts`: option list, form seed, page size, dan helper bus count.
+  - `itinerary.ts`: builder/editing/helper itinerary dan schedule.
+  - `checklist.ts`: builder checklist H-1/H+2.
+  - `status.ts`: tone/status grup dan normalisasi snapshot overview.
+- `src/features/invoice/*`: boundary feature untuk invoice API, React Query bindings, export, dan halaman invoice.
+- `src/features/visa/*`: boundary feature untuk domain/helper visa.
 - `src/components/*`: komponen UI reusable.
 - `src/pages/*`: layar/halaman per fitur.
 - `src/hooks/*`: state orchestration dan komunikasi backend.
 - `src/hooks/app-controller/*`: hook modular untuk navigation, feedback, dan group state.
-- `src/shared/*`: tipe domain + helper bisnis frontend.
+- `src/shared/app-domain-types.ts`: source of truth untuk type domain lintas fitur.
+- `src/shared/app-domain-core.ts`: helper inti netral yang dipakai lintas fitur.
+- `src/shared/app-domain.ts`: compatibility facade untuk import lama yang belum dipindah.
+- `src/shared/*`: helper bisnis frontend lain yang belum punya boundary fitur sendiri.
 - `public/*`: aset statis + `index.html`.
+
+Catatan transisi:
+
+- Path lama di `src/pages/*`, `src/hooks/*`, `src/shared/visa-domain.ts`, dan `src/shared/app-domain.ts` masih disediakan sebagai compatibility wrapper/facade agar refactor boundary feature bisa dilakukan bertahap tanpa memutus import lama sekaligus.
 
 ## 3. Navigasi dan Halaman
 
@@ -92,8 +107,8 @@ Mekanisme:
 
 Hook backend utama:
 
-- `use-app-controller-backend.ts` -> endpoint grup (`/api/groups` dan turunannya).
-- `use-invoice-backend.ts` -> invoice (`/api/invoices`, `/api/invoices/clients`, `/api/health`).
+- `src/features/groups/api.ts` -> endpoint grup (`/api/groups` dan turunannya).
+- `src/features/invoice/api.ts` -> invoice (`/api/invoices`, `/api/invoices/clients`, `/api/health`).
 - `use-user-management-backend.ts` -> user management (`/api/auth/users`).
 - `use-master-data-backend.ts` -> master data (`/api/master-data/*`).
 - `use-saudi-city-options.ts` -> konsumsi category `saudi-city` dari master data.

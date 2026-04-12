@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { type MasterDataOption } from "./use-master-data-backend";
 import { useMasterDataOptionsQuery } from "./use-master-data-query";
-import { registerSaudiCityOptions } from "../shared/app-domain";
+import { registerSaudiCityOptions } from "../features/groups/domain";
 
 function mapOptionsToCityList(options: MasterDataOption[]): string[] {
   return Array.from(

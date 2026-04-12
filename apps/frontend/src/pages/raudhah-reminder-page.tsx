@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as Domain from "../shared/app-domain";
 import type { GroupData, GroupRaudhahStatus, VisaTrackingRow } from "../shared/app-domain";
-import { useThemeMode } from "../theme/theme-provider";
-import { ThemeToggleButton } from "../components/theme-toggle-button";
-
-const {
+import { formatLocalIsoDate } from "../shared/app-domain";
+import {
   buildVisaTrackingRowsFromGroups,
-  formatLocalIsoDate,
   formatVisaDateWithYear,
   isIsoDateValue,
   resolveValidRaudhahAppointments,
   resolveVisaProvider,
   shiftIsoDate,
-} = Domain;
+} from "../features/visa/domain";
+import { useThemeMode } from "../theme/theme-provider";
+import { ThemeToggleButton } from "../components/theme-toggle-button";
 
 type ReminderSlot = "h2" | "h7" | "h7Upcoming";
 type ReminderSlotStatus = "open" | "upcoming" | "missed";

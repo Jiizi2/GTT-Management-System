@@ -1,8 +1,8 @@
-import * as Domain from "../shared/app-domain";
+import * as GroupDomain from "../features/groups/domain";
+import { escapeHtml } from "../shared/app-domain";
 import type { GroupData, ItineraryItem, Musyrif, NoteItem } from "../shared/app-domain";
 
 const {
-  escapeHtml,
   formatScheduleTime,
   inferCategoryKey,
   inferCityTourCity,
@@ -10,7 +10,7 @@ const {
   parseDisplayDateToIso,
   parseTimeForInput,
   resolveTotalBusCount,
-} = Domain;
+} = GroupDomain;
 
 function formatItineraryActivityHeading(
   item: ItineraryItem,
