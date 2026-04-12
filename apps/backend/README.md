@@ -36,6 +36,16 @@
   4. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
   5. Keep runtime cleanup enabled unless you intentionally externalize retention management.
 
+## Initial Production Super Admin
+
+- Production does not auto-create default auth users.
+- `AUTH_BOOTSTRAP_DEFAULT_USERS=true` is rejected in production.
+- Prisma seed also refuses to run in production.
+- For a fresh production database, create the first super-admin manually with:
+  - `npm run auth:bootstrap:superadmin -- --name "Owner" --email "owner@example.com" --password "StrongPassword#2026"`
+- The command only succeeds when the `AuthUser` table is still empty.
+- If `--username` is omitted, the username is derived from the email local-part.
+
 ## Quick Start (Fallback: Memory Mode)
 
 1. Copy env:

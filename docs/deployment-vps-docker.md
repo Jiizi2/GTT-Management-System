@@ -146,7 +146,7 @@ Yang terjadi:
 Sebelum seluruh stack dinaikkan, jalankan migrasi:
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm backend npm run db:deploy --workspace backend
+docker compose -f docker-compose.prod.yml run --rm backend npm run db:deploy
 ```
 
 Kenapa langkah ini dipisah:
@@ -155,6 +155,32 @@ Kenapa langkah ini dipisah:
 - jika migrasi gagal, kamu tahu masalahnya sebelum service production dijalankan penuh
 
 Jangan pakai `db:migrate` di production. Gunakan `db:deploy`.
+
+## Step 3b: Bootstrap Super Admin Pertama
+
+Kalau database production masih kosong, buat super-admin pertama sekali saja:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm backend npm run auth:bootstrap:superadmin -- --name "Owner" --email "owner@example.com" --password "StrongPassword#2026"
+```
+
+Aturan command ini:
+
+- hanya berlaku saat `AuthUser` masih kosong
+- otomatis membuat role `SUPER_ADMIN`
+- menolak jalan kalau database sudah punya user
+- aman dipakai di production untuk bootstrap pertama karena tidak bergantung pada `AUTH_BOOTSTRAP_DEFAULT_USERS`
+
+Setelah command sukses, login pertama bisa dilakukan dengan:
+
+- email: `owner@example.com`
+- atau username hasil turunan dari email, misalnya `owner`
+
+Kalau kamu mau username eksplisit, tambahkan:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm backend npm run auth:bootstrap:superadmin -- --name "Owner" --email "owner@example.com" --username "owner.root" --password "StrongPassword#2026"
+```
 
 ## Step 4: Naikkan Stack
 
@@ -214,7 +240,7 @@ Saat ada rilis baru:
 ```bash
 git pull
 docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml run --rm backend npm run db:deploy --workspace backend
+docker compose -f docker-compose.prod.yml run --rm backend npm run db:deploy
 docker compose -f docker-compose.prod.yml up -d
 ```
 
