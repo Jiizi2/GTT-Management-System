@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
 import { SereneSelect } from "./serene-select";

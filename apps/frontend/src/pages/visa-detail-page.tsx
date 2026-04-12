@@ -1,17 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
-import {
-  PaymentStatusModal,
-  SyarikahModal,
-  VisaHotelModal,
-  VisaRaudhahModal,
-  VisaStatusModal,
-} from "../components/visa-detail-modals";
 import type {
   GroupAgreementHotel,
   GroupData,
@@ -30,6 +23,35 @@ const {
   resolveVisaProvider,
   shiftIsoDate,
 } = Domain;
+
+const LazyPaymentStatusModal = lazy(async () => ({
+  default: (await import("../components/visa-detail-modals")).PaymentStatusModal,
+}));
+const LazySyarikahModal = lazy(async () => ({
+  default: (await import("../components/visa-detail-modals")).SyarikahModal,
+}));
+const LazyVisaHotelModal = lazy(async () => ({
+  default: (await import("../components/visa-detail-modals")).VisaHotelModal,
+}));
+const LazyVisaRaudhahModal = lazy(async () => ({
+  default: (await import("../components/visa-detail-modals")).VisaRaudhahModal,
+}));
+const LazyVisaStatusModal = lazy(async () => ({
+  default: (await import("../components/visa-detail-modals")).VisaStatusModal,
+}));
+
+function VisaDetailModalFallback() {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-4">
+      <div className="inline-flex items-center gap-2 rounded-xl bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface shadow-ambient">
+        <span className="material-symbols-outlined animate-pulse text-brand-primary" aria-hidden="true">
+          hourglass_top
+        </span>
+        <span>Loading modal...</span>
+      </div>
+    </div>
+  );
+}
 
 type Tone = "success" | "warning" | "muted";
 type RaudhahStatus = "Free" | "Before" | "After";
@@ -1219,36 +1241,40 @@ export function VisaTrackingDetailScreen({
         </article>
       </section>
 
-      {activeModal === "visa-status" ? (
-        <VisaStatusModal initialValue={row.visaStatus} onClose={closeModal} onSave={saveVisaStatus} />
-      ) : null}
+      {activeModal ? (
+        <Suspense fallback={<VisaDetailModalFallback />}>
+          {activeModal === "visa-status" ? (
+            <LazyVisaStatusModal initialValue={row.visaStatus} onClose={closeModal} onSave={saveVisaStatus} />
+          ) : null}
 
-      {activeModal === "payment-status" ? (
-        <PaymentStatusModal initialValue={paymentStatus} onClose={closeModal} onSave={savePaymentStatus} />
-      ) : null}
+          {activeModal === "payment-status" ? (
+            <LazyPaymentStatusModal initialValue={paymentStatus} onClose={closeModal} onSave={savePaymentStatus} />
+          ) : null}
 
-      {activeModal === "syarikah" ? (
-        <SyarikahModal initialValue={providerName} onClose={closeModal} onSave={saveSyarikah} />
-      ) : null}
+          {activeModal === "syarikah" ? (
+            <LazySyarikahModal initialValue={providerName} onClose={closeModal} onSave={saveSyarikah} />
+          ) : null}
 
-      {activeModal === "hotel" ? (
-        <VisaHotelModal
-          city={hotelCityDraft}
-          mode={hotelDraftMode}
-          initialValue={buildHotelDraft(hotelCityDraft, hotelDraftMode, hotelDraftId ?? undefined)}
-          onClose={closeModal}
-          onSave={saveHotel}
-        />
-      ) : null}
+          {activeModal === "hotel" ? (
+            <LazyVisaHotelModal
+              city={hotelCityDraft}
+              mode={hotelDraftMode}
+              initialValue={buildHotelDraft(hotelCityDraft, hotelDraftMode, hotelDraftId ?? undefined)}
+              onClose={closeModal}
+              onSave={saveHotel}
+            />
+          ) : null}
 
-      {activeModal === "raudhah" ? (
-        <VisaRaudhahModal
-          initialValue={buildRaudhahDraft()}
-          appointmentIdPrefix={row.groupCode}
-          defaultAppointmentDateIso={row.departureIso}
-          onClose={closeModal}
-          onSave={saveRaudhah}
-        />
+          {activeModal === "raudhah" ? (
+            <LazyVisaRaudhahModal
+              initialValue={buildRaudhahDraft()}
+              appointmentIdPrefix={row.groupCode}
+              defaultAppointmentDateIso={row.departureIso}
+              onClose={closeModal}
+              onSave={saveRaudhah}
+            />
+          ) : null}
+        </Suspense>
       ) : null}
 
       {isClearRaudhahConfirmOpen ? (

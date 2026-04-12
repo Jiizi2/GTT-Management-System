@@ -11,7 +11,6 @@ import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useThemeMode } from "../theme/theme-provider";
-import { exportVisaTrackingReportPdf } from "./visa-tracking-export";
 
 const {
   buildVisaTrackingRowsFromGroups,
@@ -341,6 +340,41 @@ export function VisaTrackingScreen({
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
   }, [totalPages]);
 
+  const handleExportPdf = () => {
+    const printableWindow = window.open("", "_blank", "width=1120,height=760");
+    if (!printableWindow) {
+      window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
+      return;
+    }
+
+    void import("./visa-tracking-export").then(({ exportVisaTrackingReportPdf }) => {
+      const exported = exportVisaTrackingReportPdf(
+        {
+          rows: filteredRows,
+          groups,
+          query,
+          activeFilter,
+          issuedMonthLabel: selectedIssuedMonthLabel,
+        },
+        {
+          printWindow: printableWindow,
+        },
+      );
+
+      if (!exported) {
+        if (!printableWindow.closed) {
+          printableWindow.close();
+        }
+        window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
+      }
+    }).catch(() => {
+      if (!printableWindow.closed) {
+        printableWindow.close();
+      }
+      window.alert("Gagal menyiapkan export PDF. Coba lagi.");
+    });
+  };
+
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
       <header className="flex items-center gap-3">
@@ -385,18 +419,7 @@ export function VisaTrackingScreen({
                 ? "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
                 : "cursor-not-allowed bg-surface-container-high/70 text-on-surface-variant/70"
             }`}
-            onClick={() => {
-              const exported = exportVisaTrackingReportPdf({
-                rows: filteredRows,
-                groups,
-                query,
-                activeFilter,
-                issuedMonthLabel: selectedIssuedMonthLabel,
-              });
-              if (!exported) {
-                window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
-              }
-            }}
+            onClick={handleExportPdf}
             disabled={!hasRowsForExport}
           >
             <span className="material-symbols-outlined text-base" aria-hidden="true">

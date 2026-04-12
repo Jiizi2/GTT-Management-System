@@ -55,6 +55,50 @@ function collectTopInputContributors(outputName, metafile, limit = 5) {
     .slice(0, limit);
 }
 
+function resolveOutputMeta(outputPath, metafile) {
+  return (
+    metafile.outputs?.[outputPath] ??
+    metafile.outputs?.[`dist/${outputPath}`] ??
+    Object.entries(metafile.outputs ?? {}).find(([candidate]) => candidate.endsWith(`/${outputPath}`))?.[1] ??
+    null
+  );
+}
+
+function collectStaticImportGraph(entryOutputPath, metafile) {
+  const visited = new Set();
+  const dynamicImports = [];
+
+  function visit(outputPath) {
+    const normalizedPath = outputPath.replaceAll("\\", "/");
+    if (visited.has(normalizedPath)) {
+      return;
+    }
+
+    visited.add(normalizedPath);
+
+    const outputMeta = resolveOutputMeta(normalizedPath, metafile);
+    if (!outputMeta?.imports) {
+      return;
+    }
+
+    for (const imported of outputMeta.imports) {
+      if (imported.kind === "dynamic-import") {
+        dynamicImports.push(imported.path.replaceAll("\\", "/"));
+        continue;
+      }
+
+      visit(imported.path);
+    }
+  }
+
+  visit(entryOutputPath);
+
+  return {
+    staticOutputs: Array.from(visited),
+    dynamicImports: Array.from(new Set(dynamicImports)),
+  };
+}
+
 function printSection(title) {
   console.log(`\n${title}`);
 }
@@ -67,13 +111,38 @@ async function main() {
   const jsOutputs = topAssets.filter((file) => file.path.endsWith(".js"));
   const initialJs = jsOutputs.find((file) => file.path === "index.js");
   const initialCss = distFiles.find((file) => file.path === "index.css");
+  const { staticOutputs, dynamicImports } = collectStaticImportGraph("dist/index.js", metafile);
+  const distFilesByPath = new Map(distFiles.map((file) => [`dist/${file.path}`, file]));
+  const initialGraphAssets = staticOutputs
+    .map((outputPath) => distFilesByPath.get(outputPath))
+    .filter((file) => file !== undefined);
+  const initialGraphJs = initialGraphAssets.filter((file) => file.path.endsWith(".js"));
+  const initialGraphBytes = initialGraphJs.reduce((total, file) => total + file.bytes, 0);
 
   console.log("Bundle Baseline");
   if (initialJs) {
-    console.log(`- Initial JS: ${formatBytes(initialJs.bytes)} (${initialJs.path})`);
+    console.log(`- Entry JS File: ${formatBytes(initialJs.bytes)} (${initialJs.path})`);
   }
   if (initialCss) {
     console.log(`- Initial CSS: ${formatBytes(initialCss.bytes)} (${initialCss.path})`);
+  }
+  console.log(`- Initial JS Graph: ${formatBytes(initialGraphBytes)} (${initialGraphJs.length} files)`);
+
+  printSection("Initial JS Graph Assets");
+  for (const file of initialGraphJs) {
+    console.log(`- ${file.path}: ${formatBytes(file.bytes)}`);
+  }
+
+  if (dynamicImports.length > 0) {
+    printSection("Dynamic Entry Chunks");
+    for (const outputPath of dynamicImports) {
+      const file = distFilesByPath.get(outputPath);
+      if (!file) {
+        continue;
+      }
+
+      console.log(`- ${file.path}: ${formatBytes(file.bytes)}`);
+    }
   }
 
   printSection("Top Dist Assets");

@@ -218,6 +218,7 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
   const capUrl = new URL("/cap-ghaniya.png", window.location.origin).toString();
   const signatureUrl = new URL("/ttd-husein.png", window.location.origin).toString();
   const appCssUrl = new URL("/index.css", window.location.origin).toString();
+  const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const statusLabel = resolvePaymentStatusLabel(payload);
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
@@ -253,9 +254,8 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Invoice - Ghaniya Tour and Travel</title>
+<link href="${escapeHtml(fontsCssUrl)}" rel="stylesheet"/>
 <link href="${escapeHtml(appCssUrl)}" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <style>
         :root {
             --invoice-ink: #111111;
