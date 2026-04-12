@@ -35,9 +35,7 @@ export function AppSidebar({
   const primaryNavItems = sidebarItems.filter(
     (item) => item.id === "overview" || item.id === "checklist" || item.id === "visa",
   );
-  const utilityNavItems = sidebarItems.filter(
-    (item) => item.id === "invoice" || item.id === "raudhah-reminder",
-  );
+  const utilityNavItems = sidebarItems.filter((item) => item.id === "invoice" || item.id === "raudhah-reminder");
   const desktopOnlyAdminItems: Array<{ id: NavId; label: string; icon: string }> =
     sessionAccessTier === "super-admin"
       ? [
@@ -47,8 +45,7 @@ export function AppSidebar({
       : [];
   const toolsNavItems = [...utilityNavItems, ...desktopOnlyAdminItems];
 
-  const sectionLabelClass =
-    "px-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-on-surface-variant/55";
+  const sectionLabelClass = "px-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-on-surface-variant/55";
   const sectionDividerClass = isCollapsed
     ? "mx-auto h-px w-8 bg-surface-container-high/75"
     : "mx-2 h-px bg-surface-container-high/75";
@@ -84,20 +81,19 @@ export function AppSidebar({
           isCollapsed ? "w-[104px] px-3.5" : "w-[280px] pl-6 pr-5"
         }`}
       >
-        <div
-          className={`mb-9 flex gap-3 ${
-            isCollapsed ? "flex-col items-center" : "items-start justify-between"
-          }`}
-        >
+        <div className={`mb-9 flex gap-3 ${isCollapsed ? "flex-col items-center" : "items-start justify-between"}`}>
           <div className={`min-w-0 ${isCollapsed ? "p-0 text-center" : "px-2"}`}>
             <h2
               className="m-0 text-[1.55rem] font-bold tracking-[0.02em] text-primary"
-              style={{ fontFamily: "\"Noto Naskh Arabic\", serif" }}
+              style={{ fontFamily: '"Noto Naskh Arabic", serif' }}
             >
               GTT
             </h2>
             {!isCollapsed ? (
-              <p className="mt-1.5 text-xs font-bold text-on-surface-variant/75" style={{ fontFamily: "\"Noto Naskh Arabic\", serif" }}>
+              <p
+                className="mt-1.5 text-xs font-bold text-on-surface-variant/75"
+                style={{ fontFamily: '"Noto Naskh Arabic", serif' }}
+              >
                 Ghaniya Tour and Travel
               </p>
             ) : null}
@@ -189,7 +185,9 @@ export function AppSidebar({
           <button
             type="button"
             className={`group flex items-center gap-3 rounded-[1rem] transition ${
-              isCollapsed ? "h-14 w-14 justify-center p-0" : "w-full px-2.5 py-2.5 text-left hover:bg-surface-container-lowest/75"
+              isCollapsed
+                ? "h-14 w-14 justify-center p-0"
+                : "w-full px-2.5 py-2.5 text-left hover:bg-surface-container-lowest/75"
             } ${
               activeNav === sidebarAccountItem.id
                 ? "bg-surface-container-lowest/85 text-primary"
@@ -216,7 +214,10 @@ export function AppSidebar({
                   </span>
                 </div>
 
-                <span className="material-symbols-outlined text-on-surface-variant/35 transition group-hover:text-on-surface-variant/70" aria-hidden="true">
+                <span
+                  className="material-symbols-outlined text-on-surface-variant/35 transition group-hover:text-on-surface-variant/70"
+                  aria-hidden="true"
+                >
                   chevron_right
                 </span>
               </>

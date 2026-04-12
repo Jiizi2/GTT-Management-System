@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
-import {
-  fetchCurrentSessionFromBackend,
-  loginWithBackend,
-  logoutFromBackend,
-} from "../hooks/use-auth-backend.js";
+import { describe } from "vitest";
+import { fetchCurrentSessionFromBackend, loginWithBackend, logoutFromBackend } from "../hooks/use-auth-backend.js";
+import { runCase } from "../test/run-case.js";
 
 type FetchFn = typeof fetch;
 
@@ -83,11 +81,6 @@ function withLocationHostname<T>(hostname: string, fn: () => Promise<T>): Promis
       });
     }
   });
-}
-
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
 }
 
 async function testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier(): Promise<void> {
@@ -277,18 +270,13 @@ async function testLogoutUsesCredentialedPost(): Promise<void> {
   });
 }
 
-async function main(): Promise<void> {
-  await runCase("loginWithBackend custom api base url", testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier);
-  await runCase("loginWithBackend localhost fallback url", testLoginFallsBackToLocalhostApiBaseUrl);
-  await runCase("loginWithBackend preserves loopback hostname", testLoginPreservesLoopbackHostnameForCookieAuth);
-  await runCase("loginWithBackend structured error message", testLoginReturnsStructuredBackendErrorMessage);
-  await runCase("loginWithBackend fallback error message", testLoginUsesFallbackTextWhenBackendErrorPayloadIsUnknown);
-  await runCase("loginWithBackend invalid payload handling", testLoginRejectsInvalidSessionPayload);
-  await runCase("fetchCurrentSessionFromBackend restore flow", testFetchCurrentSessionHandlesUnauthorizedAndValidPayload);
-  await runCase("logoutFromBackend credentialed request", testLogoutUsesCredentialedPost);
-}
-
-void main().catch((error: unknown) => {
-  console.error("use-auth-backend unit test failed:", error);
-  process.exitCode = 1;
+describe("use-auth-backend", () => {
+  runCase("custom api base url", testLoginUsesCustomApiBaseUrlAndNormalizesIdentifier);
+  runCase("localhost fallback url", testLoginFallsBackToLocalhostApiBaseUrl);
+  runCase("preserves loopback hostname", testLoginPreservesLoopbackHostnameForCookieAuth);
+  runCase("structured error message", testLoginReturnsStructuredBackendErrorMessage);
+  runCase("fallback error message", testLoginUsesFallbackTextWhenBackendErrorPayloadIsUnknown);
+  runCase("invalid payload handling", testLoginRejectsInvalidSessionPayload);
+  runCase("restore flow", testFetchCurrentSessionHandlesUnauthorizedAndValidPayload);
+  runCase("credentialed request", testLogoutUsesCredentialedPost);
 });

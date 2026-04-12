@@ -139,10 +139,7 @@ function clampDateRange(isoDate: string, startDate: string, endDate: string): st
   return isoDate;
 }
 
-function resolveCityHotelNameFromPrefill(
-  prefill: ItineraryPrefill | null | undefined,
-  cityInput: string,
-): string {
+function resolveCityHotelNameFromPrefill(prefill: ItineraryPrefill | null | undefined, cityInput: string): string {
   const cityKey = normalizeAgreementCityKey(cityInput);
   if (!cityKey) {
     return "";
@@ -230,10 +227,7 @@ export function createBaseTripDrafts(
             ? index === BASE_TRIP_BLUEPRINTS.length - 1
               ? safeEndDate || safeStartDate
               : safeStartDate
-            : shiftIsoDate(
-                dayOffsets[index] > 0 ? safeStartDate : safeEndDate || safeStartDate,
-                dayOffsets[index],
-              ),
+            : shiftIsoDate(dayOffsets[index] > 0 ? safeStartDate : safeEndDate || safeStartDate, dayOffsets[index]),
           safeStartDate,
           safeEndDate || safeStartDate,
         )
@@ -374,8 +368,7 @@ export function buildInputItineraryValidationState({
     !!effectiveEndDate &&
     !!effectiveMusyrifName.trim() &&
     !!effectiveMusyrifPhone.trim();
-  const isGroupReadyForItinerary =
-    isGroupInformationComplete && !hasInvalidDateRange && !isTotalBusBelowMinimum;
+  const isGroupReadyForItinerary = isGroupInformationComplete && !hasInvalidDateRange && !isTotalBusBelowMinimum;
 
   const showFlightNumberField = isFlightActivityType(form.category);
   const showHotelNameField =
@@ -466,9 +459,7 @@ export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]):
       formatScheduleTime(item.time),
       item.flightNumber ? `Flight ${item.flightNumber}` : "",
       normalizedHotelName ? `Hotel ${normalizedHotelName}` : "",
-      item.hotelPickupRequestTime
-        ? `Hotel pickup request ${formatScheduleTime(item.hotelPickupRequestTime)}`
-        : "",
+      item.hotelPickupRequestTime ? `Hotel pickup request ${formatScheduleTime(item.hotelPickupRequestTime)}` : "",
       transferTrainSummary,
       item.requiresBus ? "Requires Bus" : "",
       item.notes ? item.notes : "",
@@ -575,8 +566,5 @@ export function calculateItineraryDurationDays(sortedItems: InputItineraryItem[]
     return 1;
   }
 
-  return Math.max(
-    1,
-    Math.floor((Date.parse(itineraryEndIso) - Date.parse(itineraryStartIso)) / 86_400_000) + 1,
-  );
+  return Math.max(1, Math.floor((Date.parse(itineraryEndIso) - Date.parse(itineraryStartIso)) / 86_400_000) + 1);
 }

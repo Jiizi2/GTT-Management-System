@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { describe } from "vitest";
 import {
   createManagedUserInBackend,
   fetchManagedUsersFromBackend,
   setManagedUserPasswordInBackend,
 } from "../hooks/use-user-management-backend.js";
+import { runCase } from "../test/run-case.js";
 
 type FetchFn = typeof fetch;
 
@@ -59,11 +61,6 @@ function createManagedUserJson(overrides: Partial<Record<string, unknown>> = {})
     updatedAt: "2099-01-01T00:00:00.000Z",
     ...overrides,
   });
-}
-
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
 }
 
 async function testFetchManagedUsersMapsPasswordState(): Promise<void> {
@@ -168,14 +165,9 @@ async function testSetManagedUserPasswordUsesDedicatedEndpoint(): Promise<void> 
   });
 }
 
-async function main(): Promise<void> {
-  await runCase("fetchManagedUsersFromBackend maps hasPassword", testFetchManagedUsersMapsPasswordState);
-  await runCase("createManagedUserInBackend sends password when present", testCreateManagedUserSendsOptionalPasswordWhenPresent);
-  await runCase("createManagedUserInBackend omits blank password", testCreateManagedUserOmitsBlankPassword);
-  await runCase("setManagedUserPasswordInBackend uses password endpoint", testSetManagedUserPasswordUsesDedicatedEndpoint);
-}
-
-void main().catch((error: unknown) => {
-  console.error("use-user-management-backend unit test failed:", error);
-  process.exitCode = 1;
+describe("use-user-management-backend", () => {
+  runCase("maps hasPassword", testFetchManagedUsersMapsPasswordState);
+  runCase("sends password when present", testCreateManagedUserSendsOptionalPasswordWhenPresent);
+  runCase("omits blank password", testCreateManagedUserOmitsBlankPassword);
+  runCase("uses password endpoint", testSetManagedUserPasswordUsesDedicatedEndpoint);
 });

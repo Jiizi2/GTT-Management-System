@@ -373,16 +373,14 @@ function resolveGroupAppointments(group: GroupData): Array<{
   tasrehPrinted: boolean;
 }> {
   return resolveValidRaudhahAppointments(group).map((appointment) => ({
-      id: appointment.id,
-      dateIso: appointment.dateIso,
-      status: appointment.status,
-      tasrehPrinted: Boolean(appointment.tasrehPrinted),
-    }));
+    id: appointment.id,
+    dateIso: appointment.dateIso,
+    status: appointment.status,
+    tasrehPrinted: Boolean(appointment.tasrehPrinted),
+  }));
 }
 
-function countSlotStatuses(
-  appointments: ReminderAppointmentItem[],
-): {
+function countSlotStatuses(appointments: ReminderAppointmentItem[]): {
   open: number;
   upcoming: number;
   notPrinted: number;
@@ -460,11 +458,7 @@ function ReminderSection({
   isDarkMode: boolean;
   onCopyTemplate: (item: ReminderItem) => Promise<void>;
   onOpenVisaDetail: (groupCode: string) => void;
-  onSetRaudhahTasrehPrinted: (
-    groupCode: string,
-    appointmentId: string,
-    tasrehPrinted: boolean,
-  ) => void;
+  onSetRaudhahTasrehPrinted: (groupCode: string, appointmentId: string, tasrehPrinted: boolean) => void;
 }) {
   const config = reminderSectionConfig[slot];
   const [pendingTasrehAction, setPendingTasrehAction] = useState<PendingTasrehAction | null>(null);
@@ -584,15 +578,13 @@ function ReminderSection({
                                 {formatVisaDateWithYear(appointment.bookingDateIso)}
                               </span>
                             </p>
-                          <span
-                            className={`inline-flex items-center rounded-md border font-bold leading-none whitespace-nowrap ${
-                              appointment.status === "After" ? "px-2.5 py-1 text-[11px]" : "px-2 py-0.5 text-[10px]"
-                            } ${getRaudhahStatusBadgeClasses(
-                              appointment.status,
-                            )}`}
-                          >
-                            {appointment.status}
-                          </span>
+                            <span
+                              className={`inline-flex items-center rounded-md border font-bold leading-none whitespace-nowrap ${
+                                appointment.status === "After" ? "px-2.5 py-1 text-[11px]" : "px-2 py-0.5 text-[10px]"
+                              } ${getRaudhahStatusBadgeClasses(appointment.status)}`}
+                            >
+                              {appointment.status}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -684,8 +676,7 @@ function ReminderSection({
             <h3 className="text-lg font-extrabold text-slate-900">Konfirmasi Status Tasreh</h3>
             <p className="mt-2 text-sm text-slate-600">
               Target date <strong>{formatVisaDateWithYear(pendingTasrehAction.targetDateIso)}</strong> akan diubah
-              menjadi{" "}
-              <strong>{pendingTasrehAction.nextTasrehPrinted ? "Printed" : "Belum Print"}</strong>.
+              menjadi <strong>{pendingTasrehAction.nextTasrehPrinted ? "Printed" : "Belum Print"}</strong>.
             </p>
 
             <div className="mt-4 flex justify-end gap-2">
@@ -720,11 +711,7 @@ export function RaudhahReminderScreen({
   groups: GroupData[];
   onOpenDetail: (groupCode: string) => void;
   onOpenVisaDetail: (row: VisaTrackingRow) => void;
-  onSetRaudhahTasrehPrinted: (
-    groupCode: string,
-    appointmentId: string,
-    tasrehPrinted: boolean,
-  ) => void;
+  onSetRaudhahTasrehPrinted: (groupCode: string, appointmentId: string, tasrehPrinted: boolean) => void;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
@@ -756,13 +743,7 @@ export function RaudhahReminderScreen({
   const visaRows = useMemo(() => buildVisaTrackingRowsFromGroups(groups), [groups]);
 
   const visaRowByGroupCode = useMemo(
-    () =>
-      new Map(
-        visaRows.map((row) => [
-          row.groupCode.toUpperCase(),
-          row,
-        ] as const),
-      ),
+    () => new Map(visaRows.map((row) => [row.groupCode.toUpperCase(), row] as const)),
     [visaRows],
   );
 
@@ -837,8 +818,7 @@ export function RaudhahReminderScreen({
           const bookingDateIso = slot === "h2" ? shiftIsoDate(appointment.dateIso, -2) : h7BookingDateIso;
           const daysUntilBooking = getDaysLeft(bookingDateIso, todayIso);
           const slotStatus = resolveSlotStatus(daysUntilBooking);
-          const shouldKeepMissedH2ForTasreh =
-            slot === "h2" && slotStatus === "missed" && !appointment.tasrehPrinted;
+          const shouldKeepMissedH2ForTasreh = slot === "h2" && slotStatus === "missed" && !appointment.tasrehPrinted;
 
           if (slotStatus === "missed" && !shouldKeepMissedH2ForTasreh) {
             return;
@@ -886,8 +866,12 @@ export function RaudhahReminderScreen({
           return slotPriority[left.slot] - slotPriority[right.slot];
         }
 
-        const leftBestStatus = Math.min(...left.appointments.map((appointment) => statusPriority[appointment.slotStatus]));
-        const rightBestStatus = Math.min(...right.appointments.map((appointment) => statusPriority[appointment.slotStatus]));
+        const leftBestStatus = Math.min(
+          ...left.appointments.map((appointment) => statusPriority[appointment.slotStatus]),
+        );
+        const rightBestStatus = Math.min(
+          ...right.appointments.map((appointment) => statusPriority[appointment.slotStatus]),
+        );
         if (leftBestStatus !== rightBestStatus) {
           return leftBestStatus - rightBestStatus;
         }
@@ -1047,7 +1031,6 @@ export function RaudhahReminderScreen({
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
-
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:mr-5">
@@ -1068,12 +1051,10 @@ export function RaudhahReminderScreen({
       <section className={heroSectionClassName}>
         <div>
           <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabelClassName}`}>Global Operations</p>
-          <h1 className={heroTitleClassName}>
-            Raudhah Booking Slots
-          </h1>
+          <h1 className={heroTitleClassName}>Raudhah Booking Slots</h1>
           <p className={heroDescriptionClassName}>
-            Booking Nusuk untuk target tanggal yang sama hanya dibuka pada 2 momen: H-7 dan H-2.
-            Board ini memantau kedua slot tersebut per target date.
+            Booking Nusuk untuk target tanggal yang sama hanya dibuka pada 2 momen: H-7 dan H-2. Board ini memantau
+            kedua slot tersebut per target date.
           </p>
         </div>
 
@@ -1088,9 +1069,7 @@ export function RaudhahReminderScreen({
       <section className="grid gap-4 md:grid-cols-2" aria-label="Booking slot summary">
         <article className={openSummaryCardClassName}>
           <p className={openSummaryLabelClassName}>Open Today</p>
-          <strong className={openSummaryValueClassName}>
-            {String(slotStatusSummary.open).padStart(2, "0")} Slots
-          </strong>
+          <strong className={openSummaryValueClassName}>{String(slotStatusSummary.open).padStart(2, "0")} Slots</strong>
           <p className={openSummaryDescClassName}>Aksi booking Nusuk hari ini</p>
           <span className={openSummaryIconClassName} aria-hidden="true">
             today
@@ -1107,7 +1086,6 @@ export function RaudhahReminderScreen({
             event_upcoming
           </span>
         </article>
-
       </section>
 
       {filteredItems.length === 0 ? (
@@ -1154,4 +1132,3 @@ export function RaudhahReminderScreen({
     </div>
   );
 }
-

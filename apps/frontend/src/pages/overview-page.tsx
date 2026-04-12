@@ -83,7 +83,6 @@ export function OverviewScreen({
         </label>
 
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
-
       </header>
 
       <section className="space-y-2 pt-2">
@@ -158,7 +157,9 @@ export function OverviewScreen({
             )}`}
           >
             <span className="block text-xs font-bold uppercase tracking-[0.14em] opacity-80">{card.label}</span>
-            <strong className="mt-4 block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">{card.value}</strong>
+            <strong className="mt-4 block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
+              {card.value}
+            </strong>
             {card.subtitle ? (
               <span className="mt-3 hidden text-xs font-semibold tracking-wide opacity-80 sm:block sm:text-sm">
                 {card.subtitle}
@@ -182,17 +183,19 @@ export function OverviewScreen({
         <div className="flex items-end gap-2 text-sm text-on-surface-variant">
           <strong className="text-2xl font-bold leading-none text-on-surface">{filteredGroups.length}</strong>
           <span className="sm:hidden">{filteredGroups.length === 1 ? "group" : "groups"}</span>
-          <span className="hidden sm:inline">{filteredGroups.length === 1 ? "group displayed" : "groups displayed"}</span>
+          <span className="hidden sm:inline">
+            {filteredGroups.length === 1 ? "group displayed" : "groups displayed"}
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-bold leading-none transition ${
-                isActiveOnly
-                  ? "bg-primary text-on-primary shadow-cta-soft"
-                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
-              }`}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-bold leading-none transition ${
+              isActiveOnly
+                ? "bg-primary text-on-primary shadow-cta-soft"
+                : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
+            }`}
             onClick={() => onToggleActiveOnly(!isActiveOnly)}
             aria-pressed={isActiveOnly}
           >
@@ -213,7 +216,9 @@ export function OverviewScreen({
           ) : (
             <span className="text-xs font-medium text-on-surface-variant/80">
               <span className="sm:hidden">{isActiveOnly ? "Saudi only" : "All visible"}</span>
-              <span className="hidden sm:inline">{isActiveOnly ? "Showing groups in Saudi only" : "All groups are visible"}</span>
+              <span className="hidden sm:inline">
+                {isActiveOnly ? "Showing groups in Saudi only" : "All groups are visible"}
+              </span>
             </span>
           )}
         </div>
@@ -251,5 +256,3 @@ export function OverviewScreen({
     </div>
   );
 }
-
-

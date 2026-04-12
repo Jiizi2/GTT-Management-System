@@ -25,12 +25,8 @@ import {
   validateConnectedAgreementDates,
 } from "./new-group-screen-helpers";
 
-const {
-  createNewGroupAgreementForm,
-  createNewGroupRaudhahForm,
-  getMinimumBusCountForPax,
-  resolveVisaAgreementNumber,
-} = Domain;
+const { createNewGroupAgreementForm, createNewGroupRaudhahForm, getMinimumBusCountForPax, resolveVisaAgreementNumber } =
+  Domain;
 
 type HotelCity = "makkah" | "madinah";
 type InvoiceTone = "paid" | "pending" | "overdue" | "cancelled";
@@ -61,12 +57,8 @@ const newGroupRaudhahFormSchema = z.object({
 
 function createNewGroupScreenSchema(requireGroupInformation: boolean) {
   return z.object({
-    groupNumber: requireGroupInformation
-      ? z.string().trim().min(1, "Group number wajib diisi.")
-      : z.string(),
-    groupName: requireGroupInformation
-      ? z.string().trim().min(1, "Group name wajib diisi.")
-      : z.string(),
+    groupNumber: requireGroupInformation ? z.string().trim().min(1, "Group number wajib diisi.") : z.string(),
+    groupName: requireGroupInformation ? z.string().trim().min(1, "Group name wajib diisi.") : z.string(),
     totalPax: requireGroupInformation
       ? z
           .string()
@@ -194,10 +186,7 @@ export function NewGroupScreen({
   requireItineraryBeforeSave?: boolean;
   onItineraryPrefillChange?: (prefill: ItineraryPrefill | null) => void;
 }) {
-  const formSchema = useMemo(
-    () => createNewGroupScreenSchema(!hideGroupInformation),
-    [hideGroupInformation],
-  );
+  const formSchema = useMemo(() => createNewGroupScreenSchema(!hideGroupInformation), [hideGroupInformation]);
   const {
     register,
     control,
@@ -230,7 +219,7 @@ export function NewGroupScreen({
     name: "madinahHotels",
     keyName: "fieldKey",
   });
-  const { append: appendRaudhahDate, remove: removeRaudhahDate } = useFieldArray({
+  const { append: appendRaudhahDate } = useFieldArray({
     control,
     name: "raudhahDates",
     keyName: "fieldKey",
@@ -243,17 +232,15 @@ export function NewGroupScreen({
   const groupName = watch("groupName");
   const totalPax = watch("totalPax");
   const visaStatus = watch("visaStatus");
-  const syarikahName = watch("syarikahName");
   const busStatus = watch("busStatus");
   const paymentStatus = watch("paymentStatus");
-  const makkahHotels = watch("makkahHotels") ?? [];
-  const madinahHotels = watch("madinahHotels") ?? [];
+  const watchedMakkahHotels = watch("makkahHotels");
+  const watchedMadinahHotels = watch("madinahHotels");
+  const makkahHotels = useMemo(() => watchedMakkahHotels ?? [], [watchedMakkahHotels]);
+  const madinahHotels = useMemo(() => watchedMadinahHotels ?? [], [watchedMadinahHotels]);
   const raudhahDates = watch("raudhahDates") ?? [];
   const fallbackPax = Number.parseInt(totalPax, 10);
-  const safePax =
-    Number.isFinite(itineraryPax) && (itineraryPax ?? 0) > 0
-      ? (itineraryPax as number)
-      : fallbackPax;
+  const safePax = Number.isFinite(itineraryPax) && (itineraryPax ?? 0) > 0 ? (itineraryPax as number) : fallbackPax;
   const hasValidPax = Number.isFinite(safePax) && safePax > 0;
   const minimumBusCount = hasValidPax ? getMinimumBusCountForPax(safePax) : 1;
 
@@ -357,8 +344,7 @@ export function NewGroupScreen({
   const containerClassName = hideHeader ? "space-y-6" : "mx-auto max-w-7xl space-y-6";
   const toneDotClassName =
     "pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full border";
-  const getToneSelectClassName = (tone: InvoiceTone) =>
-    `${selectClassName} pl-10 ${getInvoiceToneClasses(tone)}`;
+  const getToneSelectClassName = (tone: InvoiceTone) => `${selectClassName} pl-10 ${getInvoiceToneClasses(tone)}`;
 
   const getAgreementStatusChipClassName = (status: AgreementApprovalStatus) =>
     `inline-flex whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getInvoiceToneClasses(
@@ -402,13 +388,11 @@ export function NewGroupScreen({
                   <h4 className="truncate text-base font-semibold text-on-surface">
                     {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                   </h4>
-                  <span className={getAgreementStatusChipClassName(agreement.status)}>
-                    {agreement.status}
-                  </span>
+                  <span className={getAgreementStatusChipClassName(agreement.status)}>{agreement.status}</span>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-                  {agreement.agreementNumber.trim() || "Agreement number pending"} · Pax{" "}
-                  {agreement.pax.trim() || "0"} · {formatAgreementStayRange(agreement)}
+                  {agreement.agreementNumber.trim() || "Agreement number pending"} · Pax {agreement.pax.trim() || "0"} ·{" "}
+                  {formatAgreementStayRange(agreement)}
                 </p>
               </div>
               <span
@@ -427,9 +411,7 @@ export function NewGroupScreen({
                     className={controlClassName}
                     type="text"
                     value={agreement.hotelName}
-                    onChange={(event) =>
-                      handleAgreementChange(city, index, "hotelName", event.target.value)
-                    }
+                    onChange={(event) => handleAgreementChange(city, index, "hotelName", event.target.value)}
                     placeholder={`e.g. ${toCityLabel(city)} Main Hotel`}
                   />
                 </label>
@@ -440,14 +422,7 @@ export function NewGroupScreen({
                     className={controlClassName}
                     type="text"
                     value={agreement.agreementNumber}
-                    onChange={(event) =>
-                      handleAgreementChange(
-                        city,
-                        index,
-                        "agreementNumber",
-                        event.target.value,
-                      )
-                    }
+                    onChange={(event) => handleAgreementChange(city, index, "agreementNumber", event.target.value)}
                     placeholder={resolveVisaAgreementNumber(
                       { groupCode: resolvedGroupCode || "901794508" },
                       undefined,
@@ -463,9 +438,7 @@ export function NewGroupScreen({
                     type="number"
                     min={0}
                     value={agreement.pax}
-                    onChange={(event) =>
-                      handleAgreementChange(city, index, "pax", event.target.value)
-                    }
+                    onChange={(event) => handleAgreementChange(city, index, "pax", event.target.value)}
                     placeholder={String(safePax || 0)}
                   />
                 </label>
@@ -474,21 +447,16 @@ export function NewGroupScreen({
                   <span>Status</span>
                   <div className="relative">
                     <span
-                      className={`${toneDotClassName} ${getInvoiceToneDotClasses(getAgreementStatusTone(
-                        agreement.status,
-                      ))}`}
+                      className={`${toneDotClassName} ${getInvoiceToneDotClasses(
+                        getAgreementStatusTone(agreement.status),
+                      )}`}
                       aria-hidden="true"
                     />
                     <SereneSelect
                       className={getToneSelectClassName(getAgreementStatusTone(agreement.status))}
                       value={agreement.status}
                       onChange={(event) =>
-                        handleAgreementChange(
-                          city,
-                          index,
-                          "status",
-                          event.target.value as AgreementApprovalStatus,
-                        )
+                        handleAgreementChange(city, index, "status", event.target.value as AgreementApprovalStatus)
                       }
                     >
                       <option value="Waiting for Approval">Waiting for Approval</option>
@@ -502,9 +470,7 @@ export function NewGroupScreen({
                   <DatePickerInput
                     inputClassName={controlClassName}
                     value={agreement.stayStartIso}
-                    onChange={(nextValue) =>
-                      handleAgreementChange(city, index, "stayStartIso", nextValue)
-                    }
+                    onChange={(nextValue) => handleAgreementChange(city, index, "stayStartIso", nextValue)}
                   />
                 </label>
 
@@ -513,9 +479,7 @@ export function NewGroupScreen({
                   <DatePickerInput
                     inputClassName={controlClassName}
                     value={agreement.stayEndIso}
-                    onChange={(nextValue) =>
-                      handleAgreementChange(city, index, "stayEndIso", nextValue)
-                    }
+                    onChange={(nextValue) => handleAgreementChange(city, index, "stayEndIso", nextValue)}
                   />
                 </label>
               </div>
@@ -572,10 +536,7 @@ export function NewGroupScreen({
         </header>
       ) : null}
 
-      <form
-        className="space-y-6"
-        onSubmit={handleSubmit(handleSave)}
-      >
+      <form className="space-y-6" onSubmit={handleSubmit(handleSave)}>
         {itinerarySectionTop ? <div className="space-y-4">{itinerarySectionTop}</div> : null}
 
         <div className={`grid gap-4 ${hideGroupInformation ? "" : "xl:grid-cols-2"}`}>
@@ -732,9 +693,7 @@ export function NewGroupScreen({
                       <DatePickerInput
                         inputClassName={controlClassName}
                         value={appointment.dateIso}
-                        onChange={(nextValue) =>
-                          handleRaudhahChange(index, "dateIso", nextValue)
-                        }
+                        onChange={(nextValue) => handleRaudhahChange(index, "dateIso", nextValue)}
                       />
                     </label>
                     <label className={fieldClassName}>
@@ -750,11 +709,7 @@ export function NewGroupScreen({
                           className={getToneSelectClassName(getRaudhahStatusTone(appointment.status))}
                           value={appointment.status}
                           onChange={(event) =>
-                            handleRaudhahChange(
-                              index,
-                              "status",
-                              event.target.value as GroupRaudhahStatus,
-                            )
+                            handleRaudhahChange(index, "status", event.target.value as GroupRaudhahStatus)
                           }
                         >
                           <option value="Free">Free</option>
@@ -828,18 +783,10 @@ export function NewGroupScreen({
               </span>
             </p>
           ) : null}
-          <button
-            type="button"
-            className="serene-btn-secondary min-h-11 w-full sm:w-auto"
-            onClick={onCancel}
-          >
+          <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
             Cancel
           </button>
-          <button
-            type="submit"
-            className="serene-btn-primary min-h-11 w-full sm:w-auto"
-            disabled={isSaveDisabled}
-          >
+          <button type="submit" className="serene-btn-primary min-h-11 w-full sm:w-auto" disabled={isSaveDisabled}>
             Save Group
           </button>
         </footer>
@@ -901,7 +848,9 @@ export function AddGroupWorkspaceScreen({
               {isItineraryVisible ? "expand_less" : "expand_more"}
             </span>
             <span className="sm:hidden">{isItineraryVisible ? "Hide Form" : "Add Detail"}</span>
-            <span className="hidden sm:inline">{isItineraryVisible ? "Hide Schedule Form" : "Add Schedule Detail"}</span>
+            <span className="hidden sm:inline">
+              {isItineraryVisible ? "Hide Schedule Form" : "Add Schedule Detail"}
+            </span>
           </button>
         </div>
       </section>
@@ -941,7 +890,9 @@ export function AddGroupWorkspaceScreen({
 
       <section className="serene-section p-5 sm:p-6">
         <div>
-          <p className={`text-xs font-extrabold uppercase tracking-[0.16em] ${isDarkMode ? "text-primary/85" : "text-emerald-700/80"}`}>
+          <p
+            className={`text-xs font-extrabold uppercase tracking-[0.16em] ${isDarkMode ? "text-primary/85" : "text-emerald-700/80"}`}
+          >
             Group Workspace
           </p>
           <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl lg:text-4xl">
@@ -968,4 +919,3 @@ export function AddGroupWorkspaceScreen({
     </div>
   );
 }
-

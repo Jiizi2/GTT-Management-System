@@ -55,12 +55,7 @@ function collectValidAgreementDateRanges(
       const endIso = form.stayEndIso.trim();
       return { city, startIso, endIso };
     })
-    .filter(
-      (range) =>
-        isIsoDateValue(range.startIso) &&
-        isIsoDateValue(range.endIso) &&
-        range.endIso >= range.startIso,
-    )
+    .filter((range) => isIsoDateValue(range.startIso) && isIsoDateValue(range.endIso) && range.endIso >= range.startIso)
     .sort((left, right) => {
       if (left.startIso === right.startIso) {
         return left.endIso.localeCompare(right.endIso);
@@ -170,10 +165,7 @@ export function buildAgreementItineraryPrefill(
   const madinahHotelName = firstMadinah?.hotelName.trim() || "Madinah Hotel";
 
   const hasAgreementHint = Boolean(
-    suggestedStart ||
-      suggestedEnd ||
-      firstMakkah?.hotelName.trim() ||
-      firstMadinah?.hotelName.trim(),
+    suggestedStart || suggestedEnd || firstMakkah?.hotelName.trim() || firstMadinah?.hotelName.trim(),
   );
   if (!hasAgreementHint) {
     return null;
@@ -246,11 +238,7 @@ export function normalizeAgreementForms(
   return sourceForms.map((form, index) => {
     const parsedHotelPax = Number.parseInt(form.pax, 10);
     const normalizedPax =
-      Number.isFinite(parsedHotelPax) && parsedHotelPax >= 0
-        ? parsedHotelPax
-        : index === 0
-          ? paxValue
-          : 0;
+      Number.isFinite(parsedHotelPax) && parsedHotelPax >= 0 ? parsedHotelPax : index === 0 ? paxValue : 0;
     const startIso = isIsoDateValue(form.stayStartIso.trim()) ? form.stayStartIso.trim() : defaultStart;
     const defaultCityEnd = city === "makkah" ? shiftIsoDate(startIso, 2) : defaultEnd;
     const rawEndIso = isIsoDateValue(form.stayEndIso.trim()) ? form.stayEndIso.trim() : defaultCityEnd;
@@ -258,10 +246,8 @@ export function normalizeAgreementForms(
 
     return {
       id: form.id,
-      hotelName:
-        form.hotelName.trim() || (city === "makkah" ? "Makkah Main Hotel" : "Madinah Main Hotel"),
-      agreementNumber:
-        form.agreementNumber.trim() || resolveVisaAgreementNumber({ groupCode }, undefined, city),
+      hotelName: form.hotelName.trim() || (city === "makkah" ? "Makkah Main Hotel" : "Madinah Main Hotel"),
+      agreementNumber: form.agreementNumber.trim() || resolveVisaAgreementNumber({ groupCode }, undefined, city),
       pax: normalizedPax,
       status: form.status,
       stayStartIso: startIso,
@@ -414,18 +400,23 @@ export function buildNewGroupPayload({
       requiresBus: true,
       hotelPickupRequestTime: "17:00",
     }),
-  ].sort((left, right) => `${left.isoDate ?? ""}T${left.time ?? ""}`.localeCompare(`${right.isoDate ?? ""}T${right.time ?? ""}`));
+  ].sort((left, right) =>
+    `${left.isoDate ?? ""}T${left.time ?? ""}`.localeCompare(`${right.isoDate ?? ""}T${right.time ?? ""}`),
+  );
 
   const firstTimelineItem = itinerary[0];
   const secondTimelineItem = itinerary[1] ?? itinerary[itinerary.length - 1];
-  const firstTimelineDate = firstTimelineItem ? formatScheduleDate(firstTimelineItem.isoDate ?? groupStartIso) : formatScheduleDate(groupStartIso);
-  const secondTimelineDate = secondTimelineItem ? formatScheduleDate(secondTimelineItem.isoDate ?? safeGroupEndIso) : formatScheduleDate(safeGroupEndIso);
+  const firstTimelineDate = firstTimelineItem
+    ? formatScheduleDate(firstTimelineItem.isoDate ?? groupStartIso)
+    : formatScheduleDate(groupStartIso);
+  const secondTimelineDate = secondTimelineItem
+    ? formatScheduleDate(secondTimelineItem.isoDate ?? safeGroupEndIso)
+    : formatScheduleDate(safeGroupEndIso);
   const primaryNextActivityItem = itinerary.find((item) => item.highlighted) ?? itinerary[0];
   const primaryNextActivityDate = primaryNextActivityItem
     ? formatScheduleDate(primaryNextActivityItem.isoDate ?? groupStartIso)
     : firstTimelineDate;
-  const primaryNextActivityTime =
-    primaryNextActivityItem?.time?.trim() || secondTimelineItem?.time?.trim() || "09:00";
+  const primaryNextActivityTime = primaryNextActivityItem?.time?.trim() || secondTimelineItem?.time?.trim() || "09:00";
 
   const normalizedRaudhahAppointments = raudhahDates
     .map((appointment, index) => {
@@ -475,14 +466,10 @@ export function buildNewGroupPayload({
       date: secondTimelineDate.date,
       title: secondTimelineItem?.title ?? "Operational follow-up",
       isCurrent: true,
-      nextActivity:
-        secondTimelineItem?.meta?.trim() ||
-        secondTimelineItem?.time?.trim() ||
-        "Awaiting operator update",
+      nextActivity: secondTimelineItem?.meta?.trim() || secondTimelineItem?.time?.trim() || "Awaiting operator update",
     },
   ];
-  const mergedTimeline =
-    itineraryDraft?.timeline?.length === 2 ? itineraryDraft.timeline : fallbackTimeline;
+  const mergedTimeline = itineraryDraft?.timeline?.length === 2 ? itineraryDraft.timeline : fallbackTimeline;
   const mergedNextActivity = itineraryDraft?.nextActivity ?? {
     title: primaryNextActivityItem?.title ?? firstTimelineItem?.title ?? "Upcoming Activity",
     date: primaryNextActivityDate.date,
@@ -490,13 +477,10 @@ export function buildNewGroupPayload({
     icon: primaryNextActivityItem?.icon ?? firstTimelineItem?.icon ?? "event",
   };
   const mergedDurationDays =
-    itineraryDraft?.durationDays && itineraryDraft.durationDays > 0
-      ? itineraryDraft.durationDays
-      : durationDays;
+    itineraryDraft?.durationDays && itineraryDraft.durationDays > 0 ? itineraryDraft.durationDays : durationDays;
   const mergedNotes = notes;
 
-  const mergedPackageName =
-    itineraryDraft?.packageName?.trim() || syarikahName.trim() || "Custom Group Package";
+  const mergedPackageName = itineraryDraft?.packageName?.trim() || syarikahName.trim() || "Custom Group Package";
   const mergedTotalBuses =
     itineraryDraft?.totalBuses && itineraryDraft.totalBuses > 0
       ? itineraryDraft.totalBuses

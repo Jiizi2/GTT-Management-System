@@ -214,10 +214,7 @@ export function exportVisaTrackingReportPdf({
           </tr>
         </thead>
         <tbody>
-          ${
-            tableRows ||
-            '<tr><td class="empty" colspan="4">No visa tracking rows for the current filter.</td></tr>'
-          }
+          ${tableRows || '<tr><td class="empty" colspan="4">No visa tracking rows for the current filter.</td></tr>'}
         </tbody>
       </table>
 

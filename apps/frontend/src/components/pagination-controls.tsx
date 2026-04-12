@@ -22,7 +22,7 @@ export function PaginationControls({
   const maxButtons = 5;
   const halfWindow = Math.floor(maxButtons / 2);
   let startPage = Math.max(1, currentPage - halfWindow);
-  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  const endPage = Math.min(totalPages, startPage + maxButtons - 1);
   startPage = Math.max(1, endPage - maxButtons + 1);
 
   const pageNumbers: number[] = [];
@@ -87,6 +87,3 @@ export function PaginationControls({
     </div>
   );
 }
-
-
-

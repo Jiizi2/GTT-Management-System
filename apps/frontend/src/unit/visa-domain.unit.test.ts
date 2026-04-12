@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { describe } from "vitest";
 import type { GroupAgreementHotel, GroupData, VisaTrackingRow } from "../shared/app-domain.js";
 import {
   buildVisaAgreementNumber,
@@ -14,6 +15,7 @@ import {
   resolveVisaProvider,
   shiftIsoDate,
 } from "../shared/visa-domain.js";
+import { runCase } from "../test/run-case.js";
 
 function createAgreementHotel(overrides: Partial<GroupAgreementHotel> = {}): GroupAgreementHotel {
   return {
@@ -93,11 +95,6 @@ function createVisaRow(overrides: Partial<VisaTrackingRow> = {}): VisaTrackingRo
     outstandingAmount: 0,
     ...overrides,
   };
-}
-
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
 }
 
 function testShiftAndDateFormatters(): void {
@@ -259,14 +256,12 @@ function testProviderAndActionRequirementHelpers(): void {
   assert.equal(isVisaRowActionRequired(draftRow), true);
 }
 
-async function main(): Promise<void> {
-  await runCase("visa-domain shift and formatter behavior", testShiftAndDateFormatters);
-  await runCase("visa-domain agreement number and city helpers", testAgreementNumberIsoValidationAndCityHotelSelection);
-  await runCase("visa-domain agreement date range fallback and custom normalization", testResolveVisaAgreementDateRangeFallbackAndCustomNormalization);
-  await runCase("visa-domain provider and action requirement helpers", testProviderAndActionRequirementHelpers);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Visa domain unit test failed:", error);
-  process.exitCode = 1;
+describe("visa-domain", () => {
+  runCase("shift and formatter behavior", testShiftAndDateFormatters);
+  runCase("agreement number and city helpers", testAgreementNumberIsoValidationAndCityHotelSelection);
+  runCase(
+    "agreement date range fallback and custom normalization",
+    testResolveVisaAgreementDateRangeFallbackAndCustomNormalization,
+  );
+  runCase("provider and action requirement helpers", testProviderAndActionRequirementHelpers);
 });

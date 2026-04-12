@@ -31,11 +31,7 @@ type SereneSelectProps = {
   "aria-describedby"?: string;
 };
 
-function getNextEnabledIndex(
-  options: SelectOption[],
-  startIndex: number,
-  direction: 1 | -1,
-): number {
+function getNextEnabledIndex(options: SelectOption[], startIndex: number, direction: 1 | -1): number {
   if (options.length === 0) {
     return -1;
   }
@@ -93,13 +89,8 @@ function computeDropdownStyle(triggerElement: HTMLElement, optionCount: number):
   const availableBelow = Math.max(0, viewportHeight - rect.bottom - viewportPadding - gap);
   const availableAbove = Math.max(0, rect.top - viewportPadding - gap);
   const openBelow = availableBelow >= estimatedHeight || availableBelow >= availableAbove;
-  const maxHeight = Math.max(
-    128,
-    Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove),
-  );
-  const top = openBelow
-    ? rect.bottom + gap
-    : Math.max(viewportPadding, rect.top - gap - maxHeight);
+  const maxHeight = Math.max(128, Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove));
+  const top = openBelow ? rect.bottom + gap : Math.max(viewportPadding, rect.top - gap - maxHeight);
 
   return {
     position: "fixed",
@@ -136,8 +127,7 @@ export function SereneSelect({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
 
-  const selectedLabel =
-    options[selectedIndex]?.label ?? options[firstEnabledIndex]?.label ?? selectedValue;
+  const selectedLabel = options[selectedIndex]?.label ?? options[firstEnabledIndex]?.label ?? selectedValue;
 
   const closeMenu = useCallback(() => {
     setIsOpen(false);

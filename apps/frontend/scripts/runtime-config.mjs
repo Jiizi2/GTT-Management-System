@@ -21,7 +21,7 @@ function buildRuntimeConfigSource(apiBaseUrl) {
   return [
     "(function () {",
     "  const existing = globalThis.__GTT_API_BASE_URL__;",
-    "  if (typeof existing === \"string\" && existing.trim()) {",
+    '  if (typeof existing === "string" && existing.trim()) {',
     "    return;",
     "  }",
     "",
@@ -37,8 +37,7 @@ export async function writeRuntimeConfigFile(targetDir = distDir) {
 }
 
 const isDirectExecution =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isDirectExecution) {
   await writeRuntimeConfigFile();

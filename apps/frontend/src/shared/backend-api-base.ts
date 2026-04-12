@@ -13,11 +13,7 @@ export function resolveBackendApiBaseUrl(): string {
   }
 
   const hostname = globalThis.location?.hostname?.trim() ?? "";
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1"
-  ) {
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
     return `http://${normalizeLoopbackHost(hostname)}:3001/api`;
   }
 

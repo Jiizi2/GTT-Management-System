@@ -37,7 +37,9 @@ function getFilterChipClasses(isActive: boolean, isDarkMode: boolean): string {
 
 function getVisaStatusClasses(status: VisaTrackingRow["visaStatus"], isDarkMode: boolean): string {
   if (status === "Issued") {
-    return isDarkMode ? "border-primary/30 bg-primary/14 text-primary" : "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode
+      ? "border-primary/30 bg-primary/14 text-primary"
+      : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
   if (status === "Pending") {
@@ -63,7 +65,9 @@ function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Onl
 
 function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval", isDarkMode: boolean): string {
   if (status === "Approved") {
-    return isDarkMode ? "border-primary/30 bg-primary/14 text-primary" : "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode
+      ? "border-primary/30 bg-primary/14 text-primary"
+      : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
   return isDarkMode
@@ -73,7 +77,9 @@ function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval"
 
 function getRaudhahStatusClasses(status: GroupRaudhahStatus, isDarkMode: boolean): string {
   if (status === "After") {
-    return isDarkMode ? "border-primary/30 bg-primary/14 text-primary" : "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return isDarkMode
+      ? "border-primary/30 bg-primary/14 text-primary"
+      : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
   if (status === "Before") {
@@ -145,10 +151,7 @@ function resolveRaudhahEntries(
 
   normalizedAppointments.forEach((appointment) => {
     const dateIso = appointment.dateIso;
-    const dateLabel =
-      appointment.status === "Free"
-        ? "Not set"
-        : formatVisaShortDate(dateIso);
+    const dateLabel = appointment.status === "Free" ? "Not set" : formatVisaShortDate(dateIso);
 
     const dedupeKey = `${dateLabel}-${appointment.status}`;
     if (seenEntryKeys.has(dedupeKey)) {
@@ -207,11 +210,7 @@ export function VisaTrackingScreen({
 }: {
   groups: GroupData[];
   onOpenDetail: (row: VisaTrackingRow) => void;
-  onUpdateAgreementStatus: (
-    groupCode: string,
-    city: "makkah" | "madinah",
-    status: AgreementApprovalStatus,
-  ) => void;
+  onUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
@@ -308,17 +307,20 @@ export function VisaTrackingScreen({
   const selectedIssuedMonthLabel =
     issuedMonthFilter === "all"
       ? "All Months"
-      : issuedMonthOptions.find((option) => option.value === issuedMonthFilter)?.label ?? issuedMonthFilter;
+      : (issuedMonthOptions.find((option) => option.value === issuedMonthFilter)?.label ?? issuedMonthFilter);
   const actionRequiredCount = visaRows.filter((row) => isVisaRowActionRequired(row)).length;
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / VISA_PAGE_SIZE));
   const startIndex = (currentPage - 1) * VISA_PAGE_SIZE;
   const paginatedRows = filteredRows.slice(startIndex, startIndex + VISA_PAGE_SIZE);
   const rangeStart = filteredRows.length === 0 ? 0 : startIndex + 1;
-  const rangeEnd =
-    filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, startIndex + paginatedRows.length);
-  const heroLabelClassName = isDarkMode ? "text-xs font-semibold uppercase tracking-[0.2em] text-primary/85" : "text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700";
-  const summaryIconClassName = isDarkMode ? "material-symbols-outlined text-primary" : "material-symbols-outlined text-emerald-700";
+  const rangeEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, startIndex + paginatedRows.length);
+  const heroLabelClassName = isDarkMode
+    ? "text-xs font-semibold uppercase tracking-[0.2em] text-primary/85"
+    : "text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700";
+  const summaryIconClassName = isDarkMode
+    ? "material-symbols-outlined text-primary"
+    : "material-symbols-outlined text-emerald-700";
 
   useEffect(() => {
     setCurrentPage(1);
@@ -329,9 +331,7 @@ export function VisaTrackingScreen({
       return;
     }
 
-    const isSelectedMonthAvailable = issuedMonthOptions.some(
-      (option) => option.value === issuedMonthFilter,
-    );
+    const isSelectedMonthAvailable = issuedMonthOptions.some((option) => option.value === issuedMonthFilter);
     if (!isSelectedMonthAvailable) {
       setIssuedMonthFilter("all");
     }
@@ -545,10 +545,7 @@ export function VisaTrackingScreen({
               const madinahAgreementStatus = resolveCityAgreementApprovalStatus(row, group, "madinah");
               const raudhahEntries = resolveRaudhahEntries(row, group);
               const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
-              const hiddenRaudhahEntriesCount = Math.max(
-                0,
-                raudhahEntries.length - visibleRaudhahEntries.length,
-              );
+              const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
               const agreementDateRange = resolveVisaAgreementDateRange(
                 row,
                 durationByGroupCode.get(row.groupCode) ?? 8,
@@ -556,7 +553,10 @@ export function VisaTrackingScreen({
               );
 
               return (
-                <article key={row.id} className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+                <article
+                  key={row.id}
+                  className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900">{row.groupCode}</p>
@@ -573,9 +573,11 @@ export function VisaTrackingScreen({
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                         Makkah Agreement
                       </p>
-                      <strong className="mt-1 block text-xs font-semibold text-slate-800">{makkahAgreementNumber}</strong>
+                      <strong className="mt-1 block text-xs font-semibold text-slate-800">
+                        {makkahAgreementNumber}
+                      </strong>
                       <small className="block text-xs text-slate-500">
-                        {formatVisaShortDate(agreementDateRange.makkahStartIso)} - {" "}
+                        {formatVisaShortDate(agreementDateRange.makkahStartIso)} -{" "}
                         {formatVisaShortDate(agreementDateRange.makkahEndIso)}
                       </small>
                       <SereneSelect
@@ -602,9 +604,11 @@ export function VisaTrackingScreen({
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                         Madinah Agreement
                       </p>
-                      <strong className="mt-1 block text-xs font-semibold text-slate-800">{madinahAgreementNumber}</strong>
+                      <strong className="mt-1 block text-xs font-semibold text-slate-800">
+                        {madinahAgreementNumber}
+                      </strong>
                       <small className="block text-xs text-slate-500">
-                        {formatVisaShortDate(agreementDateRange.madinahStartIso)} - {" "}
+                        {formatVisaShortDate(agreementDateRange.madinahStartIso)} -{" "}
                         {formatVisaShortDate(agreementDateRange.madinahEndIso)}
                       </small>
                       <SereneSelect
@@ -693,7 +697,10 @@ export function VisaTrackingScreen({
             })}
           </section>
 
-          <section className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-sm md:block" aria-label="Visa tracking table">
+          <section
+            className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-sm md:block"
+            aria-label="Visa tracking table"
+          >
             <div className="overflow-x-auto">
               <div className="min-w-full">
                 <div
@@ -721,10 +728,7 @@ export function VisaTrackingScreen({
                     const madinahAgreementStatus = resolveCityAgreementApprovalStatus(row, group, "madinah");
                     const raudhahEntries = resolveRaudhahEntries(row, group);
                     const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
-                    const hiddenRaudhahEntriesCount = Math.max(
-                      0,
-                      raudhahEntries.length - visibleRaudhahEntries.length,
-                    );
+                    const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
                     const agreementDateRange = resolveVisaAgreementDateRange(
                       row,
                       durationByGroupCode.get(row.groupCode) ?? 8,
@@ -752,7 +756,7 @@ export function VisaTrackingScreen({
                             {makkahAgreementNumber}
                           </strong>
                           <small className="block text-[11px] leading-tight text-slate-500">
-                            {formatVisaShortDate(agreementDateRange.makkahStartIso)} - {" "}
+                            {formatVisaShortDate(agreementDateRange.makkahStartIso)} -{" "}
                             {formatVisaShortDate(agreementDateRange.makkahEndIso)}
                           </small>
                           <SereneSelect
@@ -780,7 +784,7 @@ export function VisaTrackingScreen({
                             {madinahAgreementNumber}
                           </strong>
                           <small className="block text-[11px] leading-tight text-slate-500">
-                            {formatVisaShortDate(agreementDateRange.madinahStartIso)} - {" "}
+                            {formatVisaShortDate(agreementDateRange.madinahStartIso)} -{" "}
                             {formatVisaShortDate(agreementDateRange.madinahEndIso)}
                           </small>
                           <SereneSelect
@@ -881,6 +885,3 @@ export function VisaTrackingScreen({
     </div>
   );
 }
-
-
-

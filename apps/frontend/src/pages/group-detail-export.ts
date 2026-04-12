@@ -12,11 +12,7 @@ const {
   resolveTotalBusCount,
 } = Domain;
 
-function formatItineraryActivityHeading(
-  item: ItineraryItem,
-  categoryKey: string,
-  fallbackLabel: string,
-): string {
+function formatItineraryActivityHeading(item: ItineraryItem, categoryKey: string, fallbackLabel: string): string {
   if (categoryKey !== "transfer") {
     return fallbackLabel;
   }
@@ -72,8 +68,7 @@ function formatItinerarySupportDetail(
   const inferredToHotelName = /hotel/i.test(trimmedTo) ? trimmedTo : "";
   const fallbackHotelName = options?.fallbackHotelName?.trim() ?? "";
   const fallbackFromHotelName = options?.fallbackFromHotelName?.trim() ?? "";
-  const fromHotelName =
-    item.fromHotelName?.trim() || inferredFromHotelName || fallbackFromHotelName;
+  const fromHotelName = item.fromHotelName?.trim() || inferredFromHotelName || fallbackFromHotelName;
   const hotelName =
     item.hotelName?.trim() ||
     (categoryKey === "transfer"
@@ -144,218 +139,204 @@ export function exportGroupDetailPdf({
   noteItems: NoteItem[];
   musyrifProfile: Musyrif;
 }) {
-    const printableWindow = window.open("", "_blank", "width=1120,height=760");
-    if (!printableWindow) {
-      return;
+  const printableWindow = window.open("", "_blank", "width=1120,height=760");
+  if (!printableWindow) {
+    return;
+  }
+
+  const generatedTimestamp = new Date()
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .toUpperCase();
+  const sortedItinerary = [...itineraryItems].sort((left, right) => {
+    const leftIso = left.isoDate ?? parseDisplayDateToIso(left.date, left.year);
+    const rightIso = right.isoDate ?? parseDisplayDateToIso(right.date, right.year);
+    const leftKey = `${leftIso}T${left.time ?? "00:00"}`;
+    const rightKey = `${rightIso}T${right.time ?? "00:00"}`;
+    return leftKey.localeCompare(rightKey);
+  });
+
+  const formatLongDate = (isoDate: string): string => {
+    if (!isoDate) {
+      return "-";
     }
 
-    const generatedTimestamp = new Date()
-      .toLocaleString("en-GB", {
+    const date = new Date(`${isoDate}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return isoDate.toUpperCase();
+    }
+
+    return date
+      .toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
       })
       .toUpperCase();
-    const sortedItinerary = [...itineraryItems].sort((left, right) => {
-      const leftIso = left.isoDate ?? parseDisplayDateToIso(left.date, left.year);
-      const rightIso = right.isoDate ?? parseDisplayDateToIso(right.date, right.year);
-      const leftKey = `${leftIso}T${left.time ?? "00:00"}`;
-      const rightKey = `${rightIso}T${right.time ?? "00:00"}`;
-      return leftKey.localeCompare(rightKey);
-    });
+  };
 
-    const formatLongDate = (isoDate: string): string => {
-      if (!isoDate) {
-        return "-";
-      }
+  const formatTimelineDate = (isoDate: string): { dateLabel: string; dayLabel: string } => {
+    if (!isoDate) {
+      return { dateLabel: "-", dayLabel: "-" };
+    }
 
-      const date = new Date(`${isoDate}T12:00:00`);
-      if (Number.isNaN(date.getTime())) {
-        return isoDate.toUpperCase();
-      }
+    const date = new Date(`${isoDate}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return { dateLabel: isoDate.toUpperCase(), dayLabel: "-" };
+    }
 
-      return date
+    return {
+      dateLabel: date
         .toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "short",
-          year: "numeric",
         })
-        .toUpperCase();
+        .toUpperCase(),
+      dayLabel: date.toLocaleDateString("en-US", { weekday: "long" }),
     };
+  };
 
-    const formatTimelineDate = (isoDate: string): { dateLabel: string; dayLabel: string } => {
-      if (!isoDate) {
-        return { dateLabel: "-", dayLabel: "-" };
-      }
+  const formatTime24 = (value: string): string => {
+    if (!value) {
+      return "TBD";
+    }
 
-      const date = new Date(`${isoDate}T12:00:00`);
-      if (Number.isNaN(date.getTime())) {
-        return { dateLabel: isoDate.toUpperCase(), dayLabel: "-" };
-      }
-
-      return {
-        dateLabel: date
-          .toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-          })
-          .toUpperCase(),
-        dayLabel: date.toLocaleDateString("en-US", { weekday: "long" }),
-      };
-    };
-
-    const formatTime24 = (value: string): string => {
-      if (!value) {
-        return "TBD";
-      }
-
-      if (/^\d{2}:\d{2}$/.test(value)) {
-        return value;
-      }
-
-      const parsed = parseTimeForInput(value);
-      if (parsed) {
-        return parsed;
-      }
-
+    if (/^\d{2}:\d{2}$/.test(value)) {
       return value;
-    };
+    }
 
-    const fallbackStartIso =
-      sortedItinerary[0]?.isoDate ??
-      (sortedItinerary[0] ? parseDisplayDateToIso(sortedItinerary[0].date, sortedItinerary[0].year) : "");
-    const fallbackEndIso =
-      sortedItinerary.length > 0
-        ? sortedItinerary[sortedItinerary.length - 1]?.isoDate ??
-          parseDisplayDateToIso(
-            sortedItinerary[sortedItinerary.length - 1].date,
-            sortedItinerary[sortedItinerary.length - 1].year,
-          )
-        : "";
-    const arrivalItem = sortedItinerary.find((item) => inferCategoryKey(item) === "arrival");
-    const returnItem = [...sortedItinerary]
-      .reverse()
-      .find((item) => inferCategoryKey(item) === "departure");
-    const returnIso =
-      returnItem?.isoDate ??
-      (returnItem ? parseDisplayDateToIso(returnItem.date, returnItem.year) : fallbackEndIso);
-    const arrivalFlightNumber = arrivalItem?.flightNumber?.trim() || "-";
-    const returnFlightNumber = returnItem?.flightNumber?.trim() || "-";
-    const resolvedTotalBuses = resolveTotalBusCount(group.pax, group.totalBuses);
-    const cityHotelNames = {
-      makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
-      madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
-    };
-    const resolveHotelNameByCity = (cityInput: string): string => {
-      const cityKey = normalizeAgreementCityKey(cityInput);
-      if (!cityKey) {
-        return "";
-      }
+    const parsed = parseTimeForInput(value);
+    if (parsed) {
+      return parsed;
+    }
 
-      return cityHotelNames[cityKey]?.trim() ?? "";
-    };
-    const resolvePdfFallbackHotels = (
-      item: ItineraryItem,
-      categoryKey: string,
-    ): { fallbackHotelName: string; fallbackFromHotelName: string } => {
-      const fallbackFromHotelName =
-        categoryKey === "transfer" ? resolveHotelNameByCity(item.from ?? "") : "";
+    return value;
+  };
 
-      if (categoryKey === "departure") {
-        return {
-          fallbackHotelName: resolveHotelNameByCity(item.from ?? ""),
-          fallbackFromHotelName,
-        };
-      }
+  const fallbackStartIso =
+    sortedItinerary[0]?.isoDate ??
+    (sortedItinerary[0] ? parseDisplayDateToIso(sortedItinerary[0].date, sortedItinerary[0].year) : "");
+  const fallbackEndIso =
+    sortedItinerary.length > 0
+      ? (sortedItinerary[sortedItinerary.length - 1]?.isoDate ??
+        parseDisplayDateToIso(
+          sortedItinerary[sortedItinerary.length - 1].date,
+          sortedItinerary[sortedItinerary.length - 1].year,
+        ))
+      : "";
+  const arrivalItem = sortedItinerary.find((item) => inferCategoryKey(item) === "arrival");
+  const returnItem = [...sortedItinerary].reverse().find((item) => inferCategoryKey(item) === "departure");
+  const returnIso =
+    returnItem?.isoDate ?? (returnItem ? parseDisplayDateToIso(returnItem.date, returnItem.year) : fallbackEndIso);
+  const arrivalFlightNumber = arrivalItem?.flightNumber?.trim() || "-";
+  const returnFlightNumber = returnItem?.flightNumber?.trim() || "-";
+  const resolvedTotalBuses = resolveTotalBusCount(group.pax, group.totalBuses);
+  const cityHotelNames = {
+    makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
+    madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
+  };
+  const resolveHotelNameByCity = (cityInput: string): string => {
+    const cityKey = normalizeAgreementCityKey(cityInput);
+    if (!cityKey) {
+      return "";
+    }
 
-      if (categoryKey === "arrival" || categoryKey === "transfer") {
-        return {
-          fallbackHotelName: resolveHotelNameByCity(item.to ?? ""),
-          fallbackFromHotelName,
-        };
-      }
+    return cityHotelNames[cityKey]?.trim() ?? "";
+  };
+  const resolvePdfFallbackHotels = (
+    item: ItineraryItem,
+    categoryKey: string,
+  ): { fallbackHotelName: string; fallbackFromHotelName: string } => {
+    const fallbackFromHotelName = categoryKey === "transfer" ? resolveHotelNameByCity(item.from ?? "") : "";
 
-      if (categoryKey === "city-tour") {
-        return {
-          fallbackHotelName:
-            resolveHotelNameByCity(item.cityTourCity ?? "") ||
-            resolveHotelNameByCity(item.from ?? "") ||
-            resolveHotelNameByCity(item.to ?? ""),
-          fallbackFromHotelName,
-        };
-      }
-
+    if (categoryKey === "departure") {
       return {
-        fallbackHotelName: "",
+        fallbackHotelName: resolveHotelNameByCity(item.from ?? ""),
         fallbackFromHotelName,
       };
+    }
+
+    if (categoryKey === "arrival" || categoryKey === "transfer") {
+      return {
+        fallbackHotelName: resolveHotelNameByCity(item.to ?? ""),
+        fallbackFromHotelName,
+      };
+    }
+
+    if (categoryKey === "city-tour") {
+      return {
+        fallbackHotelName:
+          resolveHotelNameByCity(item.cityTourCity ?? "") ||
+          resolveHotelNameByCity(item.from ?? "") ||
+          resolveHotelNameByCity(item.to ?? ""),
+        fallbackFromHotelName,
+      };
+    }
+
+    return {
+      fallbackHotelName: "",
+      fallbackFromHotelName,
     };
-    const raudhahDateLabels = Array.from(
-      new Set(
-        (group.visaSetup?.raudhahAppointments ?? [])
-          .map((appointment) => formatLongDate(appointment.dateIso?.trim() ?? ""))
-          .filter((value) => value && value !== "-"),
-      ),
-    );
-    const raudhahDateSummary =
-      raudhahDateLabels.length > 0 ? raudhahDateLabels.join(" | ") : "NOT SET";
+  };
+  const raudhahDateLabels = Array.from(
+    new Set(
+      (group.visaSetup?.raudhahAppointments ?? [])
+        .map((appointment) => formatLongDate(appointment.dateIso?.trim() ?? ""))
+        .filter((value) => value && value !== "-"),
+    ),
+  );
+  const raudhahDateSummary = raudhahDateLabels.length > 0 ? raudhahDateLabels.join(" | ") : "NOT SET";
 
-    const itineraryTimelineRows = sortedItinerary
-      .map((item, index) => {
-        const itemIso = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
-        const { dateLabel, dayLabel } = formatTimelineDate(itemIso);
-        const categoryKey = inferCategoryKey(item);
-        const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item) : "";
-        const badgeClass =
-          categoryKey === "arrival"
-            ? "badge-arrival"
-            : categoryKey === "city-tour"
-              ? "badge-tour"
-              : categoryKey === "transfer"
-                ? "badge-transfer"
-                : categoryKey === "departure"
-                  ? "badge-departure"
-                  : "badge-default";
-        const dotClass =
-          categoryKey === "arrival"
-            ? "dot-arrival"
-            : categoryKey === "city-tour"
-              ? "dot-tour"
-              : categoryKey === "transfer"
-                ? "dot-transfer"
-                : categoryKey === "departure"
-                  ? "dot-departure"
-                  : "dot-default";
-        const badgeIcon =
-          categoryKey === "arrival"
-            ? "check_circle"
-            : categoryKey === "city-tour"
-              ? "map"
-              : categoryKey === "transfer"
-                ? "train"
-                : categoryKey === "departure"
-                  ? "flight_takeoff"
-                  : "event";
-        const badgeLabel =
-          categoryKey === "city-tour" && cityTourCity
-            ? `City Tour / ${cityTourCity}`
-            : item.category;
-        const activityHeading = formatItineraryActivityHeading(item, categoryKey, item.category);
-        const compactSummary = formatItineraryCompactSummary(item, categoryKey);
-        const detailText = formatItinerarySupportDetail(
-          item,
-          categoryKey,
-          resolvePdfFallbackHotels(item, categoryKey),
-        );
-        const timeSource = item.transferByTrain
-          ? item.trainDepartureTime || item.time || ""
-          : item.time || "";
-        const timelineTime = formatTime24(timeSource);
+  const itineraryTimelineRows = sortedItinerary
+    .map((item, index) => {
+      const itemIso = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
+      const { dateLabel, dayLabel } = formatTimelineDate(itemIso);
+      const categoryKey = inferCategoryKey(item);
+      const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item) : "";
+      const badgeClass =
+        categoryKey === "arrival"
+          ? "badge-arrival"
+          : categoryKey === "city-tour"
+            ? "badge-tour"
+            : categoryKey === "transfer"
+              ? "badge-transfer"
+              : categoryKey === "departure"
+                ? "badge-departure"
+                : "badge-default";
+      const dotClass =
+        categoryKey === "arrival"
+          ? "dot-arrival"
+          : categoryKey === "city-tour"
+            ? "dot-tour"
+            : categoryKey === "transfer"
+              ? "dot-transfer"
+              : categoryKey === "departure"
+                ? "dot-departure"
+                : "dot-default";
+      const badgeIcon =
+        categoryKey === "arrival"
+          ? "check_circle"
+          : categoryKey === "city-tour"
+            ? "map"
+            : categoryKey === "transfer"
+              ? "train"
+              : categoryKey === "departure"
+                ? "flight_takeoff"
+                : "event";
+      const badgeLabel = categoryKey === "city-tour" && cityTourCity ? `City Tour / ${cityTourCity}` : item.category;
+      const activityHeading = formatItineraryActivityHeading(item, categoryKey, item.category);
+      const compactSummary = formatItineraryCompactSummary(item, categoryKey);
+      const detailText = formatItinerarySupportDetail(item, categoryKey, resolvePdfFallbackHotels(item, categoryKey));
+      const timeSource = item.transferByTrain ? item.trainDepartureTime || item.time || "" : item.time || "";
+      const timelineTime = formatTime24(timeSource);
 
-        return `
+      return `
           <article class="timeline-item">
             <div class="timeline-date-col">
               <span class="timeline-date">${escapeHtml(dateLabel)}</span>
@@ -380,34 +361,34 @@ export function exportGroupDetailPdf({
             </div>
           </article>
         `;
-      })
-      .join("");
-    const departDateLabel = formatLongDate(fallbackStartIso);
-    const returnDateLabel = formatLongDate(returnIso);
+    })
+    .join("");
+  const departDateLabel = formatLongDate(fallbackStartIso);
+  const returnDateLabel = formatLongDate(returnIso);
 
-    const defaultGuidelines = [
-      "Gather in lobby 30 mins before every scheduled activity.",
-      "Nusuk permits are required for Raudhah. Monitor your app daily.",
-      "Keep Visa and Passport in hand luggage during all transit points.",
-    ];
-    const noteHighlightItems =
-      noteItems.length > 0
-        ? noteItems.slice(0, 3).map((note) => `${note.text}${note.pinned ? " (Pinned)" : ""}`)
-        : defaultGuidelines;
-    const guidelineIcons = ["groups", "confirmation_number", "badge"];
-    const noteRows = noteHighlightItems
-      .map((text, index) => {
-        const icon = guidelineIcons[index] ?? "info";
-        return `
+  const defaultGuidelines = [
+    "Gather in lobby 30 mins before every scheduled activity.",
+    "Nusuk permits are required for Raudhah. Monitor your app daily.",
+    "Keep Visa and Passport in hand luggage during all transit points.",
+  ];
+  const noteHighlightItems =
+    noteItems.length > 0
+      ? noteItems.slice(0, 3).map((note) => `${note.text}${note.pinned ? " (Pinned)" : ""}`)
+      : defaultGuidelines;
+  const guidelineIcons = ["groups", "confirmation_number", "badge"];
+  const noteRows = noteHighlightItems
+    .map((text, index) => {
+      const icon = guidelineIcons[index] ?? "info";
+      return `
           <article class="guideline-item${index === 1 ? " is-middle" : ""}">
             <span class="material-symbols-outlined">${icon}</span>
             <p>${escapeHtml(text)}</p>
           </article>
         `;
-      })
-      .join("");
+    })
+    .join("");
 
-    const printableHtml = `<!DOCTYPE html>
+  const printableHtml = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -1035,9 +1016,7 @@ export function exportGroupDetailPdf({
           <div class="timeline-head-line"></div>
         </div>
         <div class="timeline-wrap">
-          ${
-            itineraryTimelineRows || '<p class="empty-row">No itinerary data available.</p>'
-          }
+          ${itineraryTimelineRows || '<p class="empty-row">No itinerary data available.</p>'}
         </div>
       </section>
 
@@ -1067,12 +1046,12 @@ export function exportGroupDetailPdf({
   </body>
 </html>`;
 
-    printableWindow.document.open();
-    printableWindow.document.write(printableHtml);
-    printableWindow.document.close();
+  printableWindow.document.open();
+  printableWindow.document.write(printableHtml);
+  printableWindow.document.close();
 
-    window.setTimeout(() => {
-      printableWindow.focus();
-      printableWindow.print();
-    }, 450);
+  window.setTimeout(() => {
+    printableWindow.focus();
+    printableWindow.print();
+  }, 450);
 }

@@ -8,7 +8,7 @@ Dokumen ini menjelaskan arsitektur frontend, alur state, integrasi API, dan comm
 - Stack: React 19 + TypeScript + Tailwind CSS + React Router + TanStack Query + React Hook Form + Zod
 - Bundler/build: esbuild
 - Dev server: script custom `scripts/dev.mjs`
-- Testing: unit test, smoke test, dan Playwright e2e
+- Testing: Vitest untuk unit/smoke test, dan Playwright untuk e2e
 
 ## 2. Struktur Penting
 
@@ -152,7 +152,17 @@ Dari root project:
 
 - `npm run dev:frontend` -> jalankan dev server frontend.
 - `npm run build:frontend` -> build frontend.
+- `npm run lint:frontend` -> jalankan ESLint untuk frontend.
+- `npm run format:frontend` -> apply formatting frontend dengan Prettier.
+- `npm run format:check:frontend` -> cek formatting frontend dengan Prettier.
+- `npm run format:write:frontend` -> alias untuk apply formatting frontend.
 - `npm run check --workspace frontend` -> type-check frontend.
 - `npm run test --workspace frontend` -> unit test frontend.
+- `npm run test:unit:watch --workspace frontend` -> watch mode unit test frontend.
+- `npm run test:unit:coverage --workspace frontend` -> unit coverage frontend via Vitest V8 coverage.
+- `npm run test:unit:coverage:check --workspace frontend` -> unit coverage frontend + threshold check.
 - `npm run test:smoke --workspace frontend` -> smoke test frontend.
+- `npm run test:smoke:coverage --workspace frontend` -> smoke coverage frontend via Vitest V8 coverage.
+- `npm run test:smoke:watch --workspace frontend` -> watch mode smoke test frontend.
 - `npm run test:e2e --workspace frontend` -> Playwright e2e frontend.
+- `npm run build:analyze --workspace frontend` -> build frontend + tampilkan audit ukuran bundle.

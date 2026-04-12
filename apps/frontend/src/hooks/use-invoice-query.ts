@@ -59,19 +59,16 @@ export function useCreateInvoiceMutation() {
     mutationFn: (payload: CreateBackendInvoicePayload) => createInvoiceInBackend(payload),
     retry: false,
     onSuccess: (createdInvoice) => {
-      queryClient.setQueryData<InvoiceDashboardData | undefined>(
-        invoiceQueryKeys.dashboard,
-        (current) => {
-          if (!current) {
-            return current;
-          }
+      queryClient.setQueryData<InvoiceDashboardData | undefined>(invoiceQueryKeys.dashboard, (current) => {
+        if (!current) {
+          return current;
+        }
 
-          return {
-            ...current,
-            rows: sortInvoiceRows([createdInvoice, ...current.rows]),
-          };
-        },
-      );
+        return {
+          ...current,
+          rows: sortInvoiceRows([createdInvoice, ...current.rows]),
+        };
+      });
     },
   });
 }
@@ -80,30 +77,20 @@ export function useUpdateInvoiceMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      invoiceId,
-      payload,
-    }: {
-      invoiceId: string;
-      payload: UpdateBackendInvoicePayload;
-    }) => updateInvoiceInBackend(invoiceId, payload),
+    mutationFn: ({ invoiceId, payload }: { invoiceId: string; payload: UpdateBackendInvoicePayload }) =>
+      updateInvoiceInBackend(invoiceId, payload),
     retry: false,
     onSuccess: (updatedInvoice) => {
-      queryClient.setQueryData<InvoiceDashboardData | undefined>(
-        invoiceQueryKeys.dashboard,
-        (current) => {
-          if (!current) {
-            return current;
-          }
+      queryClient.setQueryData<InvoiceDashboardData | undefined>(invoiceQueryKeys.dashboard, (current) => {
+        if (!current) {
+          return current;
+        }
 
-          return {
-            ...current,
-            rows: sortInvoiceRows(
-              current.rows.map((row) => (row.id === updatedInvoice.id ? updatedInvoice : row)),
-            ),
-          };
-        },
-      );
+        return {
+          ...current,
+          rows: sortInvoiceRows(current.rows.map((row) => (row.id === updatedInvoice.id ? updatedInvoice : row))),
+        };
+      });
     },
   });
 }

@@ -73,7 +73,10 @@ export function formatVisaDateWithYear(isoDate: string): string {
 }
 
 export function buildVisaAgreementNumber(groupCode: string, city: "makkah" | "madinah"): string {
-  const digits = groupCode.replace(/[^0-9]/g, "").slice(-6).padStart(6, "0");
+  const digits = groupCode
+    .replace(/[^0-9]/g, "")
+    .slice(-6)
+    .padStart(6, "0");
   const citySuffix = city === "makkah" ? "65865716" : "77824519";
   return `2026${digits}${citySuffix}`;
 }
@@ -162,7 +165,8 @@ export function resolveVisaAgreementDateRange(
     };
   }
 
-  const customMakkahStartIso = [...makkahStartCandidates, ...madinahStartCandidates].sort()[0] ?? fallbackMakkahStartIso;
+  const customMakkahStartIso =
+    [...makkahStartCandidates, ...madinahStartCandidates].sort()[0] ?? fallbackMakkahStartIso;
   const customMakkahEndIso = [...makkahEndCandidates].sort().at(-1) ?? fallbackMakkahEndIso;
   const customMadinahStartIso = [...madinahStartCandidates].sort()[0] ?? shiftIsoDate(customMakkahEndIso, 1);
   const customMadinahEndIso = [...madinahEndCandidates, ...makkahEndCandidates].sort().at(-1) ?? fallbackMadinahEndIso;

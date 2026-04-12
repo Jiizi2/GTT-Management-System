@@ -1,5 +1,5 @@
-import { resolveBackendApiBaseUrl } from "../shared/backend-api-base";
-import { clearAuthSession } from "../shared/auth-session";
+import { fetchBackendParsed } from "../shared/api-client";
+import { extractBackendErrorMessage } from "../shared/api-error";
 
 export type MasterDataCategoryKey =
   | "invoice-issuing-office"
@@ -49,20 +49,6 @@ export type UpdateMasterDataOptionPayload = {
   sortOrder?: number;
   isActive?: boolean;
 };
-
-async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(endpoint, {
-    ...init,
-    credentials: "include",
-    headers: new Headers(init?.headers),
-  });
-
-  if (response.status === 401) {
-    clearAuthSession();
-  }
-
-  return response;
-}
 
 function readString(value: unknown, fallback = ""): string {
   if (typeof value !== "string") {
@@ -166,64 +152,25 @@ function mapOption(value: unknown): MasterDataOption | null {
   };
 }
 
-async function parseResponseJson(response: Response): Promise<unknown> {
-  const responseText = await response.text();
-  if (!responseText.trim()) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(responseText) as unknown;
-  } catch {
-    return responseText;
-  }
-}
-
-function extractBackendErrorMessage(status: number, payload: unknown, fallback: string): string {
-  if (payload && typeof payload === "object" && "message" in payload) {
-    const message = (payload as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message.trim();
-    }
-
-    if (Array.isArray(message)) {
-      const firstText = message.find((entry) => typeof entry === "string" && entry.trim());
-      if (typeof firstText === "string" && firstText.trim()) {
-        return firstText.trim();
-      }
-    }
-  }
-
-  if (fallback.trim()) {
-    return fallback.trim();
-  }
-
-  return `Master data request failed (${status}).`;
-}
-
 export async function fetchMasterDataCategoriesFromBackend({
   signal,
 }: {
   signal?: AbortSignal;
 } = {}): Promise<MasterDataCategory[]> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/master-data/categories`, {
+  const { response, payload, responseText } = await fetchBackendParsed("/master-data/categories", {
     method: "GET",
     signal,
   });
-  const payload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, payload, ""));
+    throw new Error(extractBackendErrorMessage(response.status, payload, responseText, "Master data request failed"));
   }
 
   if (!Array.isArray(payload)) {
     throw new Error("Master data categories response is invalid.");
   }
 
-  return payload
-    .map((item) => mapCategory(item))
-    .filter((item): item is MasterDataCategory => item !== null);
+  return payload.map((item) => mapCategory(item)).filter((item): item is MasterDataCategory => item !== null);
 }
 
 export async function fetchMasterDataOptionsFromBackend({
@@ -235,20 +182,18 @@ export async function fetchMasterDataOptionsFromBackend({
   includeInactive?: boolean;
   signal?: AbortSignal;
 }): Promise<MasterDataOption[]> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
   const query = new URLSearchParams({ categoryKey });
   if (includeInactive) {
     query.set("includeInactive", "true");
   }
 
-  const response = await fetchBackend(`${apiBaseUrl}/master-data/options?${query.toString()}`, {
+  const { response, payload, responseText } = await fetchBackendParsed(`/master-data/options?${query.toString()}`, {
     method: "GET",
     signal,
   });
-  const payload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, payload, ""));
+    throw new Error(extractBackendErrorMessage(response.status, payload, responseText, "Master data request failed"));
   }
 
   if (!Array.isArray(payload)) {
@@ -271,18 +216,22 @@ export async function fetchMasterDataOptionsFromBackend({
 export async function createMasterDataOptionInBackend(
   payload: CreateMasterDataOptionPayload,
 ): Promise<MasterDataOption> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/master-data/options`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed("/master-data/options", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
-  const responsePayload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, responsePayload, responseText, "Master data request failed"),
+    );
   }
 
   const mappedOption = mapOption(responsePayload);
@@ -302,18 +251,22 @@ export async function updateMasterDataOptionInBackend(
     throw new Error("Master data update failed: option id is required.");
   }
 
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/master-data/options/${encodeURIComponent(normalizedOptionId)}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/master-data/options/${encodeURIComponent(normalizedOptionId)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   });
-  const responsePayload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, responsePayload, responseText, "Master data request failed"),
+    );
   }
 
   const mappedOption = mapOption(responsePayload);

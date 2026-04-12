@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { GroupData, SessionAccessTier, VisaTrackingRow } from "../shared/app-domain";
-import type { AppController, OverviewStatCard } from "./app-controller/types";
+import type { AppController } from "./app-controller/types";
 import { useDashboardGroupRecords } from "./app-controller/use-dashboard-group-records";
 import { useDashboardRouteState } from "./app-controller/use-dashboard-route-state";
 import { useDashboardSyncFeedback } from "./app-controller/use-dashboard-sync-feedback";
@@ -74,11 +74,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const allowLocalFallback = isLocalDevelopmentHost();
 
-  const {
-    syncFeedback,
-    showSyncFeedback,
-    dismissSyncFeedback,
-  } = useDashboardSyncFeedback();
+  const { syncFeedback, showSyncFeedback, dismissSyncFeedback } = useDashboardSyncFeedback();
   const routeState = useDashboardRouteState(sessionAccessTier);
   const groupRecordsState = useDashboardGroupRecords({
     activeNav: routeState.activeNav,

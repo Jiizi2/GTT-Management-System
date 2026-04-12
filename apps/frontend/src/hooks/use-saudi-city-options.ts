@@ -16,14 +16,7 @@ function mapOptionsToCityList(options: MasterDataOption[]): string[] {
 
 export function useSaudiCityOptions(defaultOptions: readonly string[]): string[] {
   const normalizedDefaultOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          defaultOptions
-            .map((city) => city.trim())
-            .filter((city) => city.length > 0),
-        ),
-      ),
+    () => Array.from(new Set(defaultOptions.map((city) => city.trim()).filter((city) => city.length > 0))),
     [defaultOptions],
   );
   const saudiCityOptionsQuery = useMasterDataOptionsQuery({

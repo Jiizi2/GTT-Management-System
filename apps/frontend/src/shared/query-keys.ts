@@ -8,8 +8,7 @@ export const groupQueryKeys = {
   all: ["groups"] as const,
   list: (projection: GroupFetchProjection) => ["groups", "list", projection] as const,
   searchRoot: ["groups", "search"] as const,
-  search: (query: string, projection: GroupFetchProjection) =>
-    ["groups", "search", projection, query] as const,
+  search: (query: string, projection: GroupFetchProjection) => ["groups", "search", projection, query] as const,
 };
 
 export const masterDataQueryKeys = {

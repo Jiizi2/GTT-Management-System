@@ -241,13 +241,7 @@ function getRequiredBusBadgeLabel(group: GroupData): string | null {
   return `${resolveTotalBusCount(group.pax, group.totalBuses)} bus`;
 }
 
-export function GroupCard({
-  group,
-  onOpenDetail,
-}: {
-  group: GroupData;
-  onOpenDetail: (groupCode: string) => void;
-}) {
+export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDetail: (groupCode: string) => void }) {
   const itineraryPreview = buildItineraryPreview(group);
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
   const metadataBadges = [
@@ -292,9 +286,7 @@ export function GroupCard({
       <section className="mx-1 mb-8 pt-1" aria-label="Itinerary preview">
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/80">Itinerary Preview</p>
-          <span className="text-[10px] font-medium text-on-surface-variant/55">
-            {itineraryPreview.length} stops
-          </span>
+          <span className="text-[10px] font-medium text-on-surface-variant/55">{itineraryPreview.length} stops</span>
         </div>
 
         <ul className="space-y-2.5">

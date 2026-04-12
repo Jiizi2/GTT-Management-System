@@ -131,12 +131,7 @@ export function exportOverviewReportPdf({
         ? "Active only"
         : "All groups"
       : "All groups (inactive excluded in PDF)";
-  const filterLabel = [
-    scopeLabel,
-    normalizedQuery ? `Query: "${normalizedQuery}"` : "",
-  ]
-    .filter(Boolean)
-    .join(" | ");
+  const filterLabel = [scopeLabel, normalizedQuery ? `Query: "${normalizedQuery}"` : ""].filter(Boolean).join(" | ");
 
   const tableRows = rows
     .map(
@@ -310,10 +305,7 @@ export function exportOverviewReportPdf({
           </tr>
         </thead>
         <tbody>
-          ${
-            tableRows ||
-            '<tr><td class="empty" colspan="10">No trip data for the current filter.</td></tr>'
-          }
+          ${tableRows || '<tr><td class="empty" colspan="10">No trip data for the current filter.</td></tr>'}
         </tbody>
       </table>
 

@@ -56,11 +56,7 @@ function ScreenLoadingFallback() {
   );
 }
 
-export function AppMainContent({
-  controller,
-}: {
-  controller: AppController;
-}) {
+export function AppMainContent({ controller }: { controller: AppController }) {
   const location = useLocation();
   const requiresDetailedGroupRecords =
     controller.selectedGroupCode !== null ||
@@ -72,9 +68,9 @@ export function AppMainContent({
   const freshSelectedVisaRow = useMemo(
     () =>
       controller.selectedVisaRow
-        ? buildVisaTrackingRowsFromGroups(controller.groupRecords).find(
+        ? (buildVisaTrackingRowsFromGroups(controller.groupRecords).find(
             (row) => row.groupCode === controller.selectedVisaRow?.groupCode,
-          ) ?? controller.selectedVisaRow
+          ) ?? controller.selectedVisaRow)
         : null,
     [controller.groupRecords, controller.selectedVisaRow],
   );
@@ -91,7 +87,7 @@ export function AppMainContent({
         <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
         <Route
           path="/overview"
-          element={(
+          element={
             <LazyOverviewScreen
               query={controller.query}
               filteredGroups={controller.filteredGroups}
@@ -102,7 +98,7 @@ export function AppMainContent({
               onToggleActiveOnly={controller.handleToggleActiveOnly}
               onOpenDetail={controller.handleOpenDetail}
             />
-          )}
+          }
         />
         <Route
           path="/groups/:groupCode"
@@ -126,27 +122,24 @@ export function AppMainContent({
         />
         <Route
           path="/new-group"
-          element={(
+          element={
             <LazyAddGroupWorkspaceScreen
               onSaveGroup={controller.handleSaveInputGroup}
               onCancel={controller.handleBackToOverview}
             />
-          )}
+          }
         />
         <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
-        <Route
-          path="/checklist"
-          element={<LazyChecklistScreen groups={controller.groupRecords} />}
-        />
+        <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
         <Route
           path="/visa"
-          element={(
+          element={
             <LazyVisaTrackingScreen
               groups={controller.groupRecords}
               onOpenDetail={controller.handleOpenVisaDetail}
               onUpdateAgreementStatus={controller.handleUpdateAgreementStatus}
             />
-          )}
+          }
         />
         <Route
           path="/visa/:groupCode"
@@ -176,20 +169,18 @@ export function AppMainContent({
         />
         <Route
           path="/invoice"
-          element={(
-            <LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />
-          )}
+          element={<LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />}
         />
         <Route
           path="/raudhah-reminder"
-          element={(
+          element={
             <LazyRaudhahReminderScreen
               groups={controller.groupRecords}
               onOpenDetail={controller.handleOpenDetail}
               onOpenVisaDetail={controller.handleOpenVisaDetail}
               onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
             />
-          )}
+          }
         />
         <Route
           path="/user-management"
@@ -224,23 +215,23 @@ export function AppMainContent({
         />
         <Route
           path="/profile"
-          element={(
+          element={
             <LazyProfileScreen
               onNavigate={controller.handleNavigate}
               sessionAccessTier={controller.sessionAccessTier}
             />
-          )}
+          }
         />
         <Route
           path="*"
-          element={(
+          element={
             <LazyPlaceholderScreen
               eyebrow="Coming Soon"
               title="Page Not Available"
               description="This module is not available yet."
               icon="dashboard_customize"
             />
-          )}
+          }
         />
       </Routes>
     </Suspense>

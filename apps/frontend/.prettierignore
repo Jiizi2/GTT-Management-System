@@ -1,0 +1,7 @@
+build-meta/
+dist/
+node_modules/
+test-results/
+test-results-*/
+*.log
+*.tsbuildinfo

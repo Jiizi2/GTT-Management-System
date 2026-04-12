@@ -6,18 +6,9 @@ import { z } from "zod";
 import type { NavId, SessionAccessTier } from "../shared/app-domain";
 import { clearAuthSession } from "../shared/auth-session";
 
-const profilePermissionTags = [
-  "MANAGE_USERS",
-  "EDIT_ITINERARIES",
-  "VIEW_ANALYTICS",
-  "APPROVE_CHECKLISTS",
-] as const;
+const profilePermissionTags = ["MANAGE_USERS", "EDIT_ITINERARIES", "VIEW_ANALYTICS", "APPROVE_CHECKLISTS"] as const;
 
-type RoleTitleId =
-  | "super-admin"
-  | "operations-manager"
-  | "finance-manager"
-  | "customer-support";
+type RoleTitleId = "super-admin" | "operations-manager" | "finance-manager" | "customer-support";
 
 const roleTitleOptions: Array<{ id: RoleTitleId; label: string }> = [
   { id: "super-admin", label: "Super Administrator" },
@@ -44,21 +35,12 @@ type ProfileNotice = {
   message: string;
 };
 
-const roleTitleSchema = z.enum([
-  "super-admin",
-  "operations-manager",
-  "finance-manager",
-  "customer-support",
-]);
+const roleTitleSchema = z.enum(["super-admin", "operations-manager", "finance-manager", "customer-support"]);
 
 const profileFormSchema = z.object({
   fullName: z.string().trim().min(1, "Semua field profile wajib diisi."),
   roleTitleId: roleTitleSchema,
-  email: z
-    .string()
-    .trim()
-    .min(1, "Semua field profile wajib diisi.")
-    .email("Format email tidak valid."),
+  email: z.string().trim().min(1, "Semua field profile wajib diisi.").email("Format email tidak valid."),
   phone: z.string().trim().min(1, "Semua field profile wajib diisi."),
 });
 
@@ -80,11 +62,7 @@ const passwordFormSchema = z
       });
     }
 
-    if (
-      values.currentPassword.trim() &&
-      values.newPassword.trim() &&
-      values.currentPassword === values.newPassword
-    ) {
+    if (values.currentPassword.trim() && values.newPassword.trim() && values.currentPassword === values.newPassword) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["newPassword"],
@@ -145,13 +123,7 @@ function ProfileModalPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }
 
-function ProfileModalOverlay({
-  onClose,
-  children,
-}: {
-  onClose: () => void;
-  children: ReactNode;
-}) {
+function ProfileModalOverlay({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   return (
     <ProfileModalPortal>
       <div
@@ -283,13 +255,7 @@ function EditProfileModal({
   );
 }
 
-function ChangePasswordModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: () => void;
-}) {
+function ChangePasswordModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   const {
     register,
     handleSubmit,
@@ -359,13 +325,9 @@ function ChangePasswordModal({
             </label>
           </div>
 
-          {errors.currentPassword?.message ||
-          errors.newPassword?.message ||
-          errors.confirmPassword?.message ? (
+          {errors.currentPassword?.message || errors.newPassword?.message || errors.confirmPassword?.message ? (
             <p className="mt-4 rounded-md border border-error-container/65 bg-error-container px-3 py-2 text-sm font-semibold text-on-error-container">
-              {errors.currentPassword?.message ??
-                errors.newPassword?.message ??
-                errors.confirmPassword?.message}
+              {errors.currentPassword?.message ?? errors.newPassword?.message ?? errors.confirmPassword?.message}
             </p>
           ) : null}
 
@@ -640,8 +602,8 @@ export function ProfileScreen({
             <p className="mt-4 text-sm leading-relaxed text-on-surface-variant">
               <span className="sm:hidden">Akses penuh untuk itinerary, checklist, dan workspace.</span>
               <span className="hidden sm:inline">
-                Kamu memiliki akses penuh untuk mengelola itinerary, checklist operasional, dan
-                pengaturan workspace lintas modul.
+                Kamu memiliki akses penuh untuk mengelola itinerary, checklist operasional, dan pengaturan workspace
+                lintas modul.
               </span>
             </p>
 
@@ -730,4 +692,3 @@ export function ProfileScreen({
     </div>
   );
 }
-

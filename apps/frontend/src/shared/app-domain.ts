@@ -289,9 +289,7 @@ export function getLocalIsoDateWithOffset(days: number): string {
   return formatLocalIsoDate(nextDate);
 }
 
-export function resolveValidRaudhahAppointments(
-  group: GroupData | undefined,
-): GroupRaudhahAppointment[] {
+export function resolveValidRaudhahAppointments(group: GroupData | undefined): GroupRaudhahAppointment[] {
   const fallbackGroupCode = group?.code?.trim() || "group";
 
   return (group?.visaSetup?.raudhahAppointments ?? [])
@@ -459,10 +457,8 @@ export const mobileItems: NavItem[] = [
   { id: "profile", label: "Profile", icon: "account_circle" },
 ];
 
-const checklistTwoBusTodayIso = getLocalIsoDateWithOffset(0);
 const checklistTwoBusTomorrowIso = getLocalIsoDateWithOffset(1);
 const checklistTwoBusPastIso = getLocalIsoDateWithOffset(-4);
-const checklistTwoBusTodayDisplay = formatScheduleDate(checklistTwoBusTodayIso);
 const checklistTwoBusTomorrowDisplay = formatScheduleDate(checklistTwoBusTomorrowIso);
 const checklistTwoBusPastDisplay = formatScheduleDate(checklistTwoBusPastIso);
 
@@ -986,17 +982,7 @@ export function getStatusByTone(tone: StatusTone): string {
   return "In Active";
 }
 
-export const saudiLocationKeywords = [
-  "saudi",
-  "makkah",
-  "madinah",
-  "jeddah",
-  "jed",
-  "med",
-  "haram",
-  "rawdah",
-  "jabal",
-];
+export const saudiLocationKeywords = ["saudi", "makkah", "madinah", "jeddah", "jed", "med", "haram", "rawdah", "jabal"];
 
 export const nonSaudiLocationKeywords = [
   "jakarta",
@@ -1163,16 +1149,11 @@ export function normalizeGroupStatus(group: GroupData): GroupData {
   const currentReturnDate = group.returnDate?.trim() ?? "";
   const normalizedArrivalDate = isIsoDateValue(currentArrivalDate)
     ? currentArrivalDate
-    : earliestIsoDate ?? getLocalIsoDateWithOffset(0);
-  const fallbackReturnDate =
-    latestIsoDate ?? shiftIsoDate(normalizedArrivalDate, Math.max(1, group.durationDays - 1));
-  const normalizedReturnDateCandidate = isIsoDateValue(currentReturnDate)
-    ? currentReturnDate
-    : fallbackReturnDate;
+    : (earliestIsoDate ?? getLocalIsoDateWithOffset(0));
+  const fallbackReturnDate = latestIsoDate ?? shiftIsoDate(normalizedArrivalDate, Math.max(1, group.durationDays - 1));
+  const normalizedReturnDateCandidate = isIsoDateValue(currentReturnDate) ? currentReturnDate : fallbackReturnDate;
   const normalizedReturnDate =
-    normalizedReturnDateCandidate >= normalizedArrivalDate
-      ? normalizedReturnDateCandidate
-      : normalizedArrivalDate;
+    normalizedReturnDateCandidate >= normalizedArrivalDate ? normalizedReturnDateCandidate : normalizedArrivalDate;
   const tone = resolveGroupToneByItinerary(normalizedItinerary);
   const overviewSnapshot = buildOverviewSnapshotFromItinerary(normalizedItinerary, group);
   return {
@@ -1203,9 +1184,7 @@ export function createDummyOverviewGroups(): GroupData[] {
     const operationIcon = isCityTour ? "tour" : "airport_shuttle";
     const operationFrom = isCityTour ? "Makkah Hotel" : "Makkah";
     const operationTo = isCityTour ? "Jabal Rahmah" : "Madinah";
-    const operationTitle = isCityTour
-      ? "Makkah City Ziyarah"
-      : "Transfer from Makkah to Madinah";
+    const operationTitle = isCityTour ? "Makkah City Ziyarah" : "Transfer from Makkah to Madinah";
     const operationMeta = isCityTour
       ? `${formatScheduleTime(operationTime)} | Bus ${String((index % 9) + 1).padStart(2, "0")} | Gate A`
       : `${formatScheduleTime(operationTime)} | Highway Route 40`;
@@ -1326,13 +1305,7 @@ export const saudiCityOptions = [
 const SAUDI_CITY_OPTIONS_STORAGE_KEY = "gtt-master-saudi-city-options-v1";
 
 function normalizeSaudiCityOptionsList(options: readonly string[]): string[] {
-  return Array.from(
-    new Set(
-      options
-        .map((city) => city.trim())
-        .filter((city) => city.length > 0),
-    ),
-  );
+  return Array.from(new Set(options.map((city) => city.trim()).filter((city) => city.length > 0)));
 }
 
 function readPersistedSaudiCityOptions(): string[] | null {
@@ -1342,7 +1315,9 @@ function readPersistedSaudiCityOptions(): string[] | null {
 
   const runtimeOptions = (window as { __GTT_SAUDI_CITY_OPTIONS__?: unknown }).__GTT_SAUDI_CITY_OPTIONS__;
   if (Array.isArray(runtimeOptions)) {
-    const normalizedRuntime = normalizeSaudiCityOptionsList(runtimeOptions.filter((entry): entry is string => typeof entry === "string"));
+    const normalizedRuntime = normalizeSaudiCityOptionsList(
+      runtimeOptions.filter((entry): entry is string => typeof entry === "string"),
+    );
     if (normalizedRuntime.length > 0) {
       return normalizedRuntime;
     }
@@ -1359,7 +1334,9 @@ function readPersistedSaudiCityOptions(): string[] | null {
       return null;
     }
 
-    const normalizedStored = normalizeSaudiCityOptionsList(parsed.filter((entry): entry is string => typeof entry === "string"));
+    const normalizedStored = normalizeSaudiCityOptionsList(
+      parsed.filter((entry): entry is string => typeof entry === "string"),
+    );
     return normalizedStored.length > 0 ? normalizedStored : null;
   } catch {
     return null;
@@ -1585,20 +1562,7 @@ export function inferCategoryKey(item: ItineraryItem): string {
 export function formatScheduleDate(isoDate: string): { date: string; year: string } {
   const [year, month, day] = isoDate.split("-");
   const monthIndex = Number(month) - 1;
-  const shortMonths = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   return {
     date: `${Number(day)} ${shortMonths[monthIndex] ?? "Jan"}`,
@@ -1747,20 +1711,21 @@ export function createScheduleMeta({
     : "";
   const trimmedNote = note?.trim() ?? "";
   const trimmedTransferTrainSummary = transferTrainSummary?.trim() ?? "";
-  const compactNote =
-    trimmedNote.length > 42 ? `${trimmedNote.slice(0, 39).trimEnd()}...` : trimmedNote;
+  const compactNote = trimmedNote.length > 42 ? `${trimmedNote.slice(0, 39).trimEnd()}...` : trimmedNote;
 
-  return [
-    formatScheduleTime(time),
-    trimmedFlightNumber,
-    hotelNameSummary,
-    hotelPickupRequestSummary,
-    route,
-    trimmedTransferTrainSummary,
-    compactNote,
-  ]
-    .filter(Boolean)
-    .join(" | ") || "Schedule details pending confirmation";
+  return (
+    [
+      formatScheduleTime(time),
+      trimmedFlightNumber,
+      hotelNameSummary,
+      hotelPickupRequestSummary,
+      route,
+      trimmedTransferTrainSummary,
+      compactNote,
+    ]
+      .filter(Boolean)
+      .join(" | ") || "Schedule details pending confirmation"
+  );
 }
 
 export function detectCityFromText(rawValue: string): string {
@@ -1797,9 +1762,7 @@ export function normalizeSaudiCityValue(rawValue: string): string {
     return "";
   }
 
-  const matchedCity = getSaudiCityOptions().find(
-    (city) => city.toLowerCase() === trimmedValue.toLowerCase(),
-  );
+  const matchedCity = getSaudiCityOptions().find((city) => city.toLowerCase() === trimmedValue.toLowerCase());
   return matchedCity ?? "";
 }
 
@@ -1824,10 +1787,7 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
   const rawFromValue = (item.from ?? "").trim();
   const rawToValue = (item.to ?? item.title).trim();
   const fromValue = category === "transfer" ? normalizeSaudiCityValue(rawFromValue) : rawFromValue;
-  const toValue =
-    category === "arrival" || category === "transfer"
-      ? normalizeSaudiCityValue(rawToValue)
-      : rawToValue;
+  const toValue = category === "arrival" || category === "transfer" ? normalizeSaudiCityValue(rawToValue) : rawToValue;
 
   return {
     date: item.isoDate ?? parseDisplayDateToIso(item.date, item.year),
@@ -1835,7 +1795,7 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
     category,
     flightNumber: item.flightNumber ?? "",
     hotelName: item.hotelName ?? "",
-    fromHotelName: category === "transfer" ? item.fromHotelName ?? "" : "",
+    fromHotelName: category === "transfer" ? (item.fromHotelName ?? "") : "",
     from: fromValue,
     to: toValue,
     cityTourCity: category === "city-tour" ? inferCityTourCity(item) : "",
@@ -1844,14 +1804,11 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
     transferByTrain: isTransferByTrain,
     trainDepartureTime: item.trainDepartureTime ?? (isTransferByTrain ? parsedTime : ""),
     destinationPickupTime: item.destinationPickupTime ?? "",
-    hotelPickupRequestTime: isDepartureActivity ? item.hotelPickupRequestTime ?? "" : "",
+    hotelPickupRequestTime: isDepartureActivity ? (item.hotelPickupRequestTime ?? "") : "",
   };
 }
 
-export function buildItineraryItemFromEditForm(
-  currentItem: ItineraryItem,
-  form: EditScheduleFormState,
-): ItineraryItem {
+export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form: EditScheduleFormState): ItineraryItem {
   const typeOption = getScheduleTypeOption(form.category);
   const formattedDate = formatScheduleDate(form.date);
   const nextCityTourCity = isCityTourActivityType(form.category) ? form.cityTourCity.trim() : "";
@@ -1865,13 +1822,9 @@ export function buildItineraryItemFromEditForm(
     form.category === "transfer" ||
     form.category === "city-tour" ||
     form.category === "departure";
-  const nextHotelName = shouldPersistHotelName ? form.hotelName?.trim() ?? "" : "";
-  const nextFromHotelName = isTransferActivityType(form.category)
-    ? form.fromHotelName?.trim() ?? ""
-    : "";
-  const nextHotelPickupRequestTime = isDepartureActivityType(form.category)
-    ? form.hotelPickupRequestTime.trim()
-    : "";
+  const nextHotelName = shouldPersistHotelName ? (form.hotelName?.trim() ?? "") : "";
+  const nextFromHotelName = isTransferActivityType(form.category) ? (form.fromHotelName?.trim() ?? "") : "";
+  const nextHotelPickupRequestTime = isDepartureActivityType(form.category) ? form.hotelPickupRequestTime.trim() : "";
   const isTransferByTrain = isTransferActivityType(form.category) && form.transferByTrain;
   const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
   const transferTrainSummary = buildTransferTrainSummary(form);
@@ -2016,9 +1969,7 @@ export function formatRouteSummary(category: string, from: string, to: string, c
 }
 
 export function getTransferTrainSegmentCategory(segment: TransferTrainSegment): string {
-  return segment === "train-departure"
-    ? "Transfer - Train Departure"
-    : "Transfer - Arrival Station Pickup";
+  return segment === "train-departure" ? "Transfer - Train Departure" : "Transfer - Arrival Station Pickup";
 }
 
 export function expandInputTransferTrainItems(items: InputItineraryItem[]): InputItineraryItem[] {
@@ -2291,11 +2242,7 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
       visaSetup?.paymentStatus ?? (index % 5 === 0 ? "Unpaid" : index % 3 === 0 ? "Partial" : "Paid");
     const configuredIssuedDate = visaSetup?.issuedDate?.trim() ?? "";
     const issuedDateIso =
-      visaStatus === "Issued"
-        ? isIsoDateValue(configuredIssuedDate)
-          ? configuredIssuedDate
-          : departureIso
-        : "";
+      visaStatus === "Issued" ? (isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : departureIso) : "";
 
     const pax = Math.max(1, group.pax);
     const visaDelayFactor = visaStatus === "Issued" ? 0 : 1;
@@ -2326,14 +2273,9 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
 
     const validRaudhahAppointments = resolveValidRaudhahAppointments(group);
     const firstRaudhah =
-      validRaudhahAppointments.find((appointment) => appointment.status !== "Free") ??
-      validRaudhahAppointments[0];
+      validRaudhahAppointments.find((appointment) => appointment.status !== "Free") ?? validRaudhahAppointments[0];
     const raudhahTone: VisaRaudhahTone =
-      !firstRaudhah || firstRaudhah.status === "Free"
-        ? "muted"
-        : firstRaudhah.status === "Before"
-          ? "warn"
-          : "good";
+      !firstRaudhah || firstRaudhah.status === "Free" ? "muted" : firstRaudhah.status === "Before" ? "warn" : "good";
     const raudhahLabel =
       !firstRaudhah || firstRaudhah.status === "Free"
         ? "Not Set"
@@ -2345,8 +2287,7 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
           ? "Before 13:00"
           : "After 13:00";
 
-    const outstandingAmount =
-      paymentStatus === "Unpaid" ? pax * 280 : paymentStatus === "Partial" ? pax * 120 : 0;
+    const outstandingAmount = paymentStatus === "Unpaid" ? pax * 280 : paymentStatus === "Partial" ? pax * 120 : 0;
 
     return {
       id: `${group.code}-visa-${index}`,
@@ -2407,18 +2348,12 @@ export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistIte
       const requiredBusCount = resolveTotalBusCount(group.pax, group.totalBuses);
       const trainDepartureSource = item.trainDepartureTime ?? (transferByTrain ? parsedTime : "");
       const stationPickupSource = item.destinationPickupTime ?? "";
-      const hotelPickupRequestSource = isDepartureActivity ? item.hotelPickupRequestTime ?? "" : "";
-      const trainDepartureTime = trainDepartureSource
-        ? formatScheduleTime(trainDepartureSource)
-        : "TBD";
+      const hotelPickupRequestSource = isDepartureActivity ? (item.hotelPickupRequestTime ?? "") : "";
+      const trainDepartureTime = trainDepartureSource ? formatScheduleTime(trainDepartureSource) : "TBD";
       const stationPickupTime = stationPickupSource ? formatScheduleTime(stationPickupSource) : "TBD";
-      const hotelPickupRequestTime = hotelPickupRequestSource
-        ? formatScheduleTime(hotelPickupRequestSource)
-        : "";
+      const hotelPickupRequestTime = hotelPickupRequestSource ? formatScheduleTime(hotelPickupRequestSource) : "";
       const departureFlightTime = isDepartureActivity ? normalizedTime : "";
-      const scheduledTime = transferByTrain
-        ? trainDepartureTime
-        : hotelPickupRequestTime || normalizedTime;
+      const scheduledTime = transferByTrain ? trainDepartureTime : hotelPickupRequestTime || normalizedTime;
 
       result.push({
         id: `${group.code}-${tripDate}-${index}-${categoryKey}`,
@@ -2428,9 +2363,7 @@ export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistIte
         tripDate,
         activity: buildChecklistActivityLabel(item, categoryKey),
         trip:
-          item.from && item.to
-            ? formatRouteSummary(categoryKey, item.from, item.to, item.cityTourCity)
-            : item.title,
+          item.from && item.to ? formatRouteSummary(categoryKey, item.from, item.to, item.cityTourCity) : item.title,
         activityIcon: typeOption.icon,
         requiredBusCount,
         scheduledTime,
@@ -2453,4 +2386,3 @@ export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistIte
 export function scrollToTop(): void {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-

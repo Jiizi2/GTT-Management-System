@@ -59,56 +59,55 @@ const groupChecklistItemsByGroup = (items: ChecklistItem[]): ChecklistItemsGroup
   return Array.from(groupedItems.values());
 };
 
-const sanitizeConfirmedDrivers = (
-  source: unknown,
-): Record<string, ChecklistDriverAssignment> => {
+const sanitizeConfirmedDrivers = (source: unknown): Record<string, ChecklistDriverAssignment> => {
   if (!source || typeof source !== "object") {
     return {};
   }
 
-  return Object.entries(source as Record<string, unknown>).reduce<
-    Record<string, ChecklistDriverAssignment>
-  >((accumulator, [itemId, assignmentValue]) => {
-    if (!assignmentValue || typeof assignmentValue !== "object") {
+  return Object.entries(source as Record<string, unknown>).reduce<Record<string, ChecklistDriverAssignment>>(
+    (accumulator, [itemId, assignmentValue]) => {
+      if (!assignmentValue || typeof assignmentValue !== "object") {
+        return accumulator;
+      }
+
+      const driversValue = (assignmentValue as { drivers?: unknown }).drivers;
+      if (!Array.isArray(driversValue)) {
+        return accumulator;
+      }
+
+      const drivers = driversValue
+        .map((driverValue) => {
+          if (!driverValue || typeof driverValue !== "object") {
+            return null;
+          }
+
+          const rawDriver = driverValue as {
+            name?: unknown;
+            phone?: unknown;
+            plateNumber?: unknown;
+          };
+
+          if (
+            typeof rawDriver.name !== "string" ||
+            typeof rawDriver.phone !== "string" ||
+            typeof rawDriver.plateNumber !== "string"
+          ) {
+            return null;
+          }
+
+          return {
+            name: rawDriver.name,
+            phone: rawDriver.phone,
+            plateNumber: rawDriver.plateNumber,
+          };
+        })
+        .filter((driver): driver is ChecklistDriverProfile => Boolean(driver));
+
+      accumulator[itemId] = { drivers };
       return accumulator;
-    }
-
-    const driversValue = (assignmentValue as { drivers?: unknown }).drivers;
-    if (!Array.isArray(driversValue)) {
-      return accumulator;
-    }
-
-    const drivers = driversValue
-      .map((driverValue) => {
-        if (!driverValue || typeof driverValue !== "object") {
-          return null;
-        }
-
-        const rawDriver = driverValue as {
-          name?: unknown;
-          phone?: unknown;
-          plateNumber?: unknown;
-        };
-
-        if (
-          typeof rawDriver.name !== "string" ||
-          typeof rawDriver.phone !== "string" ||
-          typeof rawDriver.plateNumber !== "string"
-        ) {
-          return null;
-        }
-
-        return {
-          name: rawDriver.name,
-          phone: rawDriver.phone,
-          plateNumber: rawDriver.plateNumber,
-        };
-      })
-      .filter((driver): driver is ChecklistDriverProfile => Boolean(driver));
-
-    accumulator[itemId] = { drivers };
-    return accumulator;
-  }, {});
+    },
+    {},
+  );
 };
 
 const loadPersistedConfirmedDrivers = (): Record<string, ChecklistDriverAssignment> => {
@@ -128,8 +127,7 @@ const loadPersistedConfirmedDrivers = (): Record<string, ChecklistDriverAssignme
   }
 };
 
-const readTrimmedString = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
+const readTrimmedString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
 const sanitizeDriverProfile = (source: unknown): ChecklistDriverProfile | null => {
   if (!source || typeof source !== "object") {
@@ -256,32 +254,29 @@ const syncChecklistDriverToBackend = async ({
   driver: ChecklistDriverProfile;
 }): Promise<ChecklistDriverProfile[] | null> => {
   const apiBaseUrl = resolveChecklistApiBaseUrl();
-  const response = await fetch(
-    `${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}/checklist/confirm-driver`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        tripDate: checklistItem.tripDate,
-        activity: checklistItem.activity,
-        tripLabel: checklistItem.trip,
-        requiredBusCount: checklistItem.transferByTrain
-          ? Math.max(2, checklistItem.requiredBusCount)
-          : checklistItem.requiredBusCount,
-        scheduledTime: checklistItem.scheduledTime,
-        transferByTrain: checklistItem.transferByTrain,
-        trainDepartureTime: checklistItem.trainDepartureTime || undefined,
-        stationPickupTime: checklistItem.stationPickupTime || undefined,
-        driver: {
-          name: driver.name,
-          phone: driver.phone,
-          plateNumber: driver.plateNumber,
-        },
-      }),
+  const response = await fetch(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}/checklist/confirm-driver`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      tripDate: checklistItem.tripDate,
+      activity: checklistItem.activity,
+      tripLabel: checklistItem.trip,
+      requiredBusCount: checklistItem.transferByTrain
+        ? Math.max(2, checklistItem.requiredBusCount)
+        : checklistItem.requiredBusCount,
+      scheduledTime: checklistItem.scheduledTime,
+      transferByTrain: checklistItem.transferByTrain,
+      trainDepartureTime: checklistItem.trainDepartureTime || undefined,
+      stationPickupTime: checklistItem.stationPickupTime || undefined,
+      driver: {
+        name: driver.name,
+        phone: driver.phone,
+        plateNumber: driver.plateNumber,
+      },
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(`Checklist sync failed (${response.status})`);
@@ -310,20 +305,17 @@ const syncChecklistResetToBackend = async ({
   checklistItem: ChecklistItem;
 }): Promise<void> => {
   const apiBaseUrl = resolveChecklistApiBaseUrl();
-  const response = await fetch(
-    `${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}/checklist/reset-driver`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        tripDate: checklistItem.tripDate,
-        activity: checklistItem.activity,
-        scheduledTime: checklistItem.scheduledTime,
-      }),
+  const response = await fetch(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}/checklist/reset-driver`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      tripDate: checklistItem.tripDate,
+      activity: checklistItem.activity,
+      scheduledTime: checklistItem.scheduledTime,
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(`Checklist reset failed (${response.status})`);
@@ -333,21 +325,17 @@ const syncChecklistResetToBackend = async ({
 export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   const checklistItems = buildChecklistItemsFromGroups(groups);
   const groupsByCode = useMemo(
-    () =>
-      new Map(groups.map((group) => [group.code.trim().toUpperCase(), group])),
+    () => new Map(groups.map((group) => [group.code.trim().toUpperCase(), group])),
     [groups],
   );
-  const groupsWithItineraryCount = useMemo(
-    () => groups.filter((group) => group.itinerary.length > 0).length,
-    [groups],
-  );
+  const groupsWithItineraryCount = useMemo(() => groups.filter((group) => group.itinerary.length > 0).length, [groups]);
   const backendConfirmedDrivers = useMemo(
     () => buildConfirmedDriversFromBackendAssignments(groups, checklistItems),
     [groups, checklistItems],
   );
   const [driverDrafts, setDriverDrafts] = useState<Record<string, ChecklistDriverDraft>>({});
-  const [confirmedDrivers, setConfirmedDrivers] = useState<Record<string, ChecklistDriverAssignment>>(
-    () => loadPersistedConfirmedDrivers(),
+  const [confirmedDrivers, setConfirmedDrivers] = useState<Record<string, ChecklistDriverAssignment>>(() =>
+    loadPersistedConfirmedDrivers(),
   );
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const copiedItemTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -375,10 +363,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   const completedTotalPages = Math.max(1, Math.ceil(completedGroups.length / CHECKLIST_PAGE_SIZE));
   const pendingStartIndex = (pendingPage - 1) * CHECKLIST_PAGE_SIZE;
   const completedStartIndex = (completedPage - 1) * CHECKLIST_PAGE_SIZE;
-  const paginatedPendingGroups = pendingGroups.slice(
-    pendingStartIndex,
-    pendingStartIndex + CHECKLIST_PAGE_SIZE,
-  );
+  const paginatedPendingGroups = pendingGroups.slice(pendingStartIndex, pendingStartIndex + CHECKLIST_PAGE_SIZE);
   const paginatedCompletedGroups = completedGroups.slice(
     completedStartIndex,
     completedStartIndex + CHECKLIST_PAGE_SIZE,
@@ -387,18 +372,15 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   const paginatedCompletedItems = paginatedCompletedGroups.flatMap((group) => group.items);
   const pendingRangeStart = pendingGroups.length === 0 ? 0 : pendingStartIndex + 1;
   const pendingRangeEnd =
-    pendingGroups.length === 0
-      ? 0
-      : Math.min(pendingGroups.length, pendingStartIndex + paginatedPendingGroups.length);
+    pendingGroups.length === 0 ? 0 : Math.min(pendingGroups.length, pendingStartIndex + paginatedPendingGroups.length);
   const completedRangeStart = completedGroups.length === 0 ? 0 : completedStartIndex + 1;
   const completedRangeEnd =
     completedGroups.length === 0
       ? 0
       : Math.min(completedGroups.length, completedStartIndex + paginatedCompletedGroups.length);
-  const cancelTargetItem =
-    cancelTargetItemId
-      ? checklistItems.find((item) => item.id === cancelTargetItemId) ?? null
-      : null;
+  const cancelTargetItem = cancelTargetItemId
+    ? (checklistItems.find((item) => item.id === cancelTargetItemId) ?? null)
+    : null;
 
   useEffect(() => {
     const validIds = new Set(checklistItems.map((item) => item.id));
@@ -444,21 +426,21 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     }
 
     try {
-      window.localStorage.setItem(
-        CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY,
-        JSON.stringify(confirmedDrivers),
-      );
+      window.localStorage.setItem(CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY, JSON.stringify(confirmedDrivers));
     } catch {
       // No-op if storage is blocked or full.
     }
   }, [confirmedDrivers]);
 
-  useEffect(() => () => {
-    if (copiedItemTimerRef.current !== null) {
-      window.clearTimeout(copiedItemTimerRef.current);
-      copiedItemTimerRef.current = null;
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (copiedItemTimerRef.current !== null) {
+        window.clearTimeout(copiedItemTimerRef.current);
+        copiedItemTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     setPendingPage((previousPage) => Math.min(previousPage, pendingTotalPages));
@@ -520,7 +502,8 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
           </p>
           {groupsWithItineraryCount > 0 ? (
             <p className="mt-3 text-xs font-medium text-amber-700">
-              Beberapa group punya itinerary, tetapi belum masuk rentang H-1 (hari ini s/d H+2) atau tanggal itinerary belum valid.
+              Beberapa group punya itinerary, tetapi belum masuk rentang H-1 (hari ini s/d H+2) atau tanggal itinerary
+              belum valid.
             </p>
           ) : null}
         </article>
@@ -544,11 +527,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       ? "All trips already have verified drivers."
       : `${pendingItems.length} trips need driver assignment.`;
 
-  const handleDraftChange = (
-    itemId: string,
-    field: keyof ChecklistDriverProfile,
-    value: string,
-  ) => {
+  const handleDraftChange = (itemId: string, field: keyof ChecklistDriverProfile, value: string) => {
     const checklistItem = checklistItems.find((item) => item.id === itemId);
     if (!checklistItem) {
       return;
@@ -635,7 +614,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       ? `${scheduleDate} | TRAIN ${formatScheduleTime(checklistItem.trainDepartureTime)} | STATION PICKUP ${formatScheduleTime(checklistItem.stationPickupTime)}`
       : checklistItem.hotelPickupRequestTime
         ? `${scheduleDate} | HOTEL PICKUP ${formatScheduleTime(checklistItem.hotelPickupRequestTime)} | FLIGHT ${formatScheduleTime(checklistItem.departureFlightTime || checklistItem.scheduledTime)}`
-      : `${scheduleDate} | ${scheduleTime}`;
+        : `${scheduleDate} | ${scheduleTime}`;
     const driverLines = assignment.drivers.flatMap((driver, index) => [
       `DRIVER NAME ${index + 1} : ${(driver.name || "-").toUpperCase()}`,
       `DRIVER PHONE ${index + 1} : ${driver.phone || "-"}`,
@@ -690,7 +669,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       ? `${scheduleDate} | TRAIN ${formatScheduleTime(checklistItem.trainDepartureTime)} | STATION PICKUP ${formatScheduleTime(checklistItem.stationPickupTime)}`
       : checklistItem.hotelPickupRequestTime
         ? `${scheduleDate} | HOTEL PICKUP ${formatScheduleTime(checklistItem.hotelPickupRequestTime)} | FLIGHT ${formatScheduleTime(checklistItem.departureFlightTime || checklistItem.scheduledTime)}`
-      : `${scheduleDate} | ${scheduleTime}`;
+        : `${scheduleDate} | ${scheduleTime}`;
     const payload = [
       "*GROUP DETAILS*",
       "```",
@@ -780,16 +759,12 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     const groupRecord = groupsByCode.get(item.groupCode.trim().toUpperCase());
     const serviceType = resolveGroupServiceType(groupRecord);
     const isExternalTransport = isExternalTransportGroup(groupRecord);
-    const isConfirmDisabled =
-      isComplete ||
-      !draft.name.trim() ||
-      !draft.phone.trim() ||
-      !draft.plateNumber.trim();
+    const isConfirmDisabled = isComplete || !draft.name.trim() || !draft.phone.trim() || !draft.plateNumber.trim();
     const timeCopy = item.transferByTrain
       ? `Train ${formatScheduleTime(item.trainDepartureTime)}`
       : item.hotelPickupRequestTime
         ? `Pickup ${formatScheduleTime(item.hotelPickupRequestTime)}`
-      : formatScheduleTime(item.scheduledTime || "");
+        : formatScheduleTime(item.scheduledTime || "");
 
     return (
       <article
@@ -832,7 +807,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             <div className="mt-6 grid grid-cols-3 gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Date</p>
-                <strong className="mt-1 block text-base font-extrabold text-slate-900">{getChecklistDayLabel(item.tripDate)}</strong>
+                <strong className="mt-1 block text-base font-extrabold text-slate-900">
+                  {getChecklistDayLabel(item.tripDate)}
+                </strong>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Time</p>
@@ -852,7 +829,8 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                   warning
                 </span>
                 <p className="font-semibold">
-                  Visa Only: transport di-handle vendor eksternal. Pastikan koordinasi vendor luar sebelum konfirmasi assignment.
+                  Visa Only: transport di-handle vendor eksternal. Pastikan koordinasi vendor luar sebelum konfirmasi
+                  assignment.
                 </p>
               </div>
             ) : null}
@@ -870,40 +848,40 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Driver Name</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                  Driver Name
+                </span>
                 <input
                   type="text"
                   className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                   value={draft.name}
-                  onChange={(event) =>
-                    handleDraftChange(item.id, "name", event.target.value)
-                  }
+                  onChange={(event) => handleDraftChange(item.id, "name", event.target.value)}
                   placeholder="Enter name..."
                 />
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Phone</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                  Phone
+                </span>
                 <input
                   type="tel"
                   className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                   value={draft.phone}
-                  onChange={(event) =>
-                    handleDraftChange(item.id, "phone", event.target.value)
-                  }
+                  onChange={(event) => handleDraftChange(item.id, "phone", event.target.value)}
                   placeholder="+966..."
                 />
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Plate</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                  Plate
+                </span>
                 <input
                   type="text"
                   className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                   value={draft.plateNumber}
-                  onChange={(event) =>
-                    handleDraftChange(item.id, "plateNumber", event.target.value)
-                  }
+                  onChange={(event) => handleDraftChange(item.id, "plateNumber", event.target.value)}
                   placeholder="ABC-123"
                 />
               </label>
@@ -928,9 +906,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
               <div
                 className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold leading-none ${
-                  isComplete
-                    ? "checklist-need-attention-status-complete"
-                    : "checklist-need-attention-status-pending"
+                  isComplete ? "checklist-need-attention-status-complete" : "checklist-need-attention-status-pending"
                 }`}
                 role="status"
                 aria-live="polite"
@@ -949,14 +925,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <section
-        className="flex items-center gap-3"
-        aria-label="Search checklist items"
-      >
+      <section className="flex items-center gap-3" aria-label="Search checklist items">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
-          <label
-            className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
-          >
+          <label className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14">
             <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
               search
             </span>
@@ -968,11 +939,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               placeholder="Search group number, e.g. 901794508"
             />
           </label>
-
         </div>
 
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
-
       </section>
 
       <header className="rounded-3xl border border-slate-200/80 bg-surface-container-lowest p-5 shadow-sm">
@@ -1000,7 +969,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
       {isClear ? (
         <section className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
-          <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-lowest" aria-hidden="true">
+          <div
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-lowest"
+            aria-hidden="true"
+          >
             <span className="material-symbols-outlined">check_circle</span>
           </div>
           <div className="space-y-1">
@@ -1025,9 +997,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             </div>
 
             {pendingItems.length > 0 ? (
-              <div className="space-y-4">
-                {pendingNeedAttentionCards}
-              </div>
+              <div className="space-y-4">{pendingNeedAttentionCards}</div>
             ) : (
               <article className="rounded-2xl border border-dashed border-rose-200 bg-rose-50/55 p-8 text-center">
                 <span className="material-symbols-outlined text-3xl text-brand-primary" aria-hidden="true">
@@ -1048,9 +1018,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               rangeStart={pendingRangeStart}
               rangeEnd={pendingRangeEnd}
               itemLabel="pending trips"
-              onPageChange={(nextPage) =>
-                setPendingPage(Math.max(1, Math.min(pendingTotalPages, nextPage)))
-              }
+              onPageChange={(nextPage) => setPendingPage(Math.max(1, Math.min(pendingTotalPages, nextPage)))}
             />
           </section>
 
@@ -1081,15 +1049,18 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                   ? `Train ${formatScheduleTime(item.trainDepartureTime)}`
                   : item.hotelPickupRequestTime
                     ? `Pickup ${formatScheduleTime(item.hotelPickupRequestTime)}`
-                  : formatScheduleTime(item.scheduledTime || "");
+                    : formatScheduleTime(item.scheduledTime || "");
                 const scheduledSecondary = item.transferByTrain
                   ? `Pickup ${formatScheduleTime(item.stationPickupTime)}`
                   : item.hotelPickupRequestTime
                     ? `Flight ${formatScheduleTime(item.departureFlightTime || item.scheduledTime)}`
-                  : "";
+                    : "";
 
                 return (
-                  <article key={item.id} className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-4 py-3">
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-4 py-3"
+                  >
                     <div className="grid items-center gap-3 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.9fr_1.3fr_auto_auto]">
                       <div className="min-w-0">
                         <p className="truncate text-2xl font-extrabold leading-none tracking-tight text-slate-700 sm:text-3xl">
@@ -1104,9 +1075,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                         </p>
                         <span
                           className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
-                            serviceType === "Visa+"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-amber-100 text-amber-700"
+                            serviceType === "Visa+" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
                           }`}
                         >
                           {serviceType}
@@ -1122,7 +1091,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                         <span className="block text-[10px] font-semibold uppercase tracking-[0.11em] text-slate-400">
                           Scheduled Time
                         </span>
-                        <strong className="block text-xl font-extrabold leading-none text-slate-700 sm:text-2xl">{scheduledPrimary}</strong>
+                        <strong className="block text-xl font-extrabold leading-none text-slate-700 sm:text-2xl">
+                          {scheduledPrimary}
+                        </strong>
                         {scheduledSecondary ? (
                           <small className="block text-[10px] text-slate-500">{scheduledSecondary}</small>
                         ) : null}
@@ -1142,7 +1113,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                                 <span className="inline-flex min-w-[52px] justify-center rounded-md bg-surface-container-lowest px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-700">
                                   Supir {index + 1}
                                 </span>
-                                <strong className="truncate text-sm font-bold leading-tight text-brand-primary" title={driverName}>
+                                <strong
+                                  className="truncate text-sm font-bold leading-tight text-brand-primary"
+                                  title={driverName}
+                                >
                                   {driverName}
                                 </strong>
                               </div>
@@ -1201,9 +1175,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               rangeStart={completedRangeStart}
               rangeEnd={completedRangeEnd}
               itemLabel="completed trips"
-              onPageChange={(nextPage) =>
-                setCompletedPage(Math.max(1, Math.min(completedTotalPages, nextPage)))
-              }
+              onPageChange={(nextPage) => setCompletedPage(Math.max(1, Math.min(completedTotalPages, nextPage)))}
             />
           </section>
         </>
@@ -1270,8 +1242,3 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     </div>
   );
 }
-
-
-
-
-

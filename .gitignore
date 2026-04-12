@@ -5,8 +5,7 @@ apps/*/node_modules/
 # Build outputs
 dist/
 apps/*/dist/
-apps/*/dist-smoke/
-apps/*/dist-unit/
+apps/*/build-meta/
 *.tsbuildinfo
 
 # Test artifacts
@@ -14,6 +13,7 @@ coverage/
 .nyc_output/
 apps/frontend/playwright-report/
 apps/frontend/test-results/
+apps/frontend/test-results-*/
 
 # Logs
 *.log
