@@ -1,11 +1,14 @@
 import { Suspense, lazy, useCallback } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuthSessionQuery, useLoginMutation, useLogoutMutation } from "./hooks/use-auth-session-query";
-import { type DevelopmentLoginAccountHint, LoginScreen, type LoginCredentials } from "./pages/login-page";
+import type { DevelopmentLoginAccountHint, LoginCredentials } from "./pages/login-page";
 import { buildDashboardPath, buildLoginPath, isLoginRoute } from "./shared/app-route";
 
 const LazyDashboardWorkspaceShell = lazy(async () => ({
   default: (await import("./components/dashboard-workspace-shell")).DashboardWorkspaceShell,
+}));
+const LazyLoginScreen = lazy(async () => ({
+  default: (await import("./pages/login-page")).LoginScreen,
 }));
 
 const DEVELOPMENT_LOGIN_ACCOUNTS: DevelopmentLoginAccountHint[] = [
@@ -89,16 +92,18 @@ export function App() {
           authSession ? (
             <Navigate to={buildDashboardPath("overview")} replace />
           ) : (
-            <LoginScreen
-              onSubmit={handleLoginSubmit}
-              isSubmitting={loginMutation.isPending}
-              errorMessage={
-                loginMutation.error instanceof Error && loginMutation.error.message.trim()
-                  ? loginMutation.error.message.trim()
-                  : ""
-              }
-              developmentAccounts={shouldExposeDevelopmentLoginHints() ? DEVELOPMENT_LOGIN_ACCOUNTS : []}
-            />
+            <Suspense fallback={<RestoringSessionScreen />}>
+              <LazyLoginScreen
+                onSubmit={handleLoginSubmit}
+                isSubmitting={loginMutation.isPending}
+                errorMessage={
+                  loginMutation.error instanceof Error && loginMutation.error.message.trim()
+                    ? loginMutation.error.message.trim()
+                    : ""
+                }
+                developmentAccounts={shouldExposeDevelopmentLoginHints() ? DEVELOPMENT_LOGIN_ACCOUNTS : []}
+              />
+            </Suspense>
           )
         }
       />

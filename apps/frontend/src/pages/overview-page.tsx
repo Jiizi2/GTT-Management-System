@@ -4,7 +4,6 @@ import type { GroupData } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
 import { GroupCard } from "../components/group-card";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { exportOverviewReportPdf } from "./overview-export";
 
 const { OVERVIEW_PAGE_SIZE } = Domain;
 
@@ -62,6 +61,40 @@ export function OverviewScreen({
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
   }, [totalPages]);
+
+  const handleExportReport = () => {
+    const printableWindow = window.open("", "_blank", "width=1280,height=860");
+    if (!printableWindow) {
+      window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
+      return;
+    }
+
+    void import("./overview-export").then(({ exportOverviewReportPdf }) => {
+      const exported = exportOverviewReportPdf(
+        {
+          groups: filteredGroups,
+          query,
+          isActiveOnly,
+          summaryMessage,
+        },
+        {
+          printWindow: printableWindow,
+        },
+      );
+
+      if (!exported) {
+        if (!printableWindow.closed) {
+          printableWindow.close();
+        }
+        window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
+      }
+    }).catch(() => {
+      if (!printableWindow.closed) {
+        printableWindow.close();
+      }
+      window.alert("Gagal menyiapkan report export. Coba lagi.");
+    });
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
@@ -127,17 +160,7 @@ export function OverviewScreen({
                   ? "bg-primary text-on-primary shadow-cta-soft hover:bg-primary-container"
                   : "cursor-not-allowed bg-surface-container-high/70 text-on-surface-variant/70"
               }`}
-              onClick={() => {
-                const exported = exportOverviewReportPdf({
-                  groups: filteredGroups,
-                  query,
-                  isActiveOnly,
-                  summaryMessage,
-                });
-                if (!exported) {
-                  window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
-                }
-              }}
+              onClick={handleExportReport}
               disabled={!hasGroupsForExport}
             >
               <span className="material-symbols-outlined text-base" aria-hidden="true">

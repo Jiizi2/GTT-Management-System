@@ -11,6 +11,7 @@
     "build:js": "esbuild src/index.tsx --bundle --format=esm --platform=browser --target=es2022 --jsx=automatic --splitting --minify --outdir=dist --entry-names=index --chunk-names=chunks/[name]-[hash] --metafile=build-meta/esbuild-meta.json",
     "analyze:bundle": "node scripts/analyze-bundle.mjs",
     "build:analyze": "npm run build && npm run analyze:bundle",
+    "assets:icons": "node scripts/update-material-symbols-subset.mjs",
     "dev": "node scripts/dev.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

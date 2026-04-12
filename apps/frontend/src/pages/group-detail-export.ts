@@ -138,10 +138,14 @@ export function exportGroupDetailPdf({
   itineraryItems: ItineraryItem[];
   noteItems: NoteItem[];
   musyrifProfile: Musyrif;
-}) {
-  const printableWindow = window.open("", "_blank", "width=1120,height=760");
+}, options: { printWindow?: Window | null } = {}): boolean {
+  const reusableWindow = options.printWindow;
+  const printableWindow =
+    reusableWindow && !reusableWindow.closed
+      ? reusableWindow
+      : window.open("", "_blank", "width=1120,height=760");
   if (!printableWindow) {
-    return;
+    return false;
   }
 
   const generatedTimestamp = new Date()
@@ -241,6 +245,7 @@ export function exportGroupDetailPdf({
     makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
     madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
   };
+  const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const resolveHotelNameByCity = (cityInput: string): string => {
     const cityKey = normalizeAgreementCityKey(cityInput);
     if (!cityKey) {
@@ -394,12 +399,7 @@ export function exportGroupDetailPdf({
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ghaniya Tour And Travel - ${escapeHtml(group.code)}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-      rel="stylesheet"
-    />
+    <link href="${escapeHtml(fontsCssUrl)}" rel="stylesheet" />
     <style>
       :root {
         --on-surface: #1b1a17;
@@ -1054,4 +1054,6 @@ export function exportGroupDetailPdf({
     printableWindow.focus();
     printableWindow.print();
   }, 450);
+
+  return true;
 }

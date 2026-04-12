@@ -1,16 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Domain from "../shared/app-domain";
-import {
-  DeleteConfirmModal,
-  DeleteGroupModal,
-  EditScheduleModal,
-  GroupEditModal,
-  MusyrifModal,
-  NoteModal,
-  ScheduleModal,
-} from "../components/group-detail-modals";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { exportGroupDetailPdf } from "./group-detail-export";
 import type {
   EditScheduleFormState,
   GroupData,
@@ -42,6 +32,41 @@ const {
   parseTimeForInput,
   shouldShowFridayCityTourWarning,
 } = Domain;
+
+const LazyDeleteConfirmModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).DeleteConfirmModal,
+}));
+const LazyDeleteGroupModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).DeleteGroupModal,
+}));
+const LazyEditScheduleModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).EditScheduleModal,
+}));
+const LazyGroupEditModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).GroupEditModal,
+}));
+const LazyMusyrifModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).MusyrifModal,
+}));
+const LazyNoteModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).NoteModal,
+}));
+const LazyScheduleModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).ScheduleModal,
+}));
+
+function GroupDetailModalFallback() {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-4">
+      <div className="inline-flex items-center gap-2 rounded-xl bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface shadow-ambient">
+        <span className="material-symbols-outlined animate-pulse text-brand-primary" aria-hidden="true">
+          hourglass_top
+        </span>
+        <span>Loading modal...</span>
+      </div>
+    </div>
+  );
+}
 
 function resolveItinerarySortTimestamp(item: ItineraryItem): number {
   const trimmedIsoDate = item.isoDate?.trim() ?? "";
@@ -833,11 +858,31 @@ export function GroupDetail({
   };
 
   const handleExportPdf = () => {
-    exportGroupDetailPdf({
-      group,
-      itineraryItems,
-      noteItems,
-      musyrifProfile,
+    const printableWindow = window.open("", "_blank", "width=1120,height=760");
+    if (!printableWindow) {
+      return;
+    }
+
+    void import("./group-detail-export").then(({ exportGroupDetailPdf }) => {
+      const exported = exportGroupDetailPdf(
+        {
+          group,
+          itineraryItems,
+          noteItems,
+          musyrifProfile,
+        },
+        {
+          printWindow: printableWindow,
+        },
+      );
+
+      if (!exported && !printableWindow.closed) {
+        printableWindow.close();
+      }
+    }).catch(() => {
+      if (!printableWindow.closed) {
+        printableWindow.close();
+      }
     });
   };
 
@@ -1265,62 +1310,70 @@ export function GroupDetail({
         </footer>
       </div>
 
-      {isScheduleModalOpen ? (
-        <ScheduleModal
-          form={scheduleForm}
-          isSaveDisabled={isScheduleSaveDisabled}
-          showFridayCityTourWarning={showScheduleFridayCityTourWarning}
-          onChange={handleScheduleFieldChange}
-          onClose={handleCloseScheduleModal}
-          onSave={handleSaveSchedule}
-        />
-      ) : null}
+      {hasOpenModal ? (
+        <Suspense fallback={<GroupDetailModalFallback />}>
+          {isScheduleModalOpen ? (
+            <LazyScheduleModal
+              form={scheduleForm}
+              isSaveDisabled={isScheduleSaveDisabled}
+              showFridayCityTourWarning={showScheduleFridayCityTourWarning}
+              onChange={handleScheduleFieldChange}
+              onClose={handleCloseScheduleModal}
+              onSave={handleSaveSchedule}
+            />
+          ) : null}
 
-      {isMusyrifModalOpen ? (
-        <MusyrifModal
-          initialValues={{
-            name: musyrifProfile.name,
-            phone: musyrifProfile.phone,
-          }}
-          onClose={handleCloseMusyrifModal}
-          onSave={handleSaveMusyrif}
-        />
-      ) : null}
+          {isMusyrifModalOpen ? (
+            <LazyMusyrifModal
+              initialValues={{
+                name: musyrifProfile.name,
+                phone: musyrifProfile.phone,
+              }}
+              onClose={handleCloseMusyrifModal}
+              onSave={handleSaveMusyrif}
+            />
+          ) : null}
 
-      {isEditModalOpen && editScheduleForm ? (
-        <EditScheduleModal
-          form={editScheduleForm}
-          isSaveDisabled={isEditSaveDisabled}
-          showFridayCityTourWarning={showEditFridayCityTourWarning}
-          onChange={handleEditFieldChange}
-          onClose={handleCloseEditModal}
-          onSave={handleSaveEditedSchedule}
-        />
-      ) : null}
+          {isEditModalOpen && editScheduleForm ? (
+            <LazyEditScheduleModal
+              form={editScheduleForm}
+              isSaveDisabled={isEditSaveDisabled}
+              showFridayCityTourWarning={showEditFridayCityTourWarning}
+              onChange={handleEditFieldChange}
+              onClose={handleCloseEditModal}
+              onSave={handleSaveEditedSchedule}
+            />
+          ) : null}
 
-      {isDeleteModalOpen && deletingItem ? (
-        <DeleteConfirmModal item={deletingItem} onClose={handleCloseDeleteModal} onConfirm={handleConfirmDelete} />
-      ) : null}
+          {isDeleteModalOpen && deletingItem ? (
+            <LazyDeleteConfirmModal
+              item={deletingItem}
+              onClose={handleCloseDeleteModal}
+              onConfirm={handleConfirmDelete}
+            />
+          ) : null}
 
-      {isDeleteGroupModalOpen ? (
-        <DeleteGroupModal
-          groupCode={group.code}
-          groupName={group.name}
-          onClose={handleCloseDeleteGroupModal}
-          onConfirm={handleConfirmDeleteGroup}
-        />
-      ) : null}
+          {isDeleteGroupModalOpen ? (
+            <LazyDeleteGroupModal
+              groupCode={group.code}
+              groupName={group.name}
+              onClose={handleCloseDeleteGroupModal}
+              onConfirm={handleConfirmDeleteGroup}
+            />
+          ) : null}
 
-      {isGroupEditModalOpen ? (
-        <GroupEditModal
-          groupCode={group.code}
-          groupName={group.name}
-          onClose={handleCloseGroupEditModal}
-          onSave={handleSaveGroupEdit}
-        />
-      ) : null}
+          {isGroupEditModalOpen ? (
+            <LazyGroupEditModal
+              groupCode={group.code}
+              groupName={group.name}
+              onClose={handleCloseGroupEditModal}
+              onSave={handleSaveGroupEdit}
+            />
+          ) : null}
 
-      {isNoteModalOpen ? <NoteModal onClose={handleCloseNoteModal} onSave={handleSaveNote} /> : null}
+          {isNoteModalOpen ? <LazyNoteModal onClose={handleCloseNoteModal} onSave={handleSaveNote} /> : null}
+        </Suspense>
+      ) : null}
     </div>
   );
 }

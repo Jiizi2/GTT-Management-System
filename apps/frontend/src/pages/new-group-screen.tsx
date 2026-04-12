@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
+import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
@@ -18,12 +18,15 @@ import type {
   NewGroupRaudhahFormState,
   VisaStatus,
 } from "../shared/app-domain";
-import { InputItineraryScreen } from "./add-group-workspace-page";
 import {
   buildAgreementItineraryPrefill,
   buildNewGroupPayload,
   validateConnectedAgreementDates,
 } from "./new-group-screen-helpers";
+
+const LazyInputItineraryScreen = lazy(async () => ({
+  default: (await import("./add-group-workspace-page")).InputItineraryScreen,
+}));
 
 const { createNewGroupAgreementForm, createNewGroupRaudhahForm, getMinimumBusCountForPax, resolveVisaAgreementNumber } =
   Domain;
@@ -163,6 +166,19 @@ function getPaymentStatusTone(status: "Paid" | "Unpaid"): InvoiceTone {
   }
 
   return "pending";
+}
+
+function ItinerarySectionFallback({ label }: { label: string }) {
+  return (
+    <section className="serene-section">
+      <div className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant" role="status" aria-live="polite">
+        <span className="material-symbols-outlined animate-pulse text-base text-primary" aria-hidden="true">
+          sync
+        </span>
+        <span>{label}</span>
+      </div>
+    </section>
+  );
 }
 
 export function NewGroupScreen({
@@ -818,13 +834,15 @@ export function AddGroupWorkspaceScreen({
       : null;
 
   const itineraryIdentitySectionTop = (
-    <InputItineraryScreen
-      onSaveGroup={onSaveGroup}
-      hideHeader
-      hideSaveAction
-      sectionMode="identity-only"
-      onItineraryDraftChange={setIdentityDraft}
-    />
+    <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary identity form..." />}>
+      <LazyInputItineraryScreen
+        onSaveGroup={onSaveGroup}
+        hideHeader
+        hideSaveAction
+        sectionMode="identity-only"
+        onItineraryDraftChange={setIdentityDraft}
+      />
+    </Suspense>
   );
 
   const itineraryScheduleSectionBottom = (
@@ -856,16 +874,18 @@ export function AddGroupWorkspaceScreen({
       </section>
 
       {isItineraryVisible ? (
-        <InputItineraryScreen
-          onSaveGroup={onSaveGroup}
-          hideHeader
-          hideSaveAction
-          sectionMode="schedule-only"
-          identityDraft={identityDraft}
-          itineraryPrefill={itineraryPrefill}
-          emitIdentityInDraft={false}
-          onItineraryDraftChange={setItineraryDetailDraft}
-        />
+        <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary schedule form..." />}>
+          <LazyInputItineraryScreen
+            onSaveGroup={onSaveGroup}
+            hideHeader
+            hideSaveAction
+            sectionMode="schedule-only"
+            identityDraft={identityDraft}
+            itineraryPrefill={itineraryPrefill}
+            emitIdentityInDraft={false}
+            onItineraryDraftChange={setItineraryDetailDraft}
+          />
+        </Suspense>
       ) : null}
     </>
   );

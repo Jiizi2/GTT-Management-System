@@ -11,7 +11,7 @@ const LazyChecklistScreen = lazy(async () => ({
   default: (await import("../pages/checklist-page")).ChecklistScreen,
 }));
 const LazyInvoiceScreen = lazy(async () => ({
-  default: (await import("../pages/invoice-page")).InvoiceScreen,
+  default: (await import("../pages/invoice-list-page")).InvoiceScreen,
 }));
 const LazyGroupDetail = lazy(async () => ({
   default: (await import("../pages/group-detail-page")).GroupDetail,
