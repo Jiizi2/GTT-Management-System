@@ -33,8 +33,9 @@
   1. Copy `env.production.example` to `.env` on production host.
   2. Set real `DATABASE_URL`, `AUTH_SECRET`, and `CORS_ORIGINS`.
   3. Keep `TRUST_PROXY=false` unless requests really come through a trusted reverse proxy.
-  4. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
-  5. Keep runtime cleanup enabled unless you intentionally externalize retention management.
+  4. Keep `AUTH_COOKIE_SECURE=true` unless you are doing temporary plain-HTTP bring-up on a VPS.
+  5. Keep `AUTH_BOOTSTRAP_DEFAULT_USERS=false` in production.
+  6. Keep runtime cleanup enabled unless you intentionally externalize retention management.
 
 ## Initial Production Super Admin
 
@@ -78,6 +79,8 @@
 - `AUTH_SECRET` is required in production and should be a private random value.
 - `CORS_ORIGINS` is required in production and must use explicit origins.
 - `TRUST_PROXY` should stay `false` unless proxy headers are sanitized by trusted infrastructure.
+- `AUTH_COOKIE_SECURE` defaults to `true` in production and `false` elsewhere.
+  - Set it to `false` only for temporary HTTP-only bring-up before HTTPS is ready.
 - `LOG_LEVEL` defaults to `warn` in non-production and `info` in production.
 - `HTTP_LOG_SUCCESS` controls whether successful HTTP requests are printed.
   - Defaults to `false` in non-production to keep the terminal quieter.

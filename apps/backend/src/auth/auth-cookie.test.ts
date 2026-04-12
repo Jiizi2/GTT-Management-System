@@ -68,6 +68,26 @@ function testSerializesSessionCookieWithoutDomainOrPersistentExpiry(): void {
   assert.doesNotMatch(serialized, /Expires=/);
 }
 
+function testAllowsDisablingSecureFlagInProduction(): void {
+  const runtimeConfig = resolveAuthCookieRuntimeConfig(
+    createConfigServiceMock({
+      NODE_ENV: "production",
+      AUTH_COOKIE_SECURE: false,
+    }),
+  );
+
+  const serialized = serializeAuthCookie(
+    {
+      accessToken: "prod-http-token",
+      rememberSession: false,
+      maxAgeSeconds: 600,
+    },
+    runtimeConfig,
+  );
+
+  assert.doesNotMatch(serialized, /Secure/);
+}
+
 function testSerializesExpiredCookieWithConfiguredDomain(): void {
   const runtimeConfig = resolveAuthCookieRuntimeConfig(
     createConfigServiceMock({
@@ -114,6 +134,10 @@ async function main(): Promise<void> {
   await runCase(
     "auth cookie serializes session cookie without domain or persistent expiry",
     testSerializesSessionCookieWithoutDomainOrPersistentExpiry,
+  );
+  await runCase(
+    "auth cookie allows disabling secure flag in production",
+    testAllowsDisablingSecureFlagInProduction,
   );
   await runCase(
     "auth cookie serializes expired cookie with configured domain",

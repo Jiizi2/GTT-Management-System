@@ -21,6 +21,7 @@ const ENVIRONMENT_SCHEMA = Joi.object({
     .optional(),
   HTTP_LOG_SUCCESS: Joi.boolean().truthy("true").falsy("false").optional(),
   AUTH_COOKIE_DOMAIN: Joi.string().trim().pattern(COOKIE_DOMAIN_PATTERN).allow("").optional(),
+  AUTH_COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").optional(),
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1_000).default(60_000),
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
   AUTH_LOGIN_RATE_LIMIT_LOCK_MS: Joi.number().integer().min(1_000).default(300_000),
@@ -48,6 +49,7 @@ type ValidatedEnvironment = {
   LOG_LEVEL?: string;
   HTTP_LOG_SUCCESS?: boolean;
   AUTH_COOKIE_DOMAIN?: string;
+  AUTH_COOKIE_SECURE?: boolean;
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: number;
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: number;
   AUTH_LOGIN_RATE_LIMIT_LOCK_MS: number;
