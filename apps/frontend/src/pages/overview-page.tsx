@@ -3,6 +3,7 @@ import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
 import { GroupCard } from "../components/group-card";
+import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 
 const { OVERVIEW_PAGE_SIZE } = Domain;
@@ -23,15 +24,23 @@ export function OverviewScreen({
   query,
   filteredGroups,
   isActiveOnly,
+  overviewMonthFilter,
+  overviewMonthOptions,
   statCards,
   summaryMessage,
   onQueryChange,
   onToggleActiveOnly,
+  onOverviewMonthFilterChange,
   onOpenDetail,
 }: {
   query: string;
   filteredGroups: GroupData[];
   isActiveOnly: boolean;
+  overviewMonthFilter: string;
+  overviewMonthOptions: Array<{
+    value: string;
+    label: string;
+  }>;
   statCards: Array<{
     label: string;
     value: string;
@@ -42,10 +51,14 @@ export function OverviewScreen({
   summaryMessage: string;
   onQueryChange: (value: string) => void;
   onToggleActiveOnly: (value: boolean) => void;
+  onOverviewMonthFilterChange: (value: string) => void;
   onOpenDetail: (groupCode: string) => void;
 }) {
   const hasQuery = query.trim().length > 0;
   const [currentPage, setCurrentPage] = useState(1);
+  const selectedOverviewMonthLabel =
+    overviewMonthOptions.find((option) => option.value === overviewMonthFilter)?.label ??
+    (overviewMonthFilter === "all" ? "All Months" : overviewMonthFilter);
   const totalPages = Math.max(1, Math.ceil(filteredGroups.length / OVERVIEW_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * OVERVIEW_PAGE_SIZE;
   const paginatedGroups = filteredGroups.slice(pageStartIndex, pageStartIndex + OVERVIEW_PAGE_SIZE);
@@ -56,7 +69,7 @@ export function OverviewScreen({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, isActiveOnly]);
+  }, [overviewMonthFilter, query, isActiveOnly]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -75,6 +88,7 @@ export function OverviewScreen({
           groups: filteredGroups,
           query,
           isActiveOnly,
+          monthLabel: selectedOverviewMonthLabel,
           summaryMessage,
         },
         {
@@ -212,6 +226,28 @@ export function OverviewScreen({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[11rem]">
+            <SereneSelect
+              className="serene-select-pill h-9 w-full pr-9"
+              value={overviewMonthFilter}
+              onChange={(event) => onOverviewMonthFilterChange(event.target.value)}
+              showCaret={false}
+              aria-label="Filter overview month"
+            >
+              {overviewMonthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SereneSelect>
+            <span
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-base text-on-surface-variant"
+              aria-hidden="true"
+            >
+              calendar_month
+            </span>
+          </div>
+
           <button
             type="button"
             className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-bold leading-none transition ${

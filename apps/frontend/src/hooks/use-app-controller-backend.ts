@@ -1046,10 +1046,12 @@ export async function fetchGroupsFromBackend({
   signal,
   query,
   projection = "detail",
+  activeOnly = false,
 }: {
   signal?: AbortSignal;
   query?: string;
   projection?: GroupFetchProjection;
+  activeOnly?: boolean;
 } = {}): Promise<GroupData[]> {
   const searchParams = new URLSearchParams();
   const normalizedQuery = query?.trim() ?? "";
@@ -1058,6 +1060,9 @@ export async function fetchGroupsFromBackend({
   }
   if (projection) {
     searchParams.set("projection", projection);
+  }
+  if (activeOnly) {
+    searchParams.set("activeOnly", "true");
   }
   const endpoint = searchParams.size > 0 ? `/groups?${searchParams.toString()}` : "/groups";
   const { response, payload, responseText } = await fetchBackendParsed(endpoint, {

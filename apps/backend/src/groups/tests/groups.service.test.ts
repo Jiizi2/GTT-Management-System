@@ -3,6 +3,7 @@ import {
   AgreementApprovalStatus,
   AgreementCity,
   GroupRaudhahStatus,
+  GroupTone,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -108,11 +109,37 @@ async function testSearchFilterPagination(): Promise<void> {
         name: "Family Transit",
       }),
     );
+    await service.create(
+      createGroupPayload({
+        code: "G-104",
+        name: "Inactive Archive",
+        status: "Inactive",
+        tone: GroupTone.INACTIVE,
+        visaSetup: {
+          visaStatus: VisaStatus.ISSUED,
+          syarikah: "Gamma Provider",
+          paymentStatus: VisaPaymentStatus.PAID,
+          outstandingAmount: 0,
+          hotelAgreements: [
+            {
+              city: AgreementCity.MAKKAH,
+              hotelName: "Archive Hotel",
+              agreementNumber: "M-104",
+              pax: 18,
+              status: AgreementApprovalStatus.APPROVED,
+              stayStart: "2026-04-06",
+              stayEnd: "2026-04-08",
+            },
+          ],
+          raudhahAppointments: [],
+        },
+      }),
+    );
 
     const pagedResult = await service.findAll(undefined, { page: 1, pageSize: 2 });
     assert.equal(Array.isArray(pagedResult), false);
     const paged = pagedResult as { items: unknown[]; total: number; page: number; pageSize: number };
-    assert.equal(paged.total, 3);
+    assert.equal(paged.total, 4);
     assert.equal(paged.items.length, 2);
     assert.equal(paged.page, 1);
     assert.equal(paged.pageSize, 2);
@@ -133,10 +160,17 @@ async function testSearchFilterPagination(): Promise<void> {
     assert.equal(Array.isArray(missingHotel), true);
     assert.equal((missingHotel as unknown[]).length, 2);
 
+    const activeOnly = (await service.findAll(undefined, { activeOnly: true })) as Array<{ code?: string }>;
+    assert.equal(activeOnly.length, 3);
+    assert.deepEqual(
+      activeOnly.map((group) => group.code),
+      ["G-103", "G-102", "G-101"],
+    );
+
     const summaryList = (await service.findAll(undefined, {
       projection: "summary",
     })) as Array<Record<string, unknown>>;
-    assert.equal(summaryList.length, 3);
+    assert.equal(summaryList.length, 4);
     const summaryGroup = summaryList.find((group) => group.code === "G-101");
     assert.ok(summaryGroup);
     assert.equal(Object.prototype.hasOwnProperty.call(summaryGroup, "itinerary"), true);

@@ -1,4 +1,4 @@
-import { Prisma, VisaPaymentStatus, VisaStatus } from "@prisma/client";
+import { GroupTone, Prisma, VisaPaymentStatus, VisaStatus } from "@prisma/client";
 import { buildGroupSearchDocument, normalizeGroupSearchTokens } from "../domain/groups.search-document";
 import type {
   FindAllOptions,
@@ -45,6 +45,7 @@ export function findAllFromMemory(
   memoryGroups: MemoryGroupRecord[],
   query?: string,
   rawFilter?: string,
+  activeOnly = false,
 ): MemoryGroupRecord[] {
   const searchTokens = normalizeGroupSearchTokens(query);
   const filter = normalizeGroupListFilter(rawFilter);
@@ -61,7 +62,7 @@ export function findAllFromMemory(
           return searchTokens.every((token) => searchDocument.includes(token));
         });
 
-  const filtered = source.filter((item) => matchesMemoryFilter(item, filter));
+  const filtered = source.filter((item) => matchesMemoryFilter(item, filter, activeOnly));
   return [...filtered].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
@@ -106,7 +107,11 @@ export function normalizeGroupListFilter(rawFilter?: string): GroupListFilter {
   return "all";
 }
 
-function matchesMemoryFilter(item: MemoryGroupRecord, filter: GroupListFilter): boolean {
+function matchesMemoryFilter(item: MemoryGroupRecord, filter: GroupListFilter, activeOnly: boolean): boolean {
+  if (activeOnly && item.tone !== GroupTone.ACTIVE) {
+    return false;
+  }
+
   if (filter === "all") {
     return true;
   }
@@ -122,7 +127,7 @@ function matchesMemoryFilter(item: MemoryGroupRecord, filter: GroupListFilter): 
   return item.visaSetup?.paymentStatus !== VisaPaymentStatus.PAID;
 }
 
-export function buildGroupWhere(query?: string, rawFilter?: string): Prisma.GroupWhereInput | undefined {
+export function buildGroupWhere(query?: string, rawFilter?: string, activeOnly = false): Prisma.GroupWhereInput | undefined {
   const searchTokens = normalizeGroupSearchTokens(query);
   const filter = normalizeGroupListFilter(rawFilter);
   const conditions: Prisma.GroupWhereInput[] = [];
@@ -135,6 +140,12 @@ export function buildGroupWhere(query?: string, rawFilter?: string): Prisma.Grou
           mode: "insensitive",
         },
       })),
+    });
+  }
+
+  if (activeOnly) {
+    conditions.push({
+      tone: GroupTone.ACTIVE,
     });
   }
 

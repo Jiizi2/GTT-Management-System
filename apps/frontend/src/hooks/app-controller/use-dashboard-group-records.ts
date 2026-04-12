@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   buildVisaTrackingRowsFromGroups,
   formatLocalIsoDate,
+  getItineraryIsoDate,
   groups,
   normalizeGroupStatus,
   resolveVisaAgreementDateRange,
@@ -33,12 +34,13 @@ import {
   sortHotelsByStayStart,
   type GroupFetchProjection,
 } from "../use-app-controller-backend";
-import type { OverviewStatCard, SyncFeedback } from "./types";
+import type { OverviewMonthOption, OverviewStatCard, SyncFeedback } from "./types";
 
 type UseDashboardGroupRecordsOptions = {
   activeNav: NavId;
   query: string;
   isActiveOnly: boolean;
+  overviewMonthFilter: string;
   selectedGroupCode: string | null;
   selectedVisaGroupCode: string | null;
   allowLocalFallback: boolean;
@@ -103,6 +105,122 @@ function formatPeakTripDayLabel(isoDate: string): string {
   });
 }
 
+function getCurrentMonthKey(referenceDate = new Date()): string {
+  return formatLocalIsoDate(referenceDate).slice(0, 7);
+}
+
+function isMonthKey(value: string): boolean {
+  return /^\d{4}-\d{2}$/.test(value);
+}
+
+function resolveMonthKeyFromIsoDate(isoDate: string | undefined): string | null {
+  if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+    return null;
+  }
+
+  return isoDate.slice(0, 7);
+}
+
+function formatOverviewMonthLabel(monthKey: string): string {
+  if (!isMonthKey(monthKey)) {
+    return monthKey;
+  }
+
+  const parsedDate = new Date(`${monthKey}-01T12:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return monthKey;
+  }
+
+  return parsedDate.toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function resolveMonthIsoRange(monthKey: string): { startIso: string; endIso: string } | null {
+  if (!isMonthKey(monthKey)) {
+    return null;
+  }
+
+  const parsedDate = new Date(`${monthKey}-01T12:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  const monthStart = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), 1, 12);
+  const monthEnd = new Date(parsedDate.getFullYear(), parsedDate.getMonth() + 1, 0, 12);
+  return {
+    startIso: formatLocalIsoDate(monthStart),
+    endIso: formatLocalIsoDate(monthEnd),
+  };
+}
+
+function resolveGroupTravelIsoRange(group: GroupData): { startIso: string; endIso: string } | null {
+  const normalizedArrivalIso = group.arrivalDate?.trim() ?? "";
+  const normalizedReturnIso = group.returnDate?.trim() ?? "";
+  const validItineraryDates = group.itinerary
+    .map((item) => getItineraryIsoDate(item).trim())
+    .filter((isoDate) => /^\d{4}-\d{2}-\d{2}$/.test(isoDate))
+    .sort();
+
+  const startIso = /^\d{4}-\d{2}-\d{2}$/.test(normalizedArrivalIso)
+    ? normalizedArrivalIso
+    : (validItineraryDates[0] ?? "");
+  const latestItineraryIso = validItineraryDates[validItineraryDates.length - 1] ?? "";
+  const endIsoCandidate = /^\d{4}-\d{2}-\d{2}$/.test(normalizedReturnIso) ? normalizedReturnIso : latestItineraryIso;
+  if (!startIso && !endIsoCandidate) {
+    return null;
+  }
+
+  const endIso = endIsoCandidate && endIsoCandidate >= startIso ? endIsoCandidate : startIso;
+  return {
+    startIso: startIso || endIso,
+    endIso,
+  };
+}
+
+function collectGroupMonthKeys(group: GroupData): string[] {
+  const travelRange = resolveGroupTravelIsoRange(group);
+  if (!travelRange) {
+    return [];
+  }
+
+  const startMonthKey = resolveMonthKeyFromIsoDate(travelRange.startIso);
+  const endMonthKey = resolveMonthKeyFromIsoDate(travelRange.endIso);
+  if (!startMonthKey || !endMonthKey) {
+    return [];
+  }
+
+  const startDate = new Date(`${startMonthKey}-01T12:00:00`);
+  const endDate = new Date(`${endMonthKey}-01T12:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return [];
+  }
+
+  const monthKeys: string[] = [];
+  const cursor = new Date(startDate);
+  while (cursor.getTime() <= endDate.getTime()) {
+    monthKeys.push(formatLocalIsoDate(cursor).slice(0, 7));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return monthKeys;
+}
+
+function doesGroupMatchOverviewMonth(group: GroupData, monthKey: string): boolean {
+  if (monthKey === "all") {
+    return true;
+  }
+
+  const monthRange = resolveMonthIsoRange(monthKey);
+  const groupRange = resolveGroupTravelIsoRange(group);
+  if (!monthRange || !groupRange) {
+    return false;
+  }
+
+  return groupRange.endIso >= monthRange.startIso && groupRange.startIso <= monthRange.endIso;
+}
+
 function routeUsesGroupRecords({
   activeNav,
   selectedGroupCode,
@@ -153,6 +271,7 @@ export function useDashboardGroupRecords({
   activeNav,
   query,
   isActiveOnly,
+  overviewMonthFilter,
   selectedGroupCode,
   selectedVisaGroupCode,
   allowLocalFallback,
@@ -179,10 +298,18 @@ export function useDashboardGroupRecords({
     selectedGroupCode,
     selectedVisaGroupCode,
   });
+  const currentOverviewMonthKey = useMemo(() => getCurrentMonthKey(), []);
+  const shouldUseRemoteOverviewActiveOnly = activeNav === "overview" && requestedProjection === "summary" && isActiveOnly;
+  const shouldFilterOverviewByMonth = activeNav === "overview" && overviewMonthFilter !== "all";
   const shouldUseRemoteSearch = usesGroupRecords && requestedProjection === "summary";
 
-  const groupsQuery = useGroupsQuery(requestedProjection, usesGroupRecords);
-  const searchQuery = useGroupsSearchQuery(normalizedQuery, "summary", shouldUseRemoteSearch);
+  const groupsQuery = useGroupsQuery(requestedProjection, usesGroupRecords, shouldUseRemoteOverviewActiveOnly);
+  const searchQuery = useGroupsSearchQuery(
+    normalizedQuery,
+    "summary",
+    shouldUseRemoteSearch,
+    shouldUseRemoteOverviewActiveOnly,
+  );
   const createGroupMutation = useMutation({
     mutationFn: (group: GroupData) => createGroupInBackend(group),
     retry: false,
@@ -201,21 +328,24 @@ export function useDashboardGroupRecords({
     (nextGroupRecords: GroupData[], projection: GroupFetchProjection) => {
       setGroupRecords(nextGroupRecords);
       setGroupRecordsProjection(projection);
-      queryClient.setQueryData(groupQueryKeys.list(projection), nextGroupRecords);
+      queryClient.setQueryData(groupQueryKeys.list(projection, shouldUseRemoteOverviewActiveOnly), nextGroupRecords);
     },
-    [queryClient],
+    [queryClient, shouldUseRemoteOverviewActiveOnly],
   );
 
   const commitGroupRecords = useCallback(
     (updater: (current: GroupData[]) => GroupData[]) => {
       setGroupRecords((current) => {
         const next = updater(current);
-        queryClient.setQueryData(groupQueryKeys.list(requestedProjection), next);
+        queryClient.setQueryData(
+          groupQueryKeys.list(requestedProjection, shouldUseRemoteOverviewActiveOnly),
+          next,
+        );
         return next;
       });
       void queryClient.invalidateQueries({ queryKey: groupQueryKeys.searchRoot });
     },
-    [queryClient, requestedProjection],
+    [queryClient, requestedProjection, shouldUseRemoteOverviewActiveOnly],
   );
 
   useEffect(() => {
@@ -288,13 +418,14 @@ export function useDashboardGroupRecords({
     try {
       const backendGroups = await fetchGroupsFromBackend({
         projection: requestedProjection,
+        activeOnly: shouldUseRemoteOverviewActiveOnly,
       });
       syncGroupRecords(backendGroups, requestedProjection);
     } catch (error: unknown) {
       syncGroupRecords([], requestedProjection);
       console.warn("Failed to restore group state from backend.", error);
     }
-  }, [requestedProjection, syncGroupRecords]);
+  }, [requestedProjection, shouldUseRemoteOverviewActiveOnly, syncGroupRecords]);
 
   const runBackendSync = useCallback(
     ({
@@ -342,6 +473,41 @@ export function useDashboardGroupRecords({
     [visibleGroupRecords],
   );
 
+  const overviewMonthOptions = useMemo<OverviewMonthOption[]>(() => {
+    const monthKeySet = new Set<string>();
+    monthKeySet.add(currentOverviewMonthKey);
+    if (overviewMonthFilter !== "all") {
+      monthKeySet.add(overviewMonthFilter);
+    }
+
+    visibleGroupRecords.forEach((group) => {
+      collectGroupMonthKeys(group).forEach((monthKey) => {
+        monthKeySet.add(monthKey);
+      });
+    });
+
+    return [
+      { value: "all", label: "All Months" },
+      ...Array.from(monthKeySet)
+        .sort((left, right) => right.localeCompare(left))
+        .map((monthKey) => ({
+          value: monthKey,
+          label: formatOverviewMonthLabel(monthKey),
+        })),
+    ];
+  }, [currentOverviewMonthKey, overviewMonthFilter, visibleGroupRecords]);
+
+  const selectedOverviewMonthLabel = useMemo(() => {
+    if (overviewMonthFilter === "all") {
+      return "All Months";
+    }
+
+    return (
+      overviewMonthOptions.find((option) => option.value === overviewMonthFilter)?.label ??
+      formatOverviewMonthLabel(overviewMonthFilter)
+    );
+  }, [overviewMonthFilter, overviewMonthOptions]);
+
   const filteredGroups = useMemo(() => {
     const sourceGroups = normalizedQuery
       ? (remoteSearchMatches ?? visibleGroupRecords).map((group) => {
@@ -351,6 +517,10 @@ export function useDashboardGroupRecords({
       : visibleGroupRecords;
 
     return sourceGroups.filter((group) => {
+      if (shouldFilterOverviewByMonth && !doesGroupMatchOverviewMonth(group, overviewMonthFilter)) {
+        return false;
+      }
+
       if (isActiveOnly && group.tone !== "active") {
         return false;
       }
@@ -363,7 +533,15 @@ export function useDashboardGroupRecords({
         value.toLowerCase().includes(normalizedQuery),
       );
     });
-  }, [groupRecordsByCode, isActiveOnly, normalizedQuery, remoteSearchMatches, visibleGroupRecords]);
+  }, [
+    groupRecordsByCode,
+    isActiveOnly,
+    normalizedQuery,
+    overviewMonthFilter,
+    remoteSearchMatches,
+    shouldFilterOverviewByMonth,
+    visibleGroupRecords,
+  ]);
 
   const visaTrackingRows = useMemo(() => buildVisaTrackingRowsFromGroups(visibleGroupRecords), [visibleGroupRecords]);
 
@@ -389,9 +567,16 @@ export function useDashboardGroupRecords({
   );
 
   const { weekStartIso, weekEndIso } = useMemo(() => getCurrentWeekIsoRange(), []);
+  const overviewMetricSourceGroups = useMemo(
+    () =>
+      shouldFilterOverviewByMonth
+        ? visibleGroupRecords.filter((group) => doesGroupMatchOverviewMonth(group, overviewMonthFilter))
+        : visibleGroupRecords,
+    [overviewMonthFilter, shouldFilterOverviewByMonth, visibleGroupRecords],
+  );
 
   const overviewMetrics = useMemo(() => {
-    const activeGroups = visibleGroupRecords.filter((group) => group.tone === "active");
+    const activeGroups = overviewMetricSourceGroups.filter((group) => group.tone === "active");
     const activePilgrims = activeGroups.reduce((total, group) => total + group.pax, 0);
     let totalTripsThisWeek = 0;
     let groupsArrivingThisWeek = 0;
@@ -445,7 +630,7 @@ export function useDashboardGroupRecords({
           ? `Peak day: ${formatPeakTripDayLabel(peakTripDateIso)} (${peakTripCount} trips).`
           : "No trips scheduled this week.",
     };
-  }, [visibleGroupRecords, weekEndIso, weekStartIso]);
+  }, [overviewMetricSourceGroups, weekEndIso, weekStartIso]);
 
   const statCards = useMemo<OverviewStatCard[]>(
     () => [
@@ -475,22 +660,27 @@ export function useDashboardGroupRecords({
   );
 
   const summaryMessage = useMemo(() => {
+    const monthMessage =
+      overviewMonthFilter === "all" ? "across all months" : `for ${selectedOverviewMonthLabel}`;
+
     if (normalizedQuery) {
-      return `${filteredGroups.length} groups match your search${isActiveOnly ? " (active only)" : ""}. ${overviewMetrics.totalTripsThisWeek} trips are scheduled this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
+      return `${filteredGroups.length} groups match your search${isActiveOnly ? " (active only)" : ""} ${monthMessage}. ${overviewMetrics.totalTripsThisWeek} trips are scheduled this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
     }
 
     if (isActiveOnly) {
-      return `${filteredGroups.length} active groups shown. ${overviewMetrics.totalTripsThisWeek} trips this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
+      return `${filteredGroups.length} active groups shown ${monthMessage}. ${overviewMetrics.totalTripsThisWeek} trips this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
     }
 
-    return `${overviewMetrics.groupsArrivingThisWeek} groups arriving with ${overviewMetrics.totalTripsThisWeek} total trips this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
+    return `${overviewMetrics.groupsArrivingThisWeek} groups arriving ${monthMessage} with ${overviewMetrics.totalTripsThisWeek} total trips this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
   }, [
     filteredGroups.length,
     isActiveOnly,
     normalizedQuery,
+    overviewMonthFilter,
     overviewMetrics.groupsArrivingThisWeek,
     overviewMetrics.peakTripSummary,
     overviewMetrics.totalTripsThisWeek,
+    selectedOverviewMonthLabel,
     weekEndIso,
     weekStartIso,
   ]);
@@ -922,6 +1112,7 @@ export function useDashboardGroupRecords({
     groupRecords: visibleGroupRecords,
     isGroupRecordsLoading: isWaitingForDetailedRecords,
     filteredGroups,
+    overviewMonthOptions,
     statCards,
     summaryMessage,
     selectedGroup,

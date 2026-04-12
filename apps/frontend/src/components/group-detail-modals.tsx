@@ -5,7 +5,9 @@ import { useForm } from "react-hook-form";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
+import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "./form-accessibility";
 import { SereneSelect } from "./serene-select";
+import { useModalFocusTrap } from "./use-modal-focus-trap";
 import { useSaudiCityOptions } from "../hooks/use-saudi-city-options";
 import type {
   EditScheduleFormState,
@@ -30,6 +32,7 @@ const modalInputClassName = "serene-input";
 const modalSelectClassName = "serene-select";
 const modalTextareaClassName = "serene-textarea";
 const modalOverlayClassName = "serene-modal-overlay z-[120]";
+const modalErrorClassName = "text-xs font-medium text-brand-tertiary";
 
 const musyrifModalSchema = z.object({
   name: z.string().trim().min(1, "Musyrif name wajib diisi."),
@@ -71,6 +74,7 @@ export function MusyrifModal({
   onClose: () => void;
   onSave: (values: MusyrifFormState) => void | Promise<void>;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const {
     register,
     handleSubmit,
@@ -85,14 +89,19 @@ export function MusyrifModal({
     reset(initialValues);
   }, [initialValues, reset]);
 
+  const nameErrorMessage = errors.name?.message;
+  const phoneErrorMessage = errors.phone?.message;
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
+          ref={dialogRef}
           className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-musyrif-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
@@ -117,25 +126,41 @@ export function MusyrifModal({
               <label className={modalFieldClassName}>
                 <span>Musyrif Name</span>
                 <input
+                  id="musyrif-name"
                   className={modalInputClassName}
                   type="text"
                   {...register("name")}
                   placeholder="e.g. Ust. Ahmad Hidayat"
+                  aria-invalid={getFieldAriaInvalid(nameErrorMessage)}
+                  aria-describedby={getFieldDescribedBy("musyrif-name", {
+                    errorMessage: nameErrorMessage,
+                  })}
                 />
-                {errors.name ? <p className="text-xs font-medium text-brand-tertiary">{errors.name.message}</p> : null}
+                <FieldErrorMessage
+                  fieldId="musyrif-name"
+                  message={nameErrorMessage}
+                  className={modalErrorClassName}
+                />
               </label>
 
               <label className={modalFieldClassName}>
                 <span>Phone Number</span>
                 <input
+                  id="musyrif-phone"
                   className={modalInputClassName}
                   type="tel"
                   {...register("phone")}
                   placeholder="+62 812-3456-7890"
+                  aria-invalid={getFieldAriaInvalid(phoneErrorMessage)}
+                  aria-describedby={getFieldDescribedBy("musyrif-phone", {
+                    errorMessage: phoneErrorMessage,
+                  })}
                 />
-                {errors.phone ? (
-                  <p className="text-xs font-medium text-brand-tertiary">{errors.phone.message}</p>
-                ) : null}
+                <FieldErrorMessage
+                  fieldId="musyrif-phone"
+                  message={phoneErrorMessage}
+                  className={modalErrorClassName}
+                />
               </label>
             </div>
 
@@ -145,8 +170,13 @@ export function MusyrifModal({
                 className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
                 disabled={isSubmitting}
               >
-                Save Changes
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </button>
+              {isSubmitting ? (
+                <p className="sr-only" role="status" aria-live="polite">
+                  Saving musyrif changes.
+                </p>
+              ) : null}
 
               <button
                 type="button"
@@ -172,14 +202,18 @@ export function DeleteConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
+          ref={dialogRef}
           className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-itinerary-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
@@ -265,14 +299,18 @@ export function DeleteGroupModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
+          ref={dialogRef}
           className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-group-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
@@ -355,6 +393,7 @@ export function GroupEditModal({
     name: string;
   }) => { ok: true } | { ok: false; message: string } | Promise<{ ok: true } | { ok: false; message: string }>;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const {
     register,
     handleSubmit,
@@ -376,15 +415,21 @@ export function GroupEditModal({
     });
   }, [groupCode, groupName, reset]);
 
+  const codeErrorMessage = errors.code?.message;
+  const nameErrorMessage = errors.name?.message;
+  const rootErrorMessage = errors.root?.message;
+
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
           id="group-edit-modal"
+          ref={dialogRef}
           className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="group-edit-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
@@ -430,17 +475,48 @@ export function GroupEditModal({
 
             <label className={modalFieldClassName}>
               <span>Group Number</span>
-              <input className={modalInputClassName} type="text" {...register("code")} placeholder={groupCode} />
+              <input
+                id="group-edit-code"
+                className={modalInputClassName}
+                type="text"
+                {...register("code")}
+                placeholder={groupCode}
+                aria-invalid={getFieldAriaInvalid(codeErrorMessage)}
+                aria-describedby={getFieldDescribedBy("group-edit-code", {
+                  errorMessage: codeErrorMessage,
+                })}
+              />
             </label>
-            {errors.code ? <p className="text-xs font-medium text-brand-tertiary">{errors.code.message}</p> : null}
+            <FieldErrorMessage
+              fieldId="group-edit-code"
+              message={codeErrorMessage}
+              className={modalErrorClassName}
+            />
 
             <label className={modalFieldClassName}>
               <span>Group Name</span>
-              <input className={modalInputClassName} type="text" {...register("name")} placeholder={groupName} />
+              <input
+                id="group-edit-name"
+                className={modalInputClassName}
+                type="text"
+                {...register("name")}
+                placeholder={groupName}
+                aria-invalid={getFieldAriaInvalid(nameErrorMessage)}
+                aria-describedby={getFieldDescribedBy("group-edit-name", {
+                  errorMessage: nameErrorMessage,
+                  extraDescribedBy: rootErrorMessage ? ["group-edit-root-error"] : [],
+                })}
+              />
             </label>
-            {errors.name ? <p className="text-xs font-medium text-brand-tertiary">{errors.name.message}</p> : null}
-            {errors.root?.message ? (
-              <p className="text-xs font-medium text-brand-tertiary">{errors.root.message}</p>
+            <FieldErrorMessage
+              fieldId="group-edit-name"
+              message={nameErrorMessage}
+              className={modalErrorClassName}
+            />
+            {rootErrorMessage ? (
+              <p id="group-edit-root-error" role="alert" aria-live="polite" className={modalErrorClassName}>
+                {rootErrorMessage}
+              </p>
             ) : null}
 
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
@@ -449,8 +525,13 @@ export function GroupEditModal({
                 className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
                 disabled={isSubmitting}
               >
-                Save Changes
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </button>
+              {isSubmitting ? (
+                <p className="sr-only" role="status" aria-live="polite">
+                  Saving group changes.
+                </p>
+              ) : null}
 
               <button
                 type="button"
@@ -482,6 +563,7 @@ export function ScheduleModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const showFlightNumberField = isFlightActivityType(form.category);
   const showPrimaryHotelNameField =
@@ -506,6 +588,7 @@ export function ScheduleModal({
   const modalToggleTrackClassName = "inline-flex h-6 w-11 items-center rounded-full bg-slate-300 p-0.5 transition";
   const modalToggleChipClassName =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
+  const scheduleStatusMessage = isSaveDisabled ? "Complete all required schedule fields before saving." : null;
 
   return (
     <ModalPortal>
@@ -514,10 +597,12 @@ export function ScheduleModal({
         onClick={onClose}
       >
         <div
+          ref={dialogRef}
           className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="schedule-modal-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-surface-container-lowest px-5 py-4">
@@ -551,6 +636,14 @@ export function ScheduleModal({
           </div>
 
           <div className="space-y-4 overflow-y-auto px-5 py-4">
+            {scheduleStatusMessage ? (
+              <div className={modalWarnClassName} role="status" aria-live="polite">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  info
+                </span>
+                <p>{scheduleStatusMessage}</p>
+              </div>
+            ) : null}
             <div className={modalGridClassName}>
               <div className={`${modalFieldClassName} ${modalWideClassName}`}>
                 <span>Activity Type</span>
@@ -943,6 +1036,7 @@ export function EditScheduleModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const showFlightNumberField = isFlightActivityType(form.category);
   const showPrimaryHotelNameField =
@@ -964,6 +1058,7 @@ export function EditScheduleModal({
   const modalTransferCardClassName = "rounded-2xl border border-sky-200 bg-sky-50 p-3";
   const modalToggleChipClassName =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
+  const scheduleStatusMessage = isSaveDisabled ? "Complete all required schedule fields before saving." : null;
 
   return (
     <ModalPortal>
@@ -972,10 +1067,12 @@ export function EditScheduleModal({
         onClick={onClose}
       >
         <div
+          ref={dialogRef}
           className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-schedule-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-surface-container-lowest px-5 py-4">
@@ -996,6 +1093,14 @@ export function EditScheduleModal({
           </div>
 
           <div className="space-y-4 overflow-y-auto px-5 py-4">
+            {scheduleStatusMessage ? (
+              <div className={modalWarnClassName} role="status" aria-live="polite">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  info
+                </span>
+                <p>{scheduleStatusMessage}</p>
+              </div>
+            ) : null}
             <div className={modalFieldClassName}>
               <span>Activity Type</span>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -1357,6 +1462,7 @@ export function NoteModal({
   onClose: () => void;
   onSave: (values: NoteFormState) => void | Promise<void>;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const {
     register,
     watch,
@@ -1372,15 +1478,18 @@ export function NoteModal({
   });
   const noteText = watch("text");
   const pinned = watch("pinned");
+  const textErrorMessage = errors.text?.message;
 
   return (
     <ModalPortal>
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
+          ref={dialogRef}
           className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="note-modal-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
@@ -1413,14 +1522,22 @@ export function NoteModal({
               <span>Operational Note</span>
               <div className="space-y-1.5">
                 <textarea
+                  id="group-note-text"
                   className={modalTextareaClassName}
                   rows={8}
                   maxLength={2000}
                   placeholder="Write your operational note here..."
                   {...register("text")}
+                  aria-invalid={getFieldAriaInvalid(textErrorMessage)}
+                  aria-describedby={getFieldDescribedBy("group-note-text", {
+                    errorMessage: textErrorMessage,
+                    extraDescribedBy: ["group-note-count"],
+                  })}
                 />
-                <div className="text-xs text-slate-500">{noteText.length}/2000</div>
-                {errors.text ? <p className="text-xs font-semibold text-error">{errors.text.message}</p> : null}
+                <div id="group-note-count" className="text-xs text-slate-500">
+                  {noteText.length}/2000
+                </div>
+                <FieldErrorMessage fieldId="group-note-text" message={textErrorMessage} />
               </div>
             </label>
 
@@ -1468,8 +1585,13 @@ export function NoteModal({
               <span className="material-symbols-outlined" aria-hidden="true">
                 check_circle
               </span>
-              <span>Save Note</span>
+              <span>{isSubmitting ? "Saving..." : "Save Note"}</span>
             </button>
+            {isSubmitting ? (
+              <p className="sr-only" role="status" aria-live="polite">
+                Saving note.
+              </p>
+            ) : null}
 
             <button
               type="button"

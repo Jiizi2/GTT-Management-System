@@ -36,7 +36,7 @@ export class GroupsQueryService {
       });
     }
 
-    const source = findAllFromMemory(this.memoryGroups, query, options?.filter).map((group) =>
+    const source = findAllFromMemory(this.memoryGroups, query, options?.filter, options?.activeOnly ?? false).map((group) =>
       projectMemoryGroupRecord(group, projection),
     );
     return paginateGroupItems(source, options);
@@ -114,7 +114,7 @@ export class GroupsQueryService {
     query?: string,
     options?: FindAllOptions,
   ): Promise<unknown[] | PaginatedGroupList<unknown>> {
-    const where = buildGroupWhere(query, options?.filter);
+    const where = buildGroupWhere(query, options?.filter, options?.activeOnly ?? false);
     const pageState = resolvePaginationState(options);
     const select = options?.projection === "summary" ? groupSummarySelection : groupDetailSelection;
 

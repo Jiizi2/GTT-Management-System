@@ -1,22 +1,28 @@
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { SereneSelect } from "./serene-select";
 
 type DatePickerProps = {
+  id?: string;
   value: string;
   onChange: (nextValue: string) => void;
   inputClassName: string;
   placeholder?: string;
   disabled?: boolean;
+  ariaInvalid?: "true" | "false";
+  ariaDescribedBy?: string;
 };
 
 type TimePickerProps = {
+  id?: string;
   value: string;
   onChange: (nextValue: string) => void;
   inputClassName: string;
   placeholder?: string;
   disabled?: boolean;
+  ariaInvalid?: "true" | "false";
+  ariaDescribedBy?: string;
 };
 
 const dayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
@@ -184,16 +190,20 @@ function useFloatingPopoverStyle(
 }
 
 export function DatePickerInput({
+  id,
   value,
   onChange,
   inputClassName,
   placeholder = "dd/mm/yyyy",
   disabled = false,
+  ariaInvalid = "false",
+  ariaDescribedBy,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState<Date>(() => parseIsoDate(value) ?? new Date());
   const rootRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const popoverId = useId();
   const selectedDate = parseIsoDate(value);
   const today = useMemo(() => new Date(), []);
   const popoverStyle = useFloatingPopoverStyle(isOpen, rootRef, 296, 360);
@@ -256,6 +266,7 @@ export function DatePickerInput({
   return (
     <div ref={rootRef} className="relative">
       <input
+        id={id}
         type="text"
         className={`${inputClassName} cursor-pointer pr-10`}
         value={selectedDate ? formatDisplayDate(value) : ""}
@@ -271,6 +282,9 @@ export function DatePickerInput({
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-readonly="true"
+        aria-controls={isOpen ? popoverId : undefined}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         disabled={disabled}
         placeholder={placeholder}
       />
@@ -284,6 +298,7 @@ export function DatePickerInput({
       {isOpen && popoverStyle && typeof document !== "undefined"
         ? createPortal(
             <div
+              id={popoverId}
               ref={popoverRef}
               className={pickerPopoverClassName}
               style={popoverStyle}
@@ -389,17 +404,21 @@ export function DatePickerInput({
 }
 
 export function TimePickerInput({
+  id,
   value,
   onChange,
   inputClassName,
   placeholder = "--:--",
   disabled = false,
+  ariaInvalid = "false",
+  ariaDescribedBy,
 }: TimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [draftHour, setDraftHour] = useState("00");
   const [draftMinute, setDraftMinute] = useState("00");
   const rootRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const popoverId = useId();
   const parsedTime = parseIsoTime(value);
   const popoverStyle = useFloatingPopoverStyle(isOpen, rootRef, 272, 280);
 
@@ -449,6 +468,7 @@ export function TimePickerInput({
   return (
     <div ref={rootRef} className="relative">
       <input
+        id={id}
         type="text"
         className={`${inputClassName} cursor-pointer pr-10`}
         value={parsedTime ? `${parsedTime.hour}:${parsedTime.minute}` : ""}
@@ -464,6 +484,9 @@ export function TimePickerInput({
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-readonly="true"
+        aria-controls={isOpen ? popoverId : undefined}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         disabled={disabled}
         placeholder={placeholder}
       />
@@ -477,6 +500,7 @@ export function TimePickerInput({
       {isOpen && popoverStyle && typeof document !== "undefined"
         ? createPortal(
             <div
+              id={popoverId}
               ref={popoverRef}
               className={pickerPopoverClassName}
               style={popoverStyle}

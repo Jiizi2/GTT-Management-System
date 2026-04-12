@@ -1,10 +1,12 @@
 import { createPortal } from "react-dom";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import { DatePickerInput } from "./date-time-pickers";
+import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "./form-accessibility";
 import { SereneSelect } from "./serene-select";
+import { useModalFocusTrap } from "./use-modal-focus-trap";
 import type {
   VisaHotelEditFormState,
   VisaPaymentStatus,
@@ -18,6 +20,7 @@ const modalInputClassName = "serene-input";
 const modalSelectClassName = "serene-select";
 const modalButtonClassName = "serene-btn-primary";
 const modalCancelButtonClassName = "serene-btn-secondary";
+const modalErrorClassName = "text-xs font-medium text-brand-tertiary";
 
 const syarikahModalSchema = z.object({
   value: z.string().trim().min(1, "Syarikah wajib diisi."),
@@ -88,6 +91,10 @@ function ModalShell({
   children: ReactNode;
   footer: ReactNode;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+  const titleId = useId();
+  const descriptionId = useId();
+
   return (
     <ModalPortal>
       <div
@@ -95,10 +102,13 @@ function ModalShell({
         onClick={onClose}
       >
         <div
+          ref={dialogRef}
           className={`serene-modal-shell flex max-h-[calc(100dvh-1.5rem)] w-full flex-col sm:max-h-[calc(100dvh-2rem)] ${widthClassName}`}
           role="dialog"
           aria-modal="true"
-          aria-label={title}
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex shrink-0 items-start justify-between gap-3 bg-surface-container-low px-5 py-4">
@@ -110,8 +120,12 @@ function ModalShell({
               </div>
 
               <div>
-                <h2 className="font-display text-2xl font-bold tracking-tight text-on-surface">{title}</h2>
-                <p className="mt-1 text-sm text-on-surface-variant">{description}</p>
+                <h2 id={titleId} className="font-display text-2xl font-bold tracking-tight text-on-surface">
+                  {title}
+                </h2>
+                <p id={descriptionId} className="mt-1 text-sm text-on-surface-variant">
+                  {description}
+                </p>
               </div>
             </div>
 
@@ -155,10 +169,15 @@ function SaveFooter({
     <>
       <button type="button" className={modalButtonClassName} onClick={onSave} disabled={isSaveDisabled || isSaving}>
         <span className="material-symbols-outlined" aria-hidden="true">
-          check_circle
+          {isSaving ? "sync" : "check_circle"}
         </span>
-        <span>{saveLabel}</span>
+        <span>{isSaving ? "Saving..." : saveLabel}</span>
       </button>
+      {isSaving ? (
+        <p className="sr-only" role="status" aria-live="polite">
+          Saving changes.
+        </p>
+      ) : null}
 
       <button type="button" className={modalCancelButtonClassName} onClick={onClose}>
         Cancel
@@ -304,6 +323,7 @@ export function SyarikahModal({
       value: initialValue,
     },
   });
+  const valueErrorMessage = errors.value?.message;
 
   return (
     <ModalShell
@@ -322,9 +342,19 @@ export function SyarikahModal({
     >
       <label className={modalFieldClassName}>
         <span>Syarikah / Provider Agency</span>
-        <input className={modalInputClassName} type="text" placeholder="e.g. Al-Tayyar" {...register("value")} />
+        <input
+          id="visa-syarikah"
+          className={modalInputClassName}
+          type="text"
+          placeholder="e.g. Al-Tayyar"
+          {...register("value")}
+          aria-invalid={getFieldAriaInvalid(valueErrorMessage)}
+          aria-describedby={getFieldDescribedBy("visa-syarikah", {
+            errorMessage: valueErrorMessage,
+          })}
+        />
       </label>
-      {errors.value ? <p className="text-xs font-medium text-brand-tertiary">{errors.value.message}</p> : null}
+      <FieldErrorMessage fieldId="visa-syarikah" message={valueErrorMessage} className={modalErrorClassName} />
     </ModalShell>
   );
 }
@@ -353,6 +383,12 @@ export function VisaHotelModal({
     resolver: zodResolver(hotelModalSchema),
     defaultValues: initialValue,
   });
+  const hotelNameErrorMessage = errors.hotelName?.message;
+  const agreementNumberErrorMessage = errors.agreementNumber?.message;
+  const paxErrorMessage = errors.pax?.message;
+  const statusErrorMessage = errors.status?.message;
+  const stayStartErrorMessage = errors.stayStartIso?.message;
+  const stayEndErrorMessage = errors.stayEndIso?.message;
 
   return (
     <ModalShell
@@ -378,34 +414,55 @@ export function VisaHotelModal({
         <label className={modalFieldClassName}>
           <span>Hotel Name</span>
           <input
+            id="visa-hotel-name"
             className={modalInputClassName}
             type="text"
             placeholder={`e.g. ${cityLabel} Hotel`}
             {...register("hotelName")}
+            aria-invalid={getFieldAriaInvalid(hotelNameErrorMessage)}
+            aria-describedby={getFieldDescribedBy("visa-hotel-name", {
+              errorMessage: hotelNameErrorMessage,
+            })}
           />
         </label>
-        {errors.hotelName ? (
-          <p className="text-xs font-medium text-brand-tertiary">{errors.hotelName.message}</p>
-        ) : null}
+        <FieldErrorMessage fieldId="visa-hotel-name" message={hotelNameErrorMessage} className={modalErrorClassName} />
 
         <label className={modalFieldClassName}>
           <span>Agreement Number</span>
           <input
+            id="visa-hotel-agreement-number"
             className={modalInputClassName}
             type="text"
             placeholder="2026xxxxxxxxxxxxx"
             {...register("agreementNumber")}
+            aria-invalid={getFieldAriaInvalid(agreementNumberErrorMessage)}
+            aria-describedby={getFieldDescribedBy("visa-hotel-agreement-number", {
+              errorMessage: agreementNumberErrorMessage,
+            })}
           />
         </label>
-        {errors.agreementNumber ? (
-          <p className="text-xs font-medium text-brand-tertiary">{errors.agreementNumber.message}</p>
-        ) : null}
+        <FieldErrorMessage
+          fieldId="visa-hotel-agreement-number"
+          message={agreementNumberErrorMessage}
+          className={modalErrorClassName}
+        />
 
         <label className={modalFieldClassName}>
           <span>Total Pax</span>
-          <input className={modalInputClassName} type="number" min={1} placeholder="70" {...register("pax")} />
+          <input
+            id="visa-hotel-pax"
+            className={modalInputClassName}
+            type="number"
+            min={1}
+            placeholder="70"
+            {...register("pax")}
+            aria-invalid={getFieldAriaInvalid(paxErrorMessage)}
+            aria-describedby={getFieldDescribedBy("visa-hotel-pax", {
+              errorMessage: paxErrorMessage,
+            })}
+          />
         </label>
-        {errors.pax ? <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p> : null}
+        <FieldErrorMessage fieldId="visa-hotel-pax" message={paxErrorMessage} className={modalErrorClassName} />
 
         <label className={modalFieldClassName}>
           <span>Approval Status</span>
@@ -418,6 +475,10 @@ export function VisaHotelModal({
                   className={modalSelectClassName}
                   value={field.value}
                   onChange={(event) => field.onChange(event.target.value)}
+                  aria-invalid={getFieldAriaInvalid(statusErrorMessage)}
+                  aria-describedby={getFieldDescribedBy("visa-hotel-status", {
+                    errorMessage: statusErrorMessage,
+                  })}
                 >
                   <option value="Waiting for Approval">Waiting for Approval</option>
                   <option value="Approved">Approved</option>
@@ -426,7 +487,7 @@ export function VisaHotelModal({
             />
           </div>
         </label>
-        {errors.status ? <p className="text-xs font-medium text-brand-tertiary">{errors.status.message}</p> : null}
+        <FieldErrorMessage fieldId="visa-hotel-status" message={statusErrorMessage} className={modalErrorClassName} />
 
         <div className="grid gap-3 md:grid-cols-2 md:col-span-2">
           <label className={modalFieldClassName}>
@@ -435,13 +496,24 @@ export function VisaHotelModal({
               control={control}
               name="stayStartIso"
               render={({ field }) => (
-                <DatePickerInput inputClassName={modalInputClassName} value={field.value} onChange={field.onChange} />
+                <DatePickerInput
+                  id="visa-hotel-stay-start"
+                  inputClassName={modalInputClassName}
+                  value={field.value}
+                  onChange={field.onChange}
+                  ariaInvalid={getFieldAriaInvalid(stayStartErrorMessage)}
+                  ariaDescribedBy={getFieldDescribedBy("visa-hotel-stay-start", {
+                    errorMessage: stayStartErrorMessage,
+                  })}
+                />
               )}
             />
           </label>
-          {errors.stayStartIso ? (
-            <p className="text-xs font-medium text-brand-tertiary">{errors.stayStartIso.message}</p>
-          ) : null}
+          <FieldErrorMessage
+            fieldId="visa-hotel-stay-start"
+            message={stayStartErrorMessage}
+            className={modalErrorClassName}
+          />
 
           <label className={modalFieldClassName}>
             <span>Stay End Date</span>
@@ -449,13 +521,24 @@ export function VisaHotelModal({
               control={control}
               name="stayEndIso"
               render={({ field }) => (
-                <DatePickerInput inputClassName={modalInputClassName} value={field.value} onChange={field.onChange} />
+                <DatePickerInput
+                  id="visa-hotel-stay-end"
+                  inputClassName={modalInputClassName}
+                  value={field.value}
+                  onChange={field.onChange}
+                  ariaInvalid={getFieldAriaInvalid(stayEndErrorMessage)}
+                  ariaDescribedBy={getFieldDescribedBy("visa-hotel-stay-end", {
+                    errorMessage: stayEndErrorMessage,
+                  })}
+                />
               )}
             />
           </label>
-          {errors.stayEndIso ? (
-            <p className="text-xs font-medium text-brand-tertiary">{errors.stayEndIso.message}</p>
-          ) : null}
+          <FieldErrorMessage
+            fieldId="visa-hotel-stay-end"
+            message={stayEndErrorMessage}
+            className={modalErrorClassName}
+          />
         </div>
       </div>
     </ModalShell>
@@ -541,18 +624,23 @@ export function VisaRaudhahModal({
                   name={`appointments.${index}.dateIso`}
                   render={({ field }) => (
                     <DatePickerInput
+                      id={`visa-raudhah-date-${index}`}
                       inputClassName={modalInputClassName}
                       value={field.value}
                       onChange={field.onChange}
+                      ariaInvalid={getFieldAriaInvalid(errors.appointments?.[index]?.dateIso?.message)}
+                      ariaDescribedBy={getFieldDescribedBy(`visa-raudhah-date-${index}`, {
+                        errorMessage: errors.appointments?.[index]?.dateIso?.message,
+                      })}
                     />
                   )}
                 />
               </label>
-              {errors.appointments?.[index]?.dateIso ? (
-                <p className="text-xs font-medium text-brand-tertiary">
-                  {errors.appointments[index]?.dateIso?.message}
-                </p>
-              ) : null}
+              <FieldErrorMessage
+                fieldId={`visa-raudhah-date-${index}`}
+                message={errors.appointments?.[index]?.dateIso?.message}
+                className={modalErrorClassName}
+              />
 
               <label className={modalFieldClassName}>
                 <span>Appointment Tone</span>

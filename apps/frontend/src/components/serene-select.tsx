@@ -29,6 +29,7 @@ type SereneSelectProps = {
   "aria-label"?: string;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
+  "aria-invalid"?: "true" | "false";
 };
 
 function getNextEnabledIndex(options: SelectOption[], startIndex: number, direction: 1 | -1): number {
@@ -113,6 +114,7 @@ export function SereneSelect({
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
   "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: SereneSelectProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -241,6 +243,7 @@ export function SereneSelect({
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         onClick={() => {
           if (isOpen) {
             closeMenu();

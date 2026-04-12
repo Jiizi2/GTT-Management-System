@@ -202,7 +202,7 @@ export function exportVisaTrackingReportPdf({
             <div class="meta-item"><strong>Generated:</strong> ${escapeHtml(generatedTimestamp)}</div>
             <div class="meta-item"><strong>Rows:</strong> ${exportRows.length}</div>
             <div class="meta-item"><strong>Filter:</strong> ${escapeHtml(filterLabel)}</div>
-            <div class="meta-item"><strong>Issued Month:</strong> ${escapeHtml(issuedMonthLabel)}</div>
+            <div class="meta-item"><strong>Month:</strong> ${escapeHtml(issuedMonthLabel)}</div>
             <div class="meta-item"><strong>Query:</strong> ${escapeHtml(normalizedQuery || "-")}</div>
           </div>
         </div>

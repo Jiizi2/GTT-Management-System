@@ -14,6 +14,7 @@ import { useThemeMode } from "../theme/theme-provider";
 
 const {
   buildVisaTrackingRowsFromGroups,
+  formatLocalIsoDate,
   formatVisaShortDate,
   getGroupAgreementHotelsByCity,
   hasMissingHotelAllocation,
@@ -213,9 +214,10 @@ export function VisaTrackingScreen({
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
+  const currentIssuedMonthKey = useMemo(() => formatLocalIsoDate(new Date()).slice(0, 7), []);
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<VisaFilterId>("all");
-  const [issuedMonthFilter, setIssuedMonthFilter] = useState("all");
+  const [issuedMonthFilter, setIssuedMonthFilter] = useState(() => currentIssuedMonthKey);
   const [currentPage, setCurrentPage] = useState(1);
 
   const visaRows = buildVisaTrackingRowsFromGroups(groups);
@@ -248,13 +250,10 @@ export function VisaTrackingScreen({
 
   const issuedMonthOptions = useMemo<IssuedMonthOption[]>(() => {
     const monthCounter = new Map<string, number>();
+    monthCounter.set(currentIssuedMonthKey, 0);
 
     visaRows.forEach((row) => {
-      if (row.visaStatus !== "Issued") {
-        return;
-      }
-
-      const issuedMonthKey = resolveIssuedMonthKey(row.issuedDateIso);
+      const issuedMonthKey = resolveIssuedMonthKey(row.departureIso);
       if (!issuedMonthKey) {
         return;
       }
@@ -268,7 +267,7 @@ export function VisaTrackingScreen({
         value,
         label: formatIssuedMonthLabel(value),
       }));
-  }, [visaRows]);
+  }, [currentIssuedMonthKey, visaRows]);
 
   const filteredRows = queriedRows
     .filter((row) => {
@@ -291,11 +290,7 @@ export function VisaTrackingScreen({
         return true;
       }
 
-      if (row.visaStatus !== "Issued") {
-        return false;
-      }
-
-      return resolveIssuedMonthKey(row.issuedDateIso) === issuedMonthFilter;
+      return resolveIssuedMonthKey(row.departureIso) === issuedMonthFilter;
     });
 
   const notIssuedCount = visaRows.filter((row) => row.visaStatus !== "Issued").length;
@@ -332,9 +327,9 @@ export function VisaTrackingScreen({
 
     const isSelectedMonthAvailable = issuedMonthOptions.some((option) => option.value === issuedMonthFilter);
     if (!isSelectedMonthAvailable) {
-      setIssuedMonthFilter("all");
+      setIssuedMonthFilter(currentIssuedMonthKey);
     }
-  }, [issuedMonthFilter, issuedMonthOptions]);
+  }, [currentIssuedMonthKey, issuedMonthFilter, issuedMonthOptions]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -472,7 +467,7 @@ export function VisaTrackingScreen({
               value={issuedMonthFilter}
               onChange={(event) => setIssuedMonthFilter(event.target.value)}
               showCaret={false}
-              aria-label="Filter issued month"
+              aria-label="Filter visa month"
             >
               <option value="all">All Months</option>
               {issuedMonthOptions.map((option) => (

@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
+import { type ReactNode, Suspense, lazy, useId, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
+import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -366,6 +367,9 @@ export function NewGroupScreen({
     `inline-flex whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getInvoiceToneClasses(
       getAgreementStatusTone(status),
     )}`;
+  const groupNumberErrorMessage = errors.groupNumber?.message;
+  const totalPaxErrorMessage = errors.totalPax?.message;
+  const groupNameErrorMessage = errors.groupName?.message;
 
   const formatAgreementStayRange = (agreement: NewGroupAgreementFormState) => {
     if (!agreement.stayStartIso && !agreement.stayEndIso) {
@@ -518,7 +522,11 @@ export function NewGroupScreen({
       </div>
 
       {agreementDateConnection.cityWarnings[city] ? (
-        <div className="mt-3 flex items-start gap-2 rounded-md bg-tertiary-fixed px-3 py-2 text-sm text-on-tertiary-fixed-variant">
+        <div
+          className="mt-3 flex items-start gap-2 rounded-md bg-tertiary-fixed px-3 py-2 text-sm text-on-tertiary-fixed-variant"
+          role="status"
+          aria-live="polite"
+        >
           <span className="material-symbols-outlined text-base" aria-hidden="true">
             warning
           </span>
@@ -563,39 +571,48 @@ export function NewGroupScreen({
                 <label className={fieldClassName}>
                   <span>Group Number</span>
                   <input
+                    id="new-group-number"
                     className={controlClassName}
                     type="text"
                     {...register("groupNumber")}
                     placeholder="e.g. 901794508"
+                    aria-invalid={getFieldAriaInvalid(groupNumberErrorMessage)}
+                    aria-describedby={getFieldDescribedBy("new-group-number", {
+                      errorMessage: groupNumberErrorMessage,
+                    })}
                   />
-                  {errors.groupNumber ? (
-                    <p className="text-xs font-semibold text-error">{errors.groupNumber.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="new-group-number" message={groupNumberErrorMessage} />
                 </label>
                 <label className={fieldClassName}>
                   <span>Total Pax</span>
                   <input
+                    id="new-group-total-pax"
                     className={controlClassName}
                     type="number"
                     min={1}
                     {...register("totalPax")}
                     placeholder="45"
+                    aria-invalid={getFieldAriaInvalid(totalPaxErrorMessage)}
+                    aria-describedby={getFieldDescribedBy("new-group-total-pax", {
+                      errorMessage: totalPaxErrorMessage,
+                    })}
                   />
-                  {errors.totalPax ? (
-                    <p className="text-xs font-semibold text-error">{errors.totalPax.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="new-group-total-pax" message={totalPaxErrorMessage} />
                 </label>
                 <label className={`${fieldClassName} md:col-span-2`}>
                   <span>Group Name</span>
                   <input
+                    id="new-group-name"
                     className={controlClassName}
                     type="text"
                     {...register("groupName")}
                     placeholder="e.g. FEB 25 - Group 3"
+                    aria-invalid={getFieldAriaInvalid(groupNameErrorMessage)}
+                    aria-describedby={getFieldDescribedBy("new-group-name", {
+                      errorMessage: groupNameErrorMessage,
+                    })}
                   />
-                  {errors.groupName ? (
-                    <p className="text-xs font-semibold text-error">{errors.groupName.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="new-group-name" message={groupNameErrorMessage} />
                 </label>
               </div>
             </section>
@@ -671,7 +688,11 @@ export function NewGroupScreen({
         <section className={sectionClassName}>
           <h2 className="mb-4 font-display text-xl font-semibold text-on-surface">Agreement Hotel</h2>
           {agreementDateConnection.crossCityWarning ? (
-            <div className="mb-4 flex items-start gap-2 rounded-md bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant">
+            <div
+              className="mb-4 flex items-start gap-2 rounded-md bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant"
+              role="status"
+              aria-live="polite"
+            >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
                 warning
               </span>
@@ -792,7 +813,7 @@ export function NewGroupScreen({
 
         <footer className="flex flex-wrap items-center justify-end gap-2">
           {requireItineraryBeforeSave && !hasItineraryDraft ? (
-            <p className="w-full text-sm font-medium text-amber-700">
+            <p className="w-full text-sm font-medium text-amber-700" role="status" aria-live="polite">
               <span className="sm:hidden">Isi Add Schedule dulu untuk mengaktifkan Save.</span>
               <span className="hidden sm:inline">
                 Isi itinerary di bagian Add Schedule terlebih dahulu untuk mengaktifkan Save Group.
@@ -820,6 +841,7 @@ export function AddGroupWorkspaceScreen({
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
+  const itineraryScheduleSectionId = useId();
   const [isItineraryVisible, setIsItineraryVisible] = useState(true);
   const [identityDraft, setIdentityDraft] = useState<NewGroupItineraryDraft | null>(null);
   const [itineraryDetailDraft, setItineraryDetailDraft] = useState<NewGroupItineraryDraft | null>(null);
@@ -861,6 +883,7 @@ export function AddGroupWorkspaceScreen({
             className="serene-btn-secondary min-h-10 w-full sm:w-auto"
             onClick={() => setIsItineraryVisible((current) => !current)}
             aria-expanded={isItineraryVisible}
+            aria-controls={itineraryScheduleSectionId}
           >
             <span className="material-symbols-outlined text-base" aria-hidden="true">
               {isItineraryVisible ? "expand_less" : "expand_more"}
@@ -874,18 +897,20 @@ export function AddGroupWorkspaceScreen({
       </section>
 
       {isItineraryVisible ? (
-        <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary schedule form..." />}>
-          <LazyInputItineraryScreen
-            onSaveGroup={onSaveGroup}
-            hideHeader
-            hideSaveAction
-            sectionMode="schedule-only"
-            identityDraft={identityDraft}
-            itineraryPrefill={itineraryPrefill}
-            emitIdentityInDraft={false}
-            onItineraryDraftChange={setItineraryDetailDraft}
-          />
-        </Suspense>
+        <div id={itineraryScheduleSectionId}>
+          <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary schedule form..." />}>
+            <LazyInputItineraryScreen
+              onSaveGroup={onSaveGroup}
+              hideHeader
+              hideSaveAction
+              sectionMode="schedule-only"
+              identityDraft={identityDraft}
+              itineraryPrefill={itineraryPrefill}
+              emitIdentityInDraft={false}
+              onItineraryDraftChange={setItineraryDetailDraft}
+            />
+          </Suspense>
+        </div>
       ) : null}
     </>
   );

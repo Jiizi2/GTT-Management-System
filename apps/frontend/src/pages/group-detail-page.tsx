@@ -1029,6 +1029,11 @@ export function GroupDetail({
                   </span>
                   <span>{isMusyrifCopied ? "Copied" : "Copy"}</span>
                 </button>
+                {isMusyrifCopied ? (
+                  <p className="sr-only" role="status" aria-live="polite">
+                    Musyrif data copied.
+                  </p>
+                ) : null}
 
                 <button
                   type="button"
