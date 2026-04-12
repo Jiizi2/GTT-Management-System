@@ -1,16 +1,11 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useEffect, useState, type FormEvent } from "react";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 
-const loginSchema = z.object({
-  identifier: z.string().trim().min(1, "Username/email wajib diisi."),
-  password: z.string().min(1, "Password wajib diisi."),
-  rememberSession: z.boolean(),
-});
-
-export type LoginCredentials = z.infer<typeof loginSchema>;
+export type LoginCredentials = {
+  identifier: string;
+  password: string;
+  rememberSession: boolean;
+};
 
 export type DevelopmentLoginAccountHint = {
   label: string;
@@ -18,6 +13,28 @@ export type DevelopmentLoginAccountHint = {
   password: string;
   accessTier: "super-admin" | "admin";
 };
+
+type LoginFieldErrors = Partial<Record<keyof LoginCredentials, string>>;
+
+const DEFAULT_LOGIN_VALUES: LoginCredentials = {
+  identifier: "",
+  password: "",
+  rememberSession: false,
+};
+
+function validateLoginCredentials(values: LoginCredentials): LoginFieldErrors {
+  const errors: LoginFieldErrors = {};
+
+  if (!values.identifier.trim()) {
+    errors.identifier = "Username/email wajib diisi.";
+  }
+
+  if (!values.password) {
+    errors.password = "Password wajib diisi.";
+  }
+
+  return errors;
+}
 
 export function LoginScreen({
   onSubmit,
@@ -31,22 +48,44 @@ export function LoginScreen({
   developmentAccounts?: DevelopmentLoginAccountHint[];
 }) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginCredentials>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      identifier: "",
-      password: "",
-      rememberSession: false,
-    },
-  });
+  const [values, setValues] = useState<LoginCredentials>(DEFAULT_LOGIN_VALUES);
+  const [errors, setErrors] = useState<LoginFieldErrors>({});
 
   useEffect(() => {
     document.title = "Login | Ghaniya Tour and Travel";
   }, []);
+
+  const handleChange = <Key extends keyof LoginCredentials>(field: Key, nextValue: LoginCredentials[Key]) => {
+    setValues((current) => ({
+      ...current,
+      [field]: nextValue,
+    }));
+    setErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const nextErrors = { ...current };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
+
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validationErrors = validateLoginCredentials(values);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    void onSubmit?.({
+      identifier: values.identifier,
+      password: values.password,
+      rememberSession: values.rememberSession,
+    });
+  };
 
   return (
     <main className="flex min-h-screen bg-surface text-on-surface">
@@ -121,7 +160,7 @@ export function LoginScreen({
           </header>
 
           <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 text-left shadow-ambient">
-            <form className="space-y-6" onSubmit={handleSubmit((credentials) => void onSubmit?.(credentials))}>
+            <form className="space-y-6" onSubmit={handleFormSubmit}>
               <label className="block space-y-2" htmlFor="login-identifier">
                 <span className="block text-sm font-semibold text-on-surface-variant">Email or Username</span>
                 <span className="group relative block">
@@ -135,7 +174,8 @@ export function LoginScreen({
                     type="text"
                     autoComplete="username"
                     placeholder="e.g. operator@alrawda.com"
-                    {...register("identifier")}
+                    value={values.identifier}
+                    onChange={(event) => handleChange("identifier", event.target.value)}
                     disabled={isSubmitting}
                     aria-invalid={errors.identifier ? "true" : "false"}
                     className="h-12 w-full rounded-lg border border-outline-variant/45 bg-surface-container-low pl-10 pr-4 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/55 focus:border-primary/55 focus:ring-2 focus:ring-primary/20"
@@ -143,7 +183,7 @@ export function LoginScreen({
                 </span>
                 {errors.identifier ? (
                   <p className="text-xs font-semibold text-error" role="alert">
-                    {errors.identifier.message}
+                    {errors.identifier}
                   </p>
                 ) : null}
               </label>
@@ -169,7 +209,8 @@ export function LoginScreen({
                     type={isPasswordVisible ? "text" : "password"}
                     autoComplete="current-password"
                     placeholder="********"
-                    {...register("password")}
+                    value={values.password}
+                    onChange={(event) => handleChange("password", event.target.value)}
                     disabled={isSubmitting}
                     aria-invalid={errors.password ? "true" : "false"}
                     className="h-12 w-full rounded-lg border border-outline-variant/45 bg-surface-container-low pl-10 pr-12 text-sm text-on-surface outline-none transition-all placeholder:text-on-surface-variant/55 focus:border-primary/55 focus:ring-2 focus:ring-primary/20"
@@ -188,7 +229,7 @@ export function LoginScreen({
                 </span>
                 {errors.password ? (
                   <p className="text-xs font-semibold text-error" role="alert">
-                    {errors.password.message}
+                    {errors.password}
                   </p>
                 ) : null}
               </label>
@@ -201,7 +242,8 @@ export function LoginScreen({
                   id="login-remember"
                   type="checkbox"
                   className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-0"
-                  {...register("rememberSession")}
+                  checked={values.rememberSession}
+                  onChange={(event) => handleChange("rememberSession", event.target.checked)}
                   disabled={isSubmitting}
                 />
                 Keep me logged in

@@ -51,8 +51,12 @@ export function exportVisaTrackingReportPdf({
   query: string;
   activeFilter: VisaFilterId;
   issuedMonthLabel: string;
-}): boolean {
-  const printableWindow = window.open("", "_blank", "width=1120,height=760");
+}, options: { printWindow?: Window | null } = {}): boolean {
+  const reusableWindow = options.printWindow;
+  const printableWindow =
+    reusableWindow && !reusableWindow.closed
+      ? reusableWindow
+      : window.open("", "_blank", "width=1120,height=760");
   if (!printableWindow) {
     return false;
   }

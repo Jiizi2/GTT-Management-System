@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import * as z from "zod/v4";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
   useCreateMasterDataOptionMutation,

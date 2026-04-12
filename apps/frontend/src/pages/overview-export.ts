@@ -107,8 +107,12 @@ export function exportOverviewReportPdf({
   isActiveOnly: boolean;
   monthLabel: string;
   summaryMessage: string;
-}): boolean {
-  const printableWindow = window.open("", "_blank", "width=1280,height=860");
+}, options: { printWindow?: Window | null } = {}): boolean {
+  const reusableWindow = options.printWindow;
+  const printableWindow =
+    reusableWindow && !reusableWindow.closed
+      ? reusableWindow
+      : window.open("", "_blank", "width=1280,height=860");
   if (!printableWindow) {
     return false;
   }

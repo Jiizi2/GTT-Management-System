@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import * as z from "zod/v4";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { type MasterDataOption } from "../hooks/use-master-data-backend";

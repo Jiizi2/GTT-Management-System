@@ -7,12 +7,12 @@ if (outputDirs.length === 0) {
   console.error("Usage: node scripts/clean-output.mjs <dir> [dir...]");
   process.exitCode = 1;
 } else {
-  await Promise.all(
-    outputDirs.map((outputDir) =>
-      rm(resolve(process.cwd(), outputDir), {
-        recursive: true,
-        force: true,
-      }),
-    ),
-  );
+  for (const outputDir of outputDirs) {
+    await rm(resolve(process.cwd(), outputDir), {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 250,
+    });
+  }
 }

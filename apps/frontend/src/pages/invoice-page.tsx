@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { z } from "zod";
+import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
@@ -19,7 +19,6 @@ import {
   useUpdateInvoiceMutation,
 } from "../hooks/use-invoice-query";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
-import { exportInvoicePdf } from "./invoice-export";
 
 const INVOICE_PAGE_SIZE = 8;
 const MANUAL_CLIENT_OPTION_ID = "__invoice_client_other__";
@@ -438,13 +437,22 @@ function normalizeInvoiceDraftItems(items: InvoiceDraftItem[]): InvoiceDraftItem
     .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
 }
 
-function viewInvoicePdfFromRow({ row, groups }: { row: InvoiceRow; groups: GroupData[] }): boolean {
+async function viewInvoicePdfFromRow({
+  row,
+  groups,
+  printWindow,
+}: {
+  row: InvoiceRow;
+  groups: GroupData[];
+  printWindow?: Window | null;
+}): Promise<boolean> {
   const linkedGroup = row.groupCode
     ? (groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null)
     : null;
   const description = linkedGroup
     ? `${linkedGroup.packageName} Package - ${linkedGroup.durationDays} Days`
     : `Invoice ${row.invoiceNumber}`;
+  const { exportInvoicePdf } = await import("./invoice-export");
 
   return exportInvoicePdf({
     invoiceNumber: row.invoiceNumber,
@@ -474,7 +482,7 @@ function viewInvoicePdfFromRow({ row, groups }: { row: InvoiceRow; groups: Group
         totalPriceIdr: row.amount,
       },
     ],
-  });
+  }, { printWindow });
 }
 
 function openPendingInvoicePdfWindow(): Window | null {
@@ -521,7 +529,7 @@ function openPendingInvoicePdfWindow(): Window | null {
   return pendingWindow;
 }
 
-function CreateInvoiceWorkspace({
+export function CreateInvoiceWorkspace({
   mode,
   initialInvoice,
   clients,
@@ -926,6 +934,7 @@ function CreateInvoiceWorkspace({
         };
       });
 
+      const { exportInvoicePdf } = await import("./invoice-export");
       const exported = exportInvoicePdf(
         {
           invoiceNumber: savedInvoice.invoiceNumber,
@@ -1880,10 +1889,25 @@ export function InvoiceScreen({
     : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
 
   const handleViewPdf = (row: InvoiceRow) => {
-    const exported = viewInvoicePdfFromRow({ row, groups });
-    if (!exported) {
+    const printableWindow = window.open("", "_blank", "width=1180,height=860");
+    if (!printableWindow) {
       setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+      return;
     }
+
+    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow }).then((exported) => {
+      if (!exported) {
+        if (!printableWindow.closed) {
+          printableWindow.close();
+        }
+        setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+      }
+    }).catch(() => {
+      if (!printableWindow.closed) {
+        printableWindow.close();
+      }
+      setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
+    });
   };
 
   const handleOpenEditInvoice = (row: InvoiceRow) => {
