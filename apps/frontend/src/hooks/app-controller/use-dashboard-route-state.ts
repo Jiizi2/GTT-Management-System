@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { buildDashboardPath, buildGroupDetailPath, buildVisaDetailPath, resolveDashboardRouteFromPathname } from "../../shared/app-route";
+import {
+  buildDashboardPath,
+  buildGroupDetailPath,
+  buildVisaDetailPath,
+  resolveDashboardRouteFromPathname,
+} from "../../shared/app-route";
 import { scrollToTop, type NavId, type SessionAccessTier, type VisaTrackingRow } from "../../shared/app-domain";
 
 function normalizePathname(pathname: string): string {
@@ -11,10 +16,7 @@ function normalizePathname(pathname: string): string {
 export function useDashboardRouteState(sessionAccessTier: SessionAccessTier) {
   const location = useLocation();
   const navigate = useNavigate();
-  const routeState = useMemo(
-    () => resolveDashboardRouteFromPathname(location.pathname),
-    [location.pathname],
-  );
+  const routeState = useMemo(() => resolveDashboardRouteFromPathname(location.pathname), [location.pathname]);
 
   useEffect(() => {
     if (normalizePathname(location.pathname) === routeState.canonicalPath) {

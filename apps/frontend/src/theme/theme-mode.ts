@@ -59,4 +59,3 @@ export function initializeThemeMode(): ThemeMode {
   applyThemeMode(initialThemeMode);
   return initialThemeMode;
 }
-

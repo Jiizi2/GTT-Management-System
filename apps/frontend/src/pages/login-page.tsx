@@ -123,9 +123,7 @@ export function LoginScreen({
           <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 text-left shadow-ambient">
             <form className="space-y-6" onSubmit={handleSubmit((credentials) => void onSubmit?.(credentials))}>
               <label className="block space-y-2" htmlFor="login-identifier">
-                <span className="block text-sm font-semibold text-on-surface-variant">
-                  Email or Username
-                </span>
+                <span className="block text-sm font-semibold text-on-surface-variant">Email or Username</span>
                 <span className="group relative block">
                   <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-outline-variant transition-colors group-focus-within:text-primary">
                     <span className="material-symbols-outlined text-xl" aria-hidden="true">
@@ -153,7 +151,10 @@ export function LoginScreen({
               <label className="block space-y-2" htmlFor="login-password">
                 <span className="flex items-center justify-between">
                   <span className="block text-sm font-semibold text-on-surface-variant">Password</span>
-                  <a href="#" className="text-xs font-semibold text-primary transition-colors hover:text-primary-container">
+                  <a
+                    href="#"
+                    className="text-xs font-semibold text-primary transition-colors hover:text-primary-container"
+                  >
                     Forgot Password?
                   </a>
                 </span>
@@ -192,7 +193,10 @@ export function LoginScreen({
                 ) : null}
               </label>
 
-              <label className="flex items-center gap-3 text-sm font-medium text-on-surface-variant" htmlFor="login-remember">
+              <label
+                className="flex items-center gap-3 text-sm font-medium text-on-surface-variant"
+                htmlFor="login-remember"
+              >
                 <input
                   id="login-remember"
                   type="checkbox"
@@ -226,12 +230,13 @@ export function LoginScreen({
 
           {developmentAccounts.length > 0 ? (
             <section className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 text-center text-xs text-on-surface-variant lg:text-left">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">
-                Development Accounts
-              </p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">Development Accounts</p>
               <div className="mt-3 space-y-3">
                 {developmentAccounts.map((account) => (
-                  <article key={account.identifier} className="rounded-lg border border-outline-variant/15 p-3 text-left">
+                  <article
+                    key={account.identifier}
+                    className="rounded-lg border border-outline-variant/15 p-3 text-left"
+                  >
                     <p className="font-semibold text-on-surface">
                       {account.label} ({account.accessTier})
                     </p>
@@ -272,4 +277,3 @@ export function LoginScreen({
     </main>
   );
 }
-

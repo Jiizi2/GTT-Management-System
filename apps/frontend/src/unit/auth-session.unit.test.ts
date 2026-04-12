@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { describe } from "vitest";
 import {
   AUTH_STATE_CHANGED_EVENT,
   clearAuthSession,
@@ -7,6 +8,7 @@ import {
   readPersistedAuthSession,
   type AuthSession,
 } from "../shared/auth-session.js";
+import { runCase } from "../test/run-case.js";
 
 const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v2";
 const LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
@@ -18,7 +20,7 @@ class MemoryStorage {
   private readonly store = new Map<string, string>();
 
   getItem(key: string): string | null {
-    return this.store.has(key) ? this.store.get(key) ?? null : null;
+    return this.store.has(key) ? (this.store.get(key) ?? null) : null;
   }
 
   setItem(key: string, value: string): void {
@@ -115,11 +117,6 @@ function withMockWindow<T>(
       });
     }
   }
-}
-
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
 }
 
 function testCoerceAuthSessionValidation(): void {
@@ -254,14 +251,9 @@ function testReadPersistedSessionRejectsInvalidAndExpiredData(): void {
   });
 }
 
-async function main(): Promise<void> {
-  await runCase("auth session coercion validation", testCoerceAuthSessionValidation);
-  await runCase("auth session persist/read/clear remembered flow", testPersistReadAndClearRememberedAuthSession);
-  await runCase("auth session ephemeral storage and legacy purge", testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys);
-  await runCase("auth session invalid/expired persistence guard", testReadPersistedSessionRejectsInvalidAndExpiredData);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Auth session unit test failed:", error);
-  process.exitCode = 1;
+describe("auth session", () => {
+  runCase("coercion validation", testCoerceAuthSessionValidation);
+  runCase("persist/read/clear remembered flow", testPersistReadAndClearRememberedAuthSession);
+  runCase("ephemeral storage and legacy purge", testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys);
+  runCase("invalid/expired persistence guard", testReadPersistedSessionRejectsInvalidAndExpiredData);
 });

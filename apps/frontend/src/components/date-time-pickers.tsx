@@ -52,11 +52,7 @@ function parseIsoDate(value: string): Date | null {
   const month = Number.parseInt(match[2], 10);
   const date = Number.parseInt(match[3], 10);
   const resolved = new Date(year, month - 1, date);
-  if (
-    resolved.getFullYear() !== year ||
-    resolved.getMonth() !== month - 1 ||
-    resolved.getDate() !== date
-  ) {
+  if (resolved.getFullYear() !== year || resolved.getMonth() !== month - 1 || resolved.getDate() !== date) {
     return null;
   }
 
@@ -287,98 +283,103 @@ export function DatePickerInput({
 
       {isOpen && popoverStyle && typeof document !== "undefined"
         ? createPortal(
-            <div ref={popoverRef} className={pickerPopoverClassName} style={popoverStyle} role="dialog" aria-label="Select date">
-          <div className="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface"
-              onClick={() =>
-                setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
-              }
-              aria-label="Previous month"
+            <div
+              ref={popoverRef}
+              className={pickerPopoverClassName}
+              style={popoverStyle}
+              role="dialog"
+              aria-label="Select date"
             >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                chevron_left
-              </span>
-            </button>
-
-            <p className="text-sm font-semibold text-on-surface">
-              {monthLabels[viewDate.getMonth()]} {viewDate.getFullYear()}
-            </p>
-
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface"
-              onClick={() =>
-                setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
-              }
-              aria-label="Next month"
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                chevron_right
-              </span>
-            </button>
-          </div>
-
-          <div className="mb-1 grid grid-cols-7 gap-1">
-            {dayLabels.map((label) => (
-              <span key={label} className="text-center text-[11px] font-semibold uppercase text-on-surface-variant/75">
-                {label}
-              </span>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day) => {
-              const isCurrentMonth = day.getMonth() === viewDate.getMonth();
-              const isSelected = selectedDate ? isSameDate(day, selectedDate) : false;
-              const isToday = isSameDate(day, today);
-              const dayIso = formatIsoDate(day);
-
-              return (
+              <div className="mb-3 flex items-center justify-between">
                 <button
-                  key={dayIso}
                   type="button"
-                  className={`inline-flex h-8 items-center justify-center rounded-lg text-sm font-medium transition ${
-                    isSelected
-                      ? "bg-brand-primary text-brand-neutral"
-                      : isCurrentMonth
-                        ? "text-on-surface hover:bg-primary-fixed hover:text-primary"
-                        : "text-on-surface-variant/35 hover:bg-surface-container-high hover:text-on-surface-variant"
-                  } ${isToday && !isSelected ? "ring-1 ring-brand-primary/40" : ""}`}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface"
+                  onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                  aria-label="Previous month"
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    chevron_left
+                  </span>
+                </button>
+
+                <p className="text-sm font-semibold text-on-surface">
+                  {monthLabels[viewDate.getMonth()]} {viewDate.getFullYear()}
+                </p>
+
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface"
+                  onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                  aria-label="Next month"
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    chevron_right
+                  </span>
+                </button>
+              </div>
+
+              <div className="mb-1 grid grid-cols-7 gap-1">
+                {dayLabels.map((label) => (
+                  <span
+                    key={label}
+                    className="text-center text-[11px] font-semibold uppercase text-on-surface-variant/75"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((day) => {
+                  const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+                  const isSelected = selectedDate ? isSameDate(day, selectedDate) : false;
+                  const isToday = isSameDate(day, today);
+                  const dayIso = formatIsoDate(day);
+
+                  return (
+                    <button
+                      key={dayIso}
+                      type="button"
+                      className={`inline-flex h-8 items-center justify-center rounded-lg text-sm font-medium transition ${
+                        isSelected
+                          ? "bg-brand-primary text-brand-neutral"
+                          : isCurrentMonth
+                            ? "text-on-surface hover:bg-primary-fixed hover:text-primary"
+                            : "text-on-surface-variant/35 hover:bg-surface-container-high hover:text-on-surface-variant"
+                      } ${isToday && !isSelected ? "ring-1 ring-brand-primary/40" : ""}`}
+                      onClick={() => {
+                        onChange(dayIso);
+                        setIsOpen(false);
+                      }}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
+                <button
+                  type="button"
+                  className={`${pickerActionButtonClassName} text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface`}
                   onClick={() => {
-                    onChange(dayIso);
+                    onChange("");
                     setIsOpen(false);
                   }}
                 >
-                  {day.getDate()}
+                  Clear
                 </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
-            <button
-              type="button"
-              className={`${pickerActionButtonClassName} text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface`}
-              onClick={() => {
-                onChange("");
-                setIsOpen(false);
-              }}
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              className={`${pickerActionButtonClassName} bg-primary-fixed text-primary hover:bg-primary-fixed/80`}
-              onClick={() => {
-                onChange(formatIsoDate(new Date()));
-                setIsOpen(false);
-              }}
-            >
-              Today
-            </button>
-          </div>
+                <button
+                  type="button"
+                  className={`${pickerActionButtonClassName} bg-primary-fixed text-primary hover:bg-primary-fixed/80`}
+                  onClick={() => {
+                    onChange(formatIsoDate(new Date()));
+                    setIsOpen(false);
+                  }}
+                >
+                  Today
+                </button>
+              </div>
             </div>,
             document.body,
           )
@@ -475,74 +476,80 @@ export function TimePickerInput({
 
       {isOpen && popoverStyle && typeof document !== "undefined"
         ? createPortal(
-            <div ref={popoverRef} className={pickerPopoverClassName} style={popoverStyle} role="dialog" aria-label="Select time">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant/75">
-              Hour
-              <SereneSelect
-                className={pickerSelectClassName}
-                value={draftHour}
-                onChange={(event) => setDraftHour(event.target.value)}
-              >
-                {hourOptions.map((hourOption) => (
-                  <option key={hourOption} value={hourOption}>
-                    {hourOption}
-                  </option>
-                ))}
-              </SereneSelect>
-            </label>
-
-            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant/75">
-              Minute
-              <SereneSelect
-                className={pickerSelectClassName}
-                value={draftMinute}
-                onChange={(event) => setDraftMinute(event.target.value)}
-              >
-                {minuteOptions.map((minuteOption) => (
-                  <option key={minuteOption} value={minuteOption}>
-                    {minuteOption}
-                  </option>
-                ))}
-              </SereneSelect>
-            </label>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
-            <button
-              type="button"
-              className={`${pickerActionButtonClassName} text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface`}
-              onClick={() => {
-                onChange("");
-                setIsOpen(false);
-              }}
+            <div
+              ref={popoverRef}
+              className={pickerPopoverClassName}
+              style={popoverStyle}
+              role="dialog"
+              aria-label="Select time"
             >
-              Clear
-            </button>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className={`${pickerActionButtonClassName} text-primary hover:bg-primary-fixed`}
-                onClick={() => {
-                  const now = getRoundedNowTime();
-                  setDraftHour(now.hour);
-                  setDraftMinute(now.minute);
-                }}
-              >
-                Now
-              </button>
-              <button
-                type="button"
-                className={`${pickerActionButtonClassName} bg-primary-fixed text-primary hover:bg-primary-fixed/80`}
-                onClick={() => {
-                  onChange(`${draftHour}:${draftMinute}`);
-                  setIsOpen(false);
-                }}
-              >
-                Apply
-              </button>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant/75">
+                  Hour
+                  <SereneSelect
+                    className={pickerSelectClassName}
+                    value={draftHour}
+                    onChange={(event) => setDraftHour(event.target.value)}
+                  >
+                    {hourOptions.map((hourOption) => (
+                      <option key={hourOption} value={hourOption}>
+                        {hourOption}
+                      </option>
+                    ))}
+                  </SereneSelect>
+                </label>
+
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant/75">
+                  Minute
+                  <SereneSelect
+                    className={pickerSelectClassName}
+                    value={draftMinute}
+                    onChange={(event) => setDraftMinute(event.target.value)}
+                  >
+                    {minuteOptions.map((minuteOption) => (
+                      <option key={minuteOption} value={minuteOption}>
+                        {minuteOption}
+                      </option>
+                    ))}
+                  </SereneSelect>
+                </label>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-outline-variant/70 pt-2">
+                <button
+                  type="button"
+                  className={`${pickerActionButtonClassName} text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface`}
+                  onClick={() => {
+                    onChange("");
+                    setIsOpen(false);
+                  }}
+                >
+                  Clear
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className={`${pickerActionButtonClassName} text-primary hover:bg-primary-fixed`}
+                    onClick={() => {
+                      const now = getRoundedNowTime();
+                      setDraftHour(now.hour);
+                      setDraftMinute(now.minute);
+                    }}
+                  >
+                    Now
+                  </button>
+                  <button
+                    type="button"
+                    className={`${pickerActionButtonClassName} bg-primary-fixed text-primary hover:bg-primary-fixed/80`}
+                    onClick={() => {
+                      onChange(`${draftHour}:${draftMinute}`);
+                      setIsOpen(false);
+                    }}
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
             </div>,
             document.body,
           )
@@ -550,5 +557,3 @@ export function TimePickerInput({
     </div>
   );
 }
-
-

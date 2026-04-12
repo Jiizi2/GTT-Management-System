@@ -70,11 +70,7 @@ function getCurrentWeekIsoRange(referenceDate = new Date()): {
   };
 }
 
-function isIsoDateInRange(
-  isoDate: string | undefined,
-  startIso: string,
-  endIso: string,
-): boolean {
+function isIsoDateInRange(isoDate: string | undefined, startIso: string, endIso: string): boolean {
   if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
     return false;
   }
@@ -167,8 +163,7 @@ export function useDashboardGroupRecords({
 }: UseDashboardGroupRecordsOptions) {
   const queryClient = useQueryClient();
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
-  const [groupRecordsProjection, setGroupRecordsProjection] =
-    useState<GroupFetchProjection>("detail");
+  const [groupRecordsProjection, setGroupRecordsProjection] = useState<GroupFetchProjection>("detail");
   const deferredQuery = useDeferredValue(query);
   const normalizedQuery = deferredQuery.trim().toLowerCase();
   const groupRecordsRef = useRef(groupRecords);
@@ -251,19 +246,13 @@ export function useDashboardGroupRecords({
     handledGroupsQueryErrorRef.current = groupsQuery.errorUpdatedAt;
 
     if (allowLocalFallback) {
-      showSyncFeedback(
-        "info",
-        "Mode lokal aktif. Backend belum terhubung, data disimpan sementara di browser.",
-      );
+      showSyncFeedback("info", "Mode lokal aktif. Backend belum terhubung, data disimpan sementara di browser.");
       console.warn("Backend group fetch skipped. App will continue with local state.", groupsQuery.error);
       return;
     }
 
     syncGroupRecords([], requestedProjection);
-    showSyncFeedback(
-      "error",
-      "Backend tidak terhubung. Data tidak bisa dimuat dari database.",
-    );
+    showSyncFeedback("error", "Backend tidak terhubung. Data tidak bisa dimuat dari database.");
   }, [
     allowLocalFallback,
     groupsQuery.error,
@@ -291,18 +280,9 @@ export function useDashboardGroupRecords({
     handledSearchQueryErrorRef.current = searchQuery.errorUpdatedAt;
 
     if (allowLocalFallback) {
-      console.warn(
-        "Backend search skipped. Using local search filter as fallback.",
-        searchQuery.error,
-      );
+      console.warn("Backend search skipped. Using local search filter as fallback.", searchQuery.error);
     }
-  }, [
-    allowLocalFallback,
-    searchQuery.error,
-    searchQuery.errorUpdatedAt,
-    searchQuery.isError,
-    shouldUseRemoteSearch,
-  ]);
+  }, [allowLocalFallback, searchQuery.error, searchQuery.errorUpdatedAt, searchQuery.isError, shouldUseRemoteSearch]);
 
   const syncGroupsFromBackendOrClear = useCallback(async () => {
     try {
@@ -351,18 +331,14 @@ export function useDashboardGroupRecords({
 
   const isWaitingForDetailedRecords =
     usesGroupRecords && requestedProjection === "detail" && groupRecordsProjection !== "detail";
-  const visibleGroupRecords = isWaitingForDetailedRecords ? [] : groupRecords;
-  const remoteSearchMatches =
-    normalizedQuery && shouldUseRemoteSearch ? (searchQuery.data ?? null) : null;
+  const visibleGroupRecords = useMemo(
+    () => (isWaitingForDetailedRecords ? [] : groupRecords),
+    [groupRecords, isWaitingForDetailedRecords],
+  );
+  const remoteSearchMatches = normalizedQuery && shouldUseRemoteSearch ? (searchQuery.data ?? null) : null;
 
   const groupRecordsByCode = useMemo(
-    () =>
-      new Map(
-        visibleGroupRecords.map((group) => [
-          group.code.toUpperCase(),
-          group,
-        ]),
-      ),
+    () => new Map(visibleGroupRecords.map((group) => [group.code.toUpperCase(), group])),
     [visibleGroupRecords],
   );
 
@@ -389,10 +365,7 @@ export function useDashboardGroupRecords({
     });
   }, [groupRecordsByCode, isActiveOnly, normalizedQuery, remoteSearchMatches, visibleGroupRecords]);
 
-  const visaTrackingRows = useMemo(
-    () => buildVisaTrackingRowsFromGroups(visibleGroupRecords),
-    [visibleGroupRecords],
-  );
+  const visaTrackingRows = useMemo(() => buildVisaTrackingRowsFromGroups(visibleGroupRecords), [visibleGroupRecords]);
 
   const selectedVisaRow = useMemo(() => {
     if (!selectedVisaGroupCode) {
@@ -401,17 +374,16 @@ export function useDashboardGroupRecords({
 
     const normalizedSelectedVisaGroupCode = selectedVisaGroupCode.trim().toUpperCase();
     return (
-      visaTrackingRows.find((row) => row.groupCode.trim().toUpperCase() === normalizedSelectedVisaGroupCode) ??
-      null
+      visaTrackingRows.find((row) => row.groupCode.trim().toUpperCase() === normalizedSelectedVisaGroupCode) ?? null
     );
   }, [selectedVisaGroupCode, visaTrackingRows]);
 
   const selectedGroup = useMemo(
     () =>
       selectedGroupCode
-        ? visibleGroupRecords.find(
+        ? (visibleGroupRecords.find(
             (group) => group.code.trim().toUpperCase() === selectedGroupCode.trim().toUpperCase(),
-          ) ?? null
+          ) ?? null)
         : null,
     [selectedGroupCode, visibleGroupRecords],
   );
@@ -435,10 +407,7 @@ export function useDashboardGroupRecords({
         }
 
         totalTripsThisWeek += 1;
-        tripCountByIsoDate.set(
-          itineraryIsoDate,
-          (tripCountByIsoDate.get(itineraryIsoDate) ?? 0) + 1,
-        );
+        tripCountByIsoDate.set(itineraryIsoDate, (tripCountByIsoDate.get(itineraryIsoDate) ?? 0) + 1);
         if (!hasArrivalThisWeek && isArrivalCategory(item)) {
           hasArrivalThisWeek = true;
         }
@@ -454,9 +423,7 @@ export function useDashboardGroupRecords({
     for (const [tripDateIso, tripCount] of tripCountByIsoDate.entries()) {
       if (
         tripCount > peakTripCount ||
-        (tripCount === peakTripCount &&
-          peakTripDateIso.length > 0 &&
-          tripDateIso.localeCompare(peakTripDateIso) < 0)
+        (tripCount === peakTripCount && peakTripDateIso.length > 0 && tripDateIso.localeCompare(peakTripDateIso) < 0)
       ) {
         peakTripCount = tripCount;
         peakTripDateIso = tripDateIso;
@@ -499,10 +466,7 @@ export function useDashboardGroupRecords({
       {
         label: "Peak Trip Day",
         value: overviewMetrics.peakTripCount > 0 ? overviewMetrics.peakTripDateLabel : "-",
-        subtitle:
-          overviewMetrics.peakTripCount > 0
-            ? `${overviewMetrics.peakTripCount} trips`
-            : "No trips this week",
+        subtitle: overviewMetrics.peakTripCount > 0 ? `${overviewMetrics.peakTripCount} trips` : "No trips this week",
         icon: "event_available",
         tone: "tertiary",
       },
@@ -548,11 +512,7 @@ export function useDashboardGroupRecords({
   const updateVisaSetupForGroupAndSync = useCallback(
     (
       groupCode: string,
-      updater: (args: {
-        group: GroupData;
-        row: VisaTrackingRow;
-        visaSetup: GroupVisaSetup;
-      }) => GroupVisaSetup,
+      updater: (args: { group: GroupData; row: VisaTrackingRow; visaSetup: GroupVisaSetup }) => GroupVisaSetup,
       syncMessages?: {
         successMessage?: string;
         failureMessage?: string;
@@ -564,9 +524,7 @@ export function useDashboardGroupRecords({
         return;
       }
 
-      const currentRow = buildVisaTrackingRowsFromGroups(latestGroupRecords).find(
-        (row) => row.groupCode === groupCode,
-      );
+      const currentRow = buildVisaTrackingRowsFromGroups(latestGroupRecords).find((row) => row.groupCode === groupCode);
       if (!currentRow) {
         return;
       }
@@ -586,16 +544,13 @@ export function useDashboardGroupRecords({
         visaSetup: nextVisaSetup,
       });
 
-      commitGroupRecords((current) =>
-        current.map((group) => (group.code === groupCode ? nextGroup : group)),
-      );
+      commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
 
       runBackendSync({
         task: replaceGroupMutation.mutateAsync({ groupCode, group: nextGroup }),
         successMessage: syncMessages?.successMessage ?? "Perubahan visa berhasil disimpan.",
         failureMessage:
-          syncMessages?.failureMessage ??
-          "Perubahan visa tersimpan lokal, tapi sinkronisasi backend gagal.",
+          syncMessages?.failureMessage ?? "Perubahan visa tersimpan lokal, tapi sinkronisasi backend gagal.",
         showSuccess: true,
       });
     },
@@ -638,13 +593,8 @@ export function useDashboardGroupRecords({
                   pax: group.pax,
                   status,
                   stayStartIso:
-                    city === "makkah"
-                      ? agreementDateRange.makkahStartIso
-                      : agreementDateRange.madinahStartIso,
-                  stayEndIso:
-                    city === "makkah"
-                      ? agreementDateRange.makkahEndIso
-                      : agreementDateRange.madinahEndIso,
+                    city === "makkah" ? agreementDateRange.makkahStartIso : agreementDateRange.madinahStartIso,
+                  stayEndIso: city === "makkah" ? agreementDateRange.makkahEndIso : agreementDateRange.madinahEndIso,
                 },
               ];
 
@@ -708,30 +658,21 @@ export function useDashboardGroupRecords({
   );
 
   const handleUpdateVisaHotel = useCallback(
-    (
-      groupCode: string,
-      city: "makkah" | "madinah",
-      hotel: VisaHotelEditFormState,
-      hotelId?: string,
-    ) => {
+    (groupCode: string, city: "makkah" | "madinah", hotel: VisaHotelEditFormState, hotelId?: string) => {
       updateVisaSetupForGroupAndSync(groupCode, ({ group, row, visaSetup }) => {
         const cityKey = city === "makkah" ? "makkahHotels" : "madinahHotels";
         const currentCityHotels = visaSetup[cityKey];
         const agreementDateRange = resolveVisaAgreementDateRange(row, group.durationDays, group);
         const parsedHotelPax = Number.parseInt(hotel.pax, 10);
-        const existingHotel = hotelId
-          ? currentCityHotels.find((entry) => entry.id === hotelId)
-          : undefined;
+        const existingHotel = hotelId ? currentCityHotels.find((entry) => entry.id === hotelId) : undefined;
         const fallbackEditableHotel: GroupAgreementHotel = {
           id: existingHotel?.id ?? `${group.code}-${city}-${Date.now().toString(36)}`,
           hotelName: city === "makkah" ? "Makkah Hotel" : "Madinah Hotel",
           agreementNumber: resolveVisaAgreementNumber(row, group, city),
           pax: group.pax,
           status: "Waiting for Approval",
-          stayStartIso:
-            city === "makkah" ? agreementDateRange.makkahStartIso : agreementDateRange.madinahStartIso,
-          stayEndIso:
-            city === "makkah" ? agreementDateRange.makkahEndIso : agreementDateRange.madinahEndIso,
+          stayStartIso: city === "makkah" ? agreementDateRange.makkahStartIso : agreementDateRange.madinahStartIso,
+          stayEndIso: city === "makkah" ? agreementDateRange.makkahEndIso : agreementDateRange.madinahEndIso,
         };
 
         const nextPrimaryHotel: GroupAgreementHotel = {
@@ -739,10 +680,7 @@ export function useDashboardGroupRecords({
           ...(existingHotel ?? {}),
           hotelName: hotel.hotelName.trim() || fallbackEditableHotel.hotelName,
           agreementNumber: hotel.agreementNumber.trim() || fallbackEditableHotel.agreementNumber,
-          pax:
-            Number.isFinite(parsedHotelPax) && parsedHotelPax >= 0
-              ? parsedHotelPax
-              : fallbackEditableHotel.pax,
+          pax: Number.isFinite(parsedHotelPax) && parsedHotelPax >= 0 ? parsedHotelPax : fallbackEditableHotel.pax,
           status: hotel.status,
           stayStartIso: hotel.stayStartIso,
           stayEndIso: hotel.stayEndIso,
@@ -798,8 +736,7 @@ export function useDashboardGroupRecords({
         },
         {
           successMessage: "Agreement hotel berhasil dihapus.",
-          failureMessage:
-            "Agreement hotel terhapus lokal, tapi sinkronisasi backend gagal.",
+          failureMessage: "Agreement hotel terhapus lokal, tapi sinkronisasi backend gagal.",
         },
       );
     },
@@ -811,9 +748,7 @@ export function useDashboardGroupRecords({
       updateVisaSetupForGroupAndSync(groupCode, ({ group, visaSetup }) => {
         const nextAppointments: GroupRaudhahAppointment[] = appointment.appointments
           .map((entry, index) => ({
-            id:
-              entry.id?.trim() ||
-              `${group.code}-raudhah-${Date.now().toString(36)}-${index + 1}`,
+            id: entry.id?.trim() || `${group.code}-raudhah-${Date.now().toString(36)}-${index + 1}`,
             dateIso: entry.dateIso.trim(),
             status: entry.status,
             tasrehPrinted: Boolean(entry.tasrehPrinted),
@@ -844,9 +779,7 @@ export function useDashboardGroupRecords({
               : entry,
           );
 
-          const hasChanged = nextAppointments.some(
-            (entry, index) => entry !== visaSetup.raudhahAppointments[index],
-          );
+          const hasChanged = nextAppointments.some((entry, index) => entry !== visaSetup.raudhahAppointments[index]);
           if (!hasChanged) {
             return visaSetup;
           }
@@ -858,8 +791,7 @@ export function useDashboardGroupRecords({
         },
         {
           successMessage: "Status print tasreh Raudhah berhasil diperbarui.",
-          failureMessage:
-            "Status print tasreh Raudhah tersimpan lokal, tapi sinkronisasi backend gagal.",
+          failureMessage: "Status print tasreh Raudhah tersimpan lokal, tapi sinkronisasi backend gagal.",
         },
       );
     },
@@ -899,21 +831,11 @@ export function useDashboardGroupRecords({
         failureMessage: "Group tersimpan lokal, tapi sinkronisasi backend gagal.",
       });
     },
-    [
-      clearQuery,
-      commitGroupRecords,
-      createGroupMutation,
-      navigateToOverview,
-      runBackendSync,
-      showSyncFeedback,
-    ],
+    [clearQuery, commitGroupRecords, createGroupMutation, navigateToOverview, runBackendSync, showSyncFeedback],
   );
 
   const handleSaveGroupDetail = useCallback(
-    (
-      group: GroupData,
-      sourceGroupCode?: string,
-    ): { ok: true } | { ok: false; message: string } => {
+    (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
       const normalizedGroup = normalizeGroupStatus(group);
       const normalizedSourceGroupCode = sourceGroupCode?.trim().toUpperCase();
       const normalizedNextGroupCode = normalizedGroup.code.trim().toUpperCase();
@@ -961,9 +883,7 @@ export function useDashboardGroupRecords({
 
           if (normalizedSourceGroupCode && normalizedSourceGroupCode !== nextGroup.code) {
             const sourceIndex = next.findIndex(
-              (item, index) =>
-                index !== existingIndex &&
-                item.code.trim().toUpperCase() === normalizedSourceGroupCode,
+              (item, index) => index !== existingIndex && item.code.trim().toUpperCase() === normalizedSourceGroupCode,
             );
             if (sourceIndex !== -1) {
               next.splice(sourceIndex, 1);
@@ -974,9 +894,7 @@ export function useDashboardGroupRecords({
         }
 
         if (normalizedSourceGroupCode) {
-          const sourceIndex = current.findIndex(
-            (item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode,
-          );
+          const sourceIndex = current.findIndex((item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode);
           if (sourceIndex !== -1) {
             const next = [...current];
             next[sourceIndex] = nextGroup;

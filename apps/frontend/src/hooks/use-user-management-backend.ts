@@ -1,11 +1,7 @@
-import { resolveBackendApiBaseUrl } from "../shared/backend-api-base.js";
-import { clearAuthSession } from "../shared/auth-session.js";
+import { fetchBackendParsed } from "../shared/api-client.js";
+import { extractBackendErrorMessage } from "../shared/api-error.js";
 
-export type BackendManagedUserRole =
-  | "super-admin"
-  | "admin"
-  | "finance-manager"
-  | "customer-support";
+export type BackendManagedUserRole = "super-admin" | "admin" | "finance-manager" | "customer-support";
 
 export type BackendManagedUser = {
   id: string;
@@ -26,27 +22,8 @@ export type CreateManagedUserPayload = UpdateManagedUserPayload & {
   password?: string;
 };
 
-async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(endpoint, {
-    ...init,
-    credentials: "include",
-    headers: new Headers(init?.headers),
-  });
-
-  if (response.status === 401) {
-    clearAuthSession();
-  }
-
-  return response;
-}
-
 function resolveRoleId(value: unknown): BackendManagedUserRole {
-  if (
-    value === "super-admin" ||
-    value === "admin" ||
-    value === "finance-manager" ||
-    value === "customer-support"
-  ) {
+  if (value === "super-admin" || value === "admin" || value === "finance-manager" || value === "customer-support") {
     return value;
   }
 
@@ -80,71 +57,35 @@ function mapManagedUser(value: unknown): BackendManagedUser | null {
   };
 }
 
-function extractBackendErrorMessage(status: number, payload: unknown, fallbackText: string): string {
-  if (payload && typeof payload === "object" && "message" in payload) {
-    const message = (payload as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message.trim();
-    }
-
-    if (Array.isArray(message)) {
-      const firstText = message.find((entry) => typeof entry === "string" && entry.trim());
-      if (typeof firstText === "string" && firstText.trim()) {
-        return firstText.trim();
-      }
-    }
-  }
-
-  if (fallbackText.trim()) {
-    return fallbackText.trim();
-  }
-
-  return `User management request failed (${status}).`;
-}
-
-async function parseResponseJson(response: Response): Promise<unknown> {
-  const responseText = await response.text();
-  if (!responseText.trim()) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(responseText) as unknown;
-  } catch {
-    return responseText;
-  }
-}
-
 export async function fetchManagedUsersFromBackend({
   signal,
 }: {
   signal?: AbortSignal;
 } = {}): Promise<BackendManagedUser[]> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/auth/users`, {
+  const { response, payload, responseText } = await fetchBackendParsed("/auth/users", {
     method: "GET",
     signal,
   });
-  const payload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, payload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, payload, responseText, "User management request failed"),
+    );
   }
 
   if (!Array.isArray(payload)) {
     throw new Error("User list response is invalid.");
   }
 
-  return payload
-    .map((item) => mapManagedUser(item))
-    .filter((item): item is BackendManagedUser => item !== null);
+  return payload.map((item) => mapManagedUser(item)).filter((item): item is BackendManagedUser => item !== null);
 }
 
-export async function createManagedUserInBackend(
-  payload: CreateManagedUserPayload,
-): Promise<BackendManagedUser> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/auth/users`, {
+export async function createManagedUserInBackend(payload: CreateManagedUserPayload): Promise<BackendManagedUser> {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed("/auth/users", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -156,10 +97,11 @@ export async function createManagedUserInBackend(
       password: payload.password?.trim() ? payload.password.trim() : undefined,
     }),
   });
-  const responsePayload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, responsePayload, responseText, "User management request failed"),
+    );
   }
 
   const managedUser = mapManagedUser(responsePayload);
@@ -174,8 +116,11 @@ export async function updateManagedUserInBackend(
   userId: string,
   payload: UpdateManagedUserPayload,
 ): Promise<BackendManagedUser> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/auth/users/${encodeURIComponent(userId)}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/auth/users/${encodeURIComponent(userId)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -186,10 +131,11 @@ export async function updateManagedUserInBackend(
       roleId: payload.roleId,
     }),
   });
-  const responsePayload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, responsePayload, responseText, "User management request failed"),
+    );
   }
 
   const managedUser = mapManagedUser(responsePayload);
@@ -201,23 +147,27 @@ export async function updateManagedUserInBackend(
 }
 
 export async function deleteManagedUserInBackend(userId: string): Promise<void> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/auth/users/${encodeURIComponent(userId)}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/auth/users/${encodeURIComponent(userId)}`, {
     method: "DELETE",
   });
-  const responsePayload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, responsePayload, responseText, "User management request failed"),
+    );
   }
 }
 
-export async function setManagedUserPasswordInBackend(
-  userId: string,
-  password: string,
-): Promise<BackendManagedUser> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/auth/users/${encodeURIComponent(userId)}/password`, {
+export async function setManagedUserPasswordInBackend(userId: string, password: string): Promise<BackendManagedUser> {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/auth/users/${encodeURIComponent(userId)}/password`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -226,10 +176,11 @@ export async function setManagedUserPasswordInBackend(
       password: password.trim(),
     }),
   });
-  const responsePayload = await parseResponseJson(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, responsePayload, ""));
+    throw new Error(
+      extractBackendErrorMessage(response.status, responsePayload, responseText, "User management request failed"),
+    );
   }
 
   const managedUser = mapManagedUser(responsePayload);

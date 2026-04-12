@@ -60,13 +60,8 @@ export function useUpdateMasterDataOptionMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      optionId,
-      payload,
-    }: {
-      optionId: string;
-      payload: UpdateMasterDataOptionPayload;
-    }) => updateMasterDataOptionInBackend(optionId, payload),
+    mutationFn: ({ optionId, payload }: { optionId: string; payload: UpdateMasterDataOptionPayload }) =>
+      updateMasterDataOptionInBackend(optionId, payload),
     retry: false,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: masterDataQueryKeys.all });

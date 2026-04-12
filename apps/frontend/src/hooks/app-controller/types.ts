@@ -45,11 +45,7 @@ export type AppController = {
   handleBackToOverview: () => void;
   handleDeleteGroup: (groupCode: string) => void;
   handleOpenVisaDetail: (row: VisaTrackingRow) => void;
-  handleUpdateAgreementStatus: (
-    groupCode: string,
-    city: "makkah" | "madinah",
-    status: AgreementApprovalStatus,
-  ) => void;
+  handleUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
   handleUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus) => void;
   handleUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   handleUpdateSyarikah: (groupCode: string, syarikah: string) => void;
@@ -59,28 +55,14 @@ export type AppController = {
     hotel: VisaHotelEditFormState,
     hotelId?: string,
   ) => void;
-  handleDeleteVisaHotel: (
-    groupCode: string,
-    city: "makkah" | "madinah",
-    hotelId: string,
-  ) => void;
-  handleUpdateRaudhahAppointment: (
-    groupCode: string,
-    appointment: VisaRaudhahEditFormState,
-  ) => void;
-  handleSetRaudhahTasrehPrinted: (
-    groupCode: string,
-    appointmentId: string,
-    tasrehPrinted: boolean,
-  ) => void;
+  handleDeleteVisaHotel: (groupCode: string, city: "makkah" | "madinah", hotelId: string) => void;
+  handleUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
+  handleSetRaudhahTasrehPrinted: (groupCode: string, appointmentId: string, tasrehPrinted: boolean) => void;
   handleClearRaudhahAppointment: (groupCode: string) => void;
   handleBackToVisaTracking: () => void;
   handleOpenNewGroup: () => void;
   handleSaveInputGroup: (group: GroupData) => void;
-  handleSaveGroupDetail: (
-    group: GroupData,
-    sourceGroupCode?: string,
-  ) => { ok: true } | { ok: false; message: string };
+  handleSaveGroupDetail: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   dismissSyncFeedback: () => void;
   handleQueryChange: (value: string) => void;
   handleToggleActiveOnly: (value: boolean) => void;

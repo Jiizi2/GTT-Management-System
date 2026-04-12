@@ -35,7 +35,10 @@ export function MobileNav({
         aria-current={isActive ? "page" : undefined}
         aria-label={item.label}
       >
-        <span className={`material-symbols-outlined text-[1.32rem] leading-none transition ${iconClassName}`} aria-hidden="true">
+        <span
+          className={`material-symbols-outlined text-[1.32rem] leading-none transition ${iconClassName}`}
+          aria-hidden="true"
+        >
           {item.icon}
         </span>
         <span

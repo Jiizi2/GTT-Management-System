@@ -1,3 +1,4 @@
+import { describe } from "vitest";
 import {
   buildChecklistItemsFromGroups,
   buildVisaTrackingRowsFromGroups,
@@ -27,6 +28,7 @@ import {
   buildNewGroupPayload,
   validateConnectedAgreementDates,
 } from "../pages/new-group-screen-helpers.js";
+import { runCase } from "../test/run-case.js";
 
 function assertEqual<T>(actual: T, expected: T, message?: string): void {
   if (actual !== expected) {
@@ -158,11 +160,6 @@ function createSmokeGroup(): GroupData {
       ],
     },
   };
-}
-
-async function runCase(name: string, fn: () => void | Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
 }
 
 async function testNavigationItems(): Promise<void> {
@@ -634,10 +631,7 @@ async function testItinerarySummaryHelpers(): Promise<void> {
     { ...items[1], notes: "   " },
   ]);
   assertEqual(fallbackNotes.length, 1);
-  assertEqual(
-    fallbackNotes[0],
-    "Itinerary drafted by operator and ready for operations review.",
-  );
+  assertEqual(fallbackNotes[0], "Itinerary drafted by operator and ready for operations review.");
 
   const durationDays = calculateItineraryDurationDays(items);
   assertEqual(durationDays, 3);
@@ -1131,8 +1125,7 @@ async function testConnectedAgreementDateValidation(): Promise<void> {
   );
   assertEqual(makkahMadinahMakkahWithGap.hasWarning, true);
   assertTruthy(
-    Boolean(makkahMadinahMakkahWithGap.cityWarnings.makkah) ||
-      Boolean(makkahMadinahMakkahWithGap.crossCityWarning),
+    Boolean(makkahMadinahMakkahWithGap.cityWarnings.makkah) || Boolean(makkahMadinahMakkahWithGap.crossCityWarning),
   );
 }
 
@@ -1192,23 +1185,18 @@ async function testNewGroupPayloadBuild(): Promise<void> {
   assertEqual(payload.visaSetup?.visaStatus, "Pending");
 }
 
-async function main(): Promise<void> {
-  await runCase("navigation metadata", testNavigationItems);
-  await runCase("checklist generation", testChecklistFlow);
-  await runCase("checklist H-1 window filtering", testChecklistWindowFiltering);
-  await runCase("visa tracking aggregation", testVisaFlow);
-  await runCase("visa tracking unsorted itinerary bounds", testVisaFlowUnsortedItineraryBounds);
-  await runCase("overview itinerary scenario coverage", testOverviewItineraryScenarioCoverage);
-  await runCase("visa agreement helper rules", testVisaAgreementHelpers);
-  await runCase("itinerary summary helper rules", testItinerarySummaryHelpers);
-  await runCase("effective identity mode helper rules", testEffectiveIdentityModeHelpers);
-  await runCase("input validation helper rules", testInputValidationHelpers);
-  await runCase("new group prefill builder", testNewGroupPrefillFromAgreements);
-  await runCase("connected agreement date validation", testConnectedAgreementDateValidation);
-  await runCase("new group payload builder", testNewGroupPayloadBuild);
-}
-
-main().catch((error: unknown) => {
-  console.error("Frontend smoke test failed:", error);
-  throw error;
+describe("frontend smoke", () => {
+  runCase("navigation metadata", testNavigationItems);
+  runCase("checklist generation", testChecklistFlow);
+  runCase("checklist H-1 window filtering", testChecklistWindowFiltering);
+  runCase("visa tracking aggregation", testVisaFlow);
+  runCase("visa tracking unsorted itinerary bounds", testVisaFlowUnsortedItineraryBounds);
+  runCase("overview itinerary scenario coverage", testOverviewItineraryScenarioCoverage);
+  runCase("visa agreement helper rules", testVisaAgreementHelpers);
+  runCase("itinerary summary helper rules", testItinerarySummaryHelpers);
+  runCase("effective identity mode helper rules", testEffectiveIdentityModeHelpers);
+  runCase("input validation helper rules", testInputValidationHelpers);
+  runCase("new group prefill builder", testNewGroupPrefillFromAgreements);
+  runCase("connected agreement date validation", testConnectedAgreementDateValidation);
+  runCase("new group payload builder", testNewGroupPayloadBuild);
 });

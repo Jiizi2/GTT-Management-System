@@ -90,7 +90,10 @@ function ModalShell({
 }) {
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`}
+        onClick={onClose}
+      >
         <div
           className={`serene-modal-shell flex max-h-[calc(100dvh-1.5rem)] w-full flex-col sm:max-h-[calc(100dvh-2rem)] ${widthClassName}`}
           role="dialog"
@@ -150,12 +153,7 @@ function SaveFooter({
 }) {
   return (
     <>
-      <button
-        type="button"
-        className={modalButtonClassName}
-        onClick={onSave}
-        disabled={isSaveDisabled || isSaving}
-      >
+      <button type="button" className={modalButtonClassName} onClick={onSave} disabled={isSaveDisabled || isSaving}>
         <span className="material-symbols-outlined" aria-hidden="true">
           check_circle
         </span>
@@ -178,7 +176,11 @@ export function VisaStatusModal({
   onClose: () => void;
   onSave: (nextValue: VisaStatus) => void | Promise<void>;
 }) {
-  const { control, handleSubmit, formState: { isSubmitting } } = useForm<{ value: VisaStatus }>({
+  const {
+    control,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<{ value: VisaStatus }>({
     resolver: zodResolver(visaStatusModalSchema),
     defaultValues: {
       value: initialValue,
@@ -233,7 +235,11 @@ export function PaymentStatusModal({
   onClose: () => void;
   onSave: (nextValue: VisaPaymentStatus) => void | Promise<void>;
 }) {
-  const { control, handleSubmit, formState: { isSubmitting } } = useForm<{ value: VisaPaymentStatus }>({
+  const {
+    control,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<{ value: VisaPaymentStatus }>({
     resolver: zodResolver(paymentStatusModalSchema),
     defaultValues: {
       value: initialValue,
@@ -308,9 +314,7 @@ export function SyarikahModal({
       footer={
         <SaveFooter
           onClose={onClose}
-          onSave={() =>
-            void handleSubmit(({ value }) => void onSave(value.trim()))()
-          }
+          onSave={() => void handleSubmit(({ value }) => void onSave(value.trim()))()}
           saveLabel="Save Changes"
           isSaving={isSubmitting}
         />
@@ -318,12 +322,7 @@ export function SyarikahModal({
     >
       <label className={modalFieldClassName}>
         <span>Syarikah / Provider Agency</span>
-        <input
-          className={modalInputClassName}
-          type="text"
-          placeholder="e.g. Al-Tayyar"
-          {...register("value")}
-        />
+        <input className={modalInputClassName} type="text" placeholder="e.g. Al-Tayyar" {...register("value")} />
       </label>
       {errors.value ? <p className="text-xs font-medium text-brand-tertiary">{errors.value.message}</p> : null}
     </ModalShell>
@@ -385,7 +384,9 @@ export function VisaHotelModal({
             {...register("hotelName")}
           />
         </label>
-        {errors.hotelName ? <p className="text-xs font-medium text-brand-tertiary">{errors.hotelName.message}</p> : null}
+        {errors.hotelName ? (
+          <p className="text-xs font-medium text-brand-tertiary">{errors.hotelName.message}</p>
+        ) : null}
 
         <label className={modalFieldClassName}>
           <span>Agreement Number</span>
@@ -402,13 +403,7 @@ export function VisaHotelModal({
 
         <label className={modalFieldClassName}>
           <span>Total Pax</span>
-          <input
-            className={modalInputClassName}
-            type="number"
-            min={1}
-            placeholder="70"
-            {...register("pax")}
-          />
+          <input className={modalInputClassName} type="number" min={1} placeholder="70" {...register("pax")} />
         </label>
         {errors.pax ? <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p> : null}
 
@@ -440,11 +435,7 @@ export function VisaHotelModal({
               control={control}
               name="stayStartIso"
               render={({ field }) => (
-                <DatePickerInput
-                  inputClassName={modalInputClassName}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
+                <DatePickerInput inputClassName={modalInputClassName} value={field.value} onChange={field.onChange} />
               )}
             />
           </label>
@@ -458,11 +449,7 @@ export function VisaHotelModal({
               control={control}
               name="stayEndIso"
               render={({ field }) => (
-                <DatePickerInput
-                  inputClassName={modalInputClassName}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
+                <DatePickerInput inputClassName={modalInputClassName} value={field.value} onChange={field.onChange} />
               )}
             />
           </label>
@@ -612,4 +599,3 @@ export function VisaRaudhahModal({
     </ModalShell>
   );
 }
-

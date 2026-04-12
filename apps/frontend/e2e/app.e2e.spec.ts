@@ -40,17 +40,11 @@ let backendServer: StartedBackendServer | null = null;
 let frontendServer: StartedFrontendServer | null = null;
 
 const DEV_SUPERADMIN_IDENTIFIER =
-  process.env.DEV_AUTH_SUPERADMIN_IDENTIFIER?.trim() ||
-  process.env.DEV_AUTH_IDENTIFIER?.trim() ||
-  "dev.superadmin";
+  process.env.DEV_AUTH_SUPERADMIN_IDENTIFIER?.trim() || process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.superadmin";
 const DEV_SUPERADMIN_PASSWORD =
-  process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() ||
-  process.env.DEV_AUTH_PASSWORD?.trim() ||
-  "DevSuperAdmin#2026";
+  process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || process.env.DEV_AUTH_PASSWORD?.trim() || "DevSuperAdmin#2026";
 const DEV_ADMIN_IDENTIFIER = process.env.DEV_AUTH_ADMIN_IDENTIFIER?.trim() || "dev.admin";
-const DEV_ADMIN_PASSWORD =
-  process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() ||
-  "DevAdmin#2026";
+const DEV_ADMIN_PASSWORD = process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -332,9 +326,12 @@ async function loginViaUi(
 
 async function logoutViaUi(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Logout" }).click();
-  const logoutDialog = page.locator(".serene-modal-shell").filter({
-    hasText: "kembali ke halaman login",
-  }).first();
+  const logoutDialog = page
+    .locator(".serene-modal-shell")
+    .filter({
+      hasText: "kembali ke halaman login",
+    })
+    .first();
   await expect(logoutDialog).toBeVisible();
   await logoutDialog.locator("button:has-text('Logout')").click();
   await expect(page.getByRole("button", { name: "Login to Dashboard" })).toBeVisible();
@@ -349,12 +346,12 @@ function isManagedUserPasswordPath(url: string): boolean {
 }
 
 async function waitForManagedUserPasswordResponse(page: Page): Promise<Response> {
-  return page.waitForResponse((response) => (
-    response.request().method() === "PUT" &&
-    isManagedUserPasswordPath(response.url())
-  ), {
-    timeout: 30_000,
-  });
+  return page.waitForResponse(
+    (response) => response.request().method() === "PUT" && isManagedUserPasswordPath(response.url()),
+    {
+      timeout: 30_000,
+    },
+  );
 }
 
 type OverlayRectSnapshot = {
@@ -401,8 +398,12 @@ function expectOverlayCoversViewport(overlayRect: OverlayRectSnapshot | null): v
   expect(overlayRect?.position).toBe("fixed");
   expect(Math.abs(overlayRect?.top ?? Number.NaN)).toBeLessThanOrEqual(1);
   expect(Math.abs(overlayRect?.left ?? Number.NaN)).toBeLessThanOrEqual(1);
-  expect(Math.abs((overlayRect?.height ?? Number.NaN) - (overlayRect?.viewportHeight ?? Number.NaN))).toBeLessThanOrEqual(1);
-  expect(Math.abs((overlayRect?.width ?? Number.NaN) - (overlayRect?.viewportWidth ?? Number.NaN))).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs((overlayRect?.height ?? Number.NaN) - (overlayRect?.viewportHeight ?? Number.NaN)),
+  ).toBeLessThanOrEqual(1);
+  expect(Math.abs((overlayRect?.width ?? Number.NaN) - (overlayRect?.viewportWidth ?? Number.NaN))).toBeLessThanOrEqual(
+    1,
+  );
 }
 
 function buildUniqueSuffix(): string {
@@ -553,7 +554,10 @@ test("edits group name from group detail modal", async ({ page }) => {
   await createdCard.getByRole("button", { name: "View Detail" }).click();
   await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
 
-  await page.getByRole("button", { name: /Edit group info/i }).first().click();
+  await page
+    .getByRole("button", { name: /Edit group info/i })
+    .first()
+    .click();
   const groupEditModal = page.locator("#group-edit-modal");
   await expect(groupEditModal).toBeVisible();
 
@@ -578,7 +582,10 @@ test("uses full-viewport modal overlays in group detail and profile", async ({ p
   await overviewCard.getByRole("button", { name: "View Detail" }).click();
   await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
 
-  await page.getByRole("button", { name: /Edit group info/i }).first().click();
+  await page
+    .getByRole("button", { name: /Edit group info/i })
+    .first()
+    .click();
   expectOverlayCoversViewport(await getVisibleModalOverlayRect(page));
   await page.getByRole("button", { name: "Close edit group popup" }).click();
 
@@ -597,7 +604,9 @@ test("uses full-viewport modal overlays in group detail and profile", async ({ p
   expectOverlayCoversViewport(await getVisibleModalOverlayRect(page));
 });
 
-test("super-admin provisions managed user passwords and admin stays restricted from user management", async ({ page }) => {
+test("super-admin provisions managed user passwords and admin stays restricted from user management", async ({
+  page,
+}) => {
   await openApp(page);
 
   await page.getByRole("button", { name: "User Management" }).click();
@@ -734,13 +743,9 @@ test("updates payment status from visa detail", async ({ page }) => {
 
   if (buttonLabel.includes("Toggle to Paid")) {
     await expect(paymentSection.getByText("Paid", { exact: true })).toBeVisible();
-    await expect(
-      paymentSection.getByRole("button", { name: "Mark as Unpaid" }),
-    ).toBeVisible();
+    await expect(paymentSection.getByRole("button", { name: "Mark as Unpaid" })).toBeVisible();
   } else {
     await expect(paymentSection.getByText("Unpaid", { exact: true })).toBeVisible();
-    await expect(
-      paymentSection.getByRole("button", { name: "Toggle to Paid" }),
-    ).toBeVisible();
+    await expect(paymentSection.getByRole("button", { name: "Toggle to Paid" })).toBeVisible();
   }
 });

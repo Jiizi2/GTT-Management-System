@@ -1,8 +1,8 @@
 export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled";
 export type BackendDataSource = "memory" | "prisma";
 
-import { resolveBackendApiBaseUrl } from "../shared/backend-api-base";
-import { clearAuthSession } from "../shared/auth-session";
+import { fetchBackendParsed } from "../shared/api-client";
+import { formatBackendRequestError } from "../shared/api-error";
 
 export type BackendInvoiceClient = {
   id: string;
@@ -76,20 +76,6 @@ type BackendInvoiceRecord = {
   monthKey?: unknown;
 };
 
-async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(endpoint, {
-    ...init,
-    credentials: "include",
-    headers: new Headers(init?.headers),
-  });
-
-  if (response.status === 401) {
-    clearAuthSession();
-  }
-
-  return response;
-}
-
 function mapBackendDataSource(value: unknown): BackendDataSource {
   const normalized = readString(value).toLowerCase();
   return normalized === "prisma" ? "prisma" : "memory";
@@ -161,9 +147,7 @@ function mapBackendInvoiceStatus(value: unknown): BackendInvoiceStatus {
   return "Pending";
 }
 
-function mapInvoiceStatusForBackend(
-  value: BackendInvoiceStatus,
-): "PAID" | "PENDING" | "OVERDUE" | "CANCELLED" {
+function mapInvoiceStatusForBackend(value: BackendInvoiceStatus): "PAID" | "PENDING" | "OVERDUE" | "CANCELLED" {
   if (value === "Cancelled") {
     return "CANCELLED";
   }
@@ -190,9 +174,7 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
   }
 
   const dueDateIso = readString(record.dueDateIso);
-  const monthKeyFromDueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateIso)
-    ? dueDateIso.slice(0, 7)
-    : "unknown";
+  const monthKeyFromDueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateIso) ? dueDateIso.slice(0, 7) : "unknown";
   const defaultClientInitials = clientName
     .split(/\s+/)
     .map((chunk) => chunk[0]?.toUpperCase())
@@ -222,17 +204,17 @@ export async function fetchInvoiceClientsFromBackend({
 }: {
   signal?: AbortSignal;
 } = {}): Promise<BackendInvoiceClient[]> {
-  const response = await fetchBackend(`${resolveBackendApiBaseUrl()}/invoices/clients`, {
+  const { response, payload, responseText } = await fetchBackendParsed("/invoices/clients", {
     method: "GET",
     signal,
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend invoice client fetch failed (${response.status}): ${errorMessage}`);
+    throw new Error(
+      formatBackendRequestError(response.status, payload, responseText, "Backend invoice client fetch failed"),
+    );
   }
 
-  const payload = (await response.json()) as unknown;
   if (!Array.isArray(payload)) {
     throw new Error("Backend invoice client fetch failed: response is not an array.");
   }
@@ -248,18 +230,16 @@ export async function fetchInvoiceBackendDataSource({
 }: {
   signal?: AbortSignal;
 } = {}): Promise<BackendDataSource> {
-  const response = await fetchBackend(`${resolveBackendApiBaseUrl()}/health`, {
+  const { response, payload, responseText } = await fetchBackendParsed("/health", {
     method: "GET",
     signal,
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend health check failed (${response.status}): ${errorMessage}`);
+    throw new Error(formatBackendRequestError(response.status, payload, responseText, "Backend health check failed"));
   }
 
-  const payload = (await response.json()) as { dataSource?: unknown };
-  return mapBackendDataSource(payload.dataSource);
+  return mapBackendDataSource((payload as { dataSource?: unknown } | null)?.dataSource);
 }
 
 export async function fetchInvoicesFromBackend({
@@ -267,17 +247,15 @@ export async function fetchInvoicesFromBackend({
 }: {
   signal?: AbortSignal;
 } = {}): Promise<BackendInvoiceRow[]> {
-  const response = await fetchBackend(`${resolveBackendApiBaseUrl()}/invoices`, {
+  const { response, payload, responseText } = await fetchBackendParsed("/invoices", {
     method: "GET",
     signal,
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend invoice fetch failed (${response.status}): ${errorMessage}`);
+    throw new Error(formatBackendRequestError(response.status, payload, responseText, "Backend invoice fetch failed"));
   }
 
-  const payload = (await response.json()) as unknown;
   if (!Array.isArray(payload)) {
     throw new Error("Backend invoice fetch failed: response is not an array.");
   }
@@ -287,16 +265,18 @@ export async function fetchInvoicesFromBackend({
     .filter((item): item is BackendInvoiceRow => item !== null);
 }
 
-export async function createInvoiceInBackend(
-  payload: CreateBackendInvoicePayload,
-): Promise<BackendInvoiceRow> {
+export async function createInvoiceInBackend(payload: CreateBackendInvoicePayload): Promise<BackendInvoiceRow> {
   const normalizedClientId = payload.clientId?.trim() ?? "";
   const normalizedClientName = payload.clientName?.trim() ?? "";
   if (!normalizedClientId && !normalizedClientName) {
     throw new Error("Backend invoice create failed: missing clientId or clientName.");
   }
 
-  const response = await fetchBackend(`${resolveBackendApiBaseUrl()}/invoices`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed("/invoices", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -314,11 +294,12 @@ export async function createInvoiceInBackend(
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend invoice create failed (${response.status}): ${errorMessage}`);
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Backend invoice create failed"),
+    );
   }
 
-  const created = mapBackendInvoice((await response.json()) as BackendInvoiceRecord);
+  const created = mapBackendInvoice(responsePayload as BackendInvoiceRecord);
   if (!created) {
     throw new Error("Backend invoice create failed: invalid response payload.");
   }
@@ -361,7 +342,11 @@ export async function updateInvoiceInBackend(
     requestBody.notes = payload.notes.trim();
   }
 
-  const response = await fetchBackend(`${resolveBackendApiBaseUrl()}/invoices/${normalizedInvoiceId}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/invoices/${normalizedInvoiceId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -370,11 +355,12 @@ export async function updateInvoiceInBackend(
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend invoice update failed (${response.status}): ${errorMessage}`);
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Backend invoice update failed"),
+    );
   }
 
-  const updated = mapBackendInvoice((await response.json()) as BackendInvoiceRecord);
+  const updated = mapBackendInvoice(responsePayload as BackendInvoiceRecord);
   if (!updated) {
     throw new Error("Backend invoice update failed: invalid response payload.");
   }

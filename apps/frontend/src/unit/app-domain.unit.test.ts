@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { describe } from "vitest";
 import {
   buildChecklistActivityLabel,
   buildChecklistItemsFromGroups,
@@ -59,6 +60,7 @@ import {
   type InputItineraryItem,
   type ItineraryItem,
 } from "../shared/app-domain.js";
+import { runCase } from "../test/run-case.js";
 
 function createBaseGroup(overrides: Partial<GroupData> = {}): GroupData {
   const todayIso = getLocalIsoDateWithOffset(0);
@@ -146,11 +148,6 @@ function createBaseItineraryItem(overrides: Partial<ItineraryItem> = {}): Itiner
     icon: "tour",
     ...overrides,
   };
-}
-
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
 }
 
 function testResolveValidRaudhahAppointmentsNormalization(): void {
@@ -412,8 +409,14 @@ function testOverviewAndStatusNormalizationHelpers(): void {
 
   const dummyGroups = createDummyOverviewGroups();
   assert.equal(dummyGroups.length, overviewDummySeeds.length);
-  assert.equal(dummyGroups.every((group) => group.itinerary.length === 3), true);
-  assert.equal(dummyGroups.every((group) => (group.totalBuses ?? 0) >= 1), true);
+  assert.equal(
+    dummyGroups.every((group) => group.itinerary.length === 3),
+    true,
+  );
+  assert.equal(
+    dummyGroups.every((group) => (group.totalBuses ?? 0) >= 1),
+    true,
+  );
 
   const normalized = normalizeGroupStatus(
     createBaseGroup({
@@ -580,14 +583,8 @@ function testFormFactoryAndCategoryHelpers(): void {
   assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Hotel Transfer" })), "transfer");
   assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Flight Departure" })), "departure");
   assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "flight_land" })), "arrival");
-  assert.equal(
-    inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "airport_shuttle" })),
-    "transfer",
-  );
-  assert.equal(
-    inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "flight_takeoff" })),
-    "departure",
-  );
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "airport_shuttle" })), "transfer");
+  assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "flight_takeoff" })), "departure");
   assert.equal(inferCategoryKey(createBaseItineraryItem({ category: "Other", icon: "help" })), "city-tour");
 }
 
@@ -760,15 +757,15 @@ function testDisplayChecklistAndScrollHelpers(): void {
   assert.equal(formatChecklistCopyDate(""), "-");
   assert.equal(formatChecklistCopyDate("bad-date"), "BAD-DATE");
   assert.equal(formatChecklistCopyDate("2026-04-10").includes("APR"), true);
-  assert.equal(
-    getItineraryIsoDate(createBaseItineraryItem({ isoDate: "2026-04-20" })),
-    "2026-04-20",
-  );
+  assert.equal(getItineraryIsoDate(createBaseItineraryItem({ isoDate: "2026-04-20" })), "2026-04-20");
   assert.equal(
     getItineraryIsoDate(createBaseItineraryItem({ isoDate: undefined, date: "2 Apr", year: "2026" })),
     "2026-04-02",
   );
-  assert.equal(buildChecklistActivityLabel(createBaseItineraryItem({ category: "Departure" }), "departure"), "Departure");
+  assert.equal(
+    buildChecklistActivityLabel(createBaseItineraryItem({ category: "Departure" }), "departure"),
+    "Departure",
+  );
   assert.equal(
     buildChecklistActivityLabel(
       createBaseItineraryItem({
@@ -829,19 +826,14 @@ function testDisplayChecklistAndScrollHelpers(): void {
   });
 }
 
-async function main(): Promise<void> {
-  await runCase("app-domain raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
-  await runCase("app-domain route helper behavior", testRouteHelpersForCategorySpecificBehavior);
-  await runCase("app-domain transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
-  await runCase("app-domain visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
-  await runCase("app-domain checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
-  await runCase("app-domain overview/status helpers", testOverviewAndStatusNormalizationHelpers);
-  await runCase("app-domain form/category helpers", testFormFactoryAndCategoryHelpers);
-  await runCase("app-domain schedule editing helpers", testScheduleEditingAndCityInferenceHelpers);
-  await runCase("app-domain display/checklist/scroll helpers", testDisplayChecklistAndScrollHelpers);
-}
-
-void main().catch((error: unknown) => {
-  console.error("App domain unit test failed:", error);
-  process.exitCode = 1;
+describe("app-domain", () => {
+  runCase("raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
+  runCase("route helper behavior", testRouteHelpersForCategorySpecificBehavior);
+  runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
+  runCase("visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
+  runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
+  runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);
+  runCase("form/category helpers", testFormFactoryAndCategoryHelpers);
+  runCase("schedule editing helpers", testScheduleEditingAndCityInferenceHelpers);
+  runCase("display/checklist/scroll helpers", testDisplayChecklistAndScrollHelpers);
 });

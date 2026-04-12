@@ -8,7 +8,13 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { THEME_STORAGE_KEY, applyThemeMode, persistThemeMode, resolveInitialThemeMode, type ThemeMode } from "./theme-mode";
+import {
+  THEME_STORAGE_KEY,
+  applyThemeMode,
+  persistThemeMode,
+  resolveInitialThemeMode,
+  type ThemeMode,
+} from "./theme-mode";
 
 type ThemeContextValue = {
   theme: ThemeMode;

@@ -141,9 +141,7 @@ function formatReminderHeaderDate(isoDate: string): string {
     .replace(".", "");
 }
 
-function buildRaudhahAgentScheduleLines(
-  appointments: Array<{ dateIso: string; status: RaudhahStatus }>,
-): string[] {
+function buildRaudhahAgentScheduleLines(appointments: Array<{ dateIso: string; status: RaudhahStatus }>): string[] {
   const parsedAppointments = appointments
     .map((appointment) => {
       const parsedDate = new Date(`${appointment.dateIso}T12:00:00`);
@@ -173,7 +171,11 @@ function buildRaudhahAgentScheduleLines(
   const lines = statusOrder
     .map((status) => {
       const days = Array.from(
-        new Set(parsedAppointments.filter((appointment) => appointment.status === status).map((appointment) => appointment.day)),
+        new Set(
+          parsedAppointments
+            .filter((appointment) => appointment.status === status)
+            .map((appointment) => appointment.day),
+        ),
       ).sort((left, right) => left - right);
 
       if (days.length === 0) {
@@ -270,10 +272,7 @@ function InlineHotelAgreementForm({
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
 
-      <form
-        className="space-y-4"
-        onSubmit={handleSubmit((values) => void onSave(values))}
-      >
+      <form className="space-y-4" onSubmit={handleSubmit((values) => void onSave(values))}>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="grid gap-1.5">
             <label className={inlineHotelFieldClassName}>
@@ -316,9 +315,7 @@ function InlineHotelAgreementForm({
                 {...register("pax")}
               />
             </label>
-            {errors.pax ? (
-              <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p>
-            ) : null}
+            {errors.pax ? <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p> : null}
           </div>
 
           <div className="grid gap-1.5">
@@ -430,10 +427,7 @@ export function VisaTrackingDetailScreen({
     hotelId?: string,
   ) => void;
   onDeleteVisaHotel: (groupCode: string, city: "makkah" | "madinah", hotelId: string) => void;
-  onUpdateRaudhahAppointment: (
-    groupCode: string,
-    appointment: VisaRaudhahEditFormState,
-  ) => void;
+  onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
 }) {
   const [paymentStatus, setPaymentStatus] = useState<VisaPaymentStatus>(row.paymentStatus);
@@ -462,12 +456,7 @@ export function VisaTrackingDetailScreen({
   const madinahStartIso = agreementDateRange.madinahStartIso;
   const fallbackReturnIso = agreementDateRange.madinahEndIso;
 
-  const makkahHotels = [
-    "Makkah Clock Tower",
-    "Swissotel Al Maqam",
-    "Hilton Suites Makkah",
-    "Movenpick Hajar Tower",
-  ];
+  const makkahHotels = ["Makkah Clock Tower", "Swissotel Al Maqam", "Hilton Suites Makkah", "Movenpick Hajar Tower"];
   const madinahHotels = [
     "Anwar Al Madinah Movenpick",
     "Pullman Zamzam Madinah",
@@ -478,8 +467,7 @@ export function VisaTrackingDetailScreen({
   const primaryMadinahAgreement = getGroupAgreementHotelsByCity(group ?? undefined, "madinah")[0];
   const makkahAgreements = getGroupAgreementHotelsByCity(group ?? undefined, "makkah");
   const madinahAgreements = getGroupAgreementHotelsByCity(group ?? undefined, "madinah");
-  const makkahHotelName =
-    primaryMakkahAgreement?.hotelName?.trim() || makkahHotels[groupIndex % makkahHotels.length];
+  const makkahHotelName = primaryMakkahAgreement?.hotelName?.trim() || makkahHotels[groupIndex % makkahHotels.length];
   const madinahHotelName =
     primaryMadinahAgreement?.hotelName?.trim() || madinahHotels[groupIndex % madinahHotels.length];
 
@@ -488,10 +476,8 @@ export function VisaTrackingDetailScreen({
   const makkahMissing = Math.max(0, totalPax - makkahAssigned);
   const madinahMissing = Math.max(0, totalPax - madinahAssigned);
 
-  const visaTone: Tone =
-    row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "muted";
-  const paymentTone: Tone =
-    paymentStatus === "Paid" ? "success" : paymentStatus === "Unpaid" ? "warning" : "muted";
+  const visaTone: Tone = row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "muted";
+  const paymentTone: Tone = paymentStatus === "Paid" ? "success" : paymentStatus === "Unpaid" ? "warning" : "muted";
   const raudhahAppointments = (group?.visaSetup?.raudhahAppointments ?? [])
     .map((appointment) => ({
       dateIso: appointment.dateIso?.trim() ?? "",
@@ -570,9 +556,7 @@ export function VisaTrackingDetailScreen({
     hotelId?: string,
   ): VisaHotelEditFormState => {
     const cityHotels = getGroupAgreementHotelsByCity(group ?? undefined, city);
-    const currentHotel = hotelId
-      ? cityHotels.find((entry) => entry.id === hotelId)
-      : cityHotels[0];
+    const currentHotel = hotelId ? cityHotels.find((entry) => entry.id === hotelId) : cityHotels[0];
     const cityRange = resolveVisaAgreementDateRange(row, durationDays, group ?? undefined);
 
     if (mode === "add") {
@@ -587,19 +571,16 @@ export function VisaTrackingDetailScreen({
     }
 
     return {
-      hotelName:
-        currentHotel?.hotelName?.trim() || (city === "makkah" ? makkahHotelName : madinahHotelName),
+      hotelName: currentHotel?.hotelName?.trim() || (city === "makkah" ? makkahHotelName : madinahHotelName),
       agreementNumber:
-        currentHotel?.agreementNumber?.trim() ||
-        resolveVisaAgreementNumber(row, group ?? undefined, city),
+        currentHotel?.agreementNumber?.trim() || resolveVisaAgreementNumber(row, group ?? undefined, city),
       pax: currentHotel?.pax?.toString() || totalPax.toString(),
       status: currentHotel?.status ?? "Waiting for Approval",
       stayStartIso:
         currentHotel?.stayStartIso?.trim() ||
         (city === "makkah" ? cityRange.makkahStartIso : cityRange.madinahStartIso),
       stayEndIso:
-        currentHotel?.stayEndIso?.trim() ||
-        (city === "makkah" ? cityRange.makkahEndIso : cityRange.madinahEndIso),
+        currentHotel?.stayEndIso?.trim() || (city === "makkah" ? cityRange.makkahEndIso : cityRange.madinahEndIso),
     };
   };
 
@@ -607,9 +588,7 @@ export function VisaTrackingDetailScreen({
     return {
       appointments: (group?.visaSetup?.raudhahAppointments ?? [])
         .map((appointment, index) => ({
-          id:
-            appointment.id?.trim() ||
-            `${row.groupCode}-raudhah-${Date.now().toString(36)}-${index + 1}`,
+          id: appointment.id?.trim() || `${row.groupCode}-raudhah-${Date.now().toString(36)}-${index + 1}`,
           dateIso: appointment.dateIso?.trim() ?? "",
           status: appointment.status,
           tasrehPrinted: Boolean(appointment.tasrehPrinted),
@@ -630,15 +609,11 @@ export function VisaTrackingDetailScreen({
     setActiveModal("syarikah");
   };
 
-  const openHotelModal = (
-    city: "makkah" | "madinah",
-    mode: "add" | "edit",
-    hotelId?: string,
-  ) => {
+  const openHotelModal = (city: "makkah" | "madinah", mode: "add" | "edit", hotelId?: string) => {
     setAddingHotelCity(null);
     setHotelCityDraft(city);
     setHotelDraftMode(mode);
-    setHotelDraftId(mode === "edit" ? hotelId ?? null : null);
+    setHotelDraftId(mode === "edit" ? (hotelId ?? null) : null);
     setActiveModal("hotel");
   };
 
@@ -680,7 +655,7 @@ export function VisaTrackingDetailScreen({
       row.groupCode,
       hotelCityDraft,
       hotel,
-      hotelDraftMode === "edit" ? hotelDraftId ?? undefined : undefined,
+      hotelDraftMode === "edit" ? (hotelDraftId ?? undefined) : undefined,
     );
     closeModal();
   };
@@ -690,10 +665,7 @@ export function VisaTrackingDetailScreen({
     closeModal();
   };
 
-  const saveAddHotelInline = (
-    city: "makkah" | "madinah",
-    hotel: VisaHotelEditFormState,
-  ) => {
+  const saveAddHotelInline = (city: "makkah" | "madinah", hotel: VisaHotelEditFormState) => {
     onUpdateVisaHotel(row.groupCode, city, hotel);
     setAddingHotelCity(null);
   };
@@ -734,12 +706,15 @@ export function VisaTrackingDetailScreen({
     setIsClearRaudhahConfirmOpen(false);
   }, [row.id]);
 
-  useEffect(() => () => {
-    if (raudhahCopyTimerRef.current !== null) {
-      window.clearTimeout(raudhahCopyTimerRef.current);
-      raudhahCopyTimerRef.current = null;
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (raudhahCopyTimerRef.current !== null) {
+        window.clearTimeout(raudhahCopyTimerRef.current);
+        raudhahCopyTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
@@ -792,7 +767,9 @@ export function VisaTrackingDetailScreen({
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Status</p>
-            <div className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(visaTone)}`}>
+            <div
+              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(visaTone)}`}
+            >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
               <strong>{row.visaStatus}</strong>
             </div>
@@ -812,7 +789,9 @@ export function VisaTrackingDetailScreen({
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Status</p>
-            <div className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(paymentTone)}`}>
+            <div
+              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(paymentTone)}`}
+            >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
               <strong>{paymentStatus}</strong>
             </div>
@@ -835,7 +814,9 @@ export function VisaTrackingDetailScreen({
               <span className="sm:hidden">Raudhah</span>
               <span className="hidden sm:inline">Raudhah Appointment</span>
             </p>
-            <div className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(raudhahTone)}`}>
+            <div
+              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(raudhahTone)}`}
+            >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
               <strong>{raudhahStatusText}</strong>
             </div>
@@ -959,7 +940,9 @@ export function VisaTrackingDetailScreen({
             />
           ) : null}
 
-          <div className={`mt-4 inline-flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium ${getCitySummaryClasses(makkahMissing > 0)}`}>
+          <div
+            className={`mt-4 inline-flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium ${getCitySummaryClasses(makkahMissing > 0)}`}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               {makkahMissing > 0 ? "error" : "check_circle"}
             </span>
@@ -968,7 +951,7 @@ export function VisaTrackingDetailScreen({
                 {makkahAssigned}/{totalPax} Pax - {makkahMissing > 0 ? `${makkahMissing} missing` : "All assigned"}
               </span>
               <span className="hidden sm:inline">
-                Total Pax: {makkahAssigned} / {totalPax} - {" "}
+                Total Pax: {makkahAssigned} / {totalPax} -{" "}
                 {makkahMissing > 0 ? `${makkahMissing} pax missing hotel in Makkah` : "All pax assigned"}
               </span>
             </p>
@@ -1080,7 +1063,9 @@ export function VisaTrackingDetailScreen({
             />
           ) : null}
 
-          <div className={`mt-4 inline-flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium ${getCitySummaryClasses(madinahMissing > 0)}`}>
+          <div
+            className={`mt-4 inline-flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium ${getCitySummaryClasses(madinahMissing > 0)}`}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               {madinahMissing > 0 ? "error" : "check_circle"}
             </span>
@@ -1089,7 +1074,7 @@ export function VisaTrackingDetailScreen({
                 {madinahAssigned}/{totalPax} Pax - {madinahMissing > 0 ? `${madinahMissing} missing` : "All assigned"}
               </span>
               <span className="hidden sm:inline">
-                Total Pax: {madinahAssigned} / {totalPax} - {" "}
+                Total Pax: {madinahAssigned} / {totalPax} -{" "}
                 {madinahMissing > 0 ? `${madinahMissing} pax missing hotel in Madinah` : "All pax assigned"}
               </span>
             </p>
@@ -1141,13 +1126,15 @@ export function VisaTrackingDetailScreen({
                 ))}
               </div>
             ) : (
-              <strong className={`block text-base font-semibold ${getToneTextClass(raudhahTone)}`}>
-                Not Set
-              </strong>
+              <strong className={`block text-base font-semibold ${getToneTextClass(raudhahTone)}`}>Not Set</strong>
             )}
             <small className="mt-2 block text-xs text-slate-500">
-              <span className="sm:hidden">Status: {raudhahStatusText} - {raudhahSecondaryTextMobile}</span>
-              <span className="hidden sm:inline">Status: {raudhahStatusText} - {raudhahSecondaryText}</span>
+              <span className="sm:hidden">
+                Status: {raudhahStatusText} - {raudhahSecondaryTextMobile}
+              </span>
+              <span className="hidden sm:inline">
+                Status: {raudhahStatusText} - {raudhahSecondaryText}
+              </span>
             </small>
           </div>
 
@@ -1233,27 +1220,15 @@ export function VisaTrackingDetailScreen({
       </section>
 
       {activeModal === "visa-status" ? (
-        <VisaStatusModal
-          initialValue={row.visaStatus}
-          onClose={closeModal}
-          onSave={saveVisaStatus}
-        />
+        <VisaStatusModal initialValue={row.visaStatus} onClose={closeModal} onSave={saveVisaStatus} />
       ) : null}
 
       {activeModal === "payment-status" ? (
-        <PaymentStatusModal
-          initialValue={paymentStatus}
-          onClose={closeModal}
-          onSave={savePaymentStatus}
-        />
+        <PaymentStatusModal initialValue={paymentStatus} onClose={closeModal} onSave={savePaymentStatus} />
       ) : null}
 
       {activeModal === "syarikah" ? (
-        <SyarikahModal
-          initialValue={providerName}
-          onClose={closeModal}
-          onSave={saveSyarikah}
-        />
+        <SyarikahModal initialValue={providerName} onClose={closeModal} onSave={saveSyarikah} />
       ) : null}
 
       {activeModal === "hotel" ? (
@@ -1290,10 +1265,7 @@ export function VisaTrackingDetailScreen({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span
-                className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700"
-                aria-hidden="true"
-              >
+              <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
                 warning
               </span>
               <div className="min-w-0">
@@ -1301,8 +1273,8 @@ export function VisaTrackingDetailScreen({
                   Clear Raudhah Dates?
                 </h3>
                 <p id="clear-raudhah-description" className="mt-1 text-sm leading-relaxed text-slate-600">
-                  Semua tanggal appointment Raudhah untuk group <strong>{row.groupCode}</strong> akan dihapus.
-                  Tindakan ini tidak bisa dibatalkan.
+                  Semua tanggal appointment Raudhah untuk group <strong>{row.groupCode}</strong> akan dihapus. Tindakan
+                  ini tidak bisa dibatalkan.
                 </p>
               </div>
             </div>
@@ -1332,9 +1304,3 @@ export function VisaTrackingDetailScreen({
     </div>
   );
 }
-
-
-
-
-
-

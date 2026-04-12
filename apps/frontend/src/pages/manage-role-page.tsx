@@ -5,9 +5,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import {
-  type MasterDataOption,
-} from "../hooks/use-master-data-backend";
+import { type MasterDataOption } from "../hooks/use-master-data-backend";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import {
   useCreateManagedUserMutation,
@@ -74,19 +72,9 @@ const defaultRoleCatalog: RoleCatalogItem[] = [
   },
 ];
 
-const roleIdSet = new Set<RoleId>([
-  "super-admin",
-  "admin",
-  "finance-manager",
-  "customer-support",
-]);
+const roleIdSet = new Set<RoleId>(["super-admin", "admin", "finance-manager", "customer-support"]);
 
-const roleIdSchema = z.enum([
-  "super-admin",
-  "admin",
-  "finance-manager",
-  "customer-support",
-]);
+const roleIdSchema = z.enum(["super-admin", "admin", "finance-manager", "customer-support"]);
 
 const managedUserFormSchema = z.object({
   name: z.string().trim().min(1, "Nama wajib diisi."),
@@ -98,10 +86,7 @@ const managedUserFormSchema = z.object({
   roleId: roleIdSchema,
 });
 
-const optionalManagedUserPasswordSchema = z
-  .string()
-  .trim()
-  .max(1024, "Password terlalu panjang.");
+const optionalManagedUserPasswordSchema = z.string().trim().max(1024, "Password terlalu panjang.");
 
 const requiredManagedUserPasswordSchema = z
   .string()
@@ -109,76 +94,80 @@ const requiredManagedUserPasswordSchema = z
   .min(8, "Password minimal 8 karakter.")
   .max(1024, "Password terlalu panjang.");
 
-const createManagedUserFormSchema = managedUserFormSchema.extend({
-  password: optionalManagedUserPasswordSchema,
-  confirmPassword: optionalManagedUserPasswordSchema,
-}).superRefine((values, context) => {
-  const password = values.password.trim();
-  const confirmPassword = values.confirmPassword.trim();
+const createManagedUserFormSchema = managedUserFormSchema
+  .extend({
+    password: optionalManagedUserPasswordSchema,
+    confirmPassword: optionalManagedUserPasswordSchema,
+  })
+  .superRefine((values, context) => {
+    const password = values.password.trim();
+    const confirmPassword = values.confirmPassword.trim();
 
-  if (!password && !confirmPassword) {
-    return;
-  }
+    if (!password && !confirmPassword) {
+      return;
+    }
 
-  if (!password) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["password"],
-      message: "Isi password dulu atau kosongkan kedua field password.",
-    });
-    return;
-  }
+    if (!password) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["password"],
+        message: "Isi password dulu atau kosongkan kedua field password.",
+      });
+      return;
+    }
 
-  if (password.length < 8) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["password"],
-      message: "Password minimal 8 karakter.",
-    });
-  }
+    if (password.length < 8) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["password"],
+        message: "Password minimal 8 karakter.",
+      });
+    }
 
-  if (!confirmPassword) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["confirmPassword"],
-      message: "Konfirmasi password wajib diisi jika password diatur.",
-    });
-    return;
-  }
+    if (!confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Konfirmasi password wajib diisi jika password diatur.",
+      });
+      return;
+    }
 
-  if (password !== confirmPassword) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["confirmPassword"],
-      message: "Konfirmasi password tidak sama.",
-    });
-  }
-});
+    if (password !== confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Konfirmasi password tidak sama.",
+      });
+    }
+  });
 
-const resetManagedUserPasswordFormSchema = z.object({
-  password: requiredManagedUserPasswordSchema,
-  confirmPassword: optionalManagedUserPasswordSchema,
-}).superRefine((values, context) => {
-  const password = values.password.trim();
-  const confirmPassword = values.confirmPassword.trim();
+const resetManagedUserPasswordFormSchema = z
+  .object({
+    password: requiredManagedUserPasswordSchema,
+    confirmPassword: optionalManagedUserPasswordSchema,
+  })
+  .superRefine((values, context) => {
+    const password = values.password.trim();
+    const confirmPassword = values.confirmPassword.trim();
 
-  if (!confirmPassword) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["confirmPassword"],
-      message: "Konfirmasi password wajib diisi.",
-    });
-    return;
-  }
+    if (!confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Konfirmasi password wajib diisi.",
+      });
+      return;
+    }
 
-  if (password !== confirmPassword) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["confirmPassword"],
-      message: "Konfirmasi password tidak sama.",
-    });
-  }
-});
+    if (password !== confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Konfirmasi password tidak sama.",
+      });
+    }
+  });
 
 type ManagedUserFormValues = z.infer<typeof managedUserFormSchema>;
 type CreateManagedUserFormValues = z.infer<typeof createManagedUserFormSchema>;
@@ -278,7 +267,7 @@ function mapRoleCatalogFromMasterData(options: MasterDataOption[]): RoleCatalogI
       sortOrder: option.sortOrder,
     }))
     .sort((left, right) => left.sortOrder - right.sortOrder)
-    .map(({ sortOrder, ...role }) => role);
+    .map(({ sortOrder: _sortOrder, ...role }) => role);
 
   return mapped;
 }
@@ -337,14 +326,8 @@ export function UserManagementScreen() {
     [roleCatalogItems],
   );
 
-  const totalSuperAdmin = useMemo(
-    () => users.filter((user) => user.roleId === "super-admin").length,
-    [users],
-  );
-  const totalUsersWithoutPassword = useMemo(
-    () => users.filter((user) => !user.hasPassword).length,
-    [users],
-  );
+  const totalSuperAdmin = useMemo(() => users.filter((user) => user.roleId === "super-admin").length, [users]);
+  const totalUsersWithoutPassword = useMemo(() => users.filter((user) => !user.hasPassword).length, [users]);
   const hasActiveRoleOptions = userRoleOptions.length > 0;
   const defaultRoleId = userRoleOptions[0]?.id ?? "admin";
 
@@ -427,9 +410,7 @@ export function UserManagementScreen() {
     editForm.reset({
       name: editingUser.name,
       email: editingUser.email,
-      roleId: userRoleOptions.some((role) => role.id === editingUser.roleId)
-        ? editingUser.roleId
-        : defaultRoleId,
+      roleId: userRoleOptions.some((role) => role.id === editingUser.roleId) ? editingUser.roleId : defaultRoleId,
     });
   }, [defaultRoleId, editForm, editingUser, userRoleOptions]);
 
@@ -598,10 +579,7 @@ export function UserManagementScreen() {
     } catch (error: unknown) {
       setNotice({
         tone: "error",
-        message: extractErrorMessage(
-          error,
-          "User baru gagal dibuat di backend.",
-        ),
+        message: extractErrorMessage(error, "User baru gagal dibuat di backend."),
       });
     }
   };
@@ -652,10 +630,7 @@ export function UserManagementScreen() {
     } catch (error: unknown) {
       setNotice({
         tone: "error",
-        message: extractErrorMessage(
-          error,
-          "Perubahan user gagal disimpan ke backend.",
-        ),
+        message: extractErrorMessage(error, "Perubahan user gagal disimpan ke backend."),
       });
     }
   };
@@ -676,10 +651,7 @@ export function UserManagementScreen() {
     } catch (error: unknown) {
       setNotice({
         tone: "error",
-        message: extractErrorMessage(
-          error,
-          "Penghapusan user gagal di backend.",
-        ),
+        message: extractErrorMessage(error, "Penghapusan user gagal di backend."),
       });
     }
   };
@@ -707,10 +679,7 @@ export function UserManagementScreen() {
     } catch (error: unknown) {
       setNotice({
         tone: "error",
-        message: extractErrorMessage(
-          error,
-          "Password user gagal diperbarui di backend.",
-        ),
+        message: extractErrorMessage(error, "Password user gagal diperbarui di backend."),
       });
     }
   };
@@ -718,252 +687,237 @@ export function UserManagementScreen() {
   return (
     <>
       <div className="mx-auto max-w-7xl space-y-6 px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-8">
-          <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <div className="space-y-2">
-              <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
-                User Management
-              </h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
-                Kelola akun pengguna, tambah user baru, dan atur role untuk kebutuhan operasional.
-              </p>
-            </div>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="space-y-2">
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
+              User Management
+            </h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+              Kelola akun pengguna, tambah user baru, dan atur role untuk kebutuhan operasional.
+            </p>
+          </div>
 
-            <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5 sm:self-auto" />
-          </header>
+          <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5 sm:self-auto" />
+        </header>
 
-          {notice ? (
-            <div
-              className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-ambient ${
-                notice.tone === "success"
-                  ? "border-primary/25 bg-primary-fixed text-on-primary-fixed-variant"
-                  : "border-error/25 bg-error-container/60 text-on-error-container"
-              }`}
-              role="status"
-              aria-live="polite"
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                {notice.tone === "success" ? "check_circle" : "error"}
-              </span>
-              <p className="leading-relaxed">{notice.message}</p>
-            </div>
-          ) : null}
+        {notice ? (
+          <div
+            className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-ambient ${
+              notice.tone === "success"
+                ? "border-primary/25 bg-primary-fixed text-on-primary-fixed-variant"
+                : "border-error/25 bg-error-container/60 text-on-error-container"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              {notice.tone === "success" ? "check_circle" : "error"}
+            </span>
+            <p className="leading-relaxed">{notice.message}</p>
+          </div>
+        ) : null}
 
-          <section className="overflow-hidden rounded-3xl border border-outline-variant/35 bg-surface-container-lowest shadow-ambient">
-            <div className="p-5 sm:p-7 lg:p-9">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                      Create User
-                    </h2>
-                    <p className="mt-2 text-sm font-medium text-on-surface-variant">
-                      Tambah akun baru lewat panel samping.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="serene-btn-primary inline-flex min-h-[46px] w-full items-center justify-center gap-1.5 px-5 sm:w-auto"
-                    onClick={openCreateDrawer}
-                    disabled={!hasActiveRoleOptions}
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      person_add
-                    </span>
-                    Tambah User
-                  </button>
+        <section className="overflow-hidden rounded-3xl border border-outline-variant/35 bg-surface-container-lowest shadow-ambient">
+          <div className="p-5 sm:p-7 lg:p-9">
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Create User</h2>
+                  <p className="mt-2 text-sm font-medium text-on-surface-variant">
+                    Tambah akun baru lewat panel samping.
+                  </p>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
-                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Total User
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
-                      {managedUsersQuery.isLoading ? "..." : users.length}
-                    </p>
-                  </article>
-
-                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Tanpa Password
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
-                      {managedUsersQuery.isLoading ? "..." : totalUsersWithoutPassword}
-                    </p>
-                  </article>
-
-                  <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Role Aktif
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
-                      {userRoleOptions.length}
-                    </p>
-                  </article>
-                </div>
+                <button
+                  type="button"
+                  className="serene-btn-primary inline-flex min-h-[46px] w-full items-center justify-center gap-1.5 px-5 sm:w-auto"
+                  onClick={openCreateDrawer}
+                  disabled={!hasActiveRoleOptions}
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    person_add
+                  </span>
+                  Tambah User
+                </button>
               </div>
-              {!hasActiveRoleOptions ? (
-                <p className="mt-3 text-xs font-semibold text-error">
-                  Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
-                </p>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Total User</p>
+                  <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
+                    {managedUsersQuery.isLoading ? "..." : users.length}
+                  </p>
+                </article>
+
+                <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Tanpa Password</p>
+                  <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
+                    {managedUsersQuery.isLoading ? "..." : totalUsersWithoutPassword}
+                  </p>
+                </article>
+
+                <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Role Aktif</p>
+                  <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">{userRoleOptions.length}</p>
+                </article>
+              </div>
+            </div>
+            {!hasActiveRoleOptions ? (
+              <p className="mt-3 text-xs font-semibold text-error">
+                Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
+              </p>
+            ) : (
+              <p className="mt-3 text-xs font-medium leading-relaxed text-on-surface-variant">
+                Password awal opsional. Hak akses tetap mengikuti role.
+              </p>
+            )}
+          </div>
+
+          <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
+
+          <div className="p-5 sm:p-7 lg:p-9">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">User Directory</h2>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
+                <span>Super Admin aktif: {totalSuperAdmin}</span>
+                <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
+                <span>Belum ada password: {totalUsersWithoutPassword}</span>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-outline-variant/35 bg-surface-container-low">
+              {managedUsersQuery.isLoading ? (
+                <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
+                  Memuat data user dari backend...
+                </div>
+              ) : users.length === 0 ? (
+                <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
+                  Belum ada data user pada backend.
+                </div>
               ) : (
-                <p className="mt-3 text-xs font-medium leading-relaxed text-on-surface-variant">
-                  Password awal opsional. Hak akses tetap mengikuti role.
-                </p>
+                users.map((user) => {
+                  const selectedRole = roleCatalogById.get(user.roleId);
+                  return (
+                    <div
+                      key={user.id}
+                      className="grid gap-3 border-b border-outline-variant/25 px-4 py-4 last:border-b-0 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-on-surface">{user.name}</p>
+                        <p className="break-all text-xs text-on-surface-variant">{user.email}</p>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex rounded-md border border-outline-variant/40 bg-surface-container-lowest px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-on-surface-variant">
+                            Status Role
+                          </span>
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${resolveRoleToneClass(
+                              user.roleId,
+                            )}`}
+                          >
+                            {selectedRole?.label ?? "Role"}
+                          </span>
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${resolvePasswordToneClass(
+                              user.hasPassword,
+                            )}`}
+                          >
+                            {user.hasPassword ? "Password Ready" : "No Password"}
+                          </span>
+                        </div>
+
+                        {selectedRole ? (
+                          <p className="mt-2 text-xs leading-relaxed text-on-surface-variant/80">
+                            {selectedRole.description}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                          onClick={() => openPasswordModal(user)}
+                        >
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                            password
+                          </span>
+                          {user.hasPassword ? "Reset Password" : "Set Password"}
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                          onClick={() => openEditModal(user)}
+                        >
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                            edit_square
+                          </span>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-error/35 bg-error-container/40 px-3 text-xs font-semibold text-on-error-container transition hover:brightness-95"
+                          onClick={() => openDeleteModal(user)}
+                        >
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                            delete
+                          </span>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
+          </div>
 
-            <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
+          <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
 
-            <div className="p-5 sm:p-7 lg:p-9">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                  User Directory
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-on-surface-variant">
-                  <span>Super Admin aktif: {totalSuperAdmin}</span>
-                  <span className="hidden h-1 w-1 rounded-full bg-outline-variant/70 sm:inline-flex" aria-hidden="true" />
-                  <span>Belum ada password: {totalUsersWithoutPassword}</span>
+          <div className="p-5 sm:p-7 lg:p-9">
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Role Catalog</h2>
+            <div className="mt-5 grid gap-4 xl:grid-cols-2">
+              {roleCatalogItems.length === 0 ? (
+                <div className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5 text-sm font-medium text-on-surface-variant">
+                  Belum ada Role Catalog yang aktif. Aktifkan option pada kategori <strong>Role Catalog</strong> di
+                  Master Data.
                 </div>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-outline-variant/35 bg-surface-container-low">
-                {managedUsersQuery.isLoading ? (
-                  <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
-                    Memuat data user dari backend...
-                  </div>
-                ) : users.length === 0 ? (
-                  <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
-                    Belum ada data user pada backend.
-                  </div>
-                ) : (
-                  users.map((user) => {
-                    const selectedRole = roleCatalogById.get(user.roleId);
-                    return (
-                      <div
-                        key={user.id}
-                        className="grid gap-3 border-b border-outline-variant/25 px-4 py-4 last:border-b-0 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center"
+              ) : (
+                roleCatalogItems.map((role) => (
+                  <article
+                    key={role.id}
+                    className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-lg font-bold text-on-surface">{role.label}</h3>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${resolveRoleToneClass(
+                          role.id,
+                        )}`}
                       >
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-on-surface">{user.name}</p>
-                          <p className="break-all text-xs text-on-surface-variant">{user.email}</p>
+                        {role.permissions.length} permissions
+                      </span>
+                    </div>
 
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="inline-flex rounded-md border border-outline-variant/40 bg-surface-container-lowest px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-on-surface-variant">
-                              Status Role
-                            </span>
-                            <span
-                              className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${resolveRoleToneClass(
-                                user.roleId,
-                              )}`}
-                            >
-                              {selectedRole?.label ?? "Role"}
-                            </span>
-                            <span
-                              className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${resolvePasswordToneClass(
-                                user.hasPassword,
-                              )}`}
-                            >
-                              {user.hasPassword ? "Password Ready" : "No Password"}
-                            </span>
-                          </div>
+                    <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{role.description}</p>
 
-                          {selectedRole ? (
-                            <p className="mt-2 text-xs leading-relaxed text-on-surface-variant/80">
-                              {selectedRole.description}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                          <button
-                            type="button"
-                            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
-                            onClick={() => openPasswordModal(user)}
-                          >
-                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                              password
-                            </span>
-                            {user.hasPassword ? "Reset Password" : "Set Password"}
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
-                            onClick={() => openEditModal(user)}
-                          >
-                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                              edit_square
-                            </span>
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-error/35 bg-error-container/40 px-3 text-xs font-semibold text-on-error-container transition hover:brightness-95"
-                            onClick={() => openDeleteModal(user)}
-                          >
-                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                              delete
-                            </span>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="mx-5 h-px bg-surface-container-high sm:mx-7 lg:mx-9" />
-
-            <div className="p-5 sm:p-7 lg:p-9">
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                Role Catalog
-              </h2>
-              <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                {roleCatalogItems.length === 0 ? (
-                  <div className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5 text-sm font-medium text-on-surface-variant">
-                    Belum ada Role Catalog yang aktif. Aktifkan option pada kategori <strong>Role Catalog</strong> di Master Data.
-                  </div>
-                ) : (
-                  roleCatalogItems.map((role) => (
-                    <article
-                      key={role.id}
-                      className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-lg font-bold text-on-surface">{role.label}</h3>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {role.permissions.map((permission) => (
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${resolveRoleToneClass(
-                            role.id,
-                          )}`}
+                          key={permission}
+                          className="inline-flex rounded-md border border-outline-variant/35 bg-surface-container-lowest px-2 py-1 text-[10px] font-black tracking-[0.08em] text-on-surface-variant"
                         >
-                          {role.permissions.length} permissions
+                          {permission}
                         </span>
-                      </div>
-
-                      <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                        {role.description}
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {role.permissions.map((permission) => (
-                          <span
-                            key={permission}
-                            className="inline-flex rounded-md border border-outline-variant/35 bg-surface-container-lowest px-2 py-1 text-[10px] font-black tracking-[0.08em] text-on-surface-variant"
-                          >
-                            {permission}
-                          </span>
-                        ))}
-                      </div>
-                    </article>
-                  ))
-                )}
-              </div>
+                      ))}
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
+      </div>
 
       {isCreateDrawerOpen ? (
         <UserManagementModalPortal>
@@ -990,7 +944,8 @@ export function UserManagementScreen() {
                     Tambah User Baru
                   </h3>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-on-surface-variant">
-                    Isi identitas user, pilih role, lalu tentukan apakah akun perlu password awal atau cukup dibuat dulu.
+                    Isi identitas user, pilih role, lalu tentukan apakah akun perlu password awal atau cukup dibuat
+                    dulu.
                   </p>
                 </div>
 
@@ -1009,25 +964,19 @@ export function UserManagementScreen() {
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Total User
-                    </p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Total User</p>
                     <p className="mt-2 text-xl font-black tracking-tight text-on-surface">
                       {managedUsersQuery.isLoading ? "..." : users.length}
                     </p>
                   </article>
 
                   <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Super Admin
-                    </p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Super Admin</p>
                     <p className="mt-2 text-xl font-black tracking-tight text-on-surface">{totalSuperAdmin}</p>
                   </article>
 
                   <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Belum Password
-                    </p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Belum Password</p>
                     <p className="mt-2 text-xl font-black tracking-tight text-on-surface">
                       {totalUsersWithoutPassword}
                     </p>
@@ -1053,9 +1002,7 @@ export function UserManagementScreen() {
                         autoFocus
                       />
                       {createForm.formState.errors.name ? (
-                        <p className="text-xs font-semibold text-error">
-                          {createForm.formState.errors.name.message}
-                        </p>
+                        <p className="text-xs font-semibold text-error">{createForm.formState.errors.name.message}</p>
                       ) : null}
                     </div>
 
@@ -1072,9 +1019,7 @@ export function UserManagementScreen() {
                         aria-label="Email user baru"
                       />
                       {createForm.formState.errors.email ? (
-                        <p className="text-xs font-semibold text-error">
-                          {createForm.formState.errors.email.message}
-                        </p>
+                        <p className="text-xs font-semibold text-error">{createForm.formState.errors.email.message}</p>
                       ) : null}
                     </div>
 
@@ -1122,7 +1067,10 @@ export function UserManagementScreen() {
 
                       <div className="mt-4 grid gap-4">
                         <div className="grid gap-1.5">
-                          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-password">
+                          <label
+                            className="text-xs font-semibold text-on-surface-variant"
+                            htmlFor="create-user-password"
+                          >
                             Password Awal
                           </label>
                           <input
@@ -1146,7 +1094,10 @@ export function UserManagementScreen() {
                         </div>
 
                         <div className="grid gap-1.5">
-                          <label className="text-xs font-semibold text-on-surface-variant" htmlFor="create-user-confirm-password">
+                          <label
+                            className="text-xs font-semibold text-on-surface-variant"
+                            htmlFor="create-user-confirm-password"
+                          >
                             Konfirmasi Password
                           </label>
                           <input
@@ -1173,15 +1124,14 @@ export function UserManagementScreen() {
 
                     {!hasActiveRoleOptions ? (
                       <p className="text-xs font-semibold text-error">
-                        Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
+                        Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum
+                        menambah user.
                       </p>
                     ) : null}
                   </form>
 
                   <aside className="rounded-3xl border border-outline-variant/35 bg-surface-container-low p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                      Ringkasan Akses
-                    </p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Ringkasan Akses</p>
                     <h4 className="mt-2 text-lg font-bold text-on-surface">
                       {selectedCreateRole?.label ?? "Pilih role"}
                     </h4>
@@ -1206,7 +1156,8 @@ export function UserManagementScreen() {
                     <div className="mt-4 rounded-2xl border border-outline-variant/35 bg-surface-container-lowest px-4 py-3 text-xs leading-relaxed text-on-surface-variant">
                       <p className="font-semibold text-on-surface">Provisioning note</p>
                       <p className="mt-1">
-                        Password hanya menandakan akun sudah diprovision. Hak akses tetap mengikuti role dan pembatasan backend.
+                        Password hanya menandakan akun sudah diprovision. Hak akses tetap mengikuti role dan pembatasan
+                        backend.
                       </p>
                     </div>
                   </aside>
@@ -1260,9 +1211,7 @@ export function UserManagementScreen() {
                 </span>
               </div>
 
-              <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">
-                Edit User
-              </h3>
+              <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">Edit User</h3>
               <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                 Perbarui nama, email, dan role untuk user ini.
               </p>
@@ -1283,9 +1232,7 @@ export function UserManagementScreen() {
                     autoFocus
                   />
                   {editForm.formState.errors.name ? (
-                    <p className="text-xs font-semibold text-error">
-                      {editForm.formState.errors.name.message}
-                    </p>
+                    <p className="text-xs font-semibold text-error">{editForm.formState.errors.name.message}</p>
                   ) : null}
                 </div>
 
@@ -1301,9 +1248,7 @@ export function UserManagementScreen() {
                     type="email"
                   />
                   {editForm.formState.errors.email ? (
-                    <p className="text-xs font-semibold text-error">
-                      {editForm.formState.errors.email.message}
-                    </p>
+                    <p className="text-xs font-semibold text-error">{editForm.formState.errors.email.message}</p>
                   ) : null}
                 </div>
 
@@ -1417,14 +1362,15 @@ export function UserManagementScreen() {
                     autoFocus
                   />
                   {passwordForm.formState.errors.password ? (
-                    <p className="text-xs font-semibold text-error">
-                      {passwordForm.formState.errors.password.message}
-                    </p>
+                    <p className="text-xs font-semibold text-error">{passwordForm.formState.errors.password.message}</p>
                   ) : null}
                 </div>
 
                 <div className="grid gap-1.5">
-                  <label className="text-xs font-semibold text-on-surface-variant" htmlFor="managed-user-password-confirm">
+                  <label
+                    className="text-xs font-semibold text-on-surface-variant"
+                    htmlFor="managed-user-password-confirm"
+                  >
                     Konfirmasi Password
                   </label>
                   <input
@@ -1488,11 +1434,10 @@ export function UserManagementScreen() {
                 </span>
               </div>
 
-              <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">
-                Hapus User?
-              </h3>
+              <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">Hapus User?</h3>
               <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                User <strong>{deleteTargetUser.name}</strong> akan dihapus dari daftar. Tindakan ini tidak bisa dibatalkan.
+                User <strong>{deleteTargetUser.name}</strong> akan dihapus dari daftar. Tindakan ini tidak bisa
+                dibatalkan.
               </p>
 
               <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1523,4 +1468,3 @@ export function UserManagementScreen() {
     </>
   );
 }
-

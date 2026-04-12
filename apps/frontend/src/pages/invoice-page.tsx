@@ -10,10 +10,7 @@ import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useThemeMode } from "../theme/theme-provider";
-import {
-  type BackendInvoiceClient,
-  type BackendInvoiceRow,
-} from "../hooks/use-invoice-backend";
+import { type BackendInvoiceClient, type BackendInvoiceRow } from "../hooks/use-invoice-backend";
 import {
   useCreateInvoiceMutation,
   useInvoiceDashboardQuery,
@@ -108,10 +105,7 @@ const invoiceWorkspaceFormSchema = z
     items: z.array(invoiceDraftItemSchema),
   })
   .superRefine((values, context) => {
-    if (
-      values.selectedClientId === MANUAL_CLIENT_OPTION_ID &&
-      values.manualClientName.trim().length === 0
-    ) {
+    if (values.selectedClientId === MANUAL_CLIENT_OPTION_ID && values.manualClientName.trim().length === 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["manualClientName"],
@@ -121,17 +115,6 @@ const invoiceWorkspaceFormSchema = z
   });
 
 type InvoiceWorkspaceFormValues = z.infer<typeof invoiceWorkspaceFormSchema>;
-
-const packageBaseRateMap: Array<{
-  keyword: string;
-  baseRate: number;
-}> = [
-  { keyword: "vip", baseRate: 18_500_000 },
-  { keyword: "deluxe", baseRate: 17_000_000 },
-  { keyword: "gold", baseRate: 14_300_000 },
-  { keyword: "silver", baseRate: 12_500_000 },
-  { keyword: "economic", baseRate: 10_200_000 },
-];
 
 function formatIdr(value: number): string {
   const normalized = Math.max(0, Math.round(value));
@@ -193,18 +176,6 @@ function shiftMonthKey(monthKey: string, offset: number): string {
   return `${year}-${month}`;
 }
 
-function resolveInvoiceAmount(group: GroupData): number {
-  const normalizedPackageName = group.packageName.trim().toLowerCase();
-  const matchedRate = packageBaseRateMap.find((item) =>
-    normalizedPackageName.includes(item.keyword),
-  );
-  const baseRate = matchedRate?.baseRate ?? 11_800_000;
-  const subtotal = group.pax * baseRate;
-  const serviceFee = Math.max(1, group.durationDays) * 400_000;
-  const rounded = Math.round((subtotal + serviceFee) / 100_000) * 100_000;
-  return Math.max(0, rounded);
-}
-
 function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): string {
   if (status === "Cancelled") {
     return "border-slate-300 bg-slate-100 text-slate-700";
@@ -222,9 +193,7 @@ function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): string {
       : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return isDarkMode
-    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
-    : "border-rose-200 bg-rose-100 text-rose-700";
+  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-rose-200 bg-rose-100 text-rose-700";
 }
 
 function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean): string {
@@ -264,9 +233,7 @@ function resolveDateRangeLabel(rows: InvoiceRow[]): string {
     return "-";
   }
 
-  const sortedDates = rows
-    .map((row) => row.dueDateIso)
-    .sort((left, right) => left.localeCompare(right));
+  const sortedDates = rows.map((row) => row.dueDateIso).sort((left, right) => left.localeCompare(right));
   const minIso = sortedDates[0];
   const maxIso = sortedDates[sortedDates.length - 1];
   return `${formatDateLabel(minIso)} - ${formatDateLabel(maxIso)}`;
@@ -331,11 +298,7 @@ function convertToIdr({
   return amount;
 }
 
-function calculateSubtotalIdr(args: {
-  items: InvoiceDraftItem[];
-  usdToIdr: number;
-  sarToIdr: number;
-}): number {
+function calculateSubtotalIdr(args: { items: InvoiceDraftItem[]; usdToIdr: number; sarToIdr: number }): number {
   return args.items.reduce((total, item) => {
     const pax = Math.max(0, Math.round(item.pax));
     const unitPrice = Math.max(0, Math.round(item.unitPrice));
@@ -364,9 +327,7 @@ function createEmptyDraftItems(): InvoiceDraftItem[] {
   ];
 }
 
-function createInitialInvoiceDraftItems(
-  initialInvoice: InvoiceWorkspaceInitialData | null,
-): InvoiceDraftItem[] {
+function createInitialInvoiceDraftItems(initialInvoice: InvoiceWorkspaceInitialData | null): InvoiceDraftItem[] {
   if (!initialInvoice) {
     return createEmptyDraftItems();
   }
@@ -384,7 +345,9 @@ function createInitialInvoiceDraftItems(
   ];
 }
 
-function mapMasterDataToSelectOptions(options: Array<{ value: string; label: string; isActive: boolean }>): SelectOption[] {
+function mapMasterDataToSelectOptions(
+  options: Array<{ value: string; label: string; isActive: boolean }>,
+): SelectOption[] {
   return options
     .filter((option) => option.isActive)
     .map((option) => ({
@@ -409,9 +372,7 @@ function mapMasterDataToInvoiceStatusOptions(
     );
 }
 
-function mapMasterDataToClientSuggestions(
-  options: Array<{ label: string; isActive: boolean }>,
-): string[] {
+function mapMasterDataToClientSuggestions(options: Array<{ label: string; isActive: boolean }>): string[] {
   return Array.from(
     new Set(
       options
@@ -429,17 +390,6 @@ function resolveBankAccountLabel(
   return options.find((option) => option.value === value)?.label ?? value;
 }
 
-function sortInvoiceRows(rows: InvoiceRow[]): InvoiceRow[] {
-  return [...rows].sort((left, right) => {
-    const dueDateDiff = right.dueDateIso.localeCompare(left.dueDateIso);
-    if (dueDateDiff !== 0) {
-      return dueDateDiff;
-    }
-
-    return right.invoiceNumber.localeCompare(left.invoiceNumber);
-  });
-}
-
 function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
   return {
     id: row.id,
@@ -455,9 +405,7 @@ function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceIni
   };
 }
 
-function resolveInvoiceWorkspaceValidationMessage(
-  errors: FieldErrors<InvoiceWorkspaceFormValues>,
-): string | null {
+function resolveInvoiceWorkspaceValidationMessage(errors: FieldErrors<InvoiceWorkspaceFormValues>): string | null {
   const candidateMessages = [
     errors.issueDateIso?.message,
     errors.dueDateIso?.message,
@@ -488,15 +436,9 @@ function normalizeInvoiceDraftItems(items: InvoiceDraftItem[]): InvoiceDraftItem
     .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
 }
 
-function viewInvoicePdfFromRow({
-  row,
-  groups,
-}: {
-  row: InvoiceRow;
-  groups: GroupData[];
-}): boolean {
+function viewInvoicePdfFromRow({ row, groups }: { row: InvoiceRow; groups: GroupData[] }): boolean {
   const linkedGroup = row.groupCode
-    ? groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null
+    ? (groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null)
     : null;
   const description = linkedGroup
     ? `${linkedGroup.packageName} Package - ${linkedGroup.durationDays} Days`
@@ -611,16 +553,12 @@ function CreateInvoiceWorkspace({
   const createInvoiceMutation = useCreateInvoiceMutation();
   const updateInvoiceMutation = useUpdateInvoiceMutation();
   const isEditMode = mode === "edit";
-  const resolvedInitialInvoice = isEditMode ? initialInvoice ?? null : null;
+  const resolvedInitialInvoice = isEditMode ? (initialInvoice ?? null) : null;
   const initialClientId = resolvedInitialInvoice?.clientId ?? "";
   const resolvedInitialClientName = resolvedInitialInvoice?.clientName.trim() ?? "";
-  const hasResolvedInitialClient = initialClientId
-    ? clients.some((client) => client.id === initialClientId)
-    : false;
+  const hasResolvedInitialClient = initialClientId ? clients.some((client) => client.id === initialClientId) : false;
   const hasResolvedInitialManualClient =
-    Boolean(resolvedInitialInvoice) &&
-    !hasResolvedInitialClient &&
-    resolvedInitialClientName.length > 0;
+    Boolean(resolvedInitialInvoice) && !hasResolvedInitialClient && resolvedInitialClientName.length > 0;
   const {
     register,
     control,
@@ -636,9 +574,8 @@ function CreateInvoiceWorkspace({
     defaultValues: {
       issueDateIso: resolvedInitialInvoice?.issuedDateIso ?? "",
       dueDateIso: resolvedInitialInvoice?.dueDateIso ?? "",
-      invoiceStatus:
-        resolvedInitialInvoice?.status ?? (isEditMode ? invoiceStatusOptions[0]?.value ?? "" : ""),
-      issuingOffice: isEditMode ? issuingOfficeOptions[0]?.value ?? "" : "",
+      invoiceStatus: resolvedInitialInvoice?.status ?? (isEditMode ? (invoiceStatusOptions[0]?.value ?? "") : ""),
+      issuingOffice: isEditMode ? (issuingOfficeOptions[0]?.value ?? "") : "",
       selectedClientId: resolvedInitialInvoice
         ? hasResolvedInitialClient
           ? initialClientId
@@ -649,7 +586,7 @@ function CreateInvoiceWorkspace({
       manualClientName: hasResolvedInitialManualClient ? resolvedInitialClientName : "",
       selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
       address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
-      bankAccount: isEditMode ? bankDisbursementOptions[0]?.value ?? "" : "",
+      bankAccount: isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "",
       notes: "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
     },
@@ -662,7 +599,11 @@ function CreateInvoiceWorkspace({
   const address = watch("address");
   const bankAccount = watch("bankAccount");
   const items = watch("items");
-  const { fields: itemFields, append: appendItem, remove: removeItemFromForm } = useFieldArray({
+  const {
+    fields: itemFields,
+    append: appendItem,
+    remove: removeItemFromForm,
+  } = useFieldArray({
     control,
     name: "items",
     keyName: "fieldKey",
@@ -775,10 +716,7 @@ function CreateInvoiceWorkspace({
     };
   }, [isCancelConfirmationOpen]);
 
-  const subtotalIdr = useMemo(
-    () => calculateSubtotalIdr({ items, usdToIdr, sarToIdr }),
-    [items, usdToIdr, sarToIdr],
-  );
+  const subtotalIdr = useMemo(() => calculateSubtotalIdr({ items, usdToIdr, sarToIdr }), [items, usdToIdr, sarToIdr]);
   const taxAmount = 0;
   const totalPayable = subtotalIdr + taxAmount;
 
@@ -822,7 +760,7 @@ function CreateInvoiceWorkspace({
     const isUsingManualClient = values.selectedClientId === MANUAL_CLIENT_OPTION_ID;
     const resolvedSelectedClient = isUsingManualClient
       ? null
-      : clients.find((client) => client.id === values.selectedClientId) ?? null;
+      : (clients.find((client) => client.id === values.selectedClientId) ?? null);
     const normalizedManualClientName = values.manualClientName.trim();
     if (!isUsingManualClient && !resolvedSelectedClient) {
       setSaveFeedback("Select a client before saving draft.");
@@ -836,7 +774,7 @@ function CreateInvoiceWorkspace({
     }
 
     const linkedGroupCode =
-      values.selectedGroupCode.trim() || (isUsingManualClient ? "" : resolvedSelectedClient?.groupCode ?? "");
+      values.selectedGroupCode.trim() || (isUsingManualClient ? "" : (resolvedSelectedClient?.groupCode ?? ""));
 
     clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
     setIsSavingDraft(true);
@@ -854,8 +792,7 @@ function CreateInvoiceWorkspace({
 
       onCreate(savedInvoice, "draft");
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to save invoice draft. Please retry.";
+      const errorMessage = error instanceof Error ? error.message : "Failed to save invoice draft. Please retry.";
       setSaveFeedback(errorMessage);
     } finally {
       setIsSavingDraft(false);
@@ -879,7 +816,7 @@ function CreateInvoiceWorkspace({
     const isUsingManualClient = values.selectedClientId === MANUAL_CLIENT_OPTION_ID;
     const resolvedSelectedClient = isUsingManualClient
       ? null
-      : clients.find((client) => client.id === values.selectedClientId) ?? null;
+      : (clients.find((client) => client.id === values.selectedClientId) ?? null);
     const normalizedManualClientName = values.manualClientName.trim();
     if (!isUsingManualClient && !resolvedSelectedClient) {
       setSaveFeedback(
@@ -923,15 +860,27 @@ function CreateInvoiceWorkspace({
     }
 
     const linkedGroupCode =
-      values.selectedGroupCode.trim() || (isUsingManualClient ? "" : resolvedSelectedClient?.groupCode ?? "");
+      values.selectedGroupCode.trim() || (isUsingManualClient ? "" : (resolvedSelectedClient?.groupCode ?? ""));
     const preOpenedPdfWindow = openPendingInvoicePdfWindow();
 
     setIsSubmitting(true);
     try {
-      const savedInvoice = isEditMode && resolvedInitialInvoice
-        ? await updateInvoiceMutation.mutateAsync({
-            invoiceId: resolvedInitialInvoice.id,
-            payload: {
+      const savedInvoice =
+        isEditMode && resolvedInitialInvoice
+          ? await updateInvoiceMutation.mutateAsync({
+              invoiceId: resolvedInitialInvoice.id,
+              payload: {
+                clientId: isUsingManualClient ? undefined : resolvedSelectedClient?.id,
+                clientName: isUsingManualClient ? normalizedManualClientName : undefined,
+                groupCode: linkedGroupCode || undefined,
+                issuedDateIso: values.issueDateIso,
+                dueDateIso: values.dueDateIso,
+                amount: totalPayable,
+                status: values.invoiceStatus as InvoiceStatus,
+                notes: values.notes,
+              },
+            })
+          : await createInvoiceMutation.mutateAsync({
               clientId: isUsingManualClient ? undefined : resolvedSelectedClient?.id,
               clientName: isUsingManualClient ? normalizedManualClientName : undefined,
               groupCode: linkedGroupCode || undefined,
@@ -940,18 +889,7 @@ function CreateInvoiceWorkspace({
               amount: totalPayable,
               status: values.invoiceStatus as InvoiceStatus,
               notes: values.notes,
-            },
-          })
-        : await createInvoiceMutation.mutateAsync({
-            clientId: isUsingManualClient ? undefined : resolvedSelectedClient?.id,
-            clientName: isUsingManualClient ? normalizedManualClientName : undefined,
-            groupCode: linkedGroupCode || undefined,
-            issuedDateIso: values.issueDateIso,
-            dueDateIso: values.dueDateIso,
-            amount: totalPayable,
-            status: values.invoiceStatus as InvoiceStatus,
-            notes: values.notes,
-          });
+            });
 
       const printableItems = normalizedItems.map((item) => {
         const totalPrice = item.pax * item.unitPrice;
@@ -972,28 +910,31 @@ function CreateInvoiceWorkspace({
         };
       });
 
-      const exported = exportInvoicePdf({
-        invoiceNumber: savedInvoice.invoiceNumber,
-        issueDateIso: values.issueDateIso,
-        dueDateIso: values.dueDateIso,
-        statusLabel: values.invoiceStatus as InvoiceStatus,
-        issuingOffice: values.issuingOffice,
-        clientName: savedInvoice.clientName,
-        clientCode: linkedGroupCode || savedInvoice.groupCode || savedInvoice.clientLabel,
-        address: values.address.trim(),
-        bankAccountLabel: resolveBankAccountLabel(values.bankAccount, bankDisbursementOptions),
-        notes: values.notes.trim(),
-        usdToIdr,
-        sarToIdr,
-        subtotalIdr,
-        taxIdr: taxAmount,
-        totalPayableIdr: totalPayable,
-        downPaymentIdr: 0,
-        remainingBalanceIdr: totalPayable,
-        items: printableItems,
-      }, {
-        printWindow: preOpenedPdfWindow,
-      });
+      const exported = exportInvoicePdf(
+        {
+          invoiceNumber: savedInvoice.invoiceNumber,
+          issueDateIso: values.issueDateIso,
+          dueDateIso: values.dueDateIso,
+          statusLabel: values.invoiceStatus as InvoiceStatus,
+          issuingOffice: values.issuingOffice,
+          clientName: savedInvoice.clientName,
+          clientCode: linkedGroupCode || savedInvoice.groupCode || savedInvoice.clientLabel,
+          address: values.address.trim(),
+          bankAccountLabel: resolveBankAccountLabel(values.bankAccount, bankDisbursementOptions),
+          notes: values.notes.trim(),
+          usdToIdr,
+          sarToIdr,
+          subtotalIdr,
+          taxIdr: taxAmount,
+          totalPayableIdr: totalPayable,
+          downPaymentIdr: 0,
+          remainingBalanceIdr: totalPayable,
+          items: printableItems,
+        },
+        {
+          printWindow: preOpenedPdfWindow,
+        },
+      );
 
       if (!exported) {
         if (preOpenedPdfWindow && !preOpenedPdfWindow.closed) {
@@ -1108,9 +1049,7 @@ function CreateInvoiceWorkspace({
               <button
                 type="button"
                 className={`inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-bold text-on-primary shadow-cta-soft transition ${
-                  isSubmitDisabled
-                    ? "cursor-not-allowed bg-slate-300"
-                    : "bg-primary hover:bg-primary-container"
+                  isSubmitDisabled ? "cursor-not-allowed bg-slate-300" : "bg-primary hover:bg-primary-container"
                 }`}
                 onClick={handleSubmitButtonClick}
                 disabled={isSubmitDisabled}
@@ -1122,7 +1061,13 @@ function CreateInvoiceWorkspace({
                       } belum bisa disimpan.`
                 }
               >
-                {isSubmitting ? (isEditMode ? "Saving..." : "Generating...") : isEditMode ? "Save Changes" : "Generate Invoice"}
+                {isSubmitting
+                  ? isEditMode
+                    ? "Saving..."
+                    : "Generating..."
+                  : isEditMode
+                    ? "Save Changes"
+                    : "Generate Invoice"}
               </button>
             </div>
           </div>
@@ -1149,7 +1094,11 @@ function CreateInvoiceWorkspace({
                     <input
                       type="text"
                       className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                      value={isEditMode && resolvedInitialInvoice ? resolvedInitialInvoice.invoiceNumber : nextInvoiceNumberPreview}
+                      value={
+                        isEditMode && resolvedInitialInvoice
+                          ? resolvedInitialInvoice.invoiceNumber
+                          : nextInvoiceNumberPreview
+                      }
                       readOnly
                     />
                   </label>
@@ -1477,12 +1426,8 @@ function CreateInvoiceWorkspace({
                             />
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-xs font-bold text-on-surface">
-                          {lineSubtotalLabel}
-                        </td>
-                        <td className="px-5 py-3 text-xs font-bold text-on-surface">
-                          {formatIdr(lineSubtotalIdr)}
-                        </td>
+                        <td className="px-5 py-3 text-xs font-bold text-on-surface">{lineSubtotalLabel}</td>
+                        <td className="px-5 py-3 text-xs font-bold text-on-surface">{formatIdr(lineSubtotalIdr)}</td>
                         <td className="px-5 py-3">
                           <button
                             type="button"
@@ -1639,7 +1584,6 @@ function CreateInvoiceWorkspace({
                 </div>
               </div>
             </div>
-
           </article>
 
           <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 text-center shadow-sm">
@@ -1656,8 +1600,7 @@ function CreateInvoiceWorkspace({
 
           <article className="rounded-xl border border-primary/15 bg-primary/5 p-4">
             <p className="text-[10px] italic leading-relaxed text-primary/75">
-              Note: Ensure all pilgrim PAX counts match the visa manifestations before generating
-              the final document.
+              Note: Ensure all pilgrim PAX counts match the visa manifestations before generating the final document.
             </p>
           </article>
         </aside>
@@ -1792,11 +1735,11 @@ export function InvoiceScreen({
   const isInvoiceBackendAvailable = invoiceDashboardQuery.data?.dataSource === "prisma";
   const isInvoiceDataLoading = invoiceDashboardQuery.isLoading;
   const invoiceClients = useMemo<InvoiceClientOption[]>(
-    () => (isInvoiceBackendAvailable ? invoiceDashboardQuery.data?.clients ?? [] : []),
+    () => (isInvoiceBackendAvailable ? (invoiceDashboardQuery.data?.clients ?? []) : []),
     [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
   );
   const invoiceRows = useMemo<InvoiceRow[]>(
-    () => (isInvoiceBackendAvailable ? invoiceDashboardQuery.data?.rows ?? [] : []),
+    () => (isInvoiceBackendAvailable ? (invoiceDashboardQuery.data?.rows ?? []) : []),
     [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
   );
   const systemFeedback = useMemo(() => {
@@ -1851,8 +1794,7 @@ export function InvoiceScreen({
   const pageStartIndex = (currentPage - 1) * INVOICE_PAGE_SIZE;
   const paginatedRows = filteredRows.slice(pageStartIndex, pageStartIndex + INVOICE_PAGE_SIZE);
   const rangeStart = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
-  const rangeEnd =
-    filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, pageStartIndex + paginatedRows.length);
+  const rangeEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, pageStartIndex + paginatedRows.length);
 
   const totalRevenue = filteredRows.reduce((total, row) => total + row.amount, 0);
   const paidCount = filteredRows.filter((row) => row.status === "Paid").length;
@@ -2045,7 +1987,6 @@ export function InvoiceScreen({
               placeholder="Search invoices or clients..."
             />
           </label>
-
         </div>
 
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
@@ -2066,9 +2007,7 @@ export function InvoiceScreen({
           <button
             type="button"
             className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition ${
-              isInvoiceBackendAvailable
-                ? "bg-primary hover:bg-primary-container"
-                : "cursor-not-allowed bg-slate-300"
+              isInvoiceBackendAvailable ? "bg-primary hover:bg-primary-container" : "cursor-not-allowed bg-slate-300"
             }`}
             aria-label="Create new invoice"
             disabled={!isInvoiceBackendAvailable}
@@ -2113,9 +2052,7 @@ export function InvoiceScreen({
                 className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium text-on-surface-variant"
                 value={statusFilter}
                 onChange={(event) =>
-                  setStatusFilter(
-                    event.target.value as "all" | "paid" | "pending" | "overdue" | "cancelled",
-                  )
+                  setStatusFilter(event.target.value as "all" | "paid" | "pending" | "overdue" | "cancelled")
                 }
               >
                 <option value="all">All Statuses</option>
@@ -2179,12 +2116,17 @@ export function InvoiceScreen({
             <span className="hidden sm:inline">Total Monthly Revenue</span>
           </p>
           <strong className="mt-2 block text-3xl font-extrabold leading-tight">{formatIdr(totalRevenue)}</strong>
-          <p className="mt-3 inline-flex rounded-lg bg-surface-container-lowest/20 px-2 py-1 text-xs font-bold">{monthlyGrowthLabel}</p>
+          <p className="mt-3 inline-flex rounded-lg bg-surface-container-lowest/20 px-2 py-1 text-xs font-bold">
+            {monthlyGrowthLabel}
+          </p>
           <p className="mt-1 text-xs text-on-primary/85">
             <span className="sm:hidden">vs last month</span>
             <span className="hidden sm:inline">vs previous month</span>
           </p>
-          <span className="material-symbols-outlined absolute -right-3 -bottom-4 text-8xl text-on-primary/15" aria-hidden="true">
+          <span
+            className="material-symbols-outlined absolute -right-3 -bottom-4 text-8xl text-on-primary/15"
+            aria-hidden="true"
+          >
             pentagon
           </span>
         </article>
@@ -2198,7 +2140,9 @@ export function InvoiceScreen({
           <h2 className="mt-3 text-xl font-bold text-slate-800">No invoices found</h2>
           <p className="mt-2 text-sm text-slate-600">
             <span className="sm:hidden">Coba keyword atau filter lain.</span>
-            <span className="hidden sm:inline">Coba ubah keyword pencarian atau filter untuk melihat invoice lainnya.</span>
+            <span className="hidden sm:inline">
+              Coba ubah keyword pencarian atau filter untuk melihat invoice lainnya.
+            </span>
           </p>
         </article>
       ) : (
@@ -2291,7 +2235,9 @@ export function InvoiceScreen({
                   <button
                     type="button"
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
-                      isInvoiceBackendAvailable ? "bg-surface-container-low" : "cursor-not-allowed bg-surface-container-high"
+                      isInvoiceBackendAvailable
+                        ? "bg-surface-container-low"
+                        : "cursor-not-allowed bg-surface-container-high"
                     }`}
                     aria-label={`Edit ${row.invoiceNumber}`}
                     onClick={() => handleOpenEditInvoice(row)}
@@ -2427,4 +2373,3 @@ export function InvoiceScreen({
     </div>
   );
 }
-

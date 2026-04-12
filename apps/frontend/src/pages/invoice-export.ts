@@ -115,7 +115,10 @@ function resolveBankMeta(bankAccountLabel: string): {
     };
   }
 
-  const chunks = trimmed.split(" - ").map((item) => item.trim()).filter(Boolean);
+  const chunks = trimmed
+    .split(" - ")
+    .map((item) => item.trim())
+    .filter(Boolean);
   if (chunks.length >= 2) {
     return {
       bankName: chunks[0],
@@ -142,14 +145,8 @@ function resolveBillToName(payload: InvoiceExportPayload): string {
   }
 
   if (normalizedClientCode) {
-    const strictCodePrefixPattern = new RegExp(
-      `^${escapeRegex(normalizedClientCode)}\\s*[-:|]\\s*`,
-      "i",
-    );
-    const looseCodePrefixPattern = new RegExp(
-      `^${escapeRegex(normalizedClientCode)}\\s+`,
-      "i",
-    );
+    const strictCodePrefixPattern = new RegExp(`^${escapeRegex(normalizedClientCode)}\\s*[-:|]\\s*`, "i");
+    const looseCodePrefixPattern = new RegExp(`^${escapeRegex(normalizedClientCode)}\\s+`, "i");
     const withoutCodePrefix = normalizedClientName
       .replace(strictCodePrefixPattern, "")
       .replace(looseCodePrefixPattern, "")
@@ -191,9 +188,13 @@ function schedulePrint(printableWindow: Window): void {
   };
 
   try {
-    printableWindow.addEventListener("load", () => {
-      window.setTimeout(triggerPrint, 180);
-    }, { once: true });
+    printableWindow.addEventListener(
+      "load",
+      () => {
+        window.setTimeout(triggerPrint, 180);
+      },
+      { once: true },
+    );
   } catch {
     // Some browser contexts expose restricted event APIs on popup proxies.
   }
@@ -201,10 +202,7 @@ function schedulePrint(printableWindow: Window): void {
   window.setTimeout(triggerPrint, 1600);
 }
 
-export function exportInvoicePdf(
-  payload: InvoiceExportPayload,
-  options: InvoiceExportWindowOptions = {},
-): boolean {
+export function exportInvoicePdf(payload: InvoiceExportPayload, options: InvoiceExportWindowOptions = {}): boolean {
   const printableWindow = resolvePrintableWindow(options);
   if (!printableWindow) {
     return false;
@@ -226,13 +224,12 @@ export function exportInvoicePdf(
   const billToName = resolveBillToName(payload);
 
   const rowsHtml = payload.items
-    .map(
-      (item, index) => {
-        const totalPriceLabel =
-          isIdrCurrency(item.currency) || item.totalPriceIdr === item.totalPrice
-            ? "-"
-            : formatCurrency(item.totalPrice, item.currency);
-        return `
+    .map((item, index) => {
+      const totalPriceLabel =
+        isIdrCurrency(item.currency) || item.totalPriceIdr === item.totalPrice
+          ? "-"
+          : formatCurrency(item.totalPrice, item.currency);
+      return `
 <tr class="invoice-line-row group hover:bg-stone-50 transition-colors">
 <td class="py-4 px-4 text-luxury-black font-semibold text-sm">${String(index + 1).padStart(2, "0")}</td>
 <td class="py-4 px-4">
@@ -244,8 +241,7 @@ export function exportInvoicePdf(
 <td class="py-4 px-4 text-left font-bold font-manrope text-luxury-black">${escapeHtml(formatIdr(item.totalPriceIdr))}</td>
 <td class="py-4 px-4 text-center text-stone-400 font-semibold text-sm">-</td>
 </tr>`;
-      },
-    )
+    })
     .join("");
 
   const notesHtml = payload.notes.trim()

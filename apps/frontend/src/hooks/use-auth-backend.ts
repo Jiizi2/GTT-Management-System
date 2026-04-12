@@ -1,26 +1,11 @@
 import { type LoginCredentials } from "../pages/login-page.js";
-import { resolveBackendApiBaseUrl } from "../shared/backend-api-base.js";
+import { fetchBackend, parseBackendResponse } from "../shared/api-client.js";
+import { extractBackendErrorMessage } from "../shared/api-error.js";
 import { coerceAuthSession, type AuthSession } from "../shared/auth-session.js";
 
-function extractBackendErrorMessage(status: number, payload: unknown, fallbackText: string): string {
-  if (payload && typeof payload === "object" && "message" in payload) {
-    const message = (payload as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message.trim();
-    }
-  }
-
-  if (fallbackText.trim()) {
-    return fallbackText.trim();
-  }
-
-  return `Authentication failed (${status}).`;
-}
-
 export async function loginWithBackend(credentials: LoginCredentials): Promise<AuthSession> {
-  const response = await fetch(`${resolveBackendApiBaseUrl()}/auth/login`, {
+  const response = await fetchBackend("/auth/login", {
     method: "POST",
-    credentials: "include",
     headers: {
       "content-type": "application/json",
     },
@@ -30,19 +15,10 @@ export async function loginWithBackend(credentials: LoginCredentials): Promise<A
       rememberSession: credentials.rememberSession,
     }),
   });
-
-  const responseText = await response.text();
-  let payload: unknown = null;
-  if (responseText.trim()) {
-    try {
-      payload = JSON.parse(responseText) as unknown;
-    } catch {
-      payload = null;
-    }
-  }
+  const { payload, responseText } = await parseBackendResponse(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, payload, responseText));
+    throw new Error(extractBackendErrorMessage(response.status, payload, responseText, "Authentication failed"));
   }
 
   const session = coerceAuthSession(payload);
@@ -54,27 +30,17 @@ export async function loginWithBackend(credentials: LoginCredentials): Promise<A
 }
 
 export async function fetchCurrentSessionFromBackend(): Promise<AuthSession | null> {
-  const response = await fetch(`${resolveBackendApiBaseUrl()}/auth/session`, {
+  const response = await fetchBackend("/auth/session", {
     method: "GET",
-    credentials: "include",
   });
 
   if (response.status === 401) {
     return null;
   }
-
-  const responseText = await response.text();
-  let payload: unknown = null;
-  if (responseText.trim()) {
-    try {
-      payload = JSON.parse(responseText) as unknown;
-    } catch {
-      payload = null;
-    }
-  }
+  const { payload, responseText } = await parseBackendResponse(response);
 
   if (!response.ok) {
-    throw new Error(extractBackendErrorMessage(response.status, payload, responseText));
+    throw new Error(extractBackendErrorMessage(response.status, payload, responseText, "Authentication failed"));
   }
 
   const session = coerceAuthSession(payload);
@@ -86,8 +52,7 @@ export async function fetchCurrentSessionFromBackend(): Promise<AuthSession | nu
 }
 
 export async function logoutFromBackend(): Promise<void> {
-  await fetch(`${resolveBackendApiBaseUrl()}/auth/logout`, {
+  await fetchBackend("/auth/logout", {
     method: "POST",
-    credentials: "include",
   });
 }

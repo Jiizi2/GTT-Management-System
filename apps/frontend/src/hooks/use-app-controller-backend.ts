@@ -7,8 +7,6 @@ import {
   musyrifAvatar,
   parseTimeForInput,
   resolveTotalBusCount,
-  resolveVisaAgreementDateRange,
-  resolveVisaAgreementNumber,
   resolveVisaProvider,
 } from "../shared/app-domain";
 import type {
@@ -21,10 +19,9 @@ import type {
   GroupVisaSetup,
   VisaPaymentStatus,
   VisaStatus,
-  VisaTrackingRow,
 } from "../shared/app-domain";
-import { resolveBackendApiBaseUrl } from "../shared/backend-api-base";
-import { clearAuthSession } from "../shared/auth-session";
+import { fetchBackendParsed } from "../shared/api-client";
+import { formatBackendRequestError } from "../shared/api-error";
 
 export type GroupFetchProjection = "summary" | "detail";
 
@@ -233,20 +230,6 @@ type BackendGroupRecord = {
   }> | null;
 };
 
-async function fetchBackend(endpoint: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(endpoint, {
-    ...init,
-    credentials: "include",
-    headers: new Headers(init?.headers),
-  });
-
-  if (response.status === 401) {
-    clearAuthSession();
-  }
-
-  return response;
-}
-
 function mapToneToBackend(tone: GroupData["tone"]): "ACTIVE" | "INACTIVE" {
   return tone === "active" ? "ACTIVE" : "INACTIVE";
 }
@@ -263,9 +246,7 @@ function mapVisaStatusToBackend(status: VisaStatus): "DRAFT" | "PENDING" | "ISSU
   return "DRAFT";
 }
 
-function mapPaymentStatusToBackend(
-  status: VisaPaymentStatus,
-): "PAID" | "UNPAID" | "PARTIAL" {
+function mapPaymentStatusToBackend(status: VisaPaymentStatus): "PAID" | "UNPAID" | "PARTIAL" {
   if (status === "Paid") {
     return "PAID";
   }
@@ -277,15 +258,11 @@ function mapPaymentStatusToBackend(
   return "UNPAID";
 }
 
-function mapAgreementStatusToBackend(
-  status: AgreementApprovalStatus,
-): "WAITING" | "APPROVED" {
+function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" {
   return status === "Approved" ? "APPROVED" : "WAITING";
 }
 
-function mapRaudhahStatusToBackend(
-  status: GroupRaudhahAppointment["status"],
-): "FREE" | "AFTER" | "BEFORE" {
+function mapRaudhahStatusToBackend(status: GroupRaudhahAppointment["status"]): "FREE" | "AFTER" | "BEFORE" {
   if (status === "After") {
     return "AFTER";
   }
@@ -297,9 +274,7 @@ function mapRaudhahStatusToBackend(
   return "FREE";
 }
 
-function mapChecklistStatusToBackend(
-  status: ChecklistAssignmentStatus,
-): "NOT_COMPLETE" | "ASSIGNED" {
+function mapChecklistStatusToBackend(status: ChecklistAssignmentStatus): "NOT_COMPLETE" | "ASSIGNED" {
   return status === "Assigned" ? "ASSIGNED" : "NOT_COMPLETE";
 }
 
@@ -349,14 +324,10 @@ function resolveGroupTravelDates(group: GroupData): { arrivalDate: string; retur
   const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary);
   const arrivalDate = isIsoDateOnly(configuredArrivalDate)
     ? configuredArrivalDate
-    : earliestIsoDate ?? getLocalIsoDateWithOffset(0);
+    : (earliestIsoDate ?? getLocalIsoDateWithOffset(0));
   const fallbackReturnDate =
-    latestIsoDate ??
-    toIsoDateWithAddedDays(arrivalDate, Math.max(1, group.durationDays - 1)) ??
-    arrivalDate;
-  const returnDateCandidate = isIsoDateOnly(configuredReturnDate)
-    ? configuredReturnDate
-    : fallbackReturnDate;
+    latestIsoDate ?? toIsoDateWithAddedDays(arrivalDate, Math.max(1, group.durationDays - 1)) ?? arrivalDate;
+  const returnDateCandidate = isIsoDateOnly(configuredReturnDate) ? configuredReturnDate : fallbackReturnDate;
   const returnDate = returnDateCandidate >= arrivalDate ? returnDateCandidate : arrivalDate;
 
   return {
@@ -422,10 +393,8 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       notes: item.notes?.trim(),
       transferByTrain: item.transferByTrain,
       trainDepartureTime: normalizeStoredTimeLabel(item.trainDepartureTime?.trim() ?? "") || undefined,
-      destinationPickupTime:
-        normalizeStoredTimeLabel(item.destinationPickupTime?.trim() ?? "") || undefined,
-      hotelPickupRequestTime:
-        normalizeStoredTimeLabel(item.hotelPickupRequestTime?.trim() ?? "") || undefined,
+      destinationPickupTime: normalizeStoredTimeLabel(item.destinationPickupTime?.trim() ?? "") || undefined,
+      hotelPickupRequestTime: normalizeStoredTimeLabel(item.hotelPickupRequestTime?.trim() ?? "") || undefined,
     })),
     notes: group.notes.map((text, index) => ({
       sortOrder: index,
@@ -438,9 +407,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
     const normalizedIssuedDate = group.visaSetup.issuedDate?.trim() ?? "";
     payload.visaSetup = {
       visaStatus: mapVisaStatusToBackend(group.visaSetup.visaStatus),
-      issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate)
-        ? normalizedIssuedDate
-        : undefined,
+      issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate) ? normalizedIssuedDate : undefined,
       syarikah: group.visaSetup.syarikah.trim(),
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
       outstandingAmount: 0,
@@ -659,10 +626,7 @@ function toIsoDate(value: unknown): string | null {
   return parsed.toISOString().slice(0, 10);
 }
 
-function mapBackendToneToFrontend(
-  tone: string | undefined,
-  status: string | undefined,
-): GroupData["tone"] {
+function mapBackendToneToFrontend(tone: string | undefined, status: string | undefined): GroupData["tone"] {
   const normalizedTone = tone?.trim().toLowerCase() ?? "";
   if (normalizedTone === "active") {
     return "active";
@@ -760,9 +724,7 @@ function inferHotelNameFromItineraryRecord(record: {
   return "";
 }
 
-function resolveBusStatusFromNotes(
-  notes: string[],
-): GroupVisaSetup["busStatus"] {
+function resolveBusStatusFromNotes(notes: string[]): GroupVisaSetup["busStatus"] {
   const marker = notes.find((note) => /^bus status\s*:/i.test(note));
   if (!marker) {
     return undefined;
@@ -780,9 +742,7 @@ function resolveBusStatusFromNotes(
   return undefined;
 }
 
-type BackendHotelAgreementRecord = NonNullable<
-  NonNullable<BackendGroupRecord["visaSetup"]>["hotelAgreements"]
->[number];
+type BackendHotelAgreementRecord = NonNullable<NonNullable<BackendGroupRecord["visaSetup"]>["hotelAgreements"]>[number];
 
 function mapBackendHotelsByCity({
   hotelAgreements,
@@ -836,8 +796,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
       ?.slice()
       .sort(
         (left, right) =>
-          readNumber(left.sortOrder, Number.MAX_SAFE_INTEGER) -
-          readNumber(right.sortOrder, Number.MAX_SAFE_INTEGER),
+          readNumber(left.sortOrder, Number.MAX_SAFE_INTEGER) - readNumber(right.sortOrder, Number.MAX_SAFE_INTEGER),
       )
       .map((item) => {
         const isoDate = toIsoDate(item.isoDate);
@@ -864,12 +823,8 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
           notes: readString(item.notes ?? "", ""),
           transferByTrain: Boolean(item.transferByTrain),
           trainDepartureTime: normalizeStoredTimeLabel(readString(item.trainDepartureTime ?? "", "")),
-          destinationPickupTime: normalizeStoredTimeLabel(
-            readString(item.destinationPickupTime ?? "", ""),
-          ),
-          hotelPickupRequestTime: normalizeStoredTimeLabel(
-            readString(item.hotelPickupRequestTime ?? "", ""),
-          ),
+          destinationPickupTime: normalizeStoredTimeLabel(readString(item.destinationPickupTime ?? "", "")),
+          hotelPickupRequestTime: normalizeStoredTimeLabel(readString(item.hotelPickupRequestTime ?? "", "")),
         };
       }) ?? [];
   const sortedItinerary = [...mappedItinerary].sort((left, right) => {
@@ -890,8 +845,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
       ?.slice()
       .sort(
         (left, right) =>
-          readNumber(left.sortOrder, Number.MAX_SAFE_INTEGER) -
-          readNumber(right.sortOrder, Number.MAX_SAFE_INTEGER),
+          readNumber(left.sortOrder, Number.MAX_SAFE_INTEGER) - readNumber(right.sortOrder, Number.MAX_SAFE_INTEGER),
       )
       .map((item) => ({
         date: readString(item.dateLabel),
@@ -901,17 +855,14 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
       }))
       .filter((item) => item.date && item.title) ?? [];
 
-  const fallbackTimelineFromItinerary = sortedItinerary
-    .slice(0, 2)
-    .map((item, index) => ({
-      date: item.date,
-      title: item.title,
-      isCurrent: index === 1,
-      nextActivity: index === 1 ? item.meta : "",
-    }));
+  const fallbackTimelineFromItinerary = sortedItinerary.slice(0, 2).map((item, index) => ({
+    date: item.date,
+    title: item.title,
+    isCurrent: index === 1,
+    nextActivity: index === 1 ? item.meta : "",
+  }));
 
-  const timelineSource =
-    fallbackTimelineFromItinerary.length > 0 ? fallbackTimelineFromItinerary : mappedTimeline;
+  const timelineSource = fallbackTimelineFromItinerary.length > 0 ? fallbackTimelineFromItinerary : mappedTimeline;
   const firstTimeline = timelineSource[0] ?? {
     date: group.nextActivity?.dateLabel?.trim() || "-",
     title: group.nextActivity?.title?.trim() || "Initial Activity",
@@ -923,11 +874,9 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     title: group.nextActivity?.title?.trim() || firstTimeline.title,
     isCurrent: true,
     nextActivity:
-      normalizeTimePrefixInPipeSeparatedText(group.nextActivity?.timeLabel?.trim() ?? "") ||
-      firstTimeline.nextActivity,
+      normalizeTimePrefixInPipeSeparatedText(group.nextActivity?.timeLabel?.trim() ?? "") || firstTimeline.nextActivity,
   };
-  const highlightedItineraryItem =
-    sortedItinerary.find((item) => item.highlighted) ?? sortedItinerary[0];
+  const highlightedItineraryItem = sortedItinerary.find((item) => item.highlighted) ?? sortedItinerary[0];
   const backendNextActivityTitle = readString(group.nextActivity?.title, "");
   const backendNextActivityLooksLikeVisaStatus = /^visa\b/i.test(backendNextActivityTitle);
 
@@ -935,13 +884,15 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     title:
       highlightedItineraryItem?.title ||
       (!backendNextActivityLooksLikeVisaStatus ? backendNextActivityTitle : "") ||
-      (secondTimeline.title || firstTimeline.title || "Upcoming Activity"),
+      secondTimeline.title ||
+      firstTimeline.title ||
+      "Upcoming Activity",
     date:
       highlightedItineraryItem?.date ||
-      (!backendNextActivityLooksLikeVisaStatus
-        ? readString(group.nextActivity?.dateLabel, "")
-        : "") ||
-      (secondTimeline.date || firstTimeline.date || "-"),
+      (!backendNextActivityLooksLikeVisaStatus ? readString(group.nextActivity?.dateLabel, "") : "") ||
+      secondTimeline.date ||
+      firstTimeline.date ||
+      "-",
     time:
       highlightedItineraryItem?.time ||
       (!backendNextActivityLooksLikeVisaStatus
@@ -950,9 +901,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
       "",
     icon:
       highlightedItineraryItem?.icon ||
-      (!backendNextActivityLooksLikeVisaStatus
-        ? readString(group.nextActivity?.icon, "")
-        : "") ||
+      (!backendNextActivityLooksLikeVisaStatus ? readString(group.nextActivity?.icon, "") : "") ||
       "event",
   };
 
@@ -964,21 +913,18 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
   const backendReturnDateIso = toIsoDate(group.returnDate) ?? "";
   const arrivalDate = isIsoDateOnly(backendArrivalDateIso)
     ? backendArrivalDateIso
-    : itineraryBoundaryDates.earliestIsoDate ?? getLocalIsoDateWithOffset(0);
+    : (itineraryBoundaryDates.earliestIsoDate ?? getLocalIsoDateWithOffset(0));
   const fallbackReturnDate =
     itineraryBoundaryDates.latestIsoDate ??
     toIsoDateWithAddedDays(arrivalDate, Math.max(1, durationDays - 1)) ??
     arrivalDate;
-  const returnDateCandidate = isIsoDateOnly(backendReturnDateIso)
-    ? backendReturnDateIso
-    : fallbackReturnDate;
+  const returnDateCandidate = isIsoDateOnly(backendReturnDateIso) ? backendReturnDateIso : fallbackReturnDate;
   const returnDate = returnDateCandidate >= arrivalDate ? returnDateCandidate : arrivalDate;
   const mappedNotes = (group.notes ?? [])
     .slice()
     .sort(
       (left, right) =>
-        readNumber(left.sortOrder, Number.MAX_SAFE_INTEGER) -
-        readNumber(right.sortOrder, Number.MAX_SAFE_INTEGER),
+        readNumber(left.sortOrder, Number.MAX_SAFE_INTEGER) - readNumber(right.sortOrder, Number.MAX_SAFE_INTEGER),
     )
     .map((item) => readString(item.text))
     .filter((item) => item.length > 0);
@@ -1060,12 +1006,8 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
         requiredBusCount: Math.max(1, readNumber(assignment.requiredBusCount, 1)),
         scheduledTime,
         transferByTrain: Boolean(assignment.transferByTrain),
-        trainDepartureTime: normalizeStoredTimeLabel(
-          readString(assignment.trainDepartureTime ?? "", ""),
-        ),
-        stationPickupTime: normalizeStoredTimeLabel(
-          readString(assignment.stationPickupTime ?? "", ""),
-        ),
+        trainDepartureTime: normalizeStoredTimeLabel(readString(assignment.trainDepartureTime ?? "", "")),
+        stationPickupTime: normalizeStoredTimeLabel(readString(assignment.stationPickupTime ?? "", "")),
         status: mapBackendChecklistStatus(assignment.status),
         drivers: mappedDrivers,
       });
@@ -1109,7 +1051,6 @@ export async function fetchGroupsFromBackend({
   query?: string;
   projection?: GroupFetchProjection;
 } = {}): Promise<GroupData[]> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
   const searchParams = new URLSearchParams();
   const normalizedQuery = query?.trim() ?? "";
   if (normalizedQuery.length > 0) {
@@ -1118,18 +1059,16 @@ export async function fetchGroupsFromBackend({
   if (projection) {
     searchParams.set("projection", projection);
   }
-  const endpoint = searchParams.size > 0 ? `${apiBaseUrl}/groups?${searchParams.toString()}` : `${apiBaseUrl}/groups`;
-  const response = await fetchBackend(endpoint, {
+  const endpoint = searchParams.size > 0 ? `/groups?${searchParams.toString()}` : "/groups";
+  const { response, payload, responseText } = await fetchBackendParsed(endpoint, {
     method: "GET",
     signal,
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend fetch failed (${response.status}): ${errorMessage}`);
+    throw new Error(formatBackendRequestError(response.status, payload, responseText, "Backend fetch failed"));
   }
 
-  const payload = (await response.json()) as unknown;
   if (!Array.isArray(payload)) {
     throw new Error("Backend fetch failed: response is not an array.");
   }
@@ -1143,8 +1082,11 @@ export async function fetchGroupsFromBackend({
 
 export async function createGroupInBackend(group: GroupData): Promise<void> {
   const payload = mapGroupToBackendPayload(group);
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/groups`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed("/groups", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1153,15 +1095,17 @@ export async function createGroupInBackend(group: GroupData): Promise<void> {
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend sync failed (${response.status}): ${errorMessage}`);
+    throw new Error(formatBackendRequestError(response.status, responsePayload, responseText, "Backend sync failed"));
   }
 }
 
 export async function updateGroupInBackend(groupCode: string, group: GroupData): Promise<void> {
   const { arrivalDate, returnDate } = resolveGroupTravelDates(group);
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -1181,15 +1125,17 @@ export async function updateGroupInBackend(groupCode: string, group: GroupData):
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend update failed (${response.status}): ${errorMessage}`);
+    throw new Error(formatBackendRequestError(response.status, responsePayload, responseText, "Backend update failed"));
   }
 }
 
 export async function replaceGroupInBackend(groupCode: string, group: GroupData): Promise<void> {
   const payload = mapGroupToBackendPayload(group);
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -1198,20 +1144,22 @@ export async function replaceGroupInBackend(groupCode: string, group: GroupData)
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend replace failed (${response.status}): ${errorMessage}`);
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Backend replace failed"),
+    );
   }
 }
 
 export async function deleteGroupInBackend(groupCode: string): Promise<void> {
-  const apiBaseUrl = resolveBackendApiBaseUrl();
-  const response = await fetchBackend(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}`, {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    const errorMessage = await response.text();
-    throw new Error(`Backend delete failed (${response.status}): ${errorMessage}`);
+    throw new Error(formatBackendRequestError(response.status, responsePayload, responseText, "Backend delete failed"));
   }
 }
-

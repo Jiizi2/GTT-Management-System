@@ -39,10 +39,7 @@ function coerceAuthSessionUser(value: unknown): AuthSessionUser | null {
   const name = typeof record.name === "string" ? record.name.trim() : "";
   const username = typeof record.username === "string" ? record.username.trim() : "";
   const email = typeof record.email === "string" ? record.email.trim() : "";
-  const accessTier =
-    record.accessTier === "admin" || record.accessTier === "super-admin"
-      ? record.accessTier
-      : null;
+  const accessTier = record.accessTier === "admin" || record.accessTier === "super-admin" ? record.accessTier : null;
 
   if (!id || !name || !username || !email || !accessTier) {
     return null;
@@ -83,10 +80,7 @@ export function coerceAuthSession(value: unknown): AuthSession | null {
   };
 }
 
-function readStorageValue(
-  storage: Storage | undefined,
-  key: string,
-): string | null {
+function readStorageValue(storage: Storage | undefined, key: string): string | null {
   if (!storage) {
     return null;
   }
@@ -180,9 +174,7 @@ export function persistAuthSession(session: AuthSession): void {
   clearStorageValue(window.sessionStorage, AUTH_SESSION_STORAGE_KEY);
 
   try {
-    const storageTarget = normalizedSession.rememberSession
-      ? window.localStorage
-      : window.sessionStorage;
+    const storageTarget = normalizedSession.rememberSession ? window.localStorage : window.sessionStorage;
     storageTarget.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
   } catch {
     // Ignore storage errors in restricted browser contexts.

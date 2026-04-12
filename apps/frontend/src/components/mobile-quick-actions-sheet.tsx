@@ -114,9 +114,7 @@ export function MobileQuickActionsSheet({
 
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary/80">
-                  Tools
-                </p>
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary/80">Tools</p>
                 <h2 id="mobile-quick-actions-title" className="mt-1 text-2xl font-bold tracking-tight text-on-surface">
                   Pilih Halaman Tools
                 </h2>

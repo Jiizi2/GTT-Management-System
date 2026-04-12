@@ -13,11 +13,7 @@ export function useGroupsQuery(projection: GroupFetchProjection, enabled = true)
   });
 }
 
-export function useGroupsSearchQuery(
-  query: string,
-  projection: GroupFetchProjection,
-  enabled = true,
-) {
+export function useGroupsSearchQuery(query: string, projection: GroupFetchProjection, enabled = true) {
   const normalizedQuery = query.trim().toLowerCase();
 
   return useQuery({
