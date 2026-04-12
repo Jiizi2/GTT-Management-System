@@ -106,6 +106,7 @@ export type FindAllOptions = {
   page?: number;
   pageSize?: number;
   filter?: string;
+  activeOnly?: boolean;
   projection?: GroupResponseProjection;
 };
 

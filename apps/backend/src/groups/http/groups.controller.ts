@@ -41,6 +41,11 @@ function normalizeGroupProjection(rawProjection?: string): GroupResponseProjecti
   return rawProjection?.trim().toLowerCase() === "summary" ? "summary" : "detail";
 }
 
+function normalizeBooleanQuery(rawValue?: string): boolean {
+  const normalized = rawValue?.trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+}
+
 @ApiTags("Groups")
 @ApiBearerAuth("access-token")
 @ApiCookieAuth("auth-cookie")
@@ -64,6 +69,7 @@ export class GroupsController {
   @ApiQuery({ name: "page", required: false, example: "1" })
   @ApiQuery({ name: "pageSize", required: false, example: "20" })
   @ApiQuery({ name: "filter", required: false, example: "missing-hotel" })
+  @ApiQuery({ name: "activeOnly", required: false, example: true })
   @ApiQuery({ name: "projection", required: false, example: "summary" })
   @ApiOkResponse({
     description: "Daftar group berhasil dibaca.",
@@ -96,6 +102,7 @@ export class GroupsController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
     @Query("filter") filter?: string,
+    @Query("activeOnly") activeOnly?: string,
     @Query("projection") projection?: string,
   ) {
     const parsedPage = Number.parseInt(page ?? "", 10);
@@ -106,6 +113,7 @@ export class GroupsController {
       pageSize:
         Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : undefined,
       filter,
+      activeOnly: normalizeBooleanQuery(activeOnly),
       projection: normalizeGroupProjection(projection),
     });
   }

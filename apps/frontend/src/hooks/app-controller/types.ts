@@ -18,6 +18,11 @@ export type OverviewStatCard = {
   tone: "primary" | "secondary" | "tertiary";
 };
 
+export type OverviewMonthOption = {
+  value: string;
+  label: string;
+};
+
 export type SyncFeedback = {
   id: number;
   tone: "success" | "error" | "info";
@@ -31,6 +36,8 @@ export type AppController = {
   activeNav: NavId;
   query: string;
   isActiveOnly: boolean;
+  overviewMonthFilter: string;
+  overviewMonthOptions: OverviewMonthOption[];
   selectedGroupCode: string | null;
   selectedGroup: GroupData | null;
   selectedVisaGroupCode: string | null;
@@ -66,5 +73,6 @@ export type AppController = {
   dismissSyncFeedback: () => void;
   handleQueryChange: (value: string) => void;
   handleToggleActiveOnly: (value: boolean) => void;
+  handleOverviewMonthFilterChange: (value: string) => void;
   toggleSidebarCollapse: () => void;
 };

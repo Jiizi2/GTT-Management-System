@@ -99,11 +99,13 @@ export function exportOverviewReportPdf({
   groups,
   query,
   isActiveOnly,
+  monthLabel,
   summaryMessage,
 }: {
   groups: GroupData[];
   query: string;
   isActiveOnly: boolean;
+  monthLabel: string;
   summaryMessage: string;
 }): boolean {
   const printableWindow = window.open("", "_blank", "width=1280,height=860");
@@ -131,7 +133,9 @@ export function exportOverviewReportPdf({
         ? "Active only"
         : "All groups"
       : "All groups (inactive excluded in PDF)";
-  const filterLabel = [scopeLabel, normalizedQuery ? `Query: "${normalizedQuery}"` : ""].filter(Boolean).join(" | ");
+  const filterLabel = [scopeLabel, `Month: ${monthLabel}`, normalizedQuery ? `Query: "${normalizedQuery}"` : ""]
+    .filter(Boolean)
+    .join(" | ");
 
   const tableRows = rows
     .map(

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { NotFoundException } from "@nestjs/common";
-import { ChecklistAssignmentStatus, Prisma, VisaPaymentStatus, VisaStatus } from "@prisma/client";
+import { ChecklistAssignmentStatus, GroupTone, Prisma, VisaPaymentStatus, VisaStatus } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
 
@@ -346,6 +346,35 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
     try {
       await service.findAll(undefined, {});
       assert.equal(whereUsed, undefined);
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let whereUsed: unknown;
+    const prismaMock = {
+      group: {
+        findMany: async (args: Record<string, unknown>) => {
+          whereUsed = args.where;
+          return [];
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      const items = (await service.findAll(undefined, {
+        activeOnly: true,
+      })) as unknown[];
+      assert.equal(items.length, 0);
+      assert.deepEqual(whereUsed, {
+        AND: [
+          {
+            tone: GroupTone.ACTIVE,
+          },
+        ],
+      });
     } finally {
       restore();
     }

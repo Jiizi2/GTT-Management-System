@@ -92,10 +92,13 @@ export function AppMainContent({ controller }: { controller: AppController }) {
               query={controller.query}
               filteredGroups={controller.filteredGroups}
               isActiveOnly={controller.isActiveOnly}
+              overviewMonthFilter={controller.overviewMonthFilter}
+              overviewMonthOptions={controller.overviewMonthOptions}
               statCards={controller.statCards}
               summaryMessage={controller.summaryMessage}
               onQueryChange={controller.handleQueryChange}
               onToggleActiveOnly={controller.handleToggleActiveOnly}
+              onOverviewMonthFilterChange={controller.handleOverviewMonthFilterChange}
               onOpenDetail={controller.handleOpenDetail}
             />
           }
