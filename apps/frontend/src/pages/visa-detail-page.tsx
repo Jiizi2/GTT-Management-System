@@ -3,8 +3,11 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import * as Domain from "../shared/app-domain";
+import { buildRaudhahReminderTemplate } from "../shared/raudhah-reminder-template.js";
 import { DatePickerInput } from "../components/date-time-pickers";
+import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
 import { SereneSelect } from "../components/serene-select";
+import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import {
   PaymentStatusModal,
   SyarikahModal,
@@ -28,7 +31,6 @@ const {
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
   resolveVisaProvider,
-  shiftIsoDate,
 } = Domain;
 
 type Tone = "success" | "warning" | "muted";
@@ -122,98 +124,6 @@ function getRaudhahStatusBadgeClasses(status: RaudhahStatus): string {
   return "border-brand-secondary/30 bg-brand-secondary/12 text-brand-secondary";
 }
 
-function formatReminderHeaderDate(isoDate: string): string {
-  if (!isoDate) {
-    return "-";
-  }
-
-  const parsedDate = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return isoDate;
-  }
-
-  return parsedDate
-    .toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    })
-    .toUpperCase()
-    .replace(".", "");
-}
-
-function buildRaudhahAgentScheduleLines(appointments: Array<{ dateIso: string; status: RaudhahStatus }>): string[] {
-  const parsedAppointments = appointments
-    .map((appointment) => {
-      const parsedDate = new Date(`${appointment.dateIso}T12:00:00`);
-      if (Number.isNaN(parsedDate.getTime())) {
-        return null;
-      }
-
-      return {
-        day: parsedDate.getDate(),
-        status: appointment.status,
-      };
-    })
-    .filter(
-      (
-        appointment,
-      ): appointment is {
-        day: number;
-        status: RaudhahStatus;
-      } => appointment !== null,
-    );
-
-  if (parsedAppointments.length === 0) {
-    return ["- [tanggal] -> Free", "- [tanggal] -> After", "- [tanggal] -> Before (sebelum dzuhur)"];
-  }
-
-  const statusOrder: RaudhahStatus[] = ["Free", "After", "Before"];
-  const lines = statusOrder
-    .map((status) => {
-      const days = Array.from(
-        new Set(
-          parsedAppointments
-            .filter((appointment) => appointment.status === status)
-            .map((appointment) => appointment.day),
-        ),
-      ).sort((left, right) => left - right);
-
-      if (days.length === 0) {
-        return null;
-      }
-
-      if (status === "Before") {
-        return `- ${days.join(" - ")} -> ${status} (sebelum dzuhur)`;
-      }
-
-      return `- ${days.join(" - ")} -> ${status}`;
-    })
-    .filter((line): line is string => line !== null);
-
-  if (lines.length > 0) {
-    return lines;
-  }
-
-  return ["- [tanggal] -> Free", "- [tanggal] -> After", "- [tanggal] -> Before (sebelum dzuhur)"];
-}
-
-function buildNusukSlotScheduleLines(appointments: Array<{ dateIso: string }>): string[] {
-  const targetDates = Array.from(new Set(appointments.map((appointment) => appointment.dateIso))).sort((left, right) =>
-    left.localeCompare(right),
-  );
-
-  if (targetDates.length === 0) {
-    return ["- Target [tanggal] -> H-7 [tanggal] | H-2 [tanggal]"];
-  }
-
-  return targetDates.map((targetDateIso) => {
-    const h7BookingDateIso = shiftIsoDate(targetDateIso, -7);
-    const h2BookingDateIso = shiftIsoDate(targetDateIso, -2);
-    return `- Target ${formatVisaDateWithYear(targetDateIso)} -> H-7 ${formatVisaDateWithYear(
-      h7BookingDateIso,
-    )} | H-2 ${formatVisaDateWithYear(h2BookingDateIso)}`;
-  });
-}
 const inlineHotelFieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-medium text-slate-700";
 const inlineHotelInputClassName =
   "h-11 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
@@ -262,6 +172,12 @@ function InlineHotelAgreementForm({
     resolver: zodResolver(inlineHotelSchema),
     defaultValues: initialValue,
   });
+  const hotelNameErrorMessage = errors.hotelName?.message;
+  const agreementNumberErrorMessage = errors.agreementNumber?.message;
+  const paxErrorMessage = errors.pax?.message;
+  const statusErrorMessage = errors.status?.message;
+  const stayStartErrorMessage = errors.stayStartIso?.message;
+  const stayEndErrorMessage = errors.stayEndIso?.message;
 
   return (
     <article className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
@@ -278,44 +194,55 @@ function InlineHotelAgreementForm({
             <label className={inlineHotelFieldClassName}>
               <span>Hotel Name</span>
               <input
+                id="visa-inline-hotel-name"
                 type="text"
                 className={inlineHotelInputClassName}
                 placeholder={hotelPlaceholder}
                 {...register("hotelName")}
+                aria-invalid={getFieldAriaInvalid(hotelNameErrorMessage)}
+                aria-describedby={getFieldDescribedBy("visa-inline-hotel-name", {
+                  errorMessage: hotelNameErrorMessage,
+                })}
               />
             </label>
-            {errors.hotelName ? (
-              <p className="text-xs font-medium text-brand-tertiary">{errors.hotelName.message}</p>
-            ) : null}
+            <FieldErrorMessage fieldId="visa-inline-hotel-name" message={hotelNameErrorMessage} />
           </div>
 
           <div className="grid gap-1.5">
             <label className={inlineHotelFieldClassName}>
               <span>Agreement Number</span>
               <input
+                id="visa-inline-agreement-number"
                 type="text"
                 className={inlineHotelInputClassName}
                 placeholder="2026xxxxxxxxxxxxx"
                 {...register("agreementNumber")}
+                aria-invalid={getFieldAriaInvalid(agreementNumberErrorMessage)}
+                aria-describedby={getFieldDescribedBy("visa-inline-agreement-number", {
+                  errorMessage: agreementNumberErrorMessage,
+                })}
               />
             </label>
-            {errors.agreementNumber ? (
-              <p className="text-xs font-medium text-brand-tertiary">{errors.agreementNumber.message}</p>
-            ) : null}
+            <FieldErrorMessage fieldId="visa-inline-agreement-number" message={agreementNumberErrorMessage} />
           </div>
 
           <div className="grid gap-1.5">
             <label className={inlineHotelFieldClassName}>
               <span>Total Pax</span>
               <input
+                id="visa-inline-hotel-pax"
                 type="number"
                 min={1}
                 className={inlineHotelInputClassName}
                 placeholder="70"
                 {...register("pax")}
+                aria-invalid={getFieldAriaInvalid(paxErrorMessage)}
+                aria-describedby={getFieldDescribedBy("visa-inline-hotel-pax", {
+                  errorMessage: paxErrorMessage,
+                })}
               />
             </label>
-            {errors.pax ? <p className="text-xs font-medium text-brand-tertiary">{errors.pax.message}</p> : null}
+            <FieldErrorMessage fieldId="visa-inline-hotel-pax" message={paxErrorMessage} />
           </div>
 
           <div className="grid gap-1.5">
@@ -327,9 +254,14 @@ function InlineHotelAgreementForm({
                   name="status"
                   render={({ field }) => (
                     <SereneSelect
+                      id="visa-inline-hotel-status"
                       className={inlineHotelSelectClassName}
                       value={field.value}
                       onChange={(event) => field.onChange(event.target.value)}
+                      aria-invalid={getFieldAriaInvalid(statusErrorMessage)}
+                      aria-describedby={getFieldDescribedBy("visa-inline-hotel-status", {
+                        errorMessage: statusErrorMessage,
+                      })}
                     >
                       <option value="Waiting for Approval">Waiting for Approval</option>
                       <option value="Approved">Approved</option>
@@ -338,6 +270,7 @@ function InlineHotelAgreementForm({
                 />
               </div>
             </label>
+            <FieldErrorMessage fieldId="visa-inline-hotel-status" message={statusErrorMessage} />
           </div>
 
           <div className="grid gap-1.5">
@@ -348,16 +281,19 @@ function InlineHotelAgreementForm({
                 name="stayStartIso"
                 render={({ field }) => (
                   <DatePickerInput
+                    id="visa-inline-hotel-stay-start"
                     inputClassName={inlineHotelInputClassName}
                     value={field.value}
                     onChange={field.onChange}
+                    ariaInvalid={getFieldAriaInvalid(stayStartErrorMessage)}
+                    ariaDescribedBy={getFieldDescribedBy("visa-inline-hotel-stay-start", {
+                      errorMessage: stayStartErrorMessage,
+                    })}
                   />
                 )}
               />
             </label>
-            {errors.stayStartIso ? (
-              <p className="text-xs font-medium text-brand-tertiary">{errors.stayStartIso.message}</p>
-            ) : null}
+            <FieldErrorMessage fieldId="visa-inline-hotel-stay-start" message={stayStartErrorMessage} />
           </div>
 
           <div className="grid gap-1.5">
@@ -368,16 +304,19 @@ function InlineHotelAgreementForm({
                 name="stayEndIso"
                 render={({ field }) => (
                   <DatePickerInput
+                    id="visa-inline-hotel-stay-end"
                     inputClassName={inlineHotelInputClassName}
                     value={field.value}
                     onChange={field.onChange}
+                    ariaInvalid={getFieldAriaInvalid(stayEndErrorMessage)}
+                    ariaDescribedBy={getFieldDescribedBy("visa-inline-hotel-stay-end", {
+                      errorMessage: stayEndErrorMessage,
+                    })}
                   />
                 )}
               />
             </label>
-            {errors.stayEndIso ? (
-              <p className="text-xs font-medium text-brand-tertiary">{errors.stayEndIso.message}</p>
-            ) : null}
+            <FieldErrorMessage fieldId="visa-inline-hotel-stay-end" message={stayEndErrorMessage} />
           </div>
         </div>
 
@@ -394,8 +333,13 @@ function InlineHotelAgreementForm({
             className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
             disabled={isSubmitting}
           >
-            Save Agreement
+            {isSubmitting ? "Saving..." : "Save Agreement"}
           </button>
+          {isSubmitting ? (
+            <p className="sr-only" role="status" aria-live="polite">
+              Saving hotel agreement.
+            </p>
+          ) : null}
         </div>
       </form>
     </article>
@@ -441,6 +385,11 @@ export function VisaTrackingDetailScreen({
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
   const raudhahCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const hasBlockingModal = activeModal !== null || isClearRaudhahConfirmOpen;
+  const clearRaudhahDialogRef = useModalFocusTrap<HTMLDivElement>({
+    isActive: isClearRaudhahConfirmOpen,
+    onClose: () => setIsClearRaudhahConfirmOpen(false),
+  });
 
   const group = groups.find((item) => item.code === row.groupCode) ?? null;
   const groupIndex = Math.max(
@@ -504,24 +453,16 @@ export function VisaTrackingDetailScreen({
     ? `${raudhahAppointments.length} date${raudhahAppointments.length > 1 ? "s" : ""} set`
     : "Pending";
   const providerName = group?.visaSetup?.syarikah?.trim() || resolveVisaProvider(row.packageName);
-  const reminderCoordinatorName = (group?.musyrif?.name?.trim() || "PIC").toUpperCase();
-  const reminderHeaderDate = formatReminderHeaderDate(row.departureIso);
-  const raudhahAgentScheduleLines = buildRaudhahAgentScheduleLines(raudhahAppointments);
-  const nusukSlotScheduleLines = buildNusukSlotScheduleLines(raudhahAppointments);
-  const raudhahReminderTemplate = [
-    `Reminder Booking Raudhah GROUP ${totalPax} PAX ${row.groupName.toUpperCase()} ${reminderHeaderDate} (${reminderCoordinatorName})`,
-    "",
-    `Syarikah: ${providerName}`,
-    "Slot booking Nusuk hanya dibuka pada H-7 dan H-2 dari target date.",
-    "Jadwal slot booking:",
-    ...nusukSlotScheduleLines,
-    "",
-    "Detail Group:",
-    `${row.groupCode} -> Ikhwan ... Pax | Akhwat ... pax`,
-    "",
-    "Jadwal Raudhah Agent:",
-    ...raudhahAgentScheduleLines,
-  ].join("\n");
+  const raudhahReminderTemplate = buildRaudhahReminderTemplate({
+    groupCode: row.groupCode,
+    groupName: row.groupName,
+    totalPax,
+    packageName: row.packageName,
+    departureIso: row.departureIso,
+    providerName,
+    coordinatorName: group?.musyrif?.name,
+    appointments: raudhahAppointments,
+  });
   const makkahAgreementNumber = resolveVisaAgreementNumber(row, group ?? undefined, "makkah");
   const madinahAgreementNumber = resolveVisaAgreementNumber(row, group ?? undefined, "madinah");
 
@@ -699,6 +640,19 @@ export function VisaTrackingDetailScreen({
   useEffect(() => {
     setPaymentStatus(row.paymentStatus);
   }, [row.id, row.paymentStatus]);
+
+  useEffect(() => {
+    if (!hasBlockingModal) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [hasBlockingModal]);
 
   useEffect(() => {
     setAddingHotelCity(null);
@@ -1103,6 +1057,11 @@ export function VisaTrackingDetailScreen({
               </span>
               <span>{isRaudhahTemplateCopied ? "Copied" : "Copy"}</span>
             </button>
+            {isRaudhahTemplateCopied ? (
+              <p className="sr-only" role="status" aria-live="polite">
+                Raudhah reminder copied.
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-3 space-y-1">
@@ -1253,11 +1212,13 @@ export function VisaTrackingDetailScreen({
 
       {isClearRaudhahConfirmOpen ? (
         <div
+          ref={clearRaudhahDialogRef}
           className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="clear-raudhah-title"
           aria-describedby="clear-raudhah-description"
+          tabIndex={-1}
           onClick={() => setIsClearRaudhahConfirmOpen(false)}
         >
           <section

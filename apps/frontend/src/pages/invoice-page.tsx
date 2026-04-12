@@ -5,10 +5,12 @@ import { createPortal } from "react-dom";
 import { z } from "zod";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
+import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
 import { PaginationControls } from "../components/pagination-controls";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import { useThemeMode } from "../theme/theme-provider";
 import { type BackendInvoiceClient, type BackendInvoiceRow } from "../hooks/use-invoice-backend";
 import {
@@ -627,8 +629,19 @@ function CreateInvoiceWorkspace({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isCancelConfirmationOpen, setIsCancelConfirmationOpen] = useState(false);
+  const cancelConfirmationDialogRef = useModalFocusTrap<HTMLDivElement>({
+    isActive: isCancelConfirmationOpen,
+    onClose: () => setIsCancelConfirmationOpen(false),
+  });
   const isWorkspaceBusy = isSubmitting || isSavingDraft;
   const isSubmitDisabled = isWorkspaceBusy || !isBackendAvailable;
+  const issueDateErrorMessage = formErrors.issueDateIso?.message;
+  const dueDateErrorMessage = formErrors.dueDateIso?.message;
+  const issuingOfficeErrorMessage = formErrors.issuingOffice?.message;
+  const invoiceStatusErrorMessage = formErrors.invoiceStatus?.message;
+  const selectedClientErrorMessage = formErrors.selectedClientId?.message;
+  const manualClientNameErrorMessage = formErrors.manualClientName?.message;
+  const bankAccountErrorMessage = formErrors.bankAccount?.message;
   const bankDisbursementHintClassName = isDarkMode
     ? "flex items-start gap-2 rounded-lg border border-outline-variant/45 bg-surface-container-high p-2"
     : "flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2";
@@ -704,14 +717,17 @@ function CreateInvoiceWorkspace({
       return undefined;
     }
 
+    const previousOverflow = document.body.style.overflow;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsCancelConfirmationOpen(false);
       }
     };
 
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleEscape);
     return () => {
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleEscape);
     };
   }, [isCancelConfirmationOpen]);
@@ -979,7 +995,10 @@ function CreateInvoiceWorkspace({
   };
 
   return (
-    <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+    <div
+      className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8"
+      aria-busy={isWorkspaceBusy ? "true" : "false"}
+    >
       <section className="space-y-3">
         <button
           type="button"
@@ -1112,15 +1131,18 @@ function CreateInvoiceWorkspace({
                       control={control}
                       render={({ field }) => (
                         <DatePickerInput
+                          id="invoice-issue-date"
                           inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
                           value={field.value}
                           onChange={field.onChange}
+                          ariaInvalid={getFieldAriaInvalid(issueDateErrorMessage)}
+                          ariaDescribedBy={getFieldDescribedBy("invoice-issue-date", {
+                            errorMessage: issueDateErrorMessage,
+                          })}
                         />
                       )}
                     />
-                    {formErrors.issueDateIso ? (
-                      <p className="text-xs font-semibold text-error">{formErrors.issueDateIso.message}</p>
-                    ) : null}
+                    <FieldErrorMessage fieldId="invoice-issue-date" message={issueDateErrorMessage} />
                   </label>
                 </div>
 
@@ -1133,15 +1155,18 @@ function CreateInvoiceWorkspace({
                     control={control}
                     render={({ field }) => (
                       <DatePickerInput
+                        id="invoice-due-date"
                         inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
                         value={field.value}
                         onChange={field.onChange}
+                        ariaInvalid={getFieldAriaInvalid(dueDateErrorMessage)}
+                        ariaDescribedBy={getFieldDescribedBy("invoice-due-date", {
+                          errorMessage: dueDateErrorMessage,
+                        })}
                       />
                     )}
                   />
-                  {formErrors.dueDateIso ? (
-                    <p className="text-xs font-semibold text-error">{formErrors.dueDateIso.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="invoice-due-date" message={dueDateErrorMessage} />
                 </label>
 
                 <label className="space-y-1">
@@ -1153,12 +1178,17 @@ function CreateInvoiceWorkspace({
                     control={control}
                     render={({ field }) => (
                       <SereneSelect
+                        id="invoice-issuing-office"
                         className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
                         value={field.value}
                         onChange={(event) => {
                           clearErrors("issuingOffice");
                           field.onChange(event.target.value);
                         }}
+                        aria-invalid={getFieldAriaInvalid(issuingOfficeErrorMessage)}
+                        aria-describedby={getFieldDescribedBy("invoice-issuing-office", {
+                          errorMessage: issuingOfficeErrorMessage,
+                        })}
                       >
                         <option value="">Select office</option>
                         {issuingOfficeOptions.map((option) => (
@@ -1169,9 +1199,7 @@ function CreateInvoiceWorkspace({
                       </SereneSelect>
                     )}
                   />
-                  {formErrors.issuingOffice ? (
-                    <p className="text-xs font-semibold text-error">{formErrors.issuingOffice.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="invoice-issuing-office" message={issuingOfficeErrorMessage} />
                 </label>
 
                 <label className="space-y-1">
@@ -1183,12 +1211,17 @@ function CreateInvoiceWorkspace({
                     control={control}
                     render={({ field }) => (
                       <SereneSelect
+                        id="invoice-status"
                         className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
                         value={field.value}
                         onChange={(event) => {
                           clearErrors("invoiceStatus");
                           field.onChange(event.target.value);
                         }}
+                        aria-invalid={getFieldAriaInvalid(invoiceStatusErrorMessage)}
+                        aria-describedby={getFieldDescribedBy("invoice-status", {
+                          errorMessage: invoiceStatusErrorMessage,
+                        })}
                       >
                         <option value="">Select status</option>
                         {invoiceStatusOptions.map((option) => (
@@ -1199,9 +1232,7 @@ function CreateInvoiceWorkspace({
                       </SereneSelect>
                     )}
                   />
-                  {formErrors.invoiceStatus ? (
-                    <p className="text-xs font-semibold text-error">{formErrors.invoiceStatus.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="invoice-status" message={invoiceStatusErrorMessage} />
                 </label>
               </div>
             </article>
@@ -1224,6 +1255,7 @@ function CreateInvoiceWorkspace({
                     control={control}
                     render={({ field }) => (
                       <SereneSelect
+                        id="invoice-client"
                         className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
                         value={field.value}
                         onChange={(event) => {
@@ -1234,6 +1266,10 @@ function CreateInvoiceWorkspace({
                             setValue("manualClientName", "");
                           }
                         }}
+                        aria-invalid={getFieldAriaInvalid(selectedClientErrorMessage)}
+                        aria-describedby={getFieldDescribedBy("invoice-client", {
+                          errorMessage: selectedClientErrorMessage,
+                        })}
                       >
                         <option value="">Select client</option>
                         <option value={MANUAL_CLIENT_OPTION_ID}>Other</option>
@@ -1245,9 +1281,7 @@ function CreateInvoiceWorkspace({
                       </SereneSelect>
                     )}
                   />
-                  {formErrors.selectedClientId ? (
-                    <p className="text-xs font-semibold text-error">{formErrors.selectedClientId.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="invoice-client" message={selectedClientErrorMessage} />
                 </label>
 
                 {isManualClientSelected ? (
@@ -1256,11 +1290,16 @@ function CreateInvoiceWorkspace({
                       Manual Client Name
                     </span>
                     <input
+                      id="invoice-manual-client-name"
                       type="text"
                       className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
                       list="invoice-manual-client-suggestions"
                       placeholder="Type client name..."
                       {...register("manualClientName")}
+                      aria-invalid={getFieldAriaInvalid(manualClientNameErrorMessage)}
+                      aria-describedby={getFieldDescribedBy("invoice-manual-client-name", {
+                        errorMessage: manualClientNameErrorMessage,
+                      })}
                     />
                     {manualClientNameSuggestions.length > 0 ? (
                       <datalist id="invoice-manual-client-suggestions">
@@ -1269,9 +1308,7 @@ function CreateInvoiceWorkspace({
                         ))}
                       </datalist>
                     ) : null}
-                    {formErrors.manualClientName ? (
-                      <p className="text-xs font-semibold text-error">{formErrors.manualClientName.message}</p>
-                    ) : null}
+                    <FieldErrorMessage fieldId="invoice-manual-client-name" message={manualClientNameErrorMessage} />
                   </label>
                 ) : null}
 
@@ -1460,12 +1497,17 @@ function CreateInvoiceWorkspace({
                     control={control}
                     render={({ field }) => (
                       <SereneSelect
+                        id="invoice-bank-account"
                         className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
                         value={field.value}
                         onChange={(event) => {
                           clearErrors("bankAccount");
                           field.onChange(event.target.value);
                         }}
+                        aria-invalid={getFieldAriaInvalid(bankAccountErrorMessage)}
+                        aria-describedby={getFieldDescribedBy("invoice-bank-account", {
+                          errorMessage: bankAccountErrorMessage,
+                        })}
                       >
                         <option value="">Select bank account</option>
                         {bankDisbursementOptions.map((option) => (
@@ -1476,9 +1518,7 @@ function CreateInvoiceWorkspace({
                       </SereneSelect>
                     )}
                   />
-                  {formErrors.bankAccount ? (
-                    <p className="text-xs font-semibold text-error">{formErrors.bankAccount.message}</p>
-                  ) : null}
+                  <FieldErrorMessage fieldId="invoice-bank-account" message={bankAccountErrorMessage} />
                   <div className={bankDisbursementHintClassName}>
                     <span className="material-symbols-outlined mt-0.5 text-sm text-primary" aria-hidden="true">
                       info
@@ -1609,10 +1649,13 @@ function CreateInvoiceWorkspace({
       {isCancelConfirmationOpen && typeof document !== "undefined"
         ? createPortal(
             <div
+              ref={cancelConfirmationDialogRef}
               className="serene-modal-overlay fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4"
               role="dialog"
               aria-modal="true"
-              aria-label="Konfirmasi status cancelled"
+              aria-labelledby="invoice-cancel-confirmation-title"
+              aria-describedby="invoice-cancel-confirmation-description"
+              tabIndex={-1}
               onClick={() => setIsCancelConfirmationOpen(false)}
             >
               <section
@@ -1627,13 +1670,19 @@ function CreateInvoiceWorkspace({
                   </div>
 
                   <div>
-                    <h2 className="font-display text-2xl font-bold tracking-tight text-on-surface">
+                    <h2
+                      id="invoice-cancel-confirmation-title"
+                      className="font-display text-2xl font-bold tracking-tight text-on-surface"
+                    >
                       Konfirmasi Status Cancelled
                     </h2>
                   </div>
                 </header>
 
-                <div className="space-y-2 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed text-on-surface-variant sm:px-5">
+                <div
+                  id="invoice-cancel-confirmation-description"
+                  className="space-y-2 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed text-on-surface-variant sm:px-5"
+                >
                   <p>Invoice ini akan disimpan sebagai Cancelled. Lanjutkan penyimpanan?</p>
                   <p>Status cancelled akan menandai invoice sebagai dibatalkan.</p>
                   <p>Amount invoice juga akan otomatis menjadi 0 saat disimpan.</p>

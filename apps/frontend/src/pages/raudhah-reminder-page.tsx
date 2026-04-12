@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Domain from "../shared/app-domain";
+import { buildRaudhahReminderTemplate } from "../shared/raudhah-reminder-template.js";
 import type { GroupData, GroupRaudhahStatus, VisaTrackingRow } from "../shared/app-domain";
 import { useThemeMode } from "../theme/theme-provider";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -242,128 +243,6 @@ function getTasrehPrintButtonClasses(tasrehPrinted: boolean): string {
   }
 
   return "border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-200";
-}
-
-function formatReminderHeaderDate(isoDate: string): string {
-  if (!isoDate) {
-    return "-";
-  }
-
-  const parsedDate = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return isoDate;
-  }
-
-  return parsedDate
-    .toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    })
-    .toUpperCase()
-    .replace(".", "");
-}
-
-function buildRaudhahAgentScheduleLines(
-  appointments: Array<{ dateIso: string; status: GroupRaudhahStatus }>,
-): string[] {
-  const parsedAppointments = appointments
-    .map((appointment) => {
-      const parsedDate = parseIsoAtNoon(appointment.dateIso);
-      if (!parsedDate) {
-        return null;
-      }
-
-      return {
-        day: parsedDate.getDate(),
-        status: appointment.status,
-      };
-    })
-    .filter(
-      (
-        appointment,
-      ): appointment is {
-        day: number;
-        status: GroupRaudhahStatus;
-      } => appointment !== null,
-    );
-
-  if (parsedAppointments.length === 0) {
-    return ["- [tanggal] -> Free", "- [tanggal] -> After", "- [tanggal] -> Before (sebelum dzuhur)"];
-  }
-
-  const statusOrder: GroupRaudhahStatus[] = ["Free", "After", "Before"];
-  const lines = statusOrder
-    .map((status) => {
-      const days = Array.from(
-        new Set(
-          parsedAppointments
-            .filter((appointment) => appointment.status === status)
-            .map((appointment) => appointment.day),
-        ),
-      ).sort((left, right) => left - right);
-
-      if (days.length === 0) {
-        return null;
-      }
-
-      if (status === "Before") {
-        return `- ${days.join(" - ")} -> ${status} (sebelum dzuhur)`;
-      }
-
-      return `- ${days.join(" - ")} -> ${status}`;
-    })
-    .filter((line): line is string => line !== null);
-
-  return lines.length > 0
-    ? lines
-    : ["- [tanggal] -> Free", "- [tanggal] -> After", "- [tanggal] -> Before (sebelum dzuhur)"];
-}
-
-function buildNusukSlotScheduleLines(appointments: Array<{ dateIso: string }>): string[] {
-  const targetDates = Array.from(new Set(appointments.map((appointment) => appointment.dateIso))).sort((left, right) =>
-    left.localeCompare(right),
-  );
-
-  if (targetDates.length === 0) {
-    return ["- Target [tanggal] -> H-7 [tanggal] | H-2 [tanggal]"];
-  }
-
-  return targetDates.map((targetDateIso) => {
-    const h7BookingDateIso = shiftIsoDate(targetDateIso, -7);
-    const h2BookingDateIso = shiftIsoDate(targetDateIso, -2);
-    return `- Target ${formatVisaDateWithYear(targetDateIso)} -> H-7 ${formatVisaDateWithYear(
-      h7BookingDateIso,
-    )} | H-2 ${formatVisaDateWithYear(h2BookingDateIso)}`;
-  });
-}
-
-function buildReminderTemplate(args: {
-  group: GroupData;
-  row: VisaTrackingRow;
-  appointments: Array<{ dateIso: string; status: GroupRaudhahStatus }>;
-}): string {
-  const { group, row, appointments } = args;
-  const totalPax = group.pax ?? row.pax;
-  const providerName = group.visaSetup?.syarikah?.trim() || resolveVisaProvider(row.packageName);
-  const reminderCoordinatorName = (group.musyrif?.name?.trim() || "PIC").toUpperCase();
-  const reminderHeaderDate = formatReminderHeaderDate(row.departureIso);
-  const raudhahAgentScheduleLines = buildRaudhahAgentScheduleLines(appointments);
-  const nusukSlotScheduleLines = buildNusukSlotScheduleLines(appointments);
-
-  return [
-    `Reminder Booking Raudhah GROUP ${totalPax} PAX ${row.groupName.toUpperCase()} ${reminderHeaderDate} (${reminderCoordinatorName})`,
-    "",
-    `Syarikah: ${providerName}`,
-    "Slot booking Nusuk hanya dibuka pada H-7 dan H-2 dari target date.",
-    "Jadwal slot booking:",
-    ...nusukSlotScheduleLines,
-    "",
-    "Detail Group:",
-    `${row.groupCode} -> Ikhwan ... Pax | Akhwat ... pax`,
-    "",
-    "Jadwal Raudhah Agent:",
-    ...raudhahAgentScheduleLines,
-  ].join("\n");
 }
 
 function resolveGroupAppointments(group: GroupData): Array<{
@@ -786,11 +665,6 @@ export function RaudhahReminderScreen({
           dateIso: appointment.dateIso,
           status: appointment.status,
         }));
-        const reminderTemplate = buildReminderTemplate({
-          group,
-          row,
-          appointments: scheduleAppointments,
-        });
 
         const appointmentsBySlot: Record<ReminderSlot, ReminderAppointmentItem[]> = {
           h2: [],
@@ -856,7 +730,17 @@ export function RaudhahReminderScreen({
               pax: Math.max(1, group.pax),
               appointments: slotAppointments,
               slot,
-              reminderTemplate,
+              reminderTemplate: buildRaudhahReminderTemplate({
+                groupCode: row.groupCode,
+                groupName: row.groupName,
+                totalPax: group.pax ?? row.pax,
+                packageName: row.packageName,
+                departureIso: row.departureIso,
+                providerName: group.visaSetup?.syarikah?.trim() || resolveVisaProvider(row.packageName),
+                coordinatorName: group.musyrif?.name,
+                appointments: scheduleAppointments,
+                bookingDateIsos: slotAppointments.map((appointment) => appointment.bookingDateIso),
+              }),
             };
           })
           .filter((item) => item.appointments.length > 0);
