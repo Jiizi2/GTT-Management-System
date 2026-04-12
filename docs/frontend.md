@@ -318,6 +318,7 @@ Catatan penting:
 - `CORS_ORIGINS` harus berisi origin frontend secara eksplisit.
 - Jangan gunakan wildcard `*`.
 - Production harus memakai HTTPS.
+- Jika masih bring-up sementara lewat HTTP, backend harus memakai `AUTH_COOKIE_SECURE=false` atau login tidak akan persisten.
 - Jika frontend dan backend memakai subdomain dalam satu domain induk, pertimbangkan `AUTH_COOKIE_DOMAIN=.example.com`.
 - `AUTH_COOKIE_DOMAIN` harus berupa bare domain, bukan URL penuh.
 - Gunakan `TRUST_PROXY=true` hanya jika reverse proxy memang trusted dan header-nya bersih.

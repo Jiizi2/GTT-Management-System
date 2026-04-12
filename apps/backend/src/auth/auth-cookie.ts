@@ -1,5 +1,9 @@
 import { ConfigService } from "@nestjs/config";
-import { resolveConfiguredNodeEnv, resolveConfiguredString } from "../config/app-config";
+import {
+  resolveConfiguredBoolean,
+  resolveConfiguredNodeEnv,
+  resolveConfiguredString,
+} from "../config/app-config";
 import { readHeaderValue } from "../http-origin";
 
 export const AUTH_COOKIE_NAME = "gtt_auth_session";
@@ -9,16 +13,18 @@ const COOKIE_DOMAIN_PATTERN = /^\.?[a-z0-9-]+(\.[a-z0-9-]+)*$/i;
 
 export type AuthCookieRuntimeConfig = {
   cookieDomain?: string;
-  isProduction: boolean;
+  secure: boolean;
 };
 
 export function resolveAuthCookieRuntimeConfig(
   configService?: ConfigService,
 ): AuthCookieRuntimeConfig {
   const normalized = (resolveConfiguredString(configService, "AUTH_COOKIE_DOMAIN") ?? "").toLowerCase();
+  const configuredSecure = resolveConfiguredBoolean(configService, "AUTH_COOKIE_SECURE");
+  const secure = configuredSecure ?? resolveConfiguredNodeEnv(configService) === "production";
   if (!normalized) {
     return {
-      isProduction: resolveConfiguredNodeEnv(configService) === "production",
+      secure,
     };
   }
 
@@ -35,7 +41,7 @@ export function resolveAuthCookieRuntimeConfig(
   }
 
   return {
-    isProduction: resolveConfiguredNodeEnv(configService) === "production",
+    secure,
     cookieDomain: normalized,
   };
 }
@@ -48,7 +54,7 @@ function buildCookieBaseParts(runtimeConfig: AuthCookieRuntimeConfig): string[] 
     "Priority=High",
   ];
 
-  if (runtimeConfig.isProduction) {
+  if (runtimeConfig.secure) {
     parts.push("Secure");
   }
 

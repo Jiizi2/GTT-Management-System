@@ -31,7 +31,7 @@ Modul utama di `src/app.module.ts`:
 Implementasi:
 
 - Guard global (`AuthGuard`) dipasang lewat `APP_GUARD`.
-- Browser session sekarang memakai cookie `HttpOnly` + `SameSite=Lax`.
+- Browser session sekarang memakai cookie `HttpOnly` + `SameSite=Lax`, dan `Secure` di production secara default.
 - Guard tetap menerima header `Authorization: Bearer <token>` untuk kompatibilitas internal/test.
 - Token ditandatangani dan diverifikasi di `AuthService` memakai `@nestjs/jwt` dengan JWT HS256.
 - Request write yang terautentikasi via cookie harus datang dari origin tepercaya (proteksi CSRF berbasis origin).
@@ -78,6 +78,7 @@ Variabel penting:
 - `LOG_LEVEL` (opsional; default `warn` di non-production, `info` di production)
 - `HTTP_LOG_SUCCESS` (opsional; default `false` di non-production, `true` di production)
 - `AUTH_COOKIE_DOMAIN` (opsional; default host-only cookie)
+- `AUTH_COOKIE_SECURE` (opsional; default `true` di production, `false` di environment lain)
 - login rate limit env (`AUTH_LOGIN_RATE_LIMIT_*`)
 - global throttle env (`THROTTLE_DEFAULT_*`)
 
@@ -89,6 +90,7 @@ Aturan khusus:
 - Saat `DATA_SOURCE=prisma` dan `AUTH_BOOTSTRAP_DEFAULT_USERS=true`, env `DEV_AUTH_SUPERADMIN_PASSWORD` dan `DEV_AUTH_ADMIN_PASSWORD` wajib diisi.
 - `CORS_ORIGINS` wajib diisi origin eksplisit di production; wildcard `*` tidak didukung untuk mode cookie auth.
 - `TRUST_PROXY=true` hanya boleh dipakai jika header proxy benar-benar disanitasi oleh reverse proxy tepercaya.
+- Jika production masih diakses lewat HTTP untuk bring-up sementara, set `AUTH_COOKIE_SECURE=false` atau browser akan menolak menyimpan cookie login.
 
 ## 5. Mode Data
 

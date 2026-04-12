@@ -14,6 +14,14 @@ function testConvertsTrustedProxyBoolean(): void {
   assert.equal(validated.TRUST_PROXY, true);
 }
 
+function testConvertsAuthCookieSecureBoolean(): void {
+  const validated = validateEnvironment({
+    AUTH_COOKIE_SECURE: "false",
+  });
+
+  assert.equal(validated.AUTH_COOKIE_SECURE, false);
+}
+
 function testProductionRequiresCorsOrigins(): void {
   assert.throws(
     () =>
@@ -74,6 +82,7 @@ function testPrismaBootstrapRequiresExplicitPasswords(): void {
 
 async function main(): Promise<void> {
   await runCase("env validation converts trust proxy boolean", testConvertsTrustedProxyBoolean);
+  await runCase("env validation converts auth cookie secure boolean", testConvertsAuthCookieSecureBoolean);
   await runCase("env validation requires cors origins in production", testProductionRequiresCorsOrigins);
   await runCase("env validation rejects wildcard cors origins", testRejectsWildcardCorsOrigins);
   await runCase("env validation rejects bootstrap in production", testProductionRejectsBootstrapDefaultUsers);

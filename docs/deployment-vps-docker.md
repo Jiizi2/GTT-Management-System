@@ -107,6 +107,10 @@ Root `.env` untuk Docker Compose:
   - Contoh sementara saat test via IP: `http://123.123.123.123:8080`
 - `TRUST_PROXY`
   - Biarkan `true` untuk jalur Compose ini
+- `AUTH_COOKIE_SECURE`
+  - Biarkan `true` kalau akses final sudah HTTPS
+  - Jika masih uji awal lewat `http://SERVER_IP:WEB_PORT`, ubah sementara ke `false`
+  - Kalau tetap `true` di HTTP, browser akan menolak cookie login dan user terlihat seperti langsung logout
 - `LOG_LEVEL`
   - `info` cocok untuk production awal
 - `HTTP_LOG_SUCCESS`
@@ -193,6 +197,11 @@ Setelah itu:
 - frontend tersedia di `http://SERVER_IP:WEB_PORT`
 - backend hanya diakses internal oleh container `web`
 - PostgreSQL hanya diakses internal oleh container `backend`
+
+Catatan auth penting:
+
+- jika tahap ini masih memakai HTTP biasa, pastikan `apps/backend/.env` berisi `AUTH_COOKIE_SECURE=false`
+- setelah domain + HTTPS siap, kembalikan ke `AUTH_COOKIE_SECURE=true`
 
 ## Step 5: Verifikasi Awal
 
