@@ -11,6 +11,7 @@ Monorepo ini berisi aplikasi operasional perjalanan/umrah dengan dua aplikasi ut
 - [Frontend](docs/frontend.md)
 - [Backend](docs/backend.md)
 - [Deploy VPS + Docker Compose](docs/deployment-vps-docker.md)
+- [Docker command cheat sheet](docs/docker-command-cheatsheet.md)
 - [QA](docs/qa.md)
 - [Release flow](docs/release-flow.md)
 
