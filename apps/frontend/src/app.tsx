@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuthSessionQuery, useLoginMutation, useLogoutMutation } from "./hooks/use-auth-session-query";
 import type { DevelopmentLoginAccountHint, LoginCredentials } from "./pages/login-page";
 import { buildDashboardPath, buildLoginPath, isLoginRoute } from "./shared/app-route";
+import { shouldBlockSessionRestore } from "./shared/session-restore";
 
 const LazyDashboardWorkspaceShell = lazy(async () => ({
   default: (await import("./components/dashboard-workspace-shell")).DashboardWorkspaceShell,
@@ -55,8 +56,12 @@ export function App() {
   const loginMutation = useLoginMutation();
   const logoutMutation = useLogoutMutation();
   const authSession = authSessionQuery.data ?? null;
-  const isRestoringSession =
-    authSessionQuery.isPending || (authSessionQuery.isFetching && !authSessionQuery.isFetchedAfterMount);
+  const isRestoringSession = shouldBlockSessionRestore({
+    hasSessionSnapshot: authSession !== null,
+    isPending: authSessionQuery.isPending,
+    isFetching: authSessionQuery.isFetching,
+    isFetchedAfterMount: authSessionQuery.isFetchedAfterMount,
+  });
 
   const handleLoginSubmit = useCallback(
     async (credentials: LoginCredentials) => {
