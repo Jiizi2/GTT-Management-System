@@ -21,6 +21,7 @@ import type {
 import {
   buildAgreementItineraryPrefill,
   buildNewGroupPayload,
+  getAgreementSaveValidationError,
   validateConnectedAgreementDates,
 } from "./new-group-screen-helpers";
 
@@ -34,6 +35,7 @@ const { createNewGroupAgreementForm, createNewGroupRaudhahForm, getMinimumBusCou
 type HotelCity = "makkah" | "madinah";
 type InvoiceTone = "paid" | "pending" | "overdue" | "cancelled";
 type VisaServiceOption = "Visa Only" | BusStatus;
+type AgreementSaveTone = "success" | "warning" | "error";
 
 const visaStatusSchema = z.enum(["Draft", "Pending", "Issued"]);
 const visaServiceOptionSchema = z.enum(["Visa Only", "Visa+"]);
@@ -184,6 +186,22 @@ function getPaymentStatusTone(status: "Paid" | "Unpaid"): InvoiceTone {
   return "pending";
 }
 
+function getAgreementSaveClasses(tone: AgreementSaveTone): string {
+  if (tone === "success") {
+    return "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant";
+  }
+
+  if (tone === "warning") {
+    return "border-tertiary-fixed/60 bg-tertiary-fixed text-on-tertiary-fixed-variant";
+  }
+
+  return "border-error-container/65 bg-error-container text-on-error-container";
+}
+
+function cloneAgreementForms(forms: NewGroupAgreementFormState[]): NewGroupAgreementFormState[] {
+  return forms.map((form) => ({ ...form }));
+}
+
 function ItinerarySectionFallback({ label }: { label: string }) {
   return (
     <section className="serene-section">
@@ -260,6 +278,15 @@ export function NewGroupScreen({
     name: "raudhahDates",
     keyName: "fieldKey",
   });
+  const [savedAgreementSnapshot, setSavedAgreementSnapshot] = useState<{
+    makkahHotels: NewGroupAgreementFormState[];
+    madinahHotels: NewGroupAgreementFormState[];
+  } | null>(null);
+  const [savedAgreementSignature, setSavedAgreementSignature] = useState<string | null>(null);
+  const [agreementSaveFeedback, setAgreementSaveFeedback] = useState<{
+    tone: Exclude<AgreementSaveTone, "warning">;
+    message: string;
+  } | null>(null);
 
   const itineraryGroupCode = itineraryDraft?.groupCode?.trim().toUpperCase() ?? "";
   const itineraryGroupName = itineraryDraft?.groupName?.trim() ?? "";
@@ -273,9 +300,10 @@ export function NewGroupScreen({
   const paymentStatus = watch("paymentStatus");
   const watchedMakkahHotels = watch("makkahHotels");
   const watchedMadinahHotels = watch("madinahHotels");
+  const watchedRaudhahDates = watch("raudhahDates");
   const makkahHotels = useMemo(() => watchedMakkahHotels ?? [], [watchedMakkahHotels]);
   const madinahHotels = useMemo(() => watchedMadinahHotels ?? [], [watchedMadinahHotels]);
-  const raudhahDates = watch("raudhahDates") ?? [];
+  const raudhahDates = useMemo(() => watchedRaudhahDates ?? [], [watchedRaudhahDates]);
   const fallbackPax = Number.parseInt(totalPax, 10);
   const safePax = Number.isFinite(itineraryPax) && (itineraryPax ?? 0) > 0 ? (itineraryPax as number) : fallbackPax;
   const hasValidPax = Number.isFinite(safePax) && safePax > 0;
@@ -288,11 +316,32 @@ export function NewGroupScreen({
     () => validateConnectedAgreementDates(makkahHotels, madinahHotels),
     [makkahHotels, madinahHotels],
   );
+  const agreementSaveValidationError = useMemo(
+    () => getAgreementSaveValidationError(makkahHotels, madinahHotels),
+    [makkahHotels, madinahHotels],
+  );
+  const currentAgreementSignature = useMemo(
+    () =>
+      JSON.stringify({
+        makkahHotels,
+        madinahHotels,
+      }),
+    [makkahHotels, madinahHotels],
+  );
+  const savedMakkahHotels = savedAgreementSnapshot?.makkahHotels ?? [];
+  const savedMadinahHotels = savedAgreementSnapshot?.madinahHotels ?? [];
+  const savedAgreementDateConnection = useMemo(
+    () => validateConnectedAgreementDates(savedMakkahHotels, savedMadinahHotels),
+    [savedMadinahHotels, savedMakkahHotels],
+  );
+  const isAgreementSaved = savedAgreementSnapshot !== null;
+  const hasUnsavedAgreementChanges = !isAgreementSaved || currentAgreementSignature !== savedAgreementSignature;
+  const isAgreementReadyForContinue = isAgreementSaved && !hasUnsavedAgreementChanges;
   const isSaveDisabled =
     !resolvedGroupCode ||
     !resolvedGroupName ||
     !hasValidPax ||
-    agreementDateConnection.hasWarning ||
+    !isAgreementReadyForContinue ||
     (requireItineraryBeforeSave && !hasItineraryDraft);
 
   const handleAgreementChange = <Key extends keyof NewGroupAgreementFormState>(
@@ -301,6 +350,7 @@ export function NewGroupScreen({
     field: Key,
     value: NewGroupAgreementFormState[Key],
   ) => {
+    setAgreementSaveFeedback(null);
     const currentAgreements = city === "makkah" ? makkahHotels : madinahHotels;
     const nextAgreements = currentAgreements.map((agreement, index) =>
       index === agreementIndex ? { ...agreement, [field]: value } : agreement,
@@ -311,6 +361,7 @@ export function NewGroupScreen({
   };
 
   const handleAddAgreement = (city: HotelCity) => {
+    setAgreementSaveFeedback(null);
     if (city === "makkah") {
       appendMakkahHotel(createNewGroupAgreementForm(city));
       return;
@@ -320,6 +371,7 @@ export function NewGroupScreen({
   };
 
   const handleRemoveAgreement = (city: HotelCity, agreementIndex: number) => {
+    setAgreementSaveFeedback(null);
     const agreements = city === "makkah" ? makkahHotels : madinahHotels;
     if (agreements.length <= 1) {
       return;
@@ -334,6 +386,7 @@ export function NewGroupScreen({
   };
 
   const handleClearAgreement = (city: HotelCity, agreementIndex: number) => {
+    setAgreementSaveFeedback(null);
     const agreements = city === "makkah" ? makkahHotels : madinahHotels;
     const agreementToClear = agreements[agreementIndex];
     if (!agreementToClear) {
@@ -363,12 +416,27 @@ export function NewGroupScreen({
     setValue("raudhahDates", nextAppointments, { shouldDirty: true });
   };
 
-  const handleSyncAgreementDatesToSchedule = () => {
-    if (!onItineraryPrefillChange || agreementDateConnection.hasWarning) {
+  const handleSaveAgreement = () => {
+    if (agreementSaveValidationError) {
+      setAgreementSaveFeedback({
+        tone: "error",
+        message: agreementSaveValidationError,
+      });
       return;
     }
 
-    onItineraryPrefillChange(buildAgreementItineraryPrefill(makkahHotels, madinahHotels));
+    setSavedAgreementSnapshot({
+      makkahHotels: cloneAgreementForms(makkahHotels),
+      madinahHotels: cloneAgreementForms(madinahHotels),
+    });
+    setSavedAgreementSignature(currentAgreementSignature);
+    onItineraryPrefillChange?.(buildAgreementItineraryPrefill(makkahHotels, madinahHotels));
+    setAgreementSaveFeedback({
+      tone: "success",
+      message: onItineraryPrefillChange
+        ? "Agreement hotel berhasil disimpan dan itinerary ikut diperbarui."
+        : "Agreement hotel berhasil disimpan.",
+    });
   };
 
   const handleSave = (values: NewGroupScreenFormValues) => {
@@ -385,8 +453,8 @@ export function NewGroupScreen({
         syarikahName: values.syarikahName,
         busStatus: values.busStatus === "Visa+" ? "Visa+" : undefined,
         paymentStatus: values.paymentStatus,
-        makkahHotels,
-        madinahHotels,
+        makkahHotels: savedMakkahHotels,
+        madinahHotels: savedMadinahHotels,
         raudhahDates,
         itineraryDraft,
       }),
@@ -410,7 +478,21 @@ export function NewGroupScreen({
   const totalPaxErrorMessage = errors.totalPax?.message;
   const groupNameErrorMessage = errors.groupName?.message;
   const canProceedFromSetupStep =
-    !agreementDateConnection.hasWarning && !!resolvedGroupCode && !!resolvedGroupName && hasValidPax;
+    isAgreementReadyForContinue && !savedAgreementDateConnection.hasWarning && !!resolvedGroupCode && !!resolvedGroupName && hasValidPax;
+  const agreementSaveStatus =
+    agreementSaveFeedback?.tone === "error"
+      ? agreementSaveFeedback
+      : !isAgreementSaved
+        ? {
+            tone: "warning" as const,
+            message: "Agreement hotel belum disimpan. Klik Save Agreement untuk validasi tanggal dan sync itinerary.",
+          }
+        : hasUnsavedAgreementChanges
+          ? {
+              tone: "warning" as const,
+              message: "Ada perubahan agreement yang belum disimpan. Klik Save Agreement lagi untuk update itinerary.",
+            }
+          : agreementSaveFeedback;
   const identitySectionSummary =
     [resolvedGroupCode, resolvedGroupName]
       .map((value) => value.trim())
@@ -437,24 +519,24 @@ export function NewGroupScreen({
       syarikahName: syarikahName.trim(),
       busStatus,
       paymentStatus,
-      makkahHotels,
-      madinahHotels,
+      makkahHotels: savedMakkahHotels,
+      madinahHotels: savedMadinahHotels,
       raudhahDates,
-      agreementDateConnection,
+      agreementDateConnection: savedAgreementDateConnection,
       canProceed: canProceedFromSetupStep,
     });
   }, [
-    agreementDateConnection,
     busStatus,
     canProceedFromSetupStep,
     hasValidPax,
-    makkahHotels,
-    madinahHotels,
     onSetupDraftChange,
     paymentStatus,
     raudhahDates,
     resolvedGroupCode,
     resolvedGroupName,
+    savedAgreementDateConnection,
+    savedMadinahHotels,
+    savedMakkahHotels,
     safePax,
     syarikahName,
     visaStatus,
@@ -800,17 +882,26 @@ export function NewGroupScreen({
             {renderAgreementSection("makkah", makkahHotels)}
             {renderAgreementSection("madinah", madinahHotels)}
           </div>
-          <div className="mt-4 flex justify-stretch sm:justify-end">
-            <button
-              type="button"
-              className="serene-btn-secondary min-h-10 w-full sm:w-auto"
-              onClick={handleSyncAgreementDatesToSchedule}
-              disabled={!onItineraryPrefillChange || agreementDateConnection.hasWarning}
+          {agreementSaveStatus ? (
+            <div
+              className={`mt-4 flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${getAgreementSaveClasses(
+                agreementSaveStatus.tone,
+              )}`}
+              role="status"
+              aria-live="polite"
             >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
-                sync
+                {agreementSaveStatus.tone === "success" ? "check_circle" : agreementSaveStatus.tone === "error" ? "error" : "info"}
               </span>
-              <span>Sync to Itinerary</span>
+              <p>{agreementSaveStatus.message}</p>
+            </div>
+          ) : null}
+          <div className="mt-4 flex justify-stretch sm:justify-end">
+            <button type="button" className="serene-btn-primary min-h-10 w-full sm:w-auto" onClick={handleSaveAgreement}>
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                task_alt
+              </span>
+              <span>Save Agreement</span>
             </button>
           </div>
         </section>
@@ -915,6 +1006,14 @@ export function NewGroupScreen({
                 <span className="sm:hidden">Isi Add Schedule dulu untuk mengaktifkan Save.</span>
                 <span className="hidden sm:inline">
                   Isi itinerary di bagian Add Schedule terlebih dahulu untuk mengaktifkan Save Group.
+                </span>
+              </p>
+            ) : null}
+            {!isAgreementReadyForContinue ? (
+              <p className="w-full text-sm font-medium text-on-tertiary-fixed-variant" role="status" aria-live="polite">
+                <span className="sm:hidden">Save agreement hotel dulu sebelum simpan group.</span>
+                <span className="hidden sm:inline">
+                  Simpan agreement hotel terlebih dahulu. Saat save, sistem akan validasi tanggal dan sync ke itinerary.
                 </span>
               </p>
             ) : null}
@@ -1091,7 +1190,7 @@ export function AddGroupWorkspaceScreen({
               Visa & Booking Setup
             </h2>
             <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-              Lengkapi visa, hotel agreement, raudhah, dan payment. Jika hotel agreement sudah siap, Anda bisa sync ke itinerary.
+              Lengkapi visa, hotel agreement, raudhah, dan payment. Jika hotel agreement sudah siap, klik save untuk validasi lalu sync ke itinerary.
             </p>
           </section>
 

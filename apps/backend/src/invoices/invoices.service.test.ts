@@ -479,6 +479,58 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
   }
 }
 
+async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> {
+  let rawReadCalls = 0;
+  let rawWriteCalls = 0;
+  const prismaMock = {
+    invoiceClient: {
+      findMany: async () => [],
+    },
+    invoice: {
+      findMany: async () => [
+        {
+          id: "inv-inline",
+          invoiceNumber: "GTT/INV/2099/0099",
+          clientId: "cli-inline",
+          client: {
+            name: "Inline Client",
+            sortOrder: 9,
+          },
+          group: null,
+          issuedDate: new Date("2099-03-01T00:00:00.000Z"),
+          dueDate: new Date("2099-03-10T00:00:00.000Z"),
+          amount: 880_000,
+          downPaymentIdr: 125_000,
+          status: InvoiceStatus.PENDING,
+          items: [],
+        },
+      ],
+    },
+    $queryRaw: async () => {
+      rawReadCalls += 1;
+      return [];
+    },
+    $executeRaw: async () => {
+      rawWriteCalls += 1;
+      return 0;
+    },
+  } as unknown as PrismaService;
+
+  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  try {
+    (service as unknown as { prismaInvoiceDownPaymentColumnState: boolean | null }).prismaInvoiceDownPaymentColumnState =
+      true;
+
+    const invoices = await service.findAll();
+    assert.equal(invoices.length, 1);
+    assert.equal(invoices[0].downPaymentIdr, 125_000);
+    assert.equal(rawReadCalls, 0);
+    assert.equal(rawWriteCalls, 0);
+  } finally {
+    restore();
+  }
+}
+
 async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promise<void> {
   let createAttempt = 0;
   const createdPayloads: Array<Record<string, unknown>> = [];
@@ -836,6 +888,7 @@ async function main(): Promise<void> {
   await runCase("invoice update validation errors", testUpdateValidationErrors);
   await runCase("invoice findAll missing client guard", testFindAllThrowsWhenInvoiceClientIsMissing);
   await runCase("invoice prisma list and findAll mapping", testPrismaListAndFindAllMapping);
+  await runCase("invoice prisma findAll prefers inline down payment column", testPrismaFindAllPrefersInlineDownPaymentColumn);
   await runCase("invoice prisma create retry and fallback serial", testPrismaCreateSupportsRetryAndFallbackSerialResolution);
   await runCase("invoice prisma create error mapping", testPrismaCreateErrorMappings);
   await runCase("invoice prisma update success and error mapping", testPrismaUpdateSuccessAndErrorMappings);

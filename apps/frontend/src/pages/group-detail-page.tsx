@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import * as Domain from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import type {
@@ -57,15 +58,20 @@ const LazyScheduleModal = lazy(async () => ({
 }));
 
 function GroupDetailModalFallback() {
-  return (
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-4">
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="serene-modal-overlay z-[140] flex items-center justify-center p-4">
       <div className="inline-flex items-center gap-2 rounded-xl bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface shadow-ambient">
         <span className="material-symbols-outlined animate-pulse text-brand-primary" aria-hidden="true">
           hourglass_top
         </span>
         <span>Loading modal...</span>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
