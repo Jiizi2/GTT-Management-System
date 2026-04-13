@@ -95,6 +95,19 @@
   --checklist-need-card-bg-rgb: 255 249 251;
   --checklist-need-meta-bg-rgb: 251 233 238;
   --checklist-need-body-bg-rgb: 255 253 254;
+  --checklist-need-heading-rgb: 154 54 80;
+  --checklist-clear-border-rgb: 184 222 194;
+  --checklist-clear-bg-rgb: 241 250 244;
+  --checklist-clear-icon-bg-rgb: 255 255 255;
+  --checklist-clear-accent-rgb: 38 111 62;
+  --checklist-complete-border-rgb: 187 221 196;
+  --checklist-complete-card-bg-rgb: 245 250 246;
+  --checklist-complete-driver-bg-rgb: 234 246 237;
+  --checklist-complete-driver-slot-bg-rgb: 255 255 255;
+  --checklist-complete-accent-rgb: 40 112 64;
+  --checklist-reminder-border-rgb: 231 205 144;
+  --checklist-reminder-bg-rgb: 255 248 236;
+  --checklist-reminder-accent-rgb: 147 95 14;
 }
 
 :root[data-theme="dark"] {
@@ -197,6 +210,19 @@
   --checklist-need-card-bg-rgb: 49 45 39;
   --checklist-need-meta-bg-rgb: 58 52 44;
   --checklist-need-body-bg-rgb: 45 41 35;
+  --checklist-need-heading-rgb: 239 211 218;
+  --checklist-clear-border-rgb: 89 111 69;
+  --checklist-clear-bg-rgb: 27 34 27;
+  --checklist-clear-icon-bg-rgb: 38 46 36;
+  --checklist-clear-accent-rgb: 206 226 184;
+  --checklist-complete-border-rgb: 84 105 67;
+  --checklist-complete-card-bg-rgb: 27 34 27;
+  --checklist-complete-driver-bg-rgb: 34 42 33;
+  --checklist-complete-driver-slot-bg-rgb: 45 55 42;
+  --checklist-complete-accent-rgb: 215 228 193;
+  --checklist-reminder-border-rgb: 128 100 53;
+  --checklist-reminder-bg-rgb: 43 36 23;
+  --checklist-reminder-accent-rgb: 241 213 140;
 }
 
 *,
@@ -398,12 +424,12 @@ img {
   }
 
   .checklist-need-section {
-    border: var(--serene-frame-border-width) solid rgb(var(--checklist-need-border-rgb) / 0.6);
+    border: 1px solid rgb(var(--checklist-need-border-rgb) / 0.6);
     background-color: rgb(var(--checklist-need-section-bg-rgb));
   }
 
   .checklist-need-attention-card {
-    border: var(--serene-frame-border-width) solid rgb(var(--checklist-need-border-rgb) / 0.55);
+    border: 1px solid rgb(var(--checklist-need-border-rgb) / 0.55);
     background-color: rgb(var(--checklist-need-card-bg-rgb));
   }
 
@@ -414,6 +440,21 @@ img {
 
   .checklist-need-attention-body {
     background-color: rgb(var(--checklist-need-body-bg-rgb));
+  }
+
+  .checklist-need-heading {
+    color: rgb(var(--checklist-reminder-accent-rgb));
+  }
+
+  .checklist-need-summary-badge {
+    border: 1px solid rgb(var(--checklist-reminder-border-rgb) / 0.72);
+    background-color: rgb(var(--checklist-reminder-bg-rgb));
+    color: rgb(var(--checklist-reminder-accent-rgb));
+  }
+
+  .checklist-need-empty {
+    border: 1px dashed rgb(var(--checklist-need-border-rgb) / 0.72);
+    background-color: rgb(var(--checklist-need-section-bg-rgb));
   }
 
   .checklist-need-attention-warning {
@@ -452,6 +493,97 @@ img {
     border-color: rgb(var(--color-primary) / 0.24);
     background-color: rgb(var(--color-primary) / 0.12);
     color: rgb(var(--color-primary));
+  }
+
+  .checklist-clear-section {
+    border: 1px solid rgb(var(--checklist-clear-border-rgb) / 0.72);
+    background-color: rgb(var(--checklist-clear-bg-rgb));
+    color: rgb(var(--checklist-clear-accent-rgb));
+  }
+
+  .checklist-clear-icon {
+    background-color: rgb(var(--checklist-clear-icon-bg-rgb));
+    color: rgb(var(--checklist-clear-accent-rgb));
+  }
+
+  .checklist-complete-heading {
+    color: rgb(var(--checklist-complete-accent-rgb));
+  }
+
+  .checklist-complete-summary-badge {
+    border: 1px solid rgb(var(--checklist-complete-border-rgb) / 0.72);
+    background-color: rgb(var(--checklist-complete-driver-bg-rgb));
+    color: rgb(var(--checklist-complete-accent-rgb));
+  }
+
+  .checklist-complete-card {
+    border: 1px solid rgb(var(--checklist-complete-border-rgb) / 0.58);
+    background-color: rgb(var(--checklist-complete-card-bg-rgb));
+  }
+
+  .checklist-complete-driver {
+    border: 1px solid rgb(var(--checklist-complete-border-rgb) / 0.62);
+    background-color: rgb(var(--checklist-complete-driver-bg-rgb));
+  }
+
+  .checklist-complete-driver-slot {
+    background-color: rgb(var(--checklist-complete-driver-slot-bg-rgb));
+    color: rgb(var(--checklist-complete-accent-rgb));
+  }
+
+  .checklist-complete-verified {
+    border: 1px solid rgb(var(--checklist-complete-border-rgb) / 0.68);
+    background-color: rgb(var(--checklist-complete-driver-bg-rgb));
+    color: rgb(var(--checklist-complete-accent-rgb));
+  }
+
+  .checklist-complete-status {
+    color: rgb(var(--checklist-complete-accent-rgb));
+  }
+
+  .checklist-reminder-section {
+    border: 1px solid rgb(var(--checklist-reminder-border-rgb) / 0.74);
+    background-color: rgb(var(--checklist-reminder-bg-rgb));
+    color: rgb(var(--checklist-reminder-accent-rgb));
+  }
+
+  .checklist-reminder-chip {
+    border: 1px solid rgb(var(--checklist-reminder-border-rgb) / 0.62);
+    background-color: rgb(var(--color-surface-container-lowest) / 0.78);
+    color: rgb(var(--checklist-reminder-accent-rgb));
+  }
+
+  .checklist-reminder-inline {
+    border: 1px solid rgb(var(--checklist-reminder-border-rgb) / 0.62);
+    background-color: rgb(var(--checklist-reminder-bg-rgb));
+    color: rgb(var(--checklist-reminder-accent-rgb));
+  }
+
+  .checklist-secondary-button {
+    border: 1px solid rgb(var(--color-outline-variant) / 0.42);
+    background-color: rgb(var(--color-surface-container-lowest));
+    color: rgb(var(--color-on-surface-variant));
+  }
+
+  .checklist-secondary-button:hover {
+    border-color: rgb(var(--color-primary) / 0.36);
+    background-color: rgb(var(--color-surface-container-high));
+    color: rgb(var(--color-primary));
+  }
+
+  .checklist-warning-button {
+    border: 1px solid rgb(var(--checklist-reminder-border-rgb) / 0.72);
+    background-color: rgb(var(--checklist-reminder-bg-rgb));
+    color: rgb(var(--checklist-reminder-accent-rgb));
+  }
+
+  .checklist-warning-button:hover {
+    border-color: rgb(var(--checklist-reminder-border-rgb) / 0.9);
+    background-color: rgb(var(--checklist-reminder-bg-rgb) / 0.92);
+  }
+
+  .checklist-section-divider {
+    background-color: rgb(var(--color-outline-variant) / 0.4);
   }
 
   .serene-field {

@@ -189,15 +189,7 @@ export function LoginScreen({
               </label>
 
               <label className="block space-y-2" htmlFor="login-password">
-                <span className="flex items-center justify-between">
-                  <span className="block text-sm font-semibold text-on-surface-variant">Password</span>
-                  <a
-                    href="#"
-                    className="text-xs font-semibold text-primary transition-colors hover:text-primary-container"
-                  >
-                    Forgot Password?
-                  </a>
-                </span>
+                <span className="block text-sm font-semibold text-on-surface-variant">Password</span>
                 <span className="group relative block">
                   <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-outline-variant transition-colors group-focus-within:text-primary">
                     <span className="material-symbols-outlined text-xl" aria-hidden="true">
@@ -291,10 +283,7 @@ export function LoginScreen({
           ) : null}
 
           <p className="pt-4 text-center text-sm text-on-surface-variant">
-            Don&apos;t have an account?{" "}
-            <a href="#" className="font-bold text-primary hover:underline">
-              Contact Administrator
-            </a>
+            Don&apos;t have an account? <span className="font-bold text-primary">Contact Administrator</span>
           </p>
 
           <div className="flex items-center justify-center gap-4 pt-12 text-outline-variant">

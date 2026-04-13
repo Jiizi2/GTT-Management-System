@@ -19,6 +19,7 @@ const {
   formatChecklistCopyDate,
   formatScheduleTime,
   getChecklistDayLabel,
+  getLocalIsoDateWithOffset,
 } = Domain;
 
 const CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY = "gtt-h1-checklist-confirmed-drivers-v1";
@@ -324,6 +325,7 @@ const syncChecklistResetToBackend = async ({
 
 export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   const checklistItems = buildChecklistItemsFromGroups(groups);
+  const dayAfterTomorrowIso = getLocalIsoDateWithOffset(2);
   const groupsByCode = useMemo(
     () => new Map(groups.map((group) => [group.code.trim().toUpperCase(), group])),
     [groups],
@@ -351,6 +353,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     const assignedCount = confirmedDrivers[item.id]?.drivers.length ?? 0;
     return assignedCount >= getRequiredDriverCount(item);
   };
+  const isTwoDaysAwayChecklistItem = (item: ChecklistItem): boolean => item.tripDate === dayAfterTomorrowIso;
   const searchedChecklistItems = checklistItems.filter((item) =>
     normalizedGroupCodeQuery ? item.groupCode.toLowerCase().includes(normalizedGroupCodeQuery) : true,
   );
@@ -479,9 +482,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   if (checklistItems.length === 0) {
     return (
       <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-        <header className="rounded-3xl border border-slate-200/80 bg-surface-container-lowest p-5 shadow-sm">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">H-1 Checklist</h2>
-          <p className="mt-2 text-sm text-slate-600">
+        <header className="serene-card rounded-3xl p-5">
+          <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
             <span className="sm:hidden">Driver readiness for next 3 days.</span>
             <span className="hidden sm:inline">
               Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
@@ -489,19 +492,19 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
           </p>
         </header>
 
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-surface-container-lowest p-10 text-center">
-          <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
+        <article className="serene-card rounded-3xl border border-dashed border-outline-variant/45 p-10 text-center">
+          <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
             event_busy
           </span>
-          <h2 className="mt-3 text-xl font-bold text-slate-800">No upcoming trips in the next 3 days</h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <h2 className="mt-3 text-xl font-bold text-on-surface">No upcoming trips in the next 3 days</h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
             <span className="sm:hidden">No trip scheduled in the next 3 days.</span>
             <span className="hidden sm:inline">
               No itinerary is scheduled for today, tomorrow, and the day after tomorrow.
             </span>
           </p>
           {groupsWithItineraryCount > 0 ? (
-            <p className="mt-3 text-xs font-medium text-amber-700">
+            <p className="mt-3 text-xs font-medium text-on-surface-variant">
               Beberapa group punya itinerary, tetapi belum masuk rentang H-1 (hari ini s/d H+2) atau tanggal itinerary
               belum valid.
             </p>
@@ -756,6 +759,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     const assignedProgressCount = assignedDrivers.length;
     const isComplete = assignedProgressCount >= requiredDriverCount;
     const isMultiDriver = requiredDriverCount > 1;
+    const isTwoDaysAway = isTwoDaysAwayChecklistItem(item);
     const groupRecord = groupsByCode.get(item.groupCode.trim().toUpperCase());
     const serviceType = resolveGroupServiceType(groupRecord);
     const isExternalTransport = isExternalTransportGroup(groupRecord);
@@ -799,9 +803,16 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Activity</p>
               <h4 className="text-lg font-bold leading-snug text-slate-900">{item.activity}</h4>
               <p className="truncate text-sm font-semibold text-slate-900">{item.groupName}</p>
-              <span className="inline-flex items-center rounded-md border border-slate-900/20 bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-900">
-                {serviceType}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-md border border-slate-900/20 bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-900">
+                  {serviceType}
+                </span>
+                {isTwoDaysAway ? (
+                  <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700">
+                    2 Hari Lagi
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-6 grid grid-cols-3 gap-3">
@@ -853,7 +864,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </span>
                 <input
                   type="text"
-                  className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                  className="serene-input h-auto rounded-xl px-3 py-2.5 text-sm font-medium"
                   value={draft.name}
                   onChange={(event) => handleDraftChange(item.id, "name", event.target.value)}
                   placeholder="Enter name..."
@@ -866,7 +877,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </span>
                 <input
                   type="tel"
-                  className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                  className="serene-input h-auto rounded-xl px-3 py-2.5 text-sm font-medium"
                   value={draft.phone}
                   onChange={(event) => handleDraftChange(item.id, "phone", event.target.value)}
                   placeholder="+966..."
@@ -879,7 +890,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </span>
                 <input
                   type="text"
-                  className="w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                  className="serene-input h-auto rounded-xl px-3 py-2.5 text-sm font-medium"
                   value={draft.plateNumber}
                   onChange={(event) => handleDraftChange(item.id, "plateNumber", event.target.value)}
                   placeholder="ABC-123"
@@ -944,9 +955,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
       </section>
 
-      <header className="rounded-3xl border border-slate-200/80 bg-surface-container-lowest p-5 shadow-sm">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">H-1 Checklist</h2>
-        <p className="mt-2 text-sm text-slate-600">
+      <header className="serene-card rounded-3xl p-5">
+        <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
+        <p className="mt-2 text-sm text-on-surface-variant">
           <span className="sm:hidden">Driver readiness for next 3 days.</span>
           <span className="hidden sm:inline">
             Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
@@ -955,12 +966,12 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       </header>
 
       {hasGroupCodeQuery && searchedChecklistItems.length === 0 ? (
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-surface-container-lowest p-10 text-center">
-          <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
+        <article className="serene-card rounded-3xl border border-dashed border-outline-variant/45 p-10 text-center">
+          <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
             search_off
           </span>
-          <h2 className="mt-3 text-xl font-bold text-slate-800">Group number not found</h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <h2 className="mt-3 text-xl font-bold text-on-surface">Group number not found</h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
             <span className="sm:hidden">Try another code or clear search.</span>
             <span className="hidden sm:inline">Try another group code or clear search to see all checklist items.</span>
           </p>
@@ -968,9 +979,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       ) : null}
 
       {isClear ? (
-        <section className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+        <section className="checklist-clear-section flex items-start gap-3 rounded-2xl p-4">
           <div
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-lowest"
+            className="checklist-clear-icon inline-flex h-9 w-9 items-center justify-center rounded-full"
             aria-hidden="true"
           >
             <span className="material-symbols-outlined">check_circle</span>
@@ -989,22 +1000,24 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         <>
           <section className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-sm font-extrabold uppercase tracking-[0.16em] text-rose-700">Need Attention</h3>
-              <span className="rounded-lg border border-rose-200 bg-rose-100 px-3 py-1 text-xs font-bold uppercase leading-none tracking-[0.12em] text-rose-700">
+              <h3 className="checklist-need-heading text-sm font-extrabold uppercase tracking-[0.16em]">
+                Need Attention
+              </h3>
+              <span className="checklist-need-summary-badge rounded-lg px-3 py-1 text-xs font-bold uppercase leading-none tracking-[0.12em]">
                 {pendingItems.length} Actions Required
               </span>
-              <span className="hidden h-px flex-1 bg-slate-200 sm:block" aria-hidden="true" />
+              <span className="checklist-section-divider hidden h-px flex-1 sm:block" aria-hidden="true" />
             </div>
 
             {pendingItems.length > 0 ? (
               <div className="space-y-4">{pendingNeedAttentionCards}</div>
             ) : (
-              <article className="rounded-2xl border border-dashed border-rose-200 bg-rose-50/55 p-8 text-center">
+              <article className="checklist-need-empty rounded-2xl p-8 text-center">
                 <span className="material-symbols-outlined text-3xl text-brand-primary" aria-hidden="true">
                   verified
                 </span>
-                <h2 className="mt-2 text-lg font-bold text-slate-800">All trips are ready</h2>
-                <p className="mt-1 text-sm text-slate-600">
+                <h2 className="mt-2 text-lg font-bold text-on-surface">All trips are ready</h2>
+                <p className="mt-1 text-sm text-on-surface-variant">
                   <span className="sm:hidden">No pending driver assignment.</span>
                   <span className="hidden sm:inline">There are no pending driver assignments in the next 3 days.</span>
                 </p>
@@ -1024,11 +1037,13 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-sm font-extrabold uppercase tracking-[0.16em] text-emerald-700">Completed</h3>
-              <span className="rounded-lg border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-bold uppercase leading-none tracking-[0.12em] text-emerald-700">
+              <h3 className="checklist-complete-heading text-sm font-extrabold uppercase tracking-[0.16em]">
+                Completed
+              </h3>
+              <span className="checklist-complete-summary-badge rounded-lg px-3 py-1 text-xs font-bold uppercase leading-none tracking-[0.12em]">
                 {completedItems.length} Trips Assigned
               </span>
-              <span className="hidden h-px flex-1 bg-slate-200 sm:block" aria-hidden="true" />
+              <span className="checklist-section-divider hidden h-px flex-1 sm:block" aria-hidden="true" />
             </div>
 
             <div className="space-y-3">
@@ -1040,6 +1055,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 const groupRecord = groupsByCode.get(item.groupCode.trim().toUpperCase());
                 const serviceType = resolveGroupServiceType(groupRecord);
                 const isExternalTransport = isExternalTransportGroup(groupRecord);
+                const isTwoDaysAway = isTwoDaysAwayChecklistItem(item);
                 const requiredDriverCount = getRequiredDriverCount(item);
                 const assignedDrivers = assignment.drivers.slice(0, requiredDriverCount);
                 const assignedDriverNames = assignedDrivers
@@ -1057,50 +1073,55 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                     : "";
 
                 return (
-                  <article
-                    key={item.id}
-                    className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-4 py-3"
-                  >
+                  <article key={item.id} className="checklist-complete-card rounded-2xl px-4 py-3">
                     <div className="grid items-center gap-3 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.9fr_1.3fr_auto_auto]">
                       <div className="min-w-0">
-                        <p className="truncate text-2xl font-extrabold leading-none tracking-tight text-slate-700 sm:text-3xl">
+                        <p className="truncate text-2xl font-extrabold leading-none tracking-tight text-on-surface sm:text-3xl">
                           {item.groupCode}
                         </p>
-                        <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">{item.groupName}</p>
-                        <p className="mt-0.5 inline-flex items-center gap-1 truncate text-sm font-semibold text-slate-600">
-                          <span className="material-symbols-outlined text-sm text-slate-500" aria-hidden="true">
+                        <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{item.groupName}</p>
+                        <p className="mt-0.5 inline-flex items-center gap-1 truncate text-sm font-semibold text-on-surface-variant">
+                          <span
+                            className="material-symbols-outlined text-sm text-on-surface-variant/70"
+                            aria-hidden="true"
+                          >
                             {item.activityIcon}
                           </span>
                           <span>{item.activity}</span>
                         </p>
-                        <span
-                          className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
-                            serviceType === "Visa+" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {serviceType}
-                        </span>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {serviceType === "Visa Only" ? (
+                            <span className="checklist-reminder-inline inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]">
+                              Visa Only
+                            </span>
+                          ) : null}
+                          {isTwoDaysAway ? (
+                            <span className="checklist-reminder-inline inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]">
+                              2 Hari Lagi
+                            </span>
+                          ) : null}
+                        </div>
                         {isExternalTransport ? (
-                          <p className="mt-1 text-[10px] font-semibold text-amber-700">
+                          <p className="mt-1 text-[10px] font-semibold text-on-surface-variant">
                             Reminder: transport vendor eksternal.
                           </p>
                         ) : null}
                       </div>
 
                       <div className="space-y-0.5">
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.11em] text-slate-400">
+                        <span className="block text-[10px] font-semibold uppercase tracking-[0.11em] text-on-surface-variant/70">
                           Scheduled Time
                         </span>
-                        <strong className="block text-xl font-extrabold leading-none text-slate-700 sm:text-2xl">
+                        <strong className="block text-xl font-extrabold leading-none text-on-surface sm:text-2xl">
                           {scheduledPrimary}
                         </strong>
                         {scheduledSecondary ? (
-                          <small className="block text-[10px] text-slate-500">{scheduledSecondary}</small>
+                          <small className="block text-[10px] text-on-surface-variant">{scheduledSecondary}</small>
                         ) : null}
                       </div>
 
                       <div className="space-y-0.5">
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.11em] text-slate-400">
+                        <span className="block text-[10px] font-semibold uppercase tracking-[0.11em] text-on-surface-variant/70">
                           {requiredDriverCount > 1 ? "Assigned Drivers" : "Assigned Driver"}
                         </span>
                         <div className="space-y-1">
@@ -1108,13 +1129,13 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                             assignedDriverNames.map((driverName, index) => (
                               <div
                                 key={`${item.id}-driver-${index}`}
-                                className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1"
+                                className="checklist-complete-driver flex items-center gap-2 rounded-lg px-2 py-1"
                               >
-                                <span className="inline-flex min-w-[52px] justify-center rounded-md bg-surface-container-lowest px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-700">
+                                <span className="checklist-complete-driver-slot inline-flex min-w-[52px] justify-center rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em]">
                                   Supir {index + 1}
                                 </span>
                                 <strong
-                                  className="truncate text-sm font-bold leading-tight text-brand-primary"
+                                  className="truncate text-sm font-bold leading-tight text-on-surface"
                                   title={driverName}
                                 >
                                   {driverName}
@@ -1122,11 +1143,11 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                               </div>
                             ))
                           ) : (
-                            <strong className="block truncate text-base font-bold leading-tight text-slate-500">
+                            <strong className="block truncate text-base font-bold leading-tight text-on-surface-variant">
                               -
                             </strong>
                           )}
-                          <span className="inline-flex rounded-lg border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.07em] text-emerald-700">
+                          <span className="checklist-complete-verified inline-flex rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.07em]">
                             Verified
                           </span>
                         </div>
@@ -1135,7 +1156,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                       <div className="inline-flex items-center gap-1.5">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.07em] text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
+                          className="checklist-warning-button inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.07em] transition"
                           onClick={() => handleOpenCancelConfirm(item.id)}
                         >
                           <span className="material-symbols-outlined text-[12px]" aria-hidden="true">
@@ -1146,7 +1167,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-surface-container-lowest px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] text-slate-500 transition hover:border-brand-primary hover:text-brand-primary"
+                          className="checklist-secondary-button inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.07em] transition"
                           onClick={() => handleCopyDriver(item.id)}
                         >
                           <span className="material-symbols-outlined text-[12px]" aria-hidden="true">
@@ -1156,7 +1177,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                         </button>
                       </div>
 
-                      <span className="inline-flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-[0.1em] text-emerald-700">
+                      <span className="checklist-complete-status inline-flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-[0.1em]">
                         <span className="material-symbols-outlined text-base" aria-hidden="true">
                           check_circle
                         </span>
@@ -1184,12 +1205,12 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       {cancelTargetItem ? (
         <ChecklistModalPortal>
           <div
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4"
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-background-deep/72 p-4"
             onClick={handleCloseCancelConfirm}
             role="presentation"
           >
             <div
-              className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-2xl"
+              className="serene-card w-full max-w-md rounded-2xl p-5 shadow-2xl"
               role="dialog"
               aria-modal="true"
               aria-labelledby="cancel-assignment-title"
@@ -1198,16 +1219,16 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             >
               <div className="flex items-start gap-3">
                 <span
-                  className="material-symbols-outlined rounded-full bg-amber-100 p-2 text-amber-700"
+                  className="checklist-warning-button material-symbols-outlined rounded-full p-2"
                   aria-hidden="true"
                 >
                   warning
                 </span>
                 <div className="min-w-0">
-                  <h4 id="cancel-assignment-title" className="text-lg font-extrabold text-slate-900">
+                  <h4 id="cancel-assignment-title" className="text-lg font-extrabold text-on-surface">
                     Cancel Driver Assignment?
                   </h4>
-                  <p id="cancel-assignment-description" className="mt-1 text-sm text-slate-600">
+                  <p id="cancel-assignment-description" className="mt-1 text-sm text-on-surface-variant">
                     Assignment untuk <strong>{cancelTargetItem.groupCode}</strong> akan dikembalikan ke
                     <strong> Need Attention</strong> dan data supir akan dihapus.
                   </p>
@@ -1217,7 +1238,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               <div className="mt-5 flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
-                  className="rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-surface-container-high"
+                  className="checklist-secondary-button rounded-xl px-3 py-2 text-sm font-semibold transition"
                   onClick={handleCloseCancelConfirm}
                 >
                   Keep Assigned

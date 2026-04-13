@@ -50,6 +50,7 @@ import {
   overviewDummySeeds,
   parseDisplayDateToIso,
   parseTimeForInput,
+  resolveCurrentGroupTone,
   resolveGroupToneByItinerary,
   resolveTotalBusCount,
   resolveValidRaudhahAppointments,
@@ -190,7 +191,7 @@ function testRouteHelpersForCategorySpecificBehavior(): void {
 
   const departureFields = getRouteFieldConfigByCategory("departure");
   assert.equal(departureFields.fromLabel, "Departure City");
-  assert.equal(departureFields.toLabel, "Destination Airport");
+  assert.equal(departureFields.toLabel, "Destination Airport City");
 }
 
 function testTransferTrainExpansionCreatesTwoChecklistSegments(): void {
@@ -380,7 +381,52 @@ function testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime(): v
   );
 }
 
+function testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow(): void {
+  const dayAfterTomorrowIso = getLocalIsoDateWithOffset(2);
+  const group = createBaseGroup({
+    code: "UNIT-VISA-ONLY",
+    visaSetup: {
+      visaStatus: "Pending",
+      syarikah: "Provider Unit",
+      paymentStatus: "Partial",
+      makkahHotels: [],
+      madinahHotels: [],
+      raudhahAppointments: [],
+    },
+    itinerary: [
+      {
+        date: "Day After Tomorrow",
+        year: dayAfterTomorrowIso.slice(0, 4),
+        category: "Departure",
+        categoryKey: "departure",
+        title: "Visa Only Departure",
+        meta: "23:00 | Trip",
+        icon: "flight_takeoff",
+        isoDate: dayAfterTomorrowIso,
+        time: "23:00",
+        from: "Madinah Hotel",
+        to: "MED Airport",
+        requiresBus: true,
+        hotelPickupRequestTime: "20:00",
+      },
+    ],
+  });
+
+  const checklistItems = buildChecklistItemsFromGroups([group]);
+  assert.equal(checklistItems.length, 1);
+  assert.equal(checklistItems[0]?.groupCode, "UNIT-VISA-ONLY");
+  assert.equal(checklistItems[0]?.tripDate, dayAfterTomorrowIso);
+  assert.equal(checklistItems[0]?.scheduledTime, "20:00");
+}
+
 function testOverviewAndStatusNormalizationHelpers(): void {
+  const now = new Date();
+  now.setHours(12, 0, 0, 0);
+  const yesterdayIso = getLocalIsoDateWithOffset(-1);
+  const todayIso = getLocalIsoDateWithOffset(0);
+  const yesterdayDate = formatScheduleDate(yesterdayIso);
+  const todayDate = formatScheduleDate(todayIso);
+
   assert.equal(formatAprilIsoDate(-3), "2026-04-01");
   assert.equal(formatAprilIsoDate(35), "2026-04-30");
   assert.equal(formatAprilDisplayDate(-4), "1 Apr");
@@ -402,6 +448,37 @@ function testOverviewAndStatusNormalizationHelpers(): void {
     ]),
     "active",
   );
+  assert.equal(
+    resolveCurrentGroupTone(
+      "active",
+      [
+        createBaseItineraryItem({
+          date: yesterdayDate.date,
+          year: yesterdayDate.year,
+          isoDate: yesterdayIso,
+          time: "08:00",
+        }),
+      ],
+      now,
+    ),
+    "inactive",
+  );
+  assert.equal(
+    resolveCurrentGroupTone(
+      "active",
+      [
+        createBaseItineraryItem({
+          date: todayDate.date,
+          year: todayDate.year,
+          isoDate: todayIso,
+          time: "",
+          meta: "Unit meta",
+        }),
+      ],
+      now,
+    ),
+    "active",
+  );
   assert.equal(getMinimumBusCountForPax(0), 1);
   assert.equal(getMinimumBusCountForPax(120), 3);
   assert.equal(resolveTotalBusCount(120, 1), 3);
@@ -418,6 +495,8 @@ function testOverviewAndStatusNormalizationHelpers(): void {
     true,
   );
 
+  const upcomingTransferIso = getLocalIsoDateWithOffset(1);
+  const upcomingTransferDate = formatScheduleDate(upcomingTransferIso);
   const normalized = normalizeGroupStatus(
     createBaseGroup({
       code: "UNIT-NORMALIZE",
@@ -431,8 +510,9 @@ function testOverviewAndStatusNormalizationHelpers(): void {
         createBaseItineraryItem({
           category: "Transfer",
           categoryKey: "transfer",
-          date: "10 Apr",
-          year: "2026",
+          date: upcomingTransferDate.date,
+          year: upcomingTransferDate.year,
+          isoDate: upcomingTransferIso,
           from: "Makkah",
           to: "Madinah",
           icon: "airport_shuttle",
@@ -444,8 +524,8 @@ function testOverviewAndStatusNormalizationHelpers(): void {
     }),
   );
 
-  assert.equal(normalized.arrivalDate, "2026-04-10");
-  assert.equal(normalized.returnDate, "2026-04-10");
+  assert.equal(normalized.arrivalDate, upcomingTransferIso);
+  assert.equal(normalized.returnDate, upcomingTransferIso);
   assert.equal(normalized.itinerary.length, 2);
   assert.equal(normalized.tone, "active");
   assert.equal(normalized.status, "Active");
@@ -832,6 +912,7 @@ describe("app-domain", () => {
   runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
   runCase("visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
+  runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);
   runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);
   runCase("form/category helpers", testFormFactoryAndCategoryHelpers);
   runCase("schedule editing helpers", testScheduleEditingAndCityInferenceHelpers);

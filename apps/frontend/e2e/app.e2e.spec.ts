@@ -446,6 +446,8 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
   await pickTodayDate(page, "End Date");
   await page.getByLabel("Musyrif Name").fill("Ustadz E2E");
   await page.getByLabel("Phone Number").fill("+6281234567890");
+  await page.getByRole("button", { name: "Next: Visa" }).click();
+  await page.getByRole("button", { name: "Next: Itinerary" }).click();
 
   const openScheduleDetailButton = page.getByRole("button", { name: "Add Schedule Detail" });
   if ((await openScheduleDetailButton.count()) > 0) {
@@ -475,7 +477,16 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
 
   const saveGroupButton = page.getByRole("button", { name: "Save Group" });
   await expect(saveGroupButton).toBeEnabled();
+  const createGroupResponsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/groups") && response.request().method() === "POST",
+  );
   await saveGroupButton.click();
+  const createGroupResponse = await createGroupResponsePromise;
+  if (!createGroupResponse.ok()) {
+    throw new Error(
+      `Create group failed with ${createGroupResponse.status()}: ${await createGroupResponse.text()}`,
+    );
+  }
 
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
   await expect(page.getByText(groupCode)).toBeVisible();

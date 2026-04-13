@@ -193,7 +193,9 @@ async function testChecklistFlow(): Promise<void> {
 async function testChecklistWindowFiltering(): Promise<void> {
   const baseGroup = createSmokeGroup();
   const farFutureIso = getLocalIsoDateWithOffset(7);
+  const dayAfterTomorrowIso = getLocalIsoDateWithOffset(2);
   const farFutureDate = formatScheduleDate(farFutureIso);
+  const dayAfterTomorrowDate = formatScheduleDate(dayAfterTomorrowIso);
 
   const farFutureOnlyGroup: GroupData = {
     ...baseGroup,
@@ -234,6 +236,46 @@ async function testChecklistWindowFiltering(): Promise<void> {
     checklistItemsMixedWindow.length >= 1,
     true,
     "Checklist should still include itinerary that falls inside H-1 window.",
+  );
+
+  const visaOnlyWindowGroup: GroupData = {
+    ...baseGroup,
+    code: "SMK-VISA-ONLY-H2",
+    visaSetup: baseGroup.visaSetup
+      ? {
+          ...baseGroup.visaSetup,
+          busStatus: undefined,
+        }
+      : undefined,
+    itinerary: [
+      {
+        date: dayAfterTomorrowDate.date,
+        year: dayAfterTomorrowDate.year,
+        category: "Departure",
+        categoryKey: "departure",
+        title: "Visa Only H+2 Departure",
+        meta: "11:30 PM | H+2 schedule",
+        icon: "flight_takeoff",
+        isoDate: dayAfterTomorrowIso,
+        time: "23:30",
+        from: "Madinah Hotel",
+        to: "MED Airport",
+        requiresBus: true,
+        hotelPickupRequestTime: "20:30",
+      },
+    ],
+  };
+
+  const visaOnlyChecklistItems = buildChecklistItemsFromGroups([visaOnlyWindowGroup]);
+  assertEqual(
+    visaOnlyChecklistItems.length,
+    1,
+    "Checklist should keep Visa Only groups visible when itinerary is inside H-1 window.",
+  );
+  assertEqual(
+    visaOnlyChecklistItems[0]?.tripDate,
+    dayAfterTomorrowIso,
+    "Checklist should still include H+2 trips for early notice.",
   );
 }
 

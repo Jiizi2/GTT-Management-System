@@ -347,11 +347,9 @@ export function GroupDetail({
   const isScheduleFlightNumberMissing =
     isFlightActivityType(scheduleForm.category) && !scheduleForm.flightNumber.trim();
   const isScheduleHotelNameMissing =
-    (scheduleForm.category === "arrival" ||
-      scheduleForm.category === "transfer" ||
-      scheduleForm.category === "departure") &&
+    (scheduleForm.category === "arrival" || scheduleForm.category === "departure") &&
     !scheduleForm.hotelName.trim();
-  const isScheduleFromHotelNameMissing = scheduleForm.category === "transfer" && !scheduleForm.fromHotelName.trim();
+  const isScheduleFromHotelNameMissing = false;
   const isScheduleDeparturePickupTimeMissing =
     scheduleForm.category === "departure" && !scheduleForm.hotelPickupRequestTime.trim();
   const isSchedulePrimaryTimeMissing =
@@ -379,12 +377,9 @@ export function GroupDetail({
     !!editScheduleForm && isCityTourActivityType(editScheduleForm.category) && !editScheduleForm.cityTourCity.trim();
   const isEditHotelNameMissing =
     !!editScheduleForm &&
-    (editScheduleForm.category === "arrival" ||
-      editScheduleForm.category === "transfer" ||
-      editScheduleForm.category === "departure") &&
+    (editScheduleForm.category === "arrival" || editScheduleForm.category === "departure") &&
     !editScheduleForm.hotelName.trim();
-  const isEditFromHotelNameMissing =
-    !!editScheduleForm && editScheduleForm.category === "transfer" && !editScheduleForm.fromHotelName.trim();
+  const isEditFromHotelNameMissing = false;
   const isEditDeparturePickupTimeMissing =
     !!editScheduleForm && editScheduleForm.category === "departure" && !editScheduleForm.hotelPickupRequestTime.trim();
   const isEditDepartureFlightTimeMissing =
@@ -430,7 +425,7 @@ export function GroupDetail({
         return resolveHotelNameByCity(draft.from);
       }
 
-      if (draft.category === "arrival" || draft.category === "transfer") {
+      if (draft.category === "arrival") {
         return resolveHotelNameByCity(draft.to);
       }
 
@@ -626,16 +621,12 @@ export function GroupDetail({
     const nextFlightNumber = isFlightActivityType(scheduleForm.category) ? scheduleForm.flightNumber.trim() : "";
     const shouldPersistHotelName =
       scheduleForm.category === "arrival" ||
-      scheduleForm.category === "transfer" ||
       scheduleForm.category === "city-tour" ||
       scheduleForm.category === "departure";
-    const isTransferCategory = isTransferActivityType(scheduleForm.category);
     const nextHotelName = shouldPersistHotelName
       ? scheduleForm.hotelName.trim() || resolveSuggestedHotelName(scheduleForm)
       : "";
-    const nextFromHotelName = isTransferCategory
-      ? scheduleForm.fromHotelName.trim() || resolveSuggestedFromHotelName(scheduleForm)
-      : "";
+    const nextFromHotelName = "";
     const nextHotelPickupRequestTime =
       scheduleForm.category === "departure" ? scheduleForm.hotelPickupRequestTime.trim() : "";
     const isTransferByTrain = isTransferActivityType(scheduleForm.category) && scheduleForm.transferByTrain;

@@ -263,41 +263,74 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
             --invoice-gold-soft: rgba(212, 175, 55, 0.72);
             --invoice-black: #1A1A1A;
         }
+        .print-container,
+        .print-container * {
+            color: var(--invoice-ink);
+            box-sizing: border-box;
+        }
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
         html,
         body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #ffffff;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
         body {
             color: var(--invoice-ink);
+            display: block;
         }
-        .print-container,
-        .print-container * {
-            color: var(--invoice-ink);
-        }
-        @page {
-            size: A4 portrait;
-            margin: 10mm;
+        .print-container {
+            width: 210mm;
+            min-width: 210mm;
+            max-width: 210mm;
+            height: 297mm;
+            min-height: 297mm;
+            max-height: 297mm;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: #ffffff;
+            page-break-after: avoid;
+            break-after: avoid;
         }
         @media print {
             html,
             body {
+                width: 100%;
+                height: 100%;
                 margin: 0;
                 padding: 0;
+                overflow: hidden;
                 background: white;
             }
-            .no-print { display: none; }
             .print-container {
-                width: 100% !important;
-                max-width: none !important;
-                min-height: auto !important;
-                height: auto !important;
-                box-shadow: none !important;
+                width: 210mm !important;
+                min-width: 210mm !important;
+                max-width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
                 padding: 0 !important;
-                overflow: visible !important;
-                display: block !important;
+                overflow: hidden !important;
+                box-shadow: none !important;
             }
-            header { background-color: var(--invoice-black) !important; -webkit-print-color-adjust: exact; }
+            header {
+                background-color: var(--invoice-black) !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
             .invoice-header-brand {
                 color: var(--invoice-gold) !important;
             }
@@ -322,6 +355,7 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
             .invoice-payment-block,
             .invoice-meta-card,
             .invoice-summary-block,
+            .invoice-subtotal-block,
             .invoice-notes-block,
             .invoice-signature-block,
             .invoice-line-row {
@@ -329,31 +363,32 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
                 page-break-inside: avoid;
             }
             .invoice-block {
-                break-inside: auto !important;
-                page-break-inside: auto !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
             }
             .invoice-overview-block {
-                margin-bottom: 6mm !important;
-                padding-top: 8mm !important;
-                padding-bottom: 7mm !important;
+                margin-bottom: 4mm !important;
+                padding-top: 5mm !important;
+                padding-bottom: 4mm !important;
             }
             .invoice-table-block {
                 margin-top: 0 !important;
-                padding-top: 2mm !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
             }
             .invoice-main-title {
-                font-size: 2.7rem !important;
-                line-height: 1 !important;
-                margin-bottom: 4mm !important;
+                font-size: 2.4rem !important;
+                line-height: 0.95 !important;
+                margin-bottom: 3mm !important;
             }
             .invoice-bill-to-name {
-                font-size: 1.1rem !important;
-                line-height: 1.4 !important;
-                letter-spacing: 0.08em !important;
+                font-size: 0.98rem !important;
+                line-height: 1.25 !important;
+                letter-spacing: 0.07em !important;
             }
             .invoice-meta-card {
-                padding: 5mm !important;
-                font-size: 11px !important;
+                padding: 4mm !important;
+                font-size: 10px !important;
             }
             .invoice-table-block .w-full {
                 overflow: visible !important;
@@ -373,35 +408,63 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
                 display: none !important;
             }
             .invoice-table th:nth-child(1),
-            .invoice-table td:nth-child(1) { width: 6%; }
+            .invoice-table td:nth-child(1) { width: 5%; }
             .invoice-table th:nth-child(2),
-            .invoice-table td:nth-child(2) { width: 28%; }
+            .invoice-table td:nth-child(2) { width: 31%; }
             .invoice-table th:nth-child(3),
             .invoice-table td:nth-child(3) { width: 12%; }
             .invoice-table th:nth-child(4),
-            .invoice-table td:nth-child(4) { width: 20%; }
+            .invoice-table td:nth-child(4) { width: 19%; }
             .invoice-table th:nth-child(5),
-            .invoice-table td:nth-child(5) { width: 16%; }
+            .invoice-table td:nth-child(5) { width: 15%; }
             .invoice-table th:nth-child(6),
             .invoice-table td:nth-child(6) { width: 18%; }
             .invoice-table th {
-                font-size: 7px !important;
-                line-height: 1.25 !important;
-                padding: 1.7mm 1.3mm !important;
+                font-size: 6.8px !important;
+                line-height: 1.2 !important;
+                padding: 1.4mm 1.1mm !important;
                 white-space: normal !important;
                 word-break: break-word !important;
                 vertical-align: bottom !important;
             }
             .invoice-table td {
-                font-size: 10px !important;
-                line-height: 1.35 !important;
-                padding: 2.2mm 1.3mm !important;
+                font-size: 9px !important;
+                line-height: 1.25 !important;
+                padding: 1.8mm 1.1mm !important;
                 word-break: break-word !important;
                 vertical-align: top !important;
             }
             .invoice-row-description {
-                font-size: 11px !important;
-                line-height: 1.3 !important;
+                font-size: 10px !important;
+                line-height: 1.25 !important;
+            }
+            .invoice-payment-summary-section {
+                display: grid !important;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+                gap: 4mm !important;
+                align-items: start !important;
+            }
+            .invoice-payment-summary-section > .invoice-payment-block,
+            .invoice-payment-summary-section > .invoice-summary-block {
+                min-width: 0 !important;
+                width: auto !important;
+            }
+            .invoice-payment-summary-section > .invoice-subtotal-block {
+                grid-column: 1 / -1 !important;
+            }
+            .invoice-bank-card,
+            .invoice-rate-card {
+                min-height: 36mm !important;
+            }
+            .invoice-subtotal-card {
+                border-top-width: 2px !important;
+                border-top-color: var(--invoice-gold) !important;
+            }
+            .invoice-subtotal-label {
+                color: var(--invoice-gold) !important;
+            }
+            .invoice-subtotal-value {
+                color: var(--invoice-ink) !important;
             }
             thead,
             tbody,
@@ -411,18 +474,30 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
-            .gold-highlight { color: #B8860B !important; }
         }
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
         .rub-el-hizb-pattern {
-            background-image:
-              linear-gradient(rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.94)),
-              url("${escapeHtml(logoUrl)}");
-            background-repeat: repeat, repeat;
-            background-position: 0 0, 0 0;
-            background-size: auto, 130px auto;
+            position: relative;
+            isolation: isolate;
+            background: #ffffff;
+        }
+        .rub-el-hizb-pattern::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: url("${escapeHtml(logoUrl)}");
+            background-repeat: repeat;
+            background-position: 0 0;
+            background-size: 170px auto;
+            opacity: 0.028;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .rub-el-hizb-pattern > * {
+            position: relative;
+            z-index: 1;
         }
         .luxury-gradient {
             background: linear-gradient(135deg, #1A1A1A 0%, #333333 100%);
@@ -471,28 +546,28 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
         }
     </style>
 </head>
-<body class="bg-stone-50 font-body text-luxury-black antialiased min-h-screen p-4 md:p-12 flex justify-center items-start">
-<div class="print-container bg-white w-full max-w-4xl min-h-[1123px] shadow-2xl relative overflow-hidden flex flex-col rub-el-hizb-pattern border border-stone-200">
-<header class="w-full luxury-gradient flex justify-between items-center px-12 py-10 relative z-10 border-b-4 border-gold-primary">
+<body class="font-body text-luxury-black antialiased">
+<div class="print-container bg-white rub-el-hizb-pattern border border-stone-200">
+<header class="w-full luxury-gradient flex justify-between items-center px-10 py-7 relative z-10 border-b-4 border-gold-primary">
 <div class="flex items-center gap-6">
 <img alt="Logo" class="h-16 w-auto object-contain" src="${escapeHtml(logoUrl)}"/>
 <div class="flex flex-col">
 <span class="invoice-header-brand font-bold text-xl uppercase tracking-[0.3em] font-headline">Ghaniya Tour</span>
-<span class="invoice-header-subtitle font-manrope text-2xl font-light tracking-tight">Umrah Group Summary</span>
+<span class="invoice-header-subtitle font-manrope text-xl font-light tracking-tight">Umrah Group Summary</span>
 </div>
 </div>
 <div class="text-right">
 <span class="invoice-header-doc-label uppercase tracking-[0.3em] text-[10px] font-bold">Official Document</span>
 </div>
 </header>
-<section class="invoice-block invoice-overview-block px-12 py-12 grid grid-cols-12 gap-8 items-start">
+<section class="invoice-block invoice-overview-block px-10 py-6 grid grid-cols-12 gap-5 items-start">
 <div class="col-span-7">
-<h1 class="invoice-main-title font-headline text-6xl font-extrabold text-luxury-black tracking-tighter mb-6">INVOICE</h1>
+<h1 class="invoice-main-title font-headline text-5xl font-extrabold text-luxury-black tracking-tighter mb-4">INVOICE</h1>
 <div class="space-y-1">
-<h2 class="invoice-bill-to-name text-xl font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
+<h2 class="invoice-bill-to-name text-lg font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
 </div>
 </div>
-<div class="invoice-meta-card col-span-5 bg-stone-50 p-8 border-t-2 border-luxury-black space-y-4">
+<div class="invoice-meta-card col-span-5 bg-stone-50 p-5 border-t-2 border-luxury-black space-y-3">
 <div class="flex justify-between">
 <span class="text-stone-500 text-[10px] font-bold uppercase tracking-widest">Invoice #</span>
 <span class="font-bold text-luxury-black">${escapeHtml(payload.invoiceNumber)}</span>
@@ -509,7 +584,7 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
 </div>
 </div>
 </section>
-<section class="invoice-block invoice-table-block flex-grow px-12 py-4">
+<section class="invoice-block invoice-table-block px-10 py-2">
 <div class="w-full overflow-hidden">
 <table class="invoice-table min-w-full border-collapse text-left">
 <thead class="border-b border-stone-300 bg-stone-100/90">
@@ -529,72 +604,75 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
 </table>
 </div>
 </section>
-<section class="invoice-block px-12 py-12 flex flex-col md:flex-row gap-16 bg-stone-50/50">
-<div class="invoice-payment-block flex-grow space-y-8">
-<div>
-<h3 class="invoice-section-accent text-[10px] font-extrabold uppercase tracking-[0.25em] mb-4">Payment Instructions</h3>
-<div class="bg-white p-6 border border-stone-200 shadow-sm">
-<div class="flex items-center gap-3 mb-4">
+<section class="invoice-block invoice-payment-summary-section grid grid-cols-1 gap-4 px-10 py-4 bg-stone-50/50 lg:grid-cols-2 items-start">
+<div class="invoice-payment-block space-y-3">
+<h3 class="invoice-section-accent text-[9px] font-extrabold uppercase tracking-[0.25em] mb-1">Payment Instructions</h3>
+<div class="invoice-bank-card bg-white p-4 border border-stone-200 shadow-sm">
+<div class="flex items-center gap-2 mb-2">
 <span class="invoice-accent-icon material-symbols-outlined">account_balance</span>
-<span class="font-bold text-luxury-black uppercase tracking-widest text-sm">${escapeHtml(bankMeta.bankName)}</span>
+<span class="font-bold text-luxury-black uppercase tracking-[0.18em] text-[13px]">${escapeHtml(bankMeta.bankName)}</span>
 </div>
-<p class="text-xs text-stone-500 mb-2">Account Number: <span class="font-bold text-luxury-black text-sm">${escapeHtml(bankMeta.accountNumber)}</span></p>
-<p class="text-xs text-stone-500">Beneficiary: <span class="font-bold text-luxury-black uppercase tracking-wider text-sm">${escapeHtml(companyProfile.brandName.toUpperCase())}</span></p>
-</div>
-</div>
-<div class="grid grid-cols-2 gap-4">
-<div class="bg-white p-4 border border-stone-100">
-<span class="text-[9px] text-stone-400 font-bold uppercase tracking-widest block mb-1">Rate SAR/IDR</span>
-<span class="font-bold text-xs text-luxury-black">IDR ${escapeHtml(formatRate(payload.sarToIdr))}</span>
-</div>
-<div class="bg-white p-4 border border-stone-100">
-<span class="text-[9px] text-stone-400 font-bold uppercase tracking-widest block mb-1">Rate USD/IDR</span>
-<span class="font-bold text-xs text-luxury-black">IDR ${escapeHtml(formatRate(payload.usdToIdr))}</span>
+<p class="text-[11px] text-stone-500 mb-1">Account Number: <span class="font-bold text-luxury-black text-[13px]">${escapeHtml(bankMeta.accountNumber)}</span></p>
+<p class="text-[11px] text-stone-500">Beneficiary: <span class="font-bold text-luxury-black uppercase tracking-wider text-[13px]">${escapeHtml(companyProfile.brandName.toUpperCase())}</span></p>
 </div>
 </div>
+<div class="invoice-summary-block invoice-rate-block space-y-3">
+<h3 class="invoice-section-accent text-[9px] font-extrabold uppercase tracking-[0.25em] mb-1">Exchange Rates</h3>
+<div class="invoice-rate-card bg-white p-4 border border-stone-200 shadow-sm">
+<div class="space-y-2">
+<div class="flex justify-between items-center gap-4 border-b border-stone-100 pb-2">
+<span class="text-[8px] text-stone-400 font-bold uppercase tracking-widest">Rate SAR/IDR</span>
+<span class="font-bold text-[13px] text-luxury-black">IDR ${escapeHtml(formatRate(payload.sarToIdr))}</span>
 </div>
-<div class="invoice-summary-block w-full md:w-80 space-y-4">
-<div class="flex justify-between items-center py-2 text-sm">
-<span class="text-stone-500 font-medium">Subtotal</span>
-<span class="font-manrope font-semibold text-luxury-black">${escapeHtml(formatIdr(payload.subtotalIdr))}</span>
+<div class="flex justify-between items-center gap-4 pt-1">
+<span class="text-[8px] text-stone-400 font-bold uppercase tracking-widest">Rate USD/IDR</span>
+<span class="font-bold text-[13px] text-luxury-black">IDR ${escapeHtml(formatRate(payload.usdToIdr))}</span>
 </div>
-<div class="flex justify-between items-center py-2 text-sm">
+</div>
+</div>
+</div>
+<div class="invoice-subtotal-block lg:col-span-2">
+<div class="invoice-subtotal-card bg-white p-4 border border-stone-200 shadow-sm">
+<div class="flex justify-between items-end gap-4 border-b border-stone-100 pb-2 mb-2">
+<span class="invoice-subtotal-label text-[9px] font-extrabold uppercase tracking-[0.25em]">Subtotal</span>
+<span class="invoice-subtotal-value font-manrope text-2xl font-extrabold tracking-tight text-right">${escapeHtml(formatIdr(payload.subtotalIdr))}</span>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between items-center text-[11px]">
 <span class="text-stone-500 font-medium">Tax (${taxPercentage}%)</span>
 <span class="font-manrope font-semibold text-luxury-black">${escapeHtml(formatIdr(payload.taxIdr))}</span>
 </div>
-<div class="flex justify-between items-center py-2 border-b border-stone-200 pb-4 text-sm">
+<div class="flex justify-between items-center text-[11px]">
 <span class="text-stone-500 font-medium">Payment Received</span>
 <span class="font-manrope font-semibold text-red-700">${escapeHtml(formatIdr(payload.downPaymentIdr))}</span>
 </div>
-<div class="invoice-total-due-row flex justify-between items-center py-4">
-<span class="invoice-total-due-label font-bold uppercase tracking-[0.2em] text-[10px]">Total Due</span>
-<span class="invoice-total-due-value font-manrope text-2xl font-extrabold tracking-tight">${escapeHtml(formatIdr(payload.remainingBalanceIdr))}</span>
+</div>
+<div class="invoice-total-due-row mt-2 flex justify-between items-center py-2.5">
+<span class="invoice-total-due-label font-bold uppercase tracking-[0.2em] text-[9px]">Total Due</span>
+<span class="invoice-total-due-value font-manrope text-lg font-extrabold tracking-tight">${escapeHtml(formatIdr(payload.remainingBalanceIdr))}</span>
 </div>
 </div>
 </section>
-<section class="invoice-block px-12 py-12 grid grid-cols-2 gap-12 border-t border-stone-100">
-<div class="invoice-notes-block space-y-6">
-<div class="">
-<p class="text-[11px] font-extrabold text-luxury-black uppercase tracking-widest mb-2">Message</p>
+<section class="invoice-block px-10 py-4 grid grid-cols-2 gap-6 border-t border-stone-100 items-start">
+<div class="invoice-notes-block space-y-3">
+<div>
+<p class="text-[10px] font-extrabold text-luxury-black uppercase tracking-widest mb-1.5">Message</p>
 <p class="text-xs text-stone-500 leading-relaxed">${notesHtml}</p>
 </div>
 </div>
-<div class="invoice-signature-block flex flex-col items-center justify-end">
-<div class="w-56 border-b-2 border-gold-primary mb-3 relative pb-2 pt-6 flex justify-center">
+<div class="invoice-signature-block flex flex-col items-center justify-start pt-1">
+<div class="w-48 border-b-2 border-gold-primary mb-2 relative pb-2 pt-3 flex justify-center">
 <img alt="Cap Ghaniya" class="h-16 w-auto object-contain opacity-25 absolute -top-6 left-1/2 -translate-x-1/2" src="${escapeHtml(capUrl)}"/>
 <img alt="Tanda Tangan Husein" class="h-14 w-auto object-contain relative z-10" src="${escapeHtml(signatureUrl)}"/>
 </div>
-<p class="font-bold text-luxury-black uppercase tracking-[0.25em] text-[11px]">${escapeHtml(companyProfile.directorName)}</p>
-<p class="invoice-section-accent text-[9px] font-bold uppercase tracking-widest mt-1">${escapeHtml(companyProfile.directorTitle)}</p>
+<p class="font-bold text-luxury-black uppercase tracking-[0.25em] text-[10px]">${escapeHtml(companyProfile.directorName)}</p>
+<p class="invoice-section-accent text-[8px] font-bold uppercase tracking-widest mt-1">${escapeHtml(companyProfile.directorTitle)}</p>
 </div>
 </section>
-<footer class="invoice-footer flex justify-center items-center w-full px-12 py-8 mt-auto luxury-gradient border-t-2 border-gold-primary">
+<footer class="invoice-footer flex justify-center items-center w-full px-10 py-2 mt-auto luxury-gradient border-t-2 border-gold-primary">
 <span class="invoice-footer-muted font-inter text-[8pt] uppercase tracking-[0.2em]">© 2026 Ghaniya Tour</span>
 </footer>
 </div>
-<button class="no-print fixed bottom-8 right-8 bg-luxury-black text-gold-primary w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform border border-gold-primary/30" onclick="window.print()">
-<span class="material-symbols-outlined">print</span>
-</button>
 </body></html>`;
 
   printableWindow.document.open();

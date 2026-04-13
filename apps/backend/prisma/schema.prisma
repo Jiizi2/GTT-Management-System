@@ -183,6 +183,7 @@ model Invoice {
   amount        Decimal       @default(0) @db.Decimal(12, 2)
   status        InvoiceStatus @default(PENDING)
   notes         String?
+  items         Json?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   client        InvoiceClient @relation(fields: [clientId], references: [id], onDelete: Restrict)

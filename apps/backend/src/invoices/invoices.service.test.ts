@@ -155,6 +155,60 @@ async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<voi
   }
 }
 
+async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
+  const { service, restore } = createMemoryInvoicesService();
+  try {
+    const created = await service.create({
+      clientName: "Item Persistence Client",
+      issuedDate: "2099-06-01",
+      dueDate: "2099-06-10",
+      amount: 750_000,
+      items: [
+        {
+          description: "Umrah Package",
+          pax: 2,
+          currency: "USD",
+          unitPrice: 1_250,
+          totalPrice: 2_500,
+          totalPriceIdr: 39_500_000,
+        },
+        {
+          description: "Airport Transfer",
+          pax: 1,
+          currency: "IDR",
+          unitPrice: 250_000,
+          totalPrice: 250_000,
+          totalPriceIdr: 250_000,
+        },
+      ],
+    });
+    assert.equal(created.items?.length, 2);
+    assert.equal(created.items?.[0].description, "Umrah Package");
+    assert.equal(created.items?.[1].currency, "IDR");
+
+    const updated = await service.update(created.id, {
+      items: [
+        {
+          description: "Updated Package",
+          pax: 3,
+          currency: "SAR",
+          unitPrice: 1_500,
+          totalPrice: 4_500,
+          totalPriceIdr: 18_000_000,
+        },
+      ],
+    });
+    assert.equal(updated.items?.length, 1);
+    assert.equal(updated.items?.[0].description, "Updated Package");
+
+    const listed = await service.findAll();
+    assert.equal(listed[0].items?.length, 1);
+    assert.equal(listed[0].items?.[0].currency, "SAR");
+  } finally {
+    restore();
+  }
+}
+
 async function testCreateValidationErrors(): Promise<void> {
   const { service, restore } = createMemoryInvoicesService();
   try {
@@ -354,6 +408,16 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           dueDate: new Date("2099-01-10T00:00:00.000Z"),
           amount: 125_500,
           status: InvoiceStatus.PENDING,
+          items: [
+            {
+              description: "Alpha Package",
+              pax: 2,
+              currency: "IDR",
+              unitPrice: 62_750,
+              totalPrice: 125_500,
+              totalPriceIdr: 125_500,
+            },
+          ],
         },
         {
           id: "inv-2",
@@ -368,6 +432,7 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           dueDate: new Date("2099-01-11T00:00:00.000Z"),
           amount: 900_000,
           status: InvoiceStatus.CANCELLED,
+          items: [],
         },
       ],
     },
@@ -385,8 +450,10 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
     assert.equal(invoices.length, 2);
     assert.equal(invoices[0].status, "Pending");
     assert.equal(invoices[0].clientInitials, "AC");
+    assert.equal(invoices[0].items?.length, 1);
     assert.equal(invoices[1].status, "Cancelled");
     assert.equal(invoices[1].amount, 0);
+    assert.equal(invoices[1].items, undefined);
   } finally {
     restore();
   }
@@ -743,6 +810,7 @@ async function main(): Promise<void> {
   await runCase("invoice list clients seeded labels", testListClientsReturnsSeededSortedLabels);
   await runCase("invoice create existing client sequential numbering", testCreateUsesExistingClientAndGeneratesSequentialNumbers);
   await runCase("invoice create new clients and status rules", testCreateCanCreateNewClientAndResolvesStatusRules);
+  await runCase("invoice create and update persist items", testCreateAndUpdatePersistInvoiceItems);
   await runCase("invoice create validation errors", testCreateValidationErrors);
   await runCase("invoice update status client and group rules", testUpdateSupportsClientSwitchStatusAndGroupRules);
   await runCase("invoice update validation errors", testUpdateValidationErrors);

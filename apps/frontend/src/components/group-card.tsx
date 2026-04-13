@@ -307,9 +307,9 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
                 />
               </div>
               <div className={getItineraryPreviewRowClasses(previewItem.state)}>
-                <div className="flex items-start justify-between gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                   <p
-                    className={`min-w-0 pb-0.5 text-sm font-medium leading-snug ${getItineraryPreviewTextClasses(
+                    className={`min-w-0 truncate pb-0.5 text-sm font-medium leading-snug ${getItineraryPreviewTextClasses(
                       previewItem.state,
                     )}`}
                   >
@@ -317,7 +317,7 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
                   </p>
 
                   {previewItem.state === "next" ? (
-                    <span className="shrink-0 rounded-lg bg-primary/16 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-primary">
+                    <span className="justify-self-end rounded-lg bg-primary/16 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-primary">
                       Next
                     </span>
                   ) : null}
