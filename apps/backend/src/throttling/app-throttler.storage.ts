@@ -125,82 +125,88 @@ export class AppThrottlerStorage implements ThrottlerStorage {
     limit: number,
     blockDuration: number,
   ): Promise<AppThrottlerStorageRecord> {
-    const nowEpochMs = Date.now();
-    const model = this.getPrismaThrottleBucketModelOrThrow();
-    const currentRecord = await model.findUnique({
-      where: {
-        key,
-      },
-      select: {
-        key: true,
-        hitEpochMs: true,
-        blockedUntil: true,
-      },
-    });
+    this.getPrismaThrottleBucketModelOrThrow();
 
-    const windowStartEpochMs = nowEpochMs - ttl;
-    const hits = normalizeHitEpochMs(currentRecord?.hitEpochMs ?? []).filter(
-      (value) => value > windowStartEpochMs,
-    );
-    const blockedUntilEpochMs = currentRecord?.blockedUntil?.getTime() ?? null;
-    const isBlocked = typeof blockedUntilEpochMs === "number" && blockedUntilEpochMs > nowEpochMs;
+    return this.prisma.$transaction(async (tx) => {
+      const nowEpochMs = Date.now();
+      await this.acquirePrismaThrottleBucketLock(tx, key);
 
-    if (isBlocked) {
+      const model = this.getPrismaThrottleBucketModelOrThrow(tx);
+      const currentRecord = await model.findUnique({
+        where: {
+          key,
+        },
+        select: {
+          key: true,
+          hitEpochMs: true,
+          blockedUntil: true,
+        },
+      });
+
+      const windowStartEpochMs = nowEpochMs - ttl;
+      const hits = normalizeHitEpochMs(currentRecord?.hitEpochMs ?? []).filter(
+        (value) => value > windowStartEpochMs,
+      );
+      const blockedUntilEpochMs = currentRecord?.blockedUntil?.getTime() ?? null;
+      const isBlocked = typeof blockedUntilEpochMs === "number" && blockedUntilEpochMs > nowEpochMs;
+
+      if (isBlocked) {
+        await model.upsert({
+          where: {
+            key,
+          },
+          update: {
+            hitEpochMs: hits.map(String),
+            lastSeenAt: new Date(nowEpochMs),
+          },
+          create: {
+            key,
+            hitEpochMs: hits.map(String),
+            blockedUntil: currentRecord?.blockedUntil ?? null,
+            lastSeenAt: new Date(nowEpochMs),
+          },
+        });
+
+        return toThrottleStorageRecord({
+          hits,
+          nowEpochMs,
+          blockedUntilEpochMs,
+          ttlMs: ttl,
+        });
+      }
+
+      const nextHits = [...hits, nowEpochMs];
+      const nextBlockedUntil =
+        nextHits.length > limit ? new Date(nowEpochMs + blockDuration) : null;
+
       await model.upsert({
         where: {
           key,
         },
         update: {
-          hitEpochMs: hits.map(String),
+          hitEpochMs: nextHits.map(String),
+          blockedUntil: nextBlockedUntil,
           lastSeenAt: new Date(nowEpochMs),
         },
         create: {
           key,
-          hitEpochMs: hits.map(String),
-          blockedUntil: currentRecord?.blockedUntil ?? null,
+          hitEpochMs: nextHits.map(String),
+          blockedUntil: nextBlockedUntil,
           lastSeenAt: new Date(nowEpochMs),
         },
       });
 
       return toThrottleStorageRecord({
-        hits,
+        hits: nextHits,
         nowEpochMs,
-        blockedUntilEpochMs,
+        blockedUntilEpochMs: nextBlockedUntil?.getTime() ?? null,
         ttlMs: ttl,
       });
-    }
-
-    const nextHits = [...hits, nowEpochMs];
-    const nextBlockedUntil =
-      nextHits.length > limit ? new Date(nowEpochMs + blockDuration) : null;
-
-    await model.upsert({
-      where: {
-        key,
-      },
-      update: {
-        hitEpochMs: nextHits.map(String),
-        blockedUntil: nextBlockedUntil,
-        lastSeenAt: new Date(nowEpochMs),
-      },
-      create: {
-        key,
-        hitEpochMs: nextHits.map(String),
-        blockedUntil: nextBlockedUntil,
-        lastSeenAt: new Date(nowEpochMs),
-      },
-    });
-
-    return toThrottleStorageRecord({
-      hits: nextHits,
-      nowEpochMs,
-      blockedUntilEpochMs: nextBlockedUntil?.getTime() ?? null,
-      ttlMs: ttl,
     });
   }
 
-  private getPrismaThrottleBucketModelOrThrow(): AppThrottleBucketModel {
-    const prismaRecord = this.prisma as unknown as Record<string, unknown>;
+  private getPrismaThrottleBucketModelOrThrow(prismaClient: unknown = this.prisma): AppThrottleBucketModel {
+    const prismaRecord = prismaClient as Record<string, unknown>;
     const model = prismaRecord.appThrottleBucket;
 
     if (!model || typeof model !== "object") {
@@ -210,6 +216,16 @@ export class AppThrottlerStorage implements ThrottlerStorage {
     }
 
     return model as AppThrottleBucketModel;
+  }
+
+  private async acquirePrismaThrottleBucketLock(
+    prismaClient: Pick<PrismaService, "$executeRaw">,
+    key: string,
+  ): Promise<void> {
+    // Keep per-key throttle mutations serialized to avoid losing hits under load.
+    await prismaClient.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${AppThrottlerStorage.name}), hashtext(${key}))
+    `;
   }
 
   private isMissingClientModelError(error: unknown): boolean {

@@ -48,6 +48,33 @@ function createPrismaKnownRequestError(code: string, message = `prisma error ${c
   });
 }
 
+function withPrismaTransactionMocks<T extends Record<string, unknown>>(
+  mock: T,
+  onExecuteRaw?: () => void,
+): T & {
+  $executeRaw: (...args: unknown[]) => Promise<number>;
+  $transaction: <R>(
+    callback: (tx: T & { $executeRaw: (...args: unknown[]) => Promise<number> }) => Promise<R>,
+  ) => Promise<R>;
+} {
+  const executeRaw = async (..._args: unknown[]): Promise<number> => {
+    onExecuteRaw?.();
+    return 1;
+  };
+
+  return {
+    ...mock,
+    $executeRaw: executeRaw,
+    $transaction: async <R>(
+      callback: (tx: T & { $executeRaw: typeof executeRaw }) => Promise<R>,
+    ): Promise<R> =>
+      callback({
+        ...mock,
+        $executeRaw: executeRaw,
+      }),
+  };
+}
+
 async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
   await fn();
   console.log(`PASS ${name}`);
@@ -534,7 +561,7 @@ async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> 
 async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promise<void> {
   let createAttempt = 0;
   const createdPayloads: Array<Record<string, unknown>> = [];
-  const prismaMock = {
+  const prismaMock = withPrismaTransactionMocks({
     invoiceClient: {
       findFirst: async () => ({
         id: "cli-200",
@@ -591,7 +618,7 @@ async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promi
         };
       },
     },
-  } as unknown as PrismaService;
+  }) as unknown as PrismaService;
 
   const { service, restore } = createPrismaInvoicesService(prismaMock);
   try {
@@ -616,6 +643,107 @@ async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promi
   }
 }
 
+async function testPrismaCreateReusesClientFoundInsideLockedTransaction(): Promise<void> {
+  let clientLookupCount = 0;
+  let aggregateCalls = 0;
+  let clientCreateCalls = 0;
+  let lockQueryCount = 0;
+
+  const prismaMock = withPrismaTransactionMocks(
+    {
+      invoiceClient: {
+        findFirst: async () => {
+          clientLookupCount += 1;
+          if (clientLookupCount === 1) {
+            return null;
+          }
+
+          return {
+            id: "cli-existing",
+            groupId: "grp-existing",
+          };
+        },
+        aggregate: async () => {
+          aggregateCalls += 1;
+          return {
+            _max: {
+              sortOrder: 7,
+            },
+          };
+        },
+        create: async () => {
+          clientCreateCalls += 1;
+          return {
+            id: "cli-created",
+            groupId: null,
+          };
+        },
+      },
+      group: {
+        findUnique: async () => null,
+      },
+      invoice: {
+        findFirst: async () => ({
+          invoiceNumber: "GTT/INV/2099/0009",
+        }),
+        create: async (args: Record<string, unknown>) => {
+          const data = args.data as {
+            invoiceNumber: string;
+            clientId: string;
+            groupId: string | null;
+            issuedDate: Date;
+            dueDate: Date;
+            amount: number;
+            status: InvoiceStatus;
+            notes: string | null;
+          };
+
+          assert.equal(data.clientId, "cli-existing");
+
+          return {
+            id: "inv-locked-existing",
+            invoiceNumber: data.invoiceNumber,
+            clientId: data.clientId,
+            client: {
+              name: "Locked Existing Client",
+              sortOrder: 4,
+            },
+            group: null,
+            issuedDate: data.issuedDate,
+            dueDate: data.dueDate,
+            amount: data.amount,
+            status: data.status,
+            notes: data.notes,
+          };
+        },
+      },
+    },
+    () => {
+      lockQueryCount += 1;
+    },
+  ) as unknown as PrismaService;
+
+  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  try {
+    const created = await service.create({
+      clientName: "Locked Existing Client",
+      issuedDate: "2099-05-01",
+      dueDate: "2099-05-20",
+      amount: 450_000,
+    });
+
+    assert.equal(created.clientName, "Locked Existing Client");
+    assert.equal(created.clientId, "cli-existing");
+    assert.equal(created.invoiceNumber, "GTT/INV/2099/0010");
+    assert.equal(clientLookupCount, 2);
+    assert.equal(aggregateCalls, 0);
+    assert.equal(clientCreateCalls, 0);
+    assert.equal(lockQueryCount, 2);
+  } finally {
+    restore();
+  }
+}
+
 async function testPrismaCreateErrorMappings(): Promise<void> {
   const prismaMockUnknownGroup = {
     invoiceClient: {
@@ -635,7 +763,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
     },
   } as unknown as PrismaService;
 
-  const prismaMockPersistentP2002 = {
+  const prismaMockPersistentP2002 = withPrismaTransactionMocks({
     invoiceClient: {
       findUnique: async () => ({
         id: "cli-1",
@@ -653,9 +781,9 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
         throw createPrismaKnownRequestError("P2002", "duplicate invoice number");
       },
     },
-  } as unknown as PrismaService;
+  }) as unknown as PrismaService;
 
-  const prismaMockEnumMismatch = {
+  const prismaMockEnumMismatch = withPrismaTransactionMocks({
     invoiceClient: {
       findUnique: async () => ({
         id: "cli-1",
@@ -673,7 +801,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
         throw new Error('invalid input value for enum "InvoiceStatus"');
       },
     },
-  } as unknown as PrismaService;
+  }) as unknown as PrismaService;
 
   {
     const { service, restore } = createPrismaInvoicesService(prismaMockUnknownGroup);
@@ -748,7 +876,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
 
 async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
   const updateCalls: Array<Record<string, unknown>> = [];
-  const prismaMockSuccess = {
+  const prismaMockSuccess = withPrismaTransactionMocks({
     invoice: {
       findUnique: async () => ({
         id: "inv-100",
@@ -798,7 +926,7 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
         id: "grp-new",
       }),
     },
-  } as unknown as PrismaService;
+  }) as unknown as PrismaService;
 
   const prismaMockError = {
     invoice: {
@@ -890,6 +1018,10 @@ async function main(): Promise<void> {
   await runCase("invoice prisma list and findAll mapping", testPrismaListAndFindAllMapping);
   await runCase("invoice prisma findAll prefers inline down payment column", testPrismaFindAllPrefersInlineDownPaymentColumn);
   await runCase("invoice prisma create retry and fallback serial", testPrismaCreateSupportsRetryAndFallbackSerialResolution);
+  await runCase(
+    "invoice prisma create reuses client found inside locked transaction",
+    testPrismaCreateReusesClientFoundInsideLockedTransaction,
+  );
   await runCase("invoice prisma create error mapping", testPrismaCreateErrorMappings);
   await runCase("invoice prisma update success and error mapping", testPrismaUpdateSuccessAndErrorMappings);
 }

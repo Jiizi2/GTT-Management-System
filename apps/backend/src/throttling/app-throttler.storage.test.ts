@@ -102,6 +102,97 @@ async function testPrismaModeFailsFastInProductionWhenModelIsMissing(): Promise<
   );
 }
 
+async function testPrismaModeSerializesBucketWritesWithTransactionLock(): Promise<void> {
+  await withEnv(
+    {
+      DATA_SOURCE: "prisma",
+      NODE_ENV: "test",
+    },
+    async () => {
+      const state = new Map<
+        string,
+        {
+          key: string;
+          hitEpochMs: string[];
+          blockedUntil: Date | null;
+          lastSeenAt: Date;
+        }
+      >();
+      let lockQueryCount = 0;
+
+      const appThrottleBucket = {
+        findUnique: async (args: {
+          where: { key: string };
+        }) => state.get(args.where.key) ?? null,
+        upsert: async (args: {
+          where: { key: string };
+          update: {
+            hitEpochMs: string[];
+            blockedUntil?: Date | null;
+            lastSeenAt: Date;
+          };
+          create: {
+            key: string;
+            hitEpochMs: string[];
+            blockedUntil: Date | null;
+            lastSeenAt: Date;
+          };
+        }) => {
+          const existing = state.get(args.where.key);
+          const nextRecord = existing
+            ? {
+                ...existing,
+                hitEpochMs: args.update.hitEpochMs,
+                blockedUntil:
+                  args.update.blockedUntil !== undefined
+                    ? args.update.blockedUntil
+                    : existing.blockedUntil,
+                lastSeenAt: args.update.lastSeenAt,
+              }
+            : args.create;
+          state.set(args.where.key, nextRecord);
+          return nextRecord;
+        },
+      };
+
+      const prismaMock = {
+        appThrottleBucket,
+        $executeRaw: async (..._args: unknown[]) => {
+          lockQueryCount += 1;
+          return 1;
+        },
+        $transaction: async <T>(
+          callback: (tx: {
+            appThrottleBucket: typeof appThrottleBucket;
+            $executeRaw: (...args: unknown[]) => Promise<number>;
+          }) => Promise<T>,
+        ) =>
+          callback({
+            appThrottleBucket,
+            $executeRaw: async (..._args: unknown[]) => {
+              lockQueryCount += 1;
+              return 1;
+            },
+          }),
+      } as unknown as PrismaService;
+
+      const storage = new AppThrottlerStorage(prismaMock);
+
+      const first = await storage.increment("ip:locked", 60_000, 1, 30_000, "default");
+      const second = await storage.increment("ip:locked", 60_000, 1, 30_000, "default");
+      const third = await storage.increment("ip:locked", 60_000, 1, 30_000, "default");
+
+      assert.equal(first.totalHits, 1);
+      assert.equal(first.isBlocked, false);
+      assert.equal(second.totalHits, 2);
+      assert.equal(second.isBlocked, true);
+      assert.equal(third.totalHits, 2);
+      assert.equal(third.isBlocked, true);
+      assert.equal(lockQueryCount, 3);
+    },
+  );
+}
+
 async function main(): Promise<void> {
   await runCase("app throttler storage uses in-memory mode", testMemoryModeUsesInMemoryThrottleStorage);
   await runCase(
@@ -111,6 +202,10 @@ async function main(): Promise<void> {
   await runCase(
     "app throttler storage fails fast in production when prisma model is missing",
     testPrismaModeFailsFastInProductionWhenModelIsMissing,
+  );
+  await runCase(
+    "app throttler storage serializes prisma bucket writes with transaction lock",
+    testPrismaModeSerializesBucketWritesWithTransactionLock,
   );
 }
 

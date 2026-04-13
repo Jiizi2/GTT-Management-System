@@ -47,6 +47,7 @@ type PrismaLoginRateLimitBucketModel = {
 
 type PrismaLoginRateLimitClient = {
   authLoginRateLimitBucket: PrismaLoginRateLimitBucketModel;
+  $executeRaw: (...args: unknown[]) => Promise<unknown>;
   $transaction: <T>(callback: (tx: PrismaLoginRateLimitClient) => Promise<T>) => Promise<T>;
 };
 
@@ -83,6 +84,10 @@ function parseStoredEpochMsValues(values: string[]): number[] {
 
 function toStoredEpochMsValues(values: number[]): string[] {
   return values.map((value) => String(Math.max(0, Math.floor(value))));
+}
+
+function resolveOrderedPrismaBucketKeys(keys: LoginRateLimiterKeySet): string[] {
+  return [keys.ipKey, keys.principalKey].sort((left, right) => left.localeCompare(right));
 }
 
 @Injectable()
@@ -316,9 +321,14 @@ export class AuthLoginRateLimiter {
   private async registerFailureWithPrisma(keys: LoginRateLimiterKeySet): Promise<void> {
     const nowEpochMs = this.now();
     const prismaClient = this.getPrismaClientOrThrow();
+    const orderedKeys = resolveOrderedPrismaBucketKeys(keys);
 
     await prismaClient.$transaction(async (tx) => {
-      for (const key of [keys.ipKey, keys.principalKey]) {
+      for (const key of orderedKeys) {
+        await this.acquirePrismaBucketLock(tx, key);
+      }
+
+      for (const key of orderedKeys) {
         const existing = await tx.authLoginRateLimitBucket.findUnique({
           where: {
             key,
@@ -350,8 +360,13 @@ export class AuthLoginRateLimiter {
   private async registerSuccessWithPrisma(keys: LoginRateLimiterKeySet): Promise<void> {
     const nowEpochMs = this.now();
     const prismaClient = this.getPrismaClientOrThrow();
+    const orderedKeys = resolveOrderedPrismaBucketKeys(keys);
 
     await prismaClient.$transaction(async (tx) => {
+      for (const key of orderedKeys) {
+        await this.acquirePrismaBucketLock(tx, key);
+      }
+
       const ipBucket = await tx.authLoginRateLimitBucket.findUnique({
         where: {
           key: keys.ipKey,
@@ -381,6 +396,16 @@ export class AuthLoginRateLimiter {
       });
       await this.compactPrisma(tx, nowEpochMs);
     });
+  }
+
+  private async acquirePrismaBucketLock(
+    prismaClient: Pick<PrismaLoginRateLimitClient, "$executeRaw">,
+    key: string,
+  ): Promise<void> {
+    // Lock each bucket key in a stable order so concurrent login writes do not lose attempts.
+    await prismaClient.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${AuthLoginRateLimiter.name}), hashtext(${key}))
+    `;
   }
 
   private async compactPrisma(

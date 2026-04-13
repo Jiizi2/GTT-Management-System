@@ -365,6 +365,13 @@ function hasInvoiceStatusEnumMismatch(error: unknown): boolean {
   );
 }
 
+function isRetryablePrismaWriteConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === "P2002" || error.code === "P2034")
+  );
+}
+
 function resolveNextClientSortOrder<T extends { sortOrder: number }>(clients: T[]): number {
   const usedSortOrders = new Set(
     clients
@@ -523,21 +530,9 @@ export class InvoicesService implements OnModuleInit {
       throw new BadRequestException("Either clientId or clientName is required.");
     }
 
-    const existingByName = await this.prisma.invoiceClient.findFirst({
-      where: {
-        name: requestedClientName,
-      },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: {
-        id: true,
-        groupId: true,
-      },
-    });
+    const existingByName = await this.findPrismaInvoiceClientByName(requestedClientName);
     if (existingByName) {
-      return {
-        id: existingByName.id,
-        groupId: existingByName.groupId ?? null,
-      };
+      return existingByName;
     }
 
     return this.createInvoiceClientWithPrisma(requestedClientName);
@@ -545,47 +540,55 @@ export class InvoicesService implements OnModuleInit {
 
   private async createInvoiceClientWithPrisma(clientName: string): Promise<ResolvedPrismaInvoiceClient> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const maxSortOrderAggregate = await this.prisma.invoiceClient.aggregate({
-        _max: {
-          sortOrder: true,
-        },
-      });
-      const nextSortOrder = (maxSortOrderAggregate._max.sortOrder ?? 0) + 1;
-
       try {
-        const createdClient = await this.prisma.invoiceClient.create({
-          data: {
-            name: clientName,
-            sortOrder: nextSortOrder,
-          },
-          select: {
-            id: true,
-            groupId: true,
-          },
+        return await this.prisma.$transaction(async (tx) => {
+          await this.acquirePrismaTransactionLock(tx, "invoice-client-name", clientName);
+
+          const existingByName = await this.findPrismaInvoiceClientByName(clientName, tx);
+          if (existingByName) {
+            return existingByName;
+          }
+
+          const maxSortOrderAggregate = await tx.invoiceClient.aggregate({
+            _max: {
+              sortOrder: true,
+            },
+          });
+          const nextSortOrder = (maxSortOrderAggregate._max.sortOrder ?? 0) + 1;
+          const createdClient = await tx.invoiceClient.create({
+            data: {
+              name: clientName,
+              sortOrder: nextSortOrder,
+            },
+            select: {
+              id: true,
+              groupId: true,
+            },
+          });
+
+          this.logger.info(
+            {
+              action: "invoice-client.created",
+              dataSource: this.dataSource,
+              clientId: createdClient.id,
+              clientName,
+              sortOrder: nextSortOrder,
+            },
+            "Invoice client created.",
+          );
+
+          return {
+            id: createdClient.id,
+            groupId: createdClient.groupId ?? null,
+          };
         });
-
-        this.logger.info(
-          {
-            action: "invoice-client.created",
-            dataSource: this.dataSource,
-            clientId: createdClient.id,
-            clientName,
-            sortOrder: nextSortOrder,
-          },
-          "Invoice client created.",
-        );
-
-        return {
-          id: createdClient.id,
-          groupId: createdClient.groupId ?? null,
-        };
       } catch (error: unknown) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002" &&
-          attempt < 2
-        ) {
+        if (isRetryablePrismaWriteConflict(error) && attempt < 2) {
           continue;
+        }
+
+        if (isRetryablePrismaWriteConflict(error)) {
+          throw new ConflictException("Failed to create invoice client. Please retry.");
         }
 
         throw error;
@@ -935,37 +938,51 @@ export class InvoicesService implements OnModuleInit {
       roundedAmount,
       payload.downPaymentIdr ?? 0,
     );
+    const canWriteInlineDownPayment = await this.ensurePrismaInvoiceDownPaymentColumn();
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const nextInvoiceNumber = await this.generateNextInvoiceNumberWithPrisma(invoiceYear);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const created = await this.prisma.invoice.create({
-          data: {
-            invoiceNumber: nextInvoiceNumber,
-            clientId: client.id,
-            groupId: resolvedGroupId,
-            issuedDate: createUtcDateFromIso(issuedDateIso),
-            dueDate: createUtcDateFromIso(dueDateIso),
-            amount: roundedAmount,
-            status: effectiveStatus,
-            notes: getTrimmedString(payload.notes) || null,
-            items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
-          },
-          select: invoiceSummarySelect,
+        const created = await this.prisma.$transaction(async (tx) => {
+          await this.acquirePrismaTransactionLock(tx, "invoice-number-year", invoiceYear);
+
+          const nextInvoiceNumber = await this.generateNextInvoiceNumberWithPrisma(invoiceYear, tx);
+          const createdInvoice = await tx.invoice.create({
+            data: {
+              invoiceNumber: nextInvoiceNumber,
+              clientId: client.id,
+              groupId: resolvedGroupId,
+              issuedDate: createUtcDateFromIso(issuedDateIso),
+              dueDate: createUtcDateFromIso(dueDateIso),
+              amount: roundedAmount,
+              status: effectiveStatus,
+              notes: getTrimmedString(payload.notes) || null,
+              items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
+            },
+            select: invoiceSummarySelect,
+          });
+
+          if (canWriteInlineDownPayment) {
+            await this.writePrismaInvoiceDownPaymentWithExecutor(
+              tx,
+              createdInvoice.id,
+              normalizedDownPaymentIdr,
+            );
+          }
+
+          return createdInvoice;
         });
 
-        await this.writePrismaInvoiceDownPayment(created.id, normalizedDownPaymentIdr);
+        if (!canWriteInlineDownPayment) {
+          await this.writePrismaInvoiceDownPayment(created.id, normalizedDownPaymentIdr);
+        }
+
         return this.mapPrismaInvoiceToListItem(created as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
       } catch (error: unknown) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002" &&
-          attempt === 0
-        ) {
+        if (isRetryablePrismaWriteConflict(error) && attempt < 2) {
           continue;
         }
 
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        if (isRetryablePrismaWriteConflict(error)) {
           throw new ConflictException("Failed to generate a unique invoice number. Please retry.");
         }
 
@@ -1028,16 +1045,7 @@ export class InvoicesService implements OnModuleInit {
       resolvedClientId = matchedClient.id;
       resolvedClientGroupId = matchedClient.groupId ?? null;
     } else if (requestedClientName) {
-      const existingByName = await this.prisma.invoiceClient.findFirst({
-        where: {
-          name: requestedClientName,
-        },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        select: {
-          id: true,
-          groupId: true,
-        },
-      });
+      const existingByName = await this.findPrismaInvoiceClientByName(requestedClientName);
 
       if (existingByName) {
         resolvedClientId = existingByName.id;
@@ -1152,11 +1160,11 @@ export class InvoicesService implements OnModuleInit {
     }
 
     try {
-      await this.prisma.$executeRaw`
-        UPDATE "Invoice"
-        SET "downPaymentIdr" = ${Math.max(0, Math.round(downPaymentIdr))}
-        WHERE "id" = ${invoiceId}
-      `;
+      await this.writePrismaInvoiceDownPaymentWithExecutor(
+        this.prisma,
+        invoiceId,
+        downPaymentIdr,
+      );
     } catch (error: unknown) {
       this.logger.warn(
         {
@@ -1244,8 +1252,11 @@ export class InvoicesService implements OnModuleInit {
     return maxSerial + 1;
   }
 
-  private async generateNextInvoiceNumberWithPrisma(year: string): Promise<string> {
-    const latest = await this.prisma.invoice.findFirst({
+  private async generateNextInvoiceNumberWithPrisma(
+    year: string,
+    prismaClient: Pick<PrismaService, "invoice"> = this.prisma,
+  ): Promise<string> {
+    const latest = await prismaClient.invoice.findFirst({
       where: {
         invoiceNumber: {
           startsWith: `GTT/INV/${year}/`,
@@ -1269,7 +1280,7 @@ export class InvoicesService implements OnModuleInit {
     }
 
     // Fallback for legacy malformed invoice formats that break lexical ordering.
-    const records = await this.prisma.invoice.findMany({
+    const records = await prismaClient.invoice.findMany({
       where: {
         invoiceNumber: {
           startsWith: `GTT/INV/${year}/`,
@@ -1282,6 +1293,54 @@ export class InvoicesService implements OnModuleInit {
 
     const nextSerial = this.resolveNextSerial(records.map((entry) => entry.invoiceNumber));
     return buildInvoiceNumber(year, nextSerial);
+  }
+
+  private async acquirePrismaTransactionLock(
+    prismaClient: Pick<PrismaService, "$executeRaw">,
+    namespace: string,
+    key: string,
+  ): Promise<void> {
+    // Serialize only the small critical sections that allocate shared identifiers.
+    await prismaClient.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${namespace}), hashtext(${key}))
+    `;
+  }
+
+  private async findPrismaInvoiceClientByName(
+    clientName: string,
+    prismaClient: Pick<PrismaService, "invoiceClient"> = this.prisma,
+  ): Promise<ResolvedPrismaInvoiceClient | null> {
+    const matchedClient = await prismaClient.invoiceClient.findFirst({
+      where: {
+        name: clientName,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        groupId: true,
+      },
+    });
+
+    if (!matchedClient) {
+      return null;
+    }
+
+    return {
+      id: matchedClient.id,
+      groupId: matchedClient.groupId ?? null,
+    };
+  }
+
+  private async writePrismaInvoiceDownPaymentWithExecutor(
+    prismaClient: Pick<PrismaService, "$executeRaw">,
+    invoiceId: string,
+    downPaymentIdr: number,
+  ): Promise<void> {
+    await prismaClient.$executeRaw`
+      UPDATE "Invoice"
+      SET "downPaymentIdr" = ${Math.max(0, Math.round(downPaymentIdr))}
+      WHERE "id" = ${invoiceId}
+    `;
   }
 
   private logInvoiceMutation(action: string, invoice: InvoiceListItem): void {

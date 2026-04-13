@@ -137,6 +137,7 @@ function createPrismaRateLimitMock(): PrismaService & {
     lockedUntil: Date | null;
     lastSeenAt: Date;
   }>;
+  __lockKeys: string[];
 } {
   const state = new Map<string, {
     key: string;
@@ -144,6 +145,7 @@ function createPrismaRateLimitMock(): PrismaService & {
     lockedUntil: Date | null;
     lastSeenAt: Date;
   }>();
+  const lockKeys: string[] = [];
 
   const authLoginRateLimitBucket = {
     findUnique: async (args: {
@@ -242,17 +244,31 @@ function createPrismaRateLimitMock(): PrismaService & {
     },
   };
 
+  const executeRaw = async (...args: unknown[]) => {
+    const key = args.length > 2 ? String(args[2] ?? "") : "";
+    if (key) {
+      lockKeys.push(key);
+    }
+
+    return 1;
+  };
+
   const prismaMock = {
     authLoginRateLimitBucket,
+    $executeRaw: executeRaw,
     $transaction: async <T>(callback: (tx: {
       authLoginRateLimitBucket: typeof authLoginRateLimitBucket;
+      $executeRaw: typeof executeRaw;
     }) => Promise<T>) =>
       callback({
         authLoginRateLimitBucket,
+        $executeRaw: executeRaw,
       }),
     __state: state,
+    __lockKeys: lockKeys,
   } as unknown as PrismaService & {
     __state: typeof state;
+    __lockKeys: typeof lockKeys;
   };
 
   return prismaMock;
@@ -300,6 +316,32 @@ async function testPrismaStoragePersistsAndClearsPrincipalBucket(): Promise<void
   });
 }
 
+async function testPrismaStorageLocksBucketsInStableOrder(): Promise<void> {
+  await withDataSource("prisma", async () => {
+    const prismaMock = createPrismaRateLimitMock();
+    const limiter = new AuthLoginRateLimiter({
+      windowMs: 60_000,
+      maxAttempts: 3,
+      lockMs: 5_000,
+      now: () => 0,
+    }, undefined, prismaMock);
+
+    const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
+      ip: "198.51.100.77",
+    });
+
+    await limiter.registerFailure(keys);
+    await limiter.registerSuccess(keys);
+
+    assert.deepEqual(prismaMock.__lockKeys, [
+      keys.ipKey,
+      keys.principalKey,
+      keys.ipKey,
+      keys.principalKey,
+    ]);
+  });
+}
+
 async function main(): Promise<void> {
   await runCase(
     "auth login limiter prefers direct ip when proxy trust is disabled",
@@ -320,6 +362,10 @@ async function main(): Promise<void> {
   await runCase(
     "auth login limiter persists prisma buckets and clears principal bucket on success",
     testPrismaStoragePersistsAndClearsPrincipalBucket,
+  );
+  await runCase(
+    "auth login limiter locks prisma buckets in stable order",
+    testPrismaStorageLocksBucketsInStableOrder,
   );
 }
 
