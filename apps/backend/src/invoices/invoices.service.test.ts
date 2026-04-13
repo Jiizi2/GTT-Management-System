@@ -102,6 +102,7 @@ async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Prom
     assert.equal(createdOne.clientInitials, "Y");
     assert.equal(createdOne.status, "Pending");
     assert.equal(createdOne.amount, 1_500_000);
+    assert.equal(createdOne.downPaymentIdr, 0);
     assert.equal(createdOne.groupCode, "9017000001");
     assert.equal(createdOne.monthKey, "2099-02");
 
@@ -163,6 +164,7 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
       issuedDate: "2099-06-01",
       dueDate: "2099-06-10",
       amount: 750_000,
+      downPaymentIdr: 300_000,
       items: [
         {
           description: "Umrah Package",
@@ -185,8 +187,11 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
     assert.equal(created.items?.length, 2);
     assert.equal(created.items?.[0].description, "Umrah Package");
     assert.equal(created.items?.[1].currency, "IDR");
+    assert.equal(created.amount, 39_750_000);
+    assert.equal(created.downPaymentIdr, 300_000);
 
     const updated = await service.update(created.id, {
+      downPaymentIdr: 120_000,
       items: [
         {
           description: "Updated Package",
@@ -200,10 +205,23 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
     });
     assert.equal(updated.items?.length, 1);
     assert.equal(updated.items?.[0].description, "Updated Package");
+    assert.equal(updated.amount, 18_000_000);
+    assert.equal(updated.downPaymentIdr, 120_000);
+
+    const manuallyAdjusted = await service.update(created.id, {
+      amount: 8_880_000,
+      downPaymentIdr: 120_000,
+      status: InvoiceStatus.PAID,
+    });
+    assert.equal(manuallyAdjusted.amount, 8_880_000);
+    assert.equal(manuallyAdjusted.downPaymentIdr, 120_000);
+    assert.equal(manuallyAdjusted.items?.length, 1);
 
     const listed = await service.findAll();
     assert.equal(listed[0].items?.length, 1);
     assert.equal(listed[0].items?.[0].currency, "SAR");
+    assert.equal(listed[0].amount, 8_880_000);
+    assert.equal(listed[0].downPaymentIdr, 120_000);
   } finally {
     restore();
   }
@@ -407,6 +425,7 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           issuedDate: new Date("2099-01-01T00:00:00.000Z"),
           dueDate: new Date("2099-01-10T00:00:00.000Z"),
           amount: 125_500,
+          downPaymentIdr: 50_000,
           status: InvoiceStatus.PENDING,
           items: [
             {
@@ -451,6 +470,7 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
     assert.equal(invoices[0].status, "Pending");
     assert.equal(invoices[0].clientInitials, "AC");
     assert.equal(invoices[0].items?.length, 1);
+    assert.equal(invoices[0].downPaymentIdr, 50_000);
     assert.equal(invoices[1].status, "Cancelled");
     assert.equal(invoices[1].amount, 0);
     assert.equal(invoices[1].items, undefined);

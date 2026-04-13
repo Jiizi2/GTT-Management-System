@@ -13,7 +13,7 @@ const SOURCE_FILE_EXTENSIONS = new Set([".ts", ".tsx"]);
 const IGNORED_DIRECTORY_NAMES = new Set(["unit", "smoke", "e2e"]);
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36";
-const EXTRA_ICON_NAMES = [];
+const EXTRA_ICON_NAMES = ["map", "train", "directions_bus"];
 const ICON_NAME_PATTERN = /^[a-z0-9_]+$/u;
 const MAX_RESOLVED_VALUES = 32;
 const CHECK_MODE_FLAG = "--check";

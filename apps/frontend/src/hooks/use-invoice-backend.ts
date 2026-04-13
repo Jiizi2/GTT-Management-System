@@ -34,6 +34,7 @@ export type BackendInvoiceRow = {
   issuedDateIso: string;
   dueDateIso: string;
   amount: number;
+  downPaymentIdr: number;
   status: BackendInvoiceStatus;
   monthKey: string;
   items?: BackendInvoiceItem[];
@@ -46,6 +47,7 @@ export type CreateBackendInvoicePayload = {
   issuedDateIso: string;
   dueDateIso: string;
   amount: number;
+  downPaymentIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
   items?: BackendInvoiceItem[];
@@ -58,6 +60,7 @@ export type UpdateBackendInvoicePayload = {
   issuedDateIso?: string;
   dueDateIso?: string;
   amount?: number;
+  downPaymentIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
   items?: BackendInvoiceItem[];
@@ -84,6 +87,7 @@ type BackendInvoiceRecord = {
   issuedDateIso?: unknown;
   dueDateIso?: unknown;
   amount?: unknown;
+  downPaymentIdr?: unknown;
   status?: unknown;
   monthKey?: unknown;
   items?: unknown;
@@ -229,6 +233,10 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
 
   const dueDateIso = readString(record.dueDateIso);
   const monthKeyFromDueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateIso) ? dueDateIso.slice(0, 7) : "unknown";
+  const status = mapBackendInvoiceStatus(record.status);
+  const amount = Math.max(0, Math.round(readNumber(record.amount, 0)));
+  const rawDownPaymentIdr = Math.max(0, Math.round(readNumber(record.downPaymentIdr, 0)));
+  const downPaymentIdr = rawDownPaymentIdr > 0 ? Math.min(rawDownPaymentIdr, amount) : status === "Paid" ? amount : 0;
   const defaultClientInitials = clientName
     .split(/\s+/)
     .map((chunk) => chunk[0]?.toUpperCase())
@@ -247,8 +255,9 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
     groupName: readOptionalString(record.groupName),
     issuedDateIso: readString(record.issuedDateIso),
     dueDateIso,
-    amount: Math.max(0, Math.round(readNumber(record.amount, 0))),
-    status: mapBackendInvoiceStatus(record.status),
+    amount,
+    downPaymentIdr,
+    status,
     monthKey: readString(record.monthKey, monthKeyFromDueDate),
     items: Array.isArray(record.items)
       ? (record.items
@@ -266,6 +275,7 @@ export async function fetchInvoiceClientsFromBackend({
   const { response, payload, responseText } = await fetchBackendParsed("/invoices/clients", {
     method: "GET",
     signal,
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -292,6 +302,7 @@ export async function fetchInvoiceBackendDataSource({
   const { response, payload, responseText } = await fetchBackendParsed("/health", {
     method: "GET",
     signal,
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -309,6 +320,7 @@ export async function fetchInvoicesFromBackend({
   const { response, payload, responseText } = await fetchBackendParsed("/invoices", {
     method: "GET",
     signal,
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -340,6 +352,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
     headers: {
       "Content-Type": "application/json",
     },
+    cache: "no-store",
     body: JSON.stringify({
       clientId: normalizedClientId || undefined,
       clientName: normalizedClientName || undefined,
@@ -347,6 +360,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
       issuedDate: payload.issuedDateIso.trim(),
       dueDate: payload.dueDateIso.trim(),
       amount: Math.max(0, Math.round(payload.amount)),
+      downPaymentIdr: payload.downPaymentIdr !== undefined ? Math.max(0, Math.round(payload.downPaymentIdr)) : undefined,
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
       items: normalizeBackendInvoiceItems(payload.items),
@@ -395,6 +409,9 @@ export async function updateInvoiceInBackend(
   if (payload.amount !== undefined) {
     requestBody.amount = Math.max(0, Math.round(payload.amount));
   }
+  if (payload.downPaymentIdr !== undefined) {
+    requestBody.downPaymentIdr = Math.max(0, Math.round(payload.downPaymentIdr));
+  }
   if (payload.status !== undefined) {
     requestBody.status = mapInvoiceStatusForBackend(payload.status);
   }
@@ -414,6 +431,7 @@ export async function updateInvoiceInBackend(
     headers: {
       "Content-Type": "application/json",
     },
+    cache: "no-store",
     body: JSON.stringify(requestBody),
   });
 

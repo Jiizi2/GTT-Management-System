@@ -173,6 +173,7 @@ type InvoiceRecord = {
   invoiceNumber?: string;
   status?: string;
   amount?: number;
+  downPaymentIdr?: number;
   groupCode?: string;
 };
 
@@ -1292,10 +1293,12 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       issuedDate: todayIso,
       dueDate: addUtcDays(todayIso, 10),
       amount: 5_000_000,
+      downPaymentIdr: 1_500_000,
     });
     assert.equal(pendingInvoiceResponse.status, 201, `Create pending invoice failed: ${pendingInvoiceResponse.text}`);
     const pendingInvoice = pendingInvoiceResponse.json as InvoiceRecord;
     assert.equal(pendingInvoice.status, "Pending");
+    assert.equal(pendingInvoice.downPaymentIdr, 1_500_000);
 
     const overdueInvoiceResponse = await postJson("/api/invoices", {
       clientName: "Scenario Overdue Client",
@@ -1303,10 +1306,12 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       issuedDate: addUtcDays(todayIso, -7),
       dueDate: addUtcDays(todayIso, -1),
       amount: 1_250_000,
+      downPaymentIdr: 250_000,
     });
     assert.equal(overdueInvoiceResponse.status, 201, `Create overdue invoice failed: ${overdueInvoiceResponse.text}`);
     const overdueInvoice = overdueInvoiceResponse.json as InvoiceRecord;
     assert.equal(overdueInvoice.status, "Overdue");
+    assert.equal(overdueInvoice.downPaymentIdr, 250_000);
 
     const paidInvoiceResponse = await postJson("/api/invoices", {
       clientName: "Scenario Paid Client",
@@ -1314,17 +1319,20 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       issuedDate: addUtcDays(todayIso, -6),
       dueDate: addUtcDays(todayIso, -2),
       amount: 2_300_000,
+      downPaymentIdr: 2_300_000,
       status: "PAID",
     });
     assert.equal(paidInvoiceResponse.status, 201, `Create paid invoice failed: ${paidInvoiceResponse.text}`);
     const paidInvoice = paidInvoiceResponse.json as InvoiceRecord;
     assert.equal(paidInvoice.status, "Paid");
+    assert.equal(paidInvoice.downPaymentIdr, 2_300_000);
 
     const cancelledInvoiceResponse = await postJson("/api/invoices", {
       clientName: "Scenario Cancelled Client",
       issuedDate: todayIso,
       dueDate: addUtcDays(todayIso, 5),
       amount: 990_000,
+      downPaymentIdr: 120_000,
       status: "CANCELLED",
     });
     assert.equal(
@@ -1335,6 +1343,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     const cancelledInvoice = cancelledInvoiceResponse.json as InvoiceRecord;
     assert.equal(cancelledInvoice.status, "Cancelled");
     assert.equal(cancelledInvoice.amount, 0);
+    assert.equal(cancelledInvoice.downPaymentIdr, 0);
 
     const invalidClientInvoiceResponse = await postJson("/api/invoices", {
       clientId: "unknown-client-id",
@@ -1353,10 +1362,12 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
 
     const cancelledUpdateResponse = await patchJson(`/api/invoices/${cancelledInvoice.id ?? ""}`, {
       amount: 123_456,
+      downPaymentIdr: 50_000,
       status: "CANCELLED",
     });
     assert.equal(cancelledUpdateResponse.status, 200, `Update cancelled invoice failed: ${cancelledUpdateResponse.text}`);
     assert.equal((cancelledUpdateResponse.json as InvoiceRecord).amount, 0);
+    assert.equal((cancelledUpdateResponse.json as InvoiceRecord).downPaymentIdr, 0);
 
     const invoiceDeleteBlockedResponse = await requestJson(
       server.baseUrl,

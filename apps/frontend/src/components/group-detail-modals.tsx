@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod/v4";
@@ -18,6 +18,7 @@ import type {
 } from "../shared/app-domain";
 
 const {
+  getMinimumBusCountForPax,
   getRouteFieldConfigByCategory,
   isCityTourActivityType,
   isFlightActivityType,
@@ -39,10 +40,45 @@ const musyrifModalSchema = z.object({
   phone: z.string().trim().min(1, "Phone number wajib diisi."),
 });
 
-const groupEditModalSchema = z.object({
-  code: z.string().trim().min(1, "Group number tidak boleh kosong."),
-  name: z.string().trim().min(1, "Group name tidak boleh kosong."),
-});
+function createGroupEditModalSchema() {
+  return z
+    .object({
+      code: z.string().trim().min(1, "Group number tidak boleh kosong."),
+      name: z.string().trim().min(1, "Group name tidak boleh kosong."),
+      pax: z
+        .string()
+        .trim()
+        .min(1, "Total pax wajib diisi.")
+        .refine((value) => {
+          const parsed = Number.parseInt(value, 10);
+          return Number.isFinite(parsed) && parsed > 0;
+        }, "Total pax harus lebih dari 0."),
+      totalBuses: z
+        .string()
+        .trim()
+        .min(1, "Required bus wajib diisi.")
+        .refine((value) => {
+          const parsed = Number.parseInt(value, 10);
+          return Number.isFinite(parsed) && parsed > 0;
+        }, "Required bus harus lebih dari 0."),
+    })
+    .superRefine((values, context) => {
+      const parsedPax = Number.parseInt(values.pax, 10);
+      const parsedTotalBuses = Number.parseInt(values.totalBuses, 10);
+      if (!Number.isFinite(parsedPax) || parsedPax <= 0 || !Number.isFinite(parsedTotalBuses) || parsedTotalBuses <= 0) {
+        return;
+      }
+
+      const minimumRequiredBusCount = getMinimumBusCountForPax(parsedPax);
+      if (parsedTotalBuses < minimumRequiredBusCount) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["totalBuses"],
+          message: `Minimal ${minimumRequiredBusCount} bus diperlukan untuk ${parsedPax} pax.`,
+        });
+      }
+    });
+}
 
 const noteModalSchema = z.object({
   text: z.string().trim().min(1, "Operational note wajib diisi.").max(2000, "Maksimal 2000 karakter."),
@@ -386,29 +422,39 @@ export function DeleteGroupModal({
 export function GroupEditModal({
   groupCode,
   groupName,
+  groupPax,
+  requiredBusCount,
   onClose,
   onSave,
 }: {
   groupCode: string;
   groupName: string;
+  groupPax: number;
+  requiredBusCount: number;
   onClose: () => void;
   onSave: (values: {
     code: string;
     name: string;
+    pax: number;
+    totalBuses: number;
   }) => { ok: true } | { ok: false; message: string } | Promise<{ ok: true } | { ok: false; message: string }>;
 }) {
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+  const groupEditModalSchema = useMemo(() => createGroupEditModalSchema(), []);
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm<{ code: string; name: string }>({
+  } = useForm<{ code: string; name: string; pax: string; totalBuses: string }>({
     resolver: zodResolver(groupEditModalSchema),
     defaultValues: {
       code: groupCode,
       name: groupName,
+      pax: String(groupPax),
+      totalBuses: String(requiredBusCount),
     },
   });
 
@@ -416,12 +462,20 @@ export function GroupEditModal({
     reset({
       code: groupCode,
       name: groupName,
+      pax: String(groupPax),
+      totalBuses: String(requiredBusCount),
     });
-  }, [groupCode, groupName, reset]);
+  }, [groupCode, groupName, groupPax, requiredBusCount, reset]);
 
   const codeErrorMessage = errors.code?.message;
   const nameErrorMessage = errors.name?.message;
+  const paxErrorMessage = errors.pax?.message;
+  const totalBusesErrorMessage = errors.totalBuses?.message;
   const rootErrorMessage = errors.root?.message;
+  const watchedPax = watch("pax");
+  const previewPax = Number.parseInt((watchedPax ?? "").trim(), 10);
+  const effectivePax = Number.isFinite(previewPax) && previewPax > 0 ? previewPax : groupPax;
+  const minimumRequiredBusCount = useMemo(() => getMinimumBusCountForPax(effectivePax), [effectivePax]);
 
   return (
     <ModalPortal>
@@ -461,6 +515,8 @@ export function GroupEditModal({
               const result = await onSave({
                 code: values.code.trim().toUpperCase(),
                 name: values.name.trim(),
+                pax: Number.parseInt(values.pax.trim(), 10),
+                totalBuses: Number.parseInt(values.totalBuses.trim(), 10),
               });
               if (!result.ok) {
                 setError("root", {
@@ -474,7 +530,7 @@ export function GroupEditModal({
               <h2 id="group-edit-title" className="text-2xl font-bold tracking-tight text-slate-900">
                 Edit Group
               </h2>
-              <p className="text-sm text-slate-600">Update the group number and name in one place.</p>
+              <p className="text-sm text-slate-600">Update the group number, name, and required bus allocation.</p>
             </div>
 
             <label className={modalFieldClassName}>
@@ -517,6 +573,48 @@ export function GroupEditModal({
               message={nameErrorMessage}
               className={modalErrorClassName}
             />
+
+            <label className={modalFieldClassName}>
+              <span>Total Pax</span>
+              <input
+                id="group-edit-pax"
+                className={modalInputClassName}
+                type="number"
+                min={1}
+                {...register("pax")}
+                placeholder={String(groupPax)}
+                aria-invalid={getFieldAriaInvalid(paxErrorMessage)}
+                aria-describedby={getFieldDescribedBy("group-edit-pax", {
+                  errorMessage: paxErrorMessage,
+                })}
+              />
+            </label>
+            <FieldErrorMessage fieldId="group-edit-pax" message={paxErrorMessage} className={modalErrorClassName} />
+
+            <label className={modalFieldClassName}>
+              <span>Required Bus</span>
+              <input
+                id="group-edit-total-buses"
+                className={modalInputClassName}
+                type="number"
+                min={minimumRequiredBusCount}
+                {...register("totalBuses")}
+                placeholder={String(requiredBusCount)}
+                aria-invalid={getFieldAriaInvalid(totalBusesErrorMessage)}
+                aria-describedby={getFieldDescribedBy("group-edit-total-buses", {
+                  errorMessage: totalBusesErrorMessage,
+                })}
+              />
+            </label>
+            <FieldErrorMessage
+              fieldId="group-edit-total-buses"
+              message={totalBusesErrorMessage}
+              className={modalErrorClassName}
+            />
+            <p className="text-xs font-medium text-slate-500">
+              Minimum {minimumRequiredBusCount} bus untuk {effectivePax} pax. Kamu bisa isi lebih besar bila memang
+              perlu armada tambahan.
+            </p>
             {rootErrorMessage ? (
               <p id="group-edit-root-error" role="alert" aria-live="polite" className={modalErrorClassName}>
                 {rootErrorMessage}

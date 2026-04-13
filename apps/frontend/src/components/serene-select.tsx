@@ -288,7 +288,7 @@ export function SereneSelect({
         <span className="block truncate text-left">{selectedLabel}</span>
         {showCaret ? (
           <span
-            className="pointer-events-none absolute inset-y-0 right-3 flex items-center material-symbols-outlined text-base leading-none text-on-surface-variant"
+            className="pointer-events-none absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center material-symbols-outlined text-base leading-none text-on-surface-variant"
             aria-hidden="true"
           >
             expand_more

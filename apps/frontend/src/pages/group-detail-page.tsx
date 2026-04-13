@@ -30,6 +30,7 @@ const {
   isTransferActivityType,
   normalizeAgreementCityKey,
   parseTimeForInput,
+  resolveTotalBusCount,
   shouldShowFridayCityTourWarning,
 } = Domain;
 
@@ -559,6 +560,7 @@ export function GroupDetail({
     () => resolveNextActivityFromItinerary(itineraryItems, group.nextActivity),
     [itineraryItems, group.nextActivity],
   );
+  const requiredBusCount = useMemo(() => resolveTotalBusCount(group.pax, group.totalBuses), [group.pax, group.totalBuses]);
 
   const persistGroupSnapshot = ({
     nextItinerary = itineraryItems,
@@ -566,18 +568,24 @@ export function GroupDetail({
     nextMusyrif = musyrifProfile,
     nextGroupName = group.name,
     nextGroupCode = group.code,
+    nextPax = group.pax,
+    nextTotalBuses = group.totalBuses,
   }: {
     nextItinerary?: ItineraryItem[];
     nextNoteItems?: NoteItem[];
     nextMusyrif?: Musyrif;
     nextGroupName?: string;
     nextGroupCode?: string;
+    nextPax?: number;
+    nextTotalBuses?: number;
   }): { ok: true } | { ok: false; message: string } => {
     const normalizedItinerary = sortItineraryByNearestDate(nextItinerary);
     const nextGroup: GroupData = {
       ...group,
       code: nextGroupCode.trim().toUpperCase(),
       name: nextGroupName.trim(),
+      pax: nextPax,
+      totalBuses: nextTotalBuses,
       nextActivity: resolveNextActivityFromItinerary(normalizedItinerary, group.nextActivity),
       itinerary: normalizedItinerary,
       notes: nextNoteItems.map((item) => item.text),
@@ -786,19 +794,35 @@ export function GroupDetail({
   const handleSaveGroupEdit = ({
     code: nextGroupCode,
     name: nextGroupName,
+    pax: nextPax,
+    totalBuses: nextTotalBuses,
   }: {
     code: string;
     name: string;
+    pax: number;
+    totalBuses: number;
   }): { ok: true } | { ok: false; message: string } => {
     const normalizedCurrentGroupCode = group.code.trim().toUpperCase();
     const normalizedCurrentGroupName = group.name.trim();
+    const normalizedNextPax = Math.max(1, Math.floor(nextPax));
+    const normalizedNextTotalBuses = resolveTotalBusCount(normalizedNextPax, nextTotalBuses);
 
-    if (nextGroupCode === normalizedCurrentGroupCode && nextGroupName === normalizedCurrentGroupName) {
+    if (
+      nextGroupCode === normalizedCurrentGroupCode &&
+      nextGroupName === normalizedCurrentGroupName &&
+      normalizedNextPax === group.pax &&
+      normalizedNextTotalBuses === requiredBusCount
+    ) {
       setIsGroupEditModalOpen(false);
       return { ok: true };
     }
 
-    const result = persistGroupSnapshot({ nextGroupCode, nextGroupName });
+    const result = persistGroupSnapshot({
+      nextGroupCode,
+      nextGroupName,
+      nextPax: normalizedNextPax,
+      nextTotalBuses: normalizedNextTotalBuses,
+    });
     if (!result.ok) {
       return result;
     }
@@ -942,14 +966,14 @@ export function GroupDetail({
                     <span className={`${statusBadgeClassName} shrink-0 whitespace-nowrap`}>{group.status}</span>
                     <button
                       type="button"
-                      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
+                      className="inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2 text-[11px] font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
                       onClick={handleOpenGroupEditModal}
                       aria-label={`Edit group info for ${group.name}`}
                       aria-haspopup="dialog"
                       aria-expanded={isGroupEditModalOpen}
                       aria-controls="group-edit-modal"
                     >
-                      <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                      <span className="material-symbols-outlined text-[12px] leading-none" aria-hidden="true">
                         edit
                       </span>
                       <span>Edit</span>
@@ -963,14 +987,14 @@ export function GroupDetail({
                   <span className={`${statusBadgeClassName} hidden md:inline-flex`}>{group.status}</span>
                   <button
                     type="button"
-                    className="hidden shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15 md:inline-flex"
+                    className="hidden h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2 text-[11px] font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15 md:inline-flex"
                     onClick={handleOpenGroupEditModal}
                     aria-label={`Edit group info for ${group.name}`}
                     aria-haspopup="dialog"
                     aria-expanded={isGroupEditModalOpen}
                     aria-controls="group-edit-modal"
                   >
-                    <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                    <span className="material-symbols-outlined text-[12px] leading-none" aria-hidden="true">
                       edit
                     </span>
                     <span>Edit</span>
@@ -988,19 +1012,37 @@ export function GroupDetail({
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-high px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  groups
-                </span>
-                <span>{group.pax} Pilgrims</span>
-              </div>
+            <div className="mt-5 border-t border-outline-variant/35 pt-4">
+              <div className="grid gap-3 sm:grid-cols-3 sm:gap-0">
+                <div className="flex items-start justify-between gap-3 border-b border-outline-variant/20 pb-3 sm:border-b-0 sm:pr-4">
+                  <div>
+                    <span className={detailKickerClassName}>Pilgrims</span>
+                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{group.pax}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-xl text-on-surface-variant/70" aria-hidden="true">
+                    groups
+                  </span>
+                </div>
 
-              <div className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-high px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  calendar_today
-                </span>
-                <span>{group.durationDays} Days</span>
+                <div className="flex items-start justify-between gap-3 border-b border-outline-variant/20 py-0 pb-3 sm:border-b-0 sm:border-l sm:border-outline-variant/35 sm:px-4 sm:pb-0">
+                  <div>
+                    <span className={detailKickerClassName}>Trip Duration</span>
+                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{group.durationDays} Days</p>
+                  </div>
+                  <span className="material-symbols-outlined text-xl text-on-surface-variant/70" aria-hidden="true">
+                    calendar_today
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 sm:border-l sm:border-outline-variant/35 sm:pl-4">
+                  <div>
+                    <span className={detailKickerClassName}>Required Bus</span>
+                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{requiredBusCount} Bus</p>
+                  </div>
+                  <span className="material-symbols-outlined text-xl text-on-surface-variant/70" aria-hidden="true">
+                    directions_bus
+                  </span>
+                </div>
               </div>
             </div>
           </section>
@@ -1258,8 +1300,8 @@ export function GroupDetail({
             </section>
           </div>
 
-          <aside>
-            <section className="rounded-3xl border border-brand-tertiary/25 bg-brand-tertiary/[0.08] p-5 shadow-ambient xl:sticky xl:top-24">
+          <aside className="xl:self-start">
+            <section className="rounded-3xl border border-brand-tertiary/25 bg-brand-tertiary/[0.08] p-5 shadow-ambient">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-brand-tertiary" aria-hidden="true">
                   sticky_note_2
@@ -1362,6 +1404,8 @@ export function GroupDetail({
             <LazyGroupEditModal
               groupCode={group.code}
               groupName={group.name}
+              groupPax={group.pax}
+              requiredBusCount={requiredBusCount}
               onClose={handleCloseGroupEditModal}
               onSave={handleSaveGroupEdit}
             />

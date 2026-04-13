@@ -30,6 +30,9 @@ const resolveGroupServiceType = (group: GroupData | undefined): "Visa+" | "Visa 
 const isExternalTransportGroup = (group: GroupData | undefined): boolean =>
   resolveGroupServiceType(group) === "Visa Only";
 
+const CHECKLIST_NEUTRAL_BADGE_CLASS =
+  "inline-flex items-center rounded-md border border-slate-900/20 bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-900";
+
 type ChecklistItemsGroup = {
   groupCode: string;
   groupName: string;
@@ -804,11 +807,11 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               <h4 className="text-lg font-bold leading-snug text-slate-900">{item.activity}</h4>
               <p className="truncate text-sm font-semibold text-slate-900">{item.groupName}</p>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-md border border-slate-900/20 bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-900">
+                <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>
                   {serviceType}
                 </span>
                 {isTwoDaysAway ? (
-                  <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700">
+                  <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>
                     2 Hari Lagi
                   </span>
                 ) : null}
@@ -846,7 +849,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </div>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant/90">
+              <span className="checklist-need-panel-title text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant/90">
                 Assign Transport (Driver {assignedProgressCount}/{requiredDriverCount})
               </span>
 
@@ -859,7 +862,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                   Driver Name
                 </span>
                 <input
@@ -872,7 +875,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                   Phone
                 </span>
                 <input
@@ -885,7 +888,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                   Plate
                 </span>
                 <input
@@ -1096,7 +1099,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                             </span>
                           ) : null}
                           {isTwoDaysAway ? (
-                            <span className="checklist-reminder-inline inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]">
+                            <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>
                               2 Hari Lagi
                             </span>
                           ) : null}

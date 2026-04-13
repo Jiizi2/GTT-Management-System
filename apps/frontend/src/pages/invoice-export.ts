@@ -103,6 +103,10 @@ function resolveTaxPercentage(payload: InvoiceExportPayload): number {
   return Math.max(0, Math.round((payload.taxIdr / payload.subtotalIdr) * 100));
 }
 
+function resolveOutstandingBalanceLabel(payload: InvoiceExportPayload): string {
+  return payload.downPaymentIdr > 0 ? "Sisa Tagihan" : "Tagihan";
+}
+
 function resolveBankMeta(bankAccountLabel: string): {
   bankName: string;
   accountNumber: string;
@@ -643,12 +647,16 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
 <span class="font-manrope font-semibold text-luxury-black">${escapeHtml(formatIdr(payload.taxIdr))}</span>
 </div>
 <div class="flex justify-between items-center text-[11px]">
-<span class="text-stone-500 font-medium">Payment Received</span>
+<span class="text-stone-500 font-medium">Yang harus dibayarkan</span>
+<span class="font-manrope font-semibold text-luxury-black">${escapeHtml(formatIdr(payload.totalPayableIdr))}</span>
+</div>
+<div class="flex justify-between items-center text-[11px]">
+<span class="text-stone-500 font-medium">DP</span>
 <span class="font-manrope font-semibold text-red-700">${escapeHtml(formatIdr(payload.downPaymentIdr))}</span>
 </div>
 </div>
 <div class="invoice-total-due-row mt-2 flex justify-between items-center py-2.5">
-<span class="invoice-total-due-label font-bold uppercase tracking-[0.2em] text-[9px]">Total Due</span>
+<span class="invoice-total-due-label font-bold uppercase tracking-[0.2em] text-[9px]">${escapeHtml(resolveOutstandingBalanceLabel(payload))}</span>
 <span class="invoice-total-due-value font-manrope text-lg font-extrabold tracking-tight">${escapeHtml(formatIdr(payload.remainingBalanceIdr))}</span>
 </div>
 </div>

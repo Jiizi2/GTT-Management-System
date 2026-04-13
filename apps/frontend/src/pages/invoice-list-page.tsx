@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
+import { PageHeroSection } from "../components/page-hero-section";
 import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -392,21 +393,19 @@ export function InvoiceScreen({
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
       </header>
 
-      <section className="space-y-2">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
-              Invoice List
-            </h1>
-            <p className="text-sm text-on-surface-variant sm:text-base">
-              <span className="sm:hidden">Track all issued invoices.</span>
-              <span className="hidden sm:inline">Manage and track all issued invoices.</span>
-            </p>
-          </div>
-
+      <PageHeroSection
+        eyebrow="Invoice Workspace"
+        title="Invoice List"
+        description={
+          <>
+            <span className="sm:hidden">Track all issued invoices.</span>
+            <span className="hidden sm:inline">Manage and track all issued invoices.</span>
+          </>
+        }
+        actions={
           <button
             type="button"
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition ${
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition sm:w-auto ${
               isInvoiceBackendAvailable ? "bg-primary hover:bg-primary-container" : "cursor-not-allowed bg-slate-300"
             }`}
             aria-label="Create new invoice"
@@ -426,8 +425,8 @@ export function InvoiceScreen({
             </span>
             <span>New Invoice</span>
           </button>
-        </div>
-      </section>
+        }
+      />
 
       <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
         <article className="rounded-2xl border border-outline-variant/45 bg-surface-container-low p-4 shadow-ambient sm:p-5">

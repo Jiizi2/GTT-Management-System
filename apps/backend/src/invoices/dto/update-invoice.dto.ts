@@ -65,6 +65,16 @@ export class UpdateInvoiceDto {
   amount?: number;
 
   @ApiPropertyOptional({
+    description: "Nominal DP invoice terbaru dalam rupiah.",
+    example: 25000000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  downPaymentIdr?: number;
+
+  @ApiPropertyOptional({
     description: "Status invoice terbaru.",
     enum: InvoiceStatus,
     example: InvoiceStatus.PAID,

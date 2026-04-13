@@ -55,6 +55,9 @@ export class InvoiceListItemResponseDto {
   @ApiProperty({ example: 1500000 })
   amount!: number;
 
+  @ApiProperty({ example: 500000, minimum: 0 })
+  downPaymentIdr!: number;
+
   @ApiProperty({ enum: ["Paid", "Pending", "Overdue", "Cancelled"], example: "Pending" })
   status!: "Paid" | "Pending" | "Overdue" | "Cancelled";
 

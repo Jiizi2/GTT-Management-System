@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InvoiceStatus, Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../config/app-config";
@@ -41,6 +48,7 @@ type InvoiceListItem = {
   issuedDateIso: string;
   dueDateIso: string;
   amount: number;
+  downPaymentIdr: number;
   status: InvoiceStatusLabel;
   monthKey: string;
   items?: InvoiceLineItem[];
@@ -63,26 +71,52 @@ type MemoryInvoice = {
   issuedDateIso: string;
   dueDateIso: string;
   amount: number;
+  downPaymentIdr: number;
   status: InvoiceStatus;
   notes?: string;
   items?: InvoiceLineItem[];
 };
 
-type PrismaInvoiceWithRelations = Prisma.InvoiceGetPayload<{
-  include: {
-    client: true;
-    group: {
-      select: {
-        code: true;
-        name: true;
-      };
-    };
-  };
-}>;
-
 type ResolvedPrismaInvoiceClient = {
   id: string;
   groupId: string | null;
+};
+
+const invoiceSummarySelect = {
+  id: true,
+  invoiceNumber: true,
+  clientId: true,
+  issuedDate: true,
+  dueDate: true,
+  amount: true,
+  status: true,
+  notes: true,
+  items: true,
+  client: {
+    select: {
+      name: true,
+      sortOrder: true,
+    },
+  },
+  group: {
+    select: {
+      code: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.InvoiceSelect;
+
+type PrismaInvoiceSummaryRow = Prisma.InvoiceGetPayload<{
+  select: typeof invoiceSummarySelect;
+}>;
+
+type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & {
+  downPaymentIdr?: Prisma.Decimal | number | null;
+};
+
+type PrismaInvoiceDownPaymentRow = {
+  id: string;
+  downPaymentIdr: Prisma.Decimal | number | null;
 };
 
 function toIsoDateOnly(value: Date): string {
@@ -201,13 +235,37 @@ function extractYearFromIsoDate(isoDate: string): string {
   return isIsoDateOnly(isoDate) ? isoDate.slice(0, 4) : toIsoDateOnly(new Date()).slice(0, 4);
 }
 
-function toNumberAmount(value: Prisma.Decimal | number): number {
+function toNumberAmount(value: Prisma.Decimal | number | null | undefined): number {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+
   if (typeof value === "number") {
     return value;
   }
 
   const parsed = Number.parseFloat(value.toString());
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeDownPaymentByAmount(amount: number, downPaymentIdr: number): number {
+  const sanitizedAmount = Math.max(0, Math.round(amount));
+  const sanitizedDownPayment = Math.max(0, Math.round(downPaymentIdr));
+  return Math.min(sanitizedAmount, sanitizedDownPayment);
+}
+
+function resolveDisplayedDownPaymentByAmount(
+  amount: number,
+  status: InvoiceStatus,
+  downPaymentIdr: Prisma.Decimal | number | null | undefined,
+): number {
+  const sanitizedAmount = Math.max(0, Math.round(amount));
+  const normalizedDownPayment = normalizeDownPaymentByAmount(sanitizedAmount, toNumberAmount(downPaymentIdr));
+  if (normalizedDownPayment > 0) {
+    return normalizedDownPayment;
+  }
+
+  return status === InvoiceStatus.PAID ? sanitizedAmount : 0;
 }
 
 function coerceNumber(value: unknown, fallback = 0): number {
@@ -269,6 +327,32 @@ function parseStoredInvoiceLineItems(items: unknown): InvoiceLineItem[] | undefi
   return normalizedItems.length > 0 ? normalizedItems : undefined;
 }
 
+function resolveInvoiceAmountFromItems(
+  amount: number,
+  items: ReadonlyArray<InvoiceLineItem> | undefined,
+): number {
+  const normalizedAmount = Math.max(0, Math.round(amount));
+  if (!items || items.length === 0) {
+    return normalizedAmount;
+  }
+
+  const itemsTotalIdr = items.reduce((total, item) => total + Math.max(0, Math.round(item.totalPriceIdr)), 0);
+  return itemsTotalIdr > 0 ? itemsTotalIdr : normalizedAmount;
+}
+
+function resolveStoredInvoiceAmount(
+  amount: number,
+  items: ReadonlyArray<InvoiceLineItem> | undefined,
+): number {
+  const normalizedAmount = Math.max(0, Math.round(amount));
+  if (normalizedAmount > 0 || !items || items.length === 0) {
+    return normalizedAmount;
+  }
+
+  const itemsTotalIdr = items.reduce((total, item) => total + Math.max(0, Math.round(item.totalPriceIdr)), 0);
+  return itemsTotalIdr > 0 ? itemsTotalIdr : normalizedAmount;
+}
+
 function hasInvoiceStatusEnumMismatch(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
   return (
@@ -297,7 +381,7 @@ function getTrimmedString(value: unknown): string {
 }
 
 @Injectable()
-export class InvoicesService {
+export class InvoicesService implements OnModuleInit {
   private readonly dataSource: "memory" | "prisma";
   private readonly logger = createStructuredLogger(InvoicesService.name);
   private readonly memoryInvoiceClients: MemoryInvoiceClient[] = [
@@ -320,12 +404,22 @@ export class InvoicesService {
     },
   ];
   private readonly memoryInvoices: MemoryInvoice[] = [];
+  private prismaInvoiceDownPaymentColumnState: boolean | null = null;
+  private prismaInvoiceDownPaymentColumnInitPromise: Promise<boolean> | null = null;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     private readonly configService?: ConfigService,
   ) {
     this.dataSource = resolveConfiguredDataSource(this.configService);
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (this.dataSource !== "prisma") {
+      return;
+    }
+
+    await this.ensurePrismaInvoiceDownPaymentColumn();
   }
 
   async listClients(): Promise<InvoiceClientListItem[]> {
@@ -541,6 +635,10 @@ export class InvoicesService {
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? InvoiceStatus.PENDING, dueDateIso);
     const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
     const normalizedItems = normalizeInvoiceLineItems(payload.items);
+    const roundedAmount = normalizeAmountByStatus(
+      resolveInvoiceAmountFromItems(payload.amount, normalizedItems),
+      effectiveStatus,
+    );
 
     const createdInvoice: MemoryInvoice = {
       id: randomUUID(),
@@ -550,7 +648,8 @@ export class InvoicesService {
       groupName: normalizedGroupCode ? undefined : client.groupName,
       issuedDateIso,
       dueDateIso,
-      amount: normalizeAmountByStatus(payload.amount, effectiveStatus),
+      amount: roundedAmount,
+      downPaymentIdr: normalizeDownPaymentByAmount(roundedAmount, payload.downPaymentIdr ?? 0),
       status: effectiveStatus,
       notes: getTrimmedString(payload.notes) || undefined,
       items: normalizedItems.length > 0 ? normalizedItems : undefined,
@@ -606,8 +705,14 @@ export class InvoicesService {
       : currentInvoice.dueDateIso;
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? currentInvoice.status, dueDateIso);
     const baseAmount = payload.amount !== undefined ? payload.amount : currentInvoice.amount;
-    const roundedAmount = normalizeAmountByStatus(baseAmount, effectiveStatus);
-    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
+    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : undefined;
+    const resolvedAmount =
+      payload.items !== undefined ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems) : baseAmount;
+    const roundedAmount = normalizeAmountByStatus(resolvedAmount, effectiveStatus);
+    const nextDownPaymentIdr = normalizeDownPaymentByAmount(
+      roundedAmount,
+      payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : currentInvoice.downPaymentIdr,
+    );
 
     let nextGroupCode = currentInvoice.groupCode;
     let nextGroupName = currentInvoice.groupName;
@@ -636,6 +741,7 @@ export class InvoicesService {
       issuedDateIso,
       dueDateIso,
       amount: roundedAmount,
+      downPaymentIdr: nextDownPaymentIdr,
       status: effectiveStatus,
       notes: nextNotes,
       items: normalizedItems !== undefined ? (normalizedItems.length > 0 ? normalizedItems : undefined) : currentInvoice.items,
@@ -650,6 +756,10 @@ export class InvoicesService {
     client: MemoryInvoiceClient,
   ): InvoiceListItem {
     const effectiveStatus = resolveEffectiveStatus(invoice.status, invoice.dueDateIso);
+    const roundedAmount = normalizeAmountByStatus(
+      resolveStoredInvoiceAmount(invoice.amount, invoice.items),
+      effectiveStatus,
+    );
     return {
       id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -661,7 +771,8 @@ export class InvoicesService {
       groupName: invoice.groupName ?? client.groupName,
       issuedDateIso: invoice.issuedDateIso,
       dueDateIso: invoice.dueDateIso,
-      amount: normalizeAmountByStatus(invoice.amount, effectiveStatus),
+      amount: roundedAmount,
+      downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, invoice.downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(invoice.dueDateIso),
       items: invoice.items?.length ? invoice.items : undefined,
@@ -691,21 +802,130 @@ export class InvoicesService {
     }));
   }
 
+  private async ensurePrismaInvoiceDownPaymentColumn(): Promise<boolean> {
+    if (this.dataSource !== "prisma") {
+      return false;
+    }
+
+    if (this.prismaInvoiceDownPaymentColumnState !== null) {
+      return this.prismaInvoiceDownPaymentColumnState;
+    }
+
+    if (this.prismaInvoiceDownPaymentColumnInitPromise) {
+      return this.prismaInvoiceDownPaymentColumnInitPromise;
+    }
+
+    if (typeof this.prisma.$queryRaw !== "function" || typeof this.prisma.$executeRaw !== "function") {
+      this.prismaInvoiceDownPaymentColumnState = false;
+      return false;
+    }
+
+    this.prismaInvoiceDownPaymentColumnInitPromise = (async () => {
+      try {
+        const existingRows = await this.prisma.$queryRaw<Array<{ exists: number }>>`
+          SELECT 1 AS "exists"
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'Invoice'
+            AND column_name = 'downPaymentIdr'
+          LIMIT 1
+        `;
+
+        if (existingRows.length > 0) {
+          return true;
+        }
+
+        await this.prisma.$executeRaw`
+          ALTER TABLE "Invoice"
+          ADD COLUMN IF NOT EXISTS "downPaymentIdr" DECIMAL(12,2) NOT NULL DEFAULT 0
+        `;
+
+        const verifiedRows = await this.prisma.$queryRaw<Array<{ exists: number }>>`
+          SELECT 1 AS "exists"
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'Invoice'
+            AND column_name = 'downPaymentIdr'
+          LIMIT 1
+        `;
+
+        return verifiedRows.length > 0;
+      } catch (error: unknown) {
+        this.logger.warn(
+          {
+            action: "invoice.down-payment-column.ensure-failed",
+            dataSource: this.dataSource,
+            error,
+          },
+          "Invoice down payment column is not ready yet.",
+        );
+        return false;
+      }
+    })();
+
+    try {
+      const available = await this.prismaInvoiceDownPaymentColumnInitPromise;
+      this.prismaInvoiceDownPaymentColumnState = available;
+      return available;
+    } finally {
+      this.prismaInvoiceDownPaymentColumnInitPromise = null;
+    }
+  }
+
+  private async readPrismaInvoiceDownPaymentMap(): Promise<Map<string, number>> {
+    const canReadColumn = await this.ensurePrismaInvoiceDownPaymentColumn();
+    if (!canReadColumn || typeof this.prisma.$queryRaw !== "function") {
+      return new Map();
+    }
+
+    try {
+      const downPaymentRows = await this.prisma.$queryRaw<PrismaInvoiceDownPaymentRow[]>`
+        SELECT "id", "downPaymentIdr"
+        FROM "Invoice"
+      `;
+
+      return new Map(
+        downPaymentRows.map((row) => [row.id, Math.max(0, Math.round(toNumberAmount(row.downPaymentIdr)))]),
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        {
+          action: "invoice.down-payment-column.read-failed",
+          dataSource: this.dataSource,
+          error,
+        },
+        "Invoice down payment values could not be loaded.",
+      );
+      return new Map();
+    }
+  }
+
+  private resolvePrismaInvoiceInlineDownPayment(
+    invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment,
+  ): number | undefined {
+    if (!Object.prototype.hasOwnProperty.call(invoice, "downPaymentIdr")) {
+      return undefined;
+    }
+
+    return Math.max(0, Math.round(toNumberAmount(invoice.downPaymentIdr)));
+  }
+
   private async findAllWithPrisma(): Promise<InvoiceListItem[]> {
     const invoices = await this.prisma.invoice.findMany({
-      include: {
-        client: true,
-        group: {
-          select: {
-            code: true,
-            name: true,
-          },
-        },
-      },
+      select: invoiceSummarySelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
     });
+    const downPaymentByInvoiceId = await this.readPrismaInvoiceDownPaymentMap();
 
-    return invoices.map((invoice) => this.mapPrismaInvoiceToListItem(invoice));
+    return invoices.map((invoice) => {
+      const inlineDownPaymentIdr = this.resolvePrismaInvoiceInlineDownPayment(
+        invoice as PrismaInvoiceSummaryRowWithOptionalDownPayment,
+      );
+      const downPaymentIdr =
+        downPaymentByInvoiceId.get(invoice.id) ?? inlineDownPaymentIdr ?? 0;
+
+      return this.mapPrismaInvoiceToListItem(invoice as PrismaInvoiceSummaryRowWithOptionalDownPayment, downPaymentIdr);
+    });
   }
 
   private async createWithPrisma(payload: CreateInvoiceDto): Promise<InvoiceListItem> {
@@ -735,7 +955,14 @@ export class InvoicesService {
     }
 
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? InvoiceStatus.PENDING, dueDateIso);
-    const roundedAmount = normalizeAmountByStatus(payload.amount, effectiveStatus);
+    const roundedAmount = normalizeAmountByStatus(
+      resolveInvoiceAmountFromItems(payload.amount, normalizedItems),
+      effectiveStatus,
+    );
+    const normalizedDownPaymentIdr = normalizeDownPaymentByAmount(
+      roundedAmount,
+      payload.downPaymentIdr ?? 0,
+    );
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const nextInvoiceNumber = await this.generateNextInvoiceNumberWithPrisma(invoiceYear);
@@ -752,18 +979,11 @@ export class InvoicesService {
             notes: getTrimmedString(payload.notes) || null,
             items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
           },
-          include: {
-            client: true,
-            group: {
-              select: {
-                code: true,
-                name: true,
-              },
-            },
-          },
+          select: invoiceSummarySelect,
         });
 
-        return this.mapPrismaInvoiceToListItem(created);
+        await this.writePrismaInvoiceDownPayment(created.id, normalizedDownPaymentIdr);
+        return this.mapPrismaInvoiceToListItem(created as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
       } catch (error: unknown) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -812,6 +1032,7 @@ export class InvoicesService {
       throw new NotFoundException(`Invoice '${id}' not found.`);
     }
 
+    const existingDownPaymentIdr = await this.readPrismaInvoiceDownPayment(id);
     const requestedClientId = getTrimmedString(payload.clientId);
     const requestedClientName = getTrimmedString(payload.clientName);
     const hasClientChangeRequest = Boolean(requestedClientId || requestedClientName);
@@ -865,8 +1086,14 @@ export class InvoicesService {
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? existingInvoice.status, dueDateIso);
     const baseAmount =
       payload.amount !== undefined ? payload.amount : toNumberAmount(existingInvoice.amount);
-    const roundedAmount = normalizeAmountByStatus(baseAmount, effectiveStatus);
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
+    const resolvedAmount =
+      payload.items !== undefined ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems) : baseAmount;
+    const roundedAmount = normalizeAmountByStatus(resolvedAmount, effectiveStatus);
+    const normalizedDownPaymentIdr = normalizeDownPaymentByAmount(
+      roundedAmount,
+      payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : existingDownPaymentIdr,
+    );
 
     let resolvedGroupId: string | null = existingInvoice.groupId;
     if (payload.groupCode !== undefined) {
@@ -893,7 +1120,7 @@ export class InvoicesService {
       resolvedGroupId = resolvedClientGroupId;
     }
 
-    let updated: PrismaInvoiceWithRelations;
+    let updated: PrismaInvoiceSummaryRow;
     try {
       updated = await this.prisma.invoice.update({
         where: {
@@ -916,15 +1143,7 @@ export class InvoicesService {
               }
             : {}),
         },
-        include: {
-          client: true,
-          group: {
-            select: {
-              code: true,
-              name: true,
-            },
-          },
-        },
+        select: invoiceSummarySelect,
       });
     } catch (error: unknown) {
       if (
@@ -950,13 +1169,76 @@ export class InvoicesService {
       throw error;
     }
 
-    return this.mapPrismaInvoiceToListItem(updated);
+    await this.writePrismaInvoiceDownPayment(updated.id, normalizedDownPaymentIdr);
+    return this.mapPrismaInvoiceToListItem(updated as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
   }
 
-  private mapPrismaInvoiceToListItem(invoice: PrismaInvoiceWithRelations): InvoiceListItem {
+  private async writePrismaInvoiceDownPayment(invoiceId: string, downPaymentIdr: number): Promise<void> {
+    const canWriteColumn = await this.ensurePrismaInvoiceDownPaymentColumn();
+    if (!canWriteColumn || typeof this.prisma.$executeRaw !== "function") {
+      return;
+    }
+
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE "Invoice"
+        SET "downPaymentIdr" = ${Math.max(0, Math.round(downPaymentIdr))}
+        WHERE "id" = ${invoiceId}
+      `;
+    } catch (error: unknown) {
+      this.logger.warn(
+        {
+          action: "invoice.down-payment-column.write-failed",
+          dataSource: this.dataSource,
+          invoiceId,
+          error,
+        },
+        "Invoice down payment value could not be stored.",
+      );
+    }
+  }
+
+  private async readPrismaInvoiceDownPayment(invoiceId: string): Promise<number> {
+    const canReadColumn = await this.ensurePrismaInvoiceDownPaymentColumn();
+    if (!canReadColumn || typeof this.prisma.$queryRaw !== "function") {
+      return 0;
+    }
+
+    try {
+      const rows = await this.prisma.$queryRaw<PrismaInvoiceDownPaymentRow[]>`
+        SELECT "downPaymentIdr"
+        FROM "Invoice"
+        WHERE "id" = ${invoiceId}
+        LIMIT 1
+      `;
+
+      return rows.length > 0 ? Math.max(0, Math.round(toNumberAmount(rows[0]?.downPaymentIdr))) : 0;
+    } catch (error: unknown) {
+      this.logger.warn(
+        {
+          action: "invoice.down-payment-column.read-single-failed",
+          dataSource: this.dataSource,
+          invoiceId,
+          error,
+        },
+        "Invoice down payment value could not be read.",
+      );
+      return 0;
+    }
+  }
+
+  private mapPrismaInvoiceToListItem(
+    invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment,
+    downPaymentIdr = 0,
+  ): InvoiceListItem {
     const dueDateIso = toIsoDateOnly(invoice.dueDate);
     const issuedDateIso = toIsoDateOnly(invoice.issuedDate);
     const effectiveStatus = resolveEffectiveStatus(invoice.status, dueDateIso);
+    const items = parseStoredInvoiceLineItems(invoice.items);
+    const roundedAmount = normalizeAmountByStatus(
+      resolveStoredInvoiceAmount(toNumberAmount(invoice.amount), items),
+      effectiveStatus,
+    );
 
     return {
       id: invoice.id,
@@ -969,10 +1251,11 @@ export class InvoicesService {
       groupName: invoice.group?.name,
       issuedDateIso,
       dueDateIso,
-      amount: normalizeAmountByStatus(toNumberAmount(invoice.amount), effectiveStatus),
+      amount: roundedAmount,
+      downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
-      items: parseStoredInvoiceLineItems(invoice.items),
+      items,
     };
   }
 
