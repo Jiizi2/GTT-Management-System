@@ -9,6 +9,16 @@ import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
 
 type InvoiceStatusLabel = "Paid" | "Pending" | "Overdue" | "Cancelled";
+type InvoiceLineItemCurrency = "IDR" | "USD" | "SAR";
+
+type InvoiceLineItem = {
+  description: string;
+  pax: number;
+  currency: InvoiceLineItemCurrency;
+  unitPrice: number;
+  totalPrice: number;
+  totalPriceIdr: number;
+};
 
 type InvoiceClientListItem = {
   id: string;
@@ -33,6 +43,7 @@ type InvoiceListItem = {
   amount: number;
   status: InvoiceStatusLabel;
   monthKey: string;
+  items?: InvoiceLineItem[];
 };
 
 type MemoryInvoiceClient = {
@@ -54,6 +65,7 @@ type MemoryInvoice = {
   amount: number;
   status: InvoiceStatus;
   notes?: string;
+  items?: InvoiceLineItem[];
 };
 
 type PrismaInvoiceWithRelations = Prisma.InvoiceGetPayload<{
@@ -196,6 +208,65 @@ function toNumberAmount(value: Prisma.Decimal | number): number {
 
   const parsed = Number.parseFloat(value.toString());
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function coerceNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function isInvoiceLineItemCurrency(value: string): value is InvoiceLineItemCurrency {
+  return value === "IDR" || value === "USD" || value === "SAR";
+}
+
+function normalizeInvoiceLineItem(value: unknown): InvoiceLineItem | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const item = value as Record<string, unknown>;
+  const description = getTrimmedString(item.description);
+  const currency = getTrimmedString(item.currency).toUpperCase();
+  const pax = Math.max(0, Math.round(coerceNumber(item.pax, 0)));
+  const unitPrice = Math.max(0, Math.round(coerceNumber(item.unitPrice, 0)));
+  const totalPrice = Math.max(0, Math.round(coerceNumber(item.totalPrice, pax * unitPrice)));
+  const totalPriceIdr = Math.max(0, Math.round(coerceNumber(item.totalPriceIdr, totalPrice)));
+
+  if (!description || !isInvoiceLineItemCurrency(currency) || pax <= 0 || unitPrice <= 0) {
+    return null;
+  }
+
+  return {
+    description,
+    pax,
+    currency,
+    unitPrice,
+    totalPrice,
+    totalPriceIdr,
+  };
+}
+
+function normalizeInvoiceLineItems(items: unknown): InvoiceLineItem[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items.map(normalizeInvoiceLineItem).filter((item): item is InvoiceLineItem => item !== null);
+}
+
+function parseStoredInvoiceLineItems(items: unknown): InvoiceLineItem[] | undefined {
+  const normalizedItems = normalizeInvoiceLineItems(items);
+  return normalizedItems.length > 0 ? normalizedItems : undefined;
 }
 
 function hasInvoiceStatusEnumMismatch(error: unknown): boolean {
@@ -469,6 +540,7 @@ export class InvoicesService {
     const invoiceNumber = buildInvoiceNumber(invoiceYear, this.resolveNextSerial(existingInvoiceNumbers));
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? InvoiceStatus.PENDING, dueDateIso);
     const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
+    const normalizedItems = normalizeInvoiceLineItems(payload.items);
 
     const createdInvoice: MemoryInvoice = {
       id: randomUUID(),
@@ -481,6 +553,7 @@ export class InvoicesService {
       amount: normalizeAmountByStatus(payload.amount, effectiveStatus),
       status: effectiveStatus,
       notes: getTrimmedString(payload.notes) || undefined,
+      items: normalizedItems.length > 0 ? normalizedItems : undefined,
     };
 
     this.memoryInvoices.unshift(createdInvoice);
@@ -534,6 +607,7 @@ export class InvoicesService {
     const effectiveStatus = resolveEffectiveStatus(payload.status ?? currentInvoice.status, dueDateIso);
     const baseAmount = payload.amount !== undefined ? payload.amount : currentInvoice.amount;
     const roundedAmount = normalizeAmountByStatus(baseAmount, effectiveStatus);
+    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
 
     let nextGroupCode = currentInvoice.groupCode;
     let nextGroupName = currentInvoice.groupName;
@@ -564,6 +638,7 @@ export class InvoicesService {
       amount: roundedAmount,
       status: effectiveStatus,
       notes: nextNotes,
+      items: normalizedItems !== undefined ? (normalizedItems.length > 0 ? normalizedItems : undefined) : currentInvoice.items,
     };
 
     this.memoryInvoices[invoiceIndex] = updatedInvoice;
@@ -589,6 +664,7 @@ export class InvoicesService {
       amount: normalizeAmountByStatus(invoice.amount, effectiveStatus),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(invoice.dueDateIso),
+      items: invoice.items?.length ? invoice.items : undefined,
     };
   }
 
@@ -640,6 +716,7 @@ export class InvoicesService {
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
     const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
     let resolvedGroupId: string | null = client.groupId ?? null;
+    const normalizedItems = normalizeInvoiceLineItems(payload.items);
     if (requestedGroupCode) {
       const matchedGroup = await this.prisma.group.findUnique({
         where: {
@@ -673,6 +750,7 @@ export class InvoicesService {
             amount: roundedAmount,
             status: effectiveStatus,
             notes: getTrimmedString(payload.notes) || null,
+            items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
           },
           include: {
             client: true,
@@ -726,6 +804,7 @@ export class InvoicesService {
         amount: true,
         status: true,
         notes: true,
+        items: true,
       },
     });
 
@@ -787,6 +866,7 @@ export class InvoicesService {
     const baseAmount =
       payload.amount !== undefined ? payload.amount : toNumberAmount(existingInvoice.amount);
     const roundedAmount = normalizeAmountByStatus(baseAmount, effectiveStatus);
+    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
 
     let resolvedGroupId: string | null = existingInvoice.groupId;
     if (payload.groupCode !== undefined) {
@@ -827,6 +907,14 @@ export class InvoicesService {
           amount: roundedAmount,
           status: effectiveStatus,
           notes: payload.notes !== undefined ? payload.notes.trim() || null : existingInvoice.notes,
+          ...(payload.items !== undefined
+            ? {
+                items:
+                  normalizedItems.length > 0
+                    ? (normalizedItems as Prisma.InputJsonValue)
+                    : Prisma.JsonNull,
+              }
+            : {}),
         },
         include: {
           client: true,
@@ -884,6 +972,7 @@ export class InvoicesService {
       amount: normalizeAmountByStatus(toNumberAmount(invoice.amount), effectiveStatus),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
+      items: parseStoredInvoiceLineItems(invoice.items),
     };
   }
 

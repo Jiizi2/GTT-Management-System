@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { InvoiceLineItemDto } from "./invoice-line-item.dto";
 
 export class InvoiceClientListItemResponseDto {
   @ApiProperty({ example: "clinvoiceclientid123" })
@@ -59,4 +60,10 @@ export class InvoiceListItemResponseDto {
 
   @ApiProperty({ example: "2026-04" })
   monthKey!: string;
+
+  @ApiPropertyOptional({
+    description: "Daftar item invoice yang tersimpan.",
+    type: [InvoiceLineItemDto],
+  })
+  items?: InvoiceLineItemDto[];
 }

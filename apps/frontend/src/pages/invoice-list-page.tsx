@@ -21,6 +21,7 @@ import {
   mapMasterDataToClientSuggestions,
   mapMasterDataToInvoiceStatusOptions,
   mapMasterDataToSelectOptions,
+  mergeInvoiceClientsWithMasterData,
   resolveDateRangeLabel,
   shiftMonthKey,
   viewInvoicePdfFromRow,
@@ -109,8 +110,14 @@ export function InvoiceScreen({
   const isInvoiceBackendAvailable = invoiceDashboardQuery.data?.dataSource === "prisma";
   const isInvoiceDataLoading = invoiceDashboardQuery.isLoading;
   const invoiceClients = useMemo<InvoiceClientOption[]>(
-    () => (isInvoiceBackendAvailable ? (invoiceDashboardQuery.data?.clients ?? []) : []),
-    [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
+    () =>
+      isInvoiceBackendAvailable
+        ? mergeInvoiceClientsWithMasterData(
+            invoiceDashboardQuery.data?.clients ?? [],
+            invoiceClientNameOptionsQuery.data ?? [],
+          )
+        : [],
+    [invoiceDashboardQuery.data?.clients, invoiceClientNameOptionsQuery.data, isInvoiceBackendAvailable],
   );
   const invoiceRows = useMemo<InvoiceRow[]>(
     () => (isInvoiceBackendAvailable ? (invoiceDashboardQuery.data?.rows ?? []) : []),

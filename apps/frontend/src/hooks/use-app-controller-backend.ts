@@ -3,6 +3,7 @@ import {
   formatScheduleTime,
   getItineraryIsoDate,
   getLocalIsoDateWithOffset,
+  resolveCurrentGroupTone,
   getStatusByTone,
   musyrifAvatar,
   parseTimeForInput,
@@ -338,6 +339,10 @@ function resolveGroupTravelDates(group: GroupData): { arrivalDate: string; retur
 
 function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
   const { arrivalDate, returnDate } = resolveGroupTravelDates(group);
+  const normalizedNextActivityTimeLabel =
+    normalizeStoredTimeLabel(group.nextActivity?.time.trim() ?? "") ||
+    normalizeStoredTimeLabel(group.itinerary.find((item) => item.time?.trim())?.time?.trim() ?? "") ||
+    "09:00";
   const payload: BackendCreateGroupPayload = {
     code: group.code.trim().toUpperCase(),
     name: group.name.trim(),
@@ -360,7 +365,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       ? {
           title: group.nextActivity.title.trim(),
           dateLabel: group.nextActivity.date.trim(),
-          timeLabel: normalizeStoredTimeLabel(group.nextActivity.time.trim()),
+          timeLabel: normalizedNextActivityTimeLabel,
           icon: group.nextActivity.icon.trim(),
         }
       : undefined,
@@ -405,10 +410,11 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
 
   if (group.visaSetup) {
     const normalizedIssuedDate = group.visaSetup.issuedDate?.trim() ?? "";
+    const resolvedSyarikah = group.visaSetup.syarikah.trim() || resolveVisaProvider(group.packageName);
     payload.visaSetup = {
       visaStatus: mapVisaStatusToBackend(group.visaSetup.visaStatus),
       issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate) ? normalizedIssuedDate : undefined,
-      syarikah: group.visaSetup.syarikah.trim(),
+      syarikah: resolvedSyarikah,
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
       outstandingAmount: 0,
       hotelAgreements: [
@@ -905,8 +911,12 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
       "event",
   };
 
-  const resolvedTone = mapBackendToneToFrontend(group.tone, group.status);
-  const resolvedStatus = readString(group.status, getStatusByTone(resolvedTone));
+  const backendTone = mapBackendToneToFrontend(group.tone, group.status);
+  const resolvedTone = resolveCurrentGroupTone(backendTone, sortedItinerary);
+  const resolvedStatus =
+    resolvedTone === backendTone
+      ? readString(group.status, getStatusByTone(resolvedTone))
+      : getStatusByTone(resolvedTone);
   const pax = Math.max(1, readNumber(group.pax, 1));
   const durationDays = Math.max(1, readNumber(group.durationDays, 8));
   const backendArrivalDateIso = toIsoDate(group.arrivalDate) ?? "";

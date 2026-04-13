@@ -1,9 +1,11 @@
 import type { GroupData } from "../shared/app-domain";
-import type { BackendInvoiceClient, BackendInvoiceRow } from "../hooks/use-invoice-backend";
+import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from "../hooks/use-invoice-backend";
 
 export type InvoiceStatus = BackendInvoiceRow["status"];
 export type InvoiceRow = BackendInvoiceRow;
 export type InvoiceClientOption = BackendInvoiceClient;
+
+const MASTER_DATA_INVOICE_CLIENT_ID_PREFIX = "__invoice_client_master_data__:";
 
 export type SelectOption = {
   value: string;
@@ -26,6 +28,11 @@ export type InvoiceWorkspaceInitialData = {
   dueDateIso: string;
   amount: number;
   status: InvoiceStatus;
+  items: Array<
+    BackendInvoiceItem & {
+      id: string;
+    }
+  >;
 };
 
 export const defaultBankDisbursementOptions: SelectOption[] = [
@@ -94,6 +101,20 @@ export function shiftMonthKey(monthKey: string, offset: number): string {
   const year = parsedDate.getFullYear();
   const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
+}
+
+function normalizeClientName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function buildMasterDataInvoiceClientId(value: string, label: string): string {
+  const candidateKey = value.trim() || label.trim();
+  const sanitizedKey = candidateKey.replace(/\s+/g, "_").replace(/[^\w-]/g, "").toLowerCase();
+  return `${MASTER_DATA_INVOICE_CLIENT_ID_PREFIX}${sanitizedKey || "client"}`;
+}
+
+export function isMasterDataClientOptionId(clientId: string): boolean {
+  return clientId.trim().startsWith(MASTER_DATA_INVOICE_CLIENT_ID_PREFIX);
 }
 
 export function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): string {
@@ -197,6 +218,55 @@ export function mapMasterDataToClientSuggestions(options: Array<{ label: string;
   );
 }
 
+export function mergeInvoiceClientsWithMasterData(
+  clients: ReadonlyArray<InvoiceClientOption>,
+  options: ReadonlyArray<{ value: string; label: string; sortOrder: number; isActive: boolean }>,
+): InvoiceClientOption[] {
+  const normalizedNames = new Set(clients.map((client) => normalizeClientName(client.name)));
+  const backendClients = [...clients].sort((left, right) => {
+    const sortOrderDiff = left.sortOrder - right.sortOrder;
+    if (sortOrderDiff !== 0) {
+      return sortOrderDiff;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+
+  const masterDataOnlyClients = options
+    .filter((option) => option.isActive)
+    .map((option) => ({
+      ...option,
+      label: option.label.trim(),
+      value: option.value.trim(),
+    }))
+    .filter((option) => option.label.length > 0)
+    .filter((option) => {
+      const normalizedLabel = normalizeClientName(option.label);
+      if (!normalizedLabel || normalizedNames.has(normalizedLabel)) {
+        return false;
+      }
+
+      normalizedNames.add(normalizedLabel);
+      return true;
+    })
+    .sort((left, right) => {
+      const sortOrderDiff = left.sortOrder - right.sortOrder;
+      if (sortOrderDiff !== 0) {
+        return sortOrderDiff;
+      }
+
+      return left.label.localeCompare(right.label);
+    })
+    .map((option, index) => ({
+      id: buildMasterDataInvoiceClientId(option.value, option.label),
+      name: option.label,
+      sortOrder: backendClients.length + index + 1,
+      label: option.label,
+    }));
+
+  return [...backendClients, ...masterDataOnlyClients];
+}
+
 export function resolveBankAccountLabel(
   value: string,
   options: ReadonlyArray<SelectOption> = defaultBankDisbursementOptions,
@@ -205,6 +275,18 @@ export function resolveBankAccountLabel(
 }
 
 export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
+  const items: Array<BackendInvoiceItem & { id: string }> = Array.isArray(row.items)
+    ? row.items.map((item, index) => ({
+        id: `line-${index + 1}`,
+        description: item.description.trim(),
+        pax: Math.max(0, Math.round(item.pax)),
+        currency: item.currency,
+        unitPrice: Math.max(0, Math.round(item.unitPrice)),
+        totalPrice: Math.max(0, Math.round(item.totalPrice)),
+        totalPriceIdr: Math.max(0, Math.round(item.totalPriceIdr)),
+      }))
+    : [];
+
   return {
     id: row.id,
     invoiceNumber: row.invoiceNumber,
@@ -216,6 +298,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     dueDateIso: row.dueDateIso,
     amount: Math.max(0, Math.round(row.amount)),
     status: row.status,
+    items,
   };
 }
 
@@ -234,6 +317,19 @@ export async function viewInvoicePdfFromRow({
   const description = linkedGroup
     ? `${linkedGroup.packageName} Package - ${linkedGroup.durationDays} Days`
     : `Invoice ${row.invoiceNumber}`;
+  const printableItems =
+    row.items && row.items.length > 0
+      ? row.items
+      : [
+          {
+            description,
+            pax: 1,
+            currency: "IDR" as const,
+            unitPrice: row.amount,
+            totalPrice: row.amount,
+            totalPriceIdr: row.amount,
+          },
+        ];
   const { exportInvoicePdf } = await import("./invoice-export");
 
   return exportInvoicePdf(
@@ -255,16 +351,7 @@ export async function viewInvoicePdfFromRow({
       totalPayableIdr: row.amount,
       downPaymentIdr: row.status === "Paid" ? row.amount : 0,
       remainingBalanceIdr: row.status === "Paid" ? 0 : row.amount,
-      items: [
-        {
-          description,
-          pax: 1,
-          currency: "IDR",
-          unitPrice: row.amount,
-          totalPrice: row.amount,
-          totalPriceIdr: row.amount,
-        },
-      ],
+      items: printableItems,
     },
     { printWindow },
   );

@@ -13,6 +13,15 @@ export type BackendInvoiceClient = {
   groupName?: string;
 };
 
+export type BackendInvoiceItem = {
+  description: string;
+  pax: number;
+  currency: "IDR" | "USD" | "SAR";
+  unitPrice: number;
+  totalPrice: number;
+  totalPriceIdr: number;
+};
+
 export type BackendInvoiceRow = {
   id: string;
   invoiceNumber: string;
@@ -27,6 +36,7 @@ export type BackendInvoiceRow = {
   amount: number;
   status: BackendInvoiceStatus;
   monthKey: string;
+  items?: BackendInvoiceItem[];
 };
 
 export type CreateBackendInvoicePayload = {
@@ -38,6 +48,7 @@ export type CreateBackendInvoicePayload = {
   amount: number;
   status?: BackendInvoiceStatus;
   notes?: string;
+  items?: BackendInvoiceItem[];
 };
 
 export type UpdateBackendInvoicePayload = {
@@ -49,6 +60,7 @@ export type UpdateBackendInvoicePayload = {
   amount?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
+  items?: BackendInvoiceItem[];
 };
 
 type BackendInvoiceClientRecord = {
@@ -74,6 +86,16 @@ type BackendInvoiceRecord = {
   amount?: unknown;
   status?: unknown;
   monthKey?: unknown;
+  items?: unknown;
+};
+
+type BackendInvoiceItemRecord = {
+  description?: unknown;
+  pax?: unknown;
+  currency?: unknown;
+  unitPrice?: unknown;
+  totalPrice?: unknown;
+  totalPriceIdr?: unknown;
 };
 
 function mapBackendDataSource(value: unknown): BackendDataSource {
@@ -163,6 +185,38 @@ function mapInvoiceStatusForBackend(value: BackendInvoiceStatus): "PAID" | "PEND
   return "PENDING";
 }
 
+function mapBackendInvoiceItem(record: BackendInvoiceItemRecord): BackendInvoiceItem | null {
+  const description = readString(record.description);
+  const currency = readString(record.currency).toUpperCase();
+  const pax = Math.max(0, Math.round(readNumber(record.pax, 0)));
+  const unitPrice = Math.max(0, Math.round(readNumber(record.unitPrice, 0)));
+  const totalPrice = Math.max(0, Math.round(readNumber(record.totalPrice, pax * unitPrice)));
+  const totalPriceIdr = Math.max(0, Math.round(readNumber(record.totalPriceIdr, totalPrice)));
+
+  if (!description || (currency !== "IDR" && currency !== "USD" && currency !== "SAR") || pax <= 0 || unitPrice <= 0) {
+    return null;
+  }
+
+  return {
+    description,
+    pax,
+    currency,
+    unitPrice,
+    totalPrice,
+    totalPriceIdr,
+  };
+}
+
+function normalizeBackendInvoiceItems(items: BackendInvoiceItem[] | undefined): BackendInvoiceItem[] | undefined {
+  if (!items) {
+    return undefined;
+  }
+
+  return items
+    .map((item) => mapBackendInvoiceItem(item as BackendInvoiceItemRecord))
+    .filter((item): item is BackendInvoiceItem => item !== null);
+}
+
 function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | null {
   const id = readString(record.id);
   const invoiceNumber = readString(record.invoiceNumber);
@@ -196,6 +250,11 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
     amount: Math.max(0, Math.round(readNumber(record.amount, 0))),
     status: mapBackendInvoiceStatus(record.status),
     monthKey: readString(record.monthKey, monthKeyFromDueDate),
+    items: Array.isArray(record.items)
+      ? (record.items
+          .map((item) => mapBackendInvoiceItem(item as BackendInvoiceItemRecord))
+          .filter((item): item is BackendInvoiceItem => item !== null) ?? undefined)
+      : undefined,
   };
 }
 
@@ -290,6 +349,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
       amount: Math.max(0, Math.round(payload.amount)),
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
+      items: normalizeBackendInvoiceItems(payload.items),
     }),
   });
 
@@ -340,6 +400,9 @@ export async function updateInvoiceInBackend(
   }
   if (payload.notes !== undefined) {
     requestBody.notes = payload.notes.trim();
+  }
+  if (payload.items !== undefined) {
+    requestBody.items = normalizeBackendInvoiceItems(payload.items);
   }
 
   const {

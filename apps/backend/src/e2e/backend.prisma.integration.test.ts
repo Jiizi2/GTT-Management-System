@@ -261,6 +261,16 @@ async function testPrismaIntegrationFlow(): Promise<void> {
         issuedDate: todayIso,
         dueDate: dueDateIso,
         amount: 777000,
+        items: [
+          {
+            description: "Primary Package",
+            pax: 2,
+            currency: "IDR",
+            unitPrice: 300000,
+            totalPrice: 600000,
+            totalPriceIdr: 600000,
+          },
+        ],
       }),
     });
     assert.equal(createResponse.status, 201, `Create invoice failed: ${createResponse.text}`);
@@ -270,12 +280,15 @@ async function testPrismaIntegrationFlow(): Promise<void> {
       clientName?: string;
       amount?: number;
       status?: string;
+      items?: Array<{ description?: string }>;
     };
     assert.equal(typeof createdInvoice.id, "string", "Created invoice should include id.");
     assert.equal(typeof createdInvoice.clientId, "string", "Created invoice should include clientId.");
     assert.equal(createdInvoice.clientName, testClientName);
     assert.equal(createdInvoice.amount, 777000);
     assert.equal(createdInvoice.status, "Pending");
+    assert.equal(createdInvoice.items?.length, 1);
+    assert.equal(createdInvoice.items?.[0]?.description, "Primary Package");
     createdInvoiceId = createdInvoice.id ?? "";
 
     const clientsResponse = await requestJson(server.baseUrl, "/api/invoices/clients");
@@ -300,6 +313,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
     const updatedInvoice = updateResponse.json as { amount?: number; status?: string };
     assert.equal(updatedInvoice.amount, 888000);
     assert.equal(updatedInvoice.status, "Paid");
+    assert.equal((updateResponse.json as { items?: Array<{ description?: string }> }).items?.length, 1);
 
     const listResponse = await requestJson(server.baseUrl, "/api/invoices");
     assert.equal(listResponse.status, 200, `List invoices failed: ${listResponse.text}`);

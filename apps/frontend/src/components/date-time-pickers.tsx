@@ -1,8 +1,6 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
-import { SereneSelect } from "./serene-select";
-
 type DatePickerProps = {
   id?: string;
   value: string;
@@ -510,7 +508,7 @@ export function TimePickerInput({
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant/75">
                   Hour
-                  <SereneSelect
+                  <select
                     className={pickerSelectClassName}
                     value={draftHour}
                     onChange={(event) => setDraftHour(event.target.value)}
@@ -520,12 +518,12 @@ export function TimePickerInput({
                         {hourOption}
                       </option>
                     ))}
-                  </SereneSelect>
+                  </select>
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant/75">
                   Minute
-                  <SereneSelect
+                  <select
                     className={pickerSelectClassName}
                     value={draftMinute}
                     onChange={(event) => setDraftMinute(event.target.value)}
@@ -535,7 +533,7 @@ export function TimePickerInput({
                         {minuteOption}
                       </option>
                     ))}
-                  </SereneSelect>
+                  </select>
                 </label>
               </div>
 

@@ -1,6 +1,17 @@
 import { InvoiceStatus } from "@prisma/client";
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import {
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
+import { InvoiceLineItemDto } from "./invoice-line-item.dto";
 
 export class UpdateInvoiceDto {
   @ApiPropertyOptional({
@@ -69,4 +80,14 @@ export class UpdateInvoiceDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: "Daftar item invoice.",
+    type: [InvoiceLineItemDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InvoiceLineItemDto)
+  items?: InvoiceLineItemDto[];
 }

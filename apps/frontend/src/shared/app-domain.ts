@@ -1037,6 +1037,49 @@ export function resolveGroupToneByItinerary(itinerary: ItineraryItem[]): StatusT
   return "inactive";
 }
 
+function hasCurrentOrUpcomingItinerary(itinerary: ItineraryItem[], now: Date): boolean | null {
+  const nowMs = now.getTime();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const todayStartMs = today.getTime();
+  let hasComparableItem = false;
+
+  for (const item of itinerary) {
+    const itineraryIsoDate = getItineraryIsoDate(item).trim();
+    if (!isIsoDateValue(itineraryIsoDate)) {
+      continue;
+    }
+
+    hasComparableItem = true;
+
+    const normalizedTime =
+      parseTimeForInput(item.time?.trim() ?? "") || parseTimeForInput(item.meta.split(" | ")[0] ?? "");
+    if (normalizedTime) {
+      const parsedDateTime = Date.parse(`${itineraryIsoDate}T${normalizedTime}:00`);
+      if (Number.isFinite(parsedDateTime) && parsedDateTime >= nowMs) {
+        return true;
+      }
+
+      continue;
+    }
+
+    const parsedDateOnly = Date.parse(`${itineraryIsoDate}T00:00:00`);
+    if (Number.isFinite(parsedDateOnly) && parsedDateOnly >= todayStartMs) {
+      return true;
+    }
+  }
+
+  return hasComparableItem ? false : null;
+}
+
+export function resolveCurrentGroupTone(
+  fallbackTone: StatusTone,
+  itinerary: ItineraryItem[],
+  now: Date = new Date(),
+): StatusTone {
+  return hasCurrentOrUpcomingItinerary(itinerary, now) === false ? "inactive" : fallbackTone;
+}
+
 function sortItineraryForOverview(items: ItineraryItem[]): ItineraryItem[] {
   return [...items].sort((left, right) => {
     const leftDate = getItineraryIsoDate(left) || "9999-12-31";
@@ -1154,7 +1197,7 @@ export function normalizeGroupStatus(group: GroupData): GroupData {
   const normalizedReturnDateCandidate = isIsoDateValue(currentReturnDate) ? currentReturnDate : fallbackReturnDate;
   const normalizedReturnDate =
     normalizedReturnDateCandidate >= normalizedArrivalDate ? normalizedReturnDateCandidate : normalizedArrivalDate;
-  const tone = resolveGroupToneByItinerary(normalizedItinerary);
+  const tone = resolveCurrentGroupTone(resolveGroupToneByItinerary(normalizedItinerary), normalizedItinerary);
   const overviewSnapshot = buildOverviewSnapshotFromItinerary(normalizedItinerary, group);
   return {
     ...group,
@@ -1819,11 +1862,10 @@ export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form:
   const nextFlightNumber = isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
   const shouldPersistHotelName =
     form.category === "arrival" ||
-    form.category === "transfer" ||
     form.category === "city-tour" ||
     form.category === "departure";
   const nextHotelName = shouldPersistHotelName ? (form.hotelName?.trim() ?? "") : "";
-  const nextFromHotelName = isTransferActivityType(form.category) ? (form.fromHotelName?.trim() ?? "") : "";
+  const nextFromHotelName = "";
   const nextHotelPickupRequestTime = isDepartureActivityType(form.category) ? form.hotelPickupRequestTime.trim() : "";
   const isTransferByTrain = isTransferActivityType(form.category) && form.transferByTrain;
   const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
@@ -1910,10 +1952,10 @@ export function getRouteFieldConfigByCategory(category: string): {
   if (category === "departure") {
     return {
       fromLabel: "Departure City",
-      toLabel: "Destination Airport",
+      toLabel: "Destination Airport City",
       fromPlaceholder: "e.g. Madinah",
-      toPlaceholder: "e.g. MED Airport",
-      helperText: "Enter origin and airport, then fill flight return time and hotel pickup request time.",
+      toPlaceholder: "e.g. Jeddah",
+      helperText: "Select the departure city and airport city in Saudi, then fill flight return time and hotel pickup request time.",
     };
   }
 

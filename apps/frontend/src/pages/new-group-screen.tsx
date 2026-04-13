@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type ReactNode, Suspense, lazy, useId, useMemo, useState } from "react";
+import { type ReactNode, Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
@@ -7,7 +7,6 @@ import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { useThemeMode } from "../theme/theme-provider";
 import type {
   AgreementApprovalStatus,
   BusStatus,
@@ -85,40 +84,56 @@ function createNewGroupScreenSchema(requireGroupInformation: boolean) {
 
 type NewGroupScreenFormValues = z.infer<ReturnType<typeof createNewGroupScreenSchema>>;
 
+type NewGroupSetupDraft = {
+  resolvedGroupCode: string;
+  resolvedGroupName: string;
+  safePax: number;
+  hasValidPax: boolean;
+  visaStatus: VisaStatus;
+  syarikahName: string;
+  busStatus: VisaServiceOption;
+  paymentStatus: "Paid" | "Unpaid";
+  makkahHotels: NewGroupAgreementFormState[];
+  madinahHotels: NewGroupAgreementFormState[];
+  raudhahDates: NewGroupRaudhahFormState[];
+  agreementDateConnection: ReturnType<typeof validateConnectedAgreementDates>;
+  canProceed: boolean;
+};
+
 function toCityLabel(city: HotelCity): string {
   return city === "makkah" ? "Makkah" : "Madinah";
 }
 
 function getInvoiceToneClasses(tone: InvoiceTone): string {
   if (tone === "cancelled") {
-    return "border-slate-300 bg-slate-100 text-slate-700";
+    return "border-outline-variant/45 bg-surface-container-high text-on-surface-variant";
   }
 
   if (tone === "paid") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-800";
+    return "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant";
   }
 
   if (tone === "pending") {
-    return "border-amber-200 bg-amber-100 text-amber-800";
+    return "border-tertiary-fixed/60 bg-tertiary-fixed text-on-tertiary-fixed-variant";
   }
 
-  return "border-rose-200 bg-rose-100 text-rose-700";
+  return "border-error-container/65 bg-error-container text-on-error-container";
 }
 
 function getInvoiceToneDotClasses(tone: InvoiceTone): string {
   if (tone === "cancelled") {
-    return "border-slate-400 bg-slate-500";
+    return "border-outline-variant/55 bg-on-surface-variant/55";
   }
 
   if (tone === "paid") {
-    return "border-emerald-400 bg-emerald-500";
+    return "border-primary/35 bg-primary";
   }
 
   if (tone === "pending") {
-    return "border-amber-400 bg-amber-500";
+    return "border-tertiary-fixed/60 bg-tertiary";
   }
 
-  return "border-rose-400 bg-rose-500";
+  return "border-error-container/80 bg-on-error-container/85";
 }
 
 function getVisaStatusTone(status: VisaStatus): InvoiceTone {
@@ -192,6 +207,8 @@ export function NewGroupScreen({
   hideGroupInformation = false,
   requireItineraryBeforeSave = false,
   onItineraryPrefillChange,
+  hideFooterActions = false,
+  onSetupDraftChange,
 }: {
   onSaveGroup: (group: GroupData) => void;
   onCancel: () => void;
@@ -202,6 +219,8 @@ export function NewGroupScreen({
   hideGroupInformation?: boolean;
   requireItineraryBeforeSave?: boolean;
   onItineraryPrefillChange?: (prefill: ItineraryPrefill | null) => void;
+  hideFooterActions?: boolean;
+  onSetupDraftChange?: (draft: NewGroupSetupDraft) => void;
 }) {
   const formSchema = useMemo(() => createNewGroupScreenSchema(!hideGroupInformation), [hideGroupInformation]);
   const {
@@ -249,6 +268,7 @@ export function NewGroupScreen({
   const groupName = watch("groupName");
   const totalPax = watch("totalPax");
   const visaStatus = watch("visaStatus");
+  const syarikahName = watch("syarikahName");
   const busStatus = watch("busStatus");
   const paymentStatus = watch("paymentStatus");
   const watchedMakkahHotels = watch("makkahHotels");
@@ -313,6 +333,25 @@ export function NewGroupScreen({
     removeMadinahHotel(agreementIndex);
   };
 
+  const handleClearAgreement = (city: HotelCity, agreementIndex: number) => {
+    const agreements = city === "makkah" ? makkahHotels : madinahHotels;
+    const agreementToClear = agreements[agreementIndex];
+    if (!agreementToClear) {
+      return;
+    }
+
+    const resetAgreement: NewGroupAgreementFormState = {
+      ...createNewGroupAgreementForm(city),
+      id: agreementToClear.id,
+    };
+    const nextAgreements = agreements.map((agreement, index) =>
+      index === agreementIndex ? resetAgreement : agreement,
+    );
+    setValue(city === "makkah" ? "makkahHotels" : "madinahHotels", nextAgreements, {
+      shouldDirty: true,
+    });
+  };
+
   const handleRaudhahChange = <Key extends keyof NewGroupRaudhahFormState>(
     appointmentIndex: number,
     field: Key,
@@ -370,6 +409,56 @@ export function NewGroupScreen({
   const groupNumberErrorMessage = errors.groupNumber?.message;
   const totalPaxErrorMessage = errors.totalPax?.message;
   const groupNameErrorMessage = errors.groupName?.message;
+  const canProceedFromSetupStep =
+    !agreementDateConnection.hasWarning && !!resolvedGroupCode && !!resolvedGroupName && hasValidPax;
+  const identitySectionSummary =
+    [resolvedGroupCode, resolvedGroupName]
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0)
+      .join(" · ") || "Fill the basic group identity";
+  const setupSectionSummary = agreementDateConnection.hasWarning
+    ? "Review agreement dates"
+    : `${makkahHotels.length + madinahHotels.length} hotel cards · ${raudhahDates.length} raudhah`;
+
+  void identitySectionSummary;
+  void setupSectionSummary;
+
+  useEffect(() => {
+    if (!onSetupDraftChange) {
+      return;
+    }
+
+    onSetupDraftChange({
+      resolvedGroupCode,
+      resolvedGroupName,
+      safePax,
+      hasValidPax,
+      visaStatus,
+      syarikahName: syarikahName.trim(),
+      busStatus,
+      paymentStatus,
+      makkahHotels,
+      madinahHotels,
+      raudhahDates,
+      agreementDateConnection,
+      canProceed: canProceedFromSetupStep,
+    });
+  }, [
+    agreementDateConnection,
+    busStatus,
+    canProceedFromSetupStep,
+    hasValidPax,
+    makkahHotels,
+    madinahHotels,
+    onSetupDraftChange,
+    paymentStatus,
+    raudhahDates,
+    resolvedGroupCode,
+    resolvedGroupName,
+    safePax,
+    syarikahName,
+    visaStatus,
+  ]);
 
   const formatAgreementStayRange = (agreement: NewGroupAgreementFormState) => {
     if (!agreement.stayStartIso && !agreement.stayEndIso) {
@@ -393,7 +482,7 @@ export function NewGroupScreen({
   const renderAgreementSection = (city: HotelCity, agreements: NewGroupAgreementFormState[]) => (
     <div className="rounded-2xl bg-surface-container-low p-4 shadow-ambient">
       <div className="mb-3 flex items-center gap-2 text-on-surface">
-        <span className="material-symbols-outlined text-emerald-700" aria-hidden="true">
+        <span className="material-symbols-outlined text-primary" aria-hidden="true">
           location_on
         </span>
         <h3 className="text-lg font-semibold">{toCityLabel(city)} Subsection</h3>
@@ -504,18 +593,31 @@ export function NewGroupScreen({
                 </label>
               </div>
 
-              {agreements.length > 1 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-error-container px-3 py-1.5 text-xs font-semibold text-on-error-container transition hover:brightness-95"
-                  onClick={() => handleRemoveAgreement(city, index)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition hover:border-primary/35 hover:text-primary"
+                  onClick={() => handleClearAgreement(city, index)}
                 >
                   <span className="material-symbols-outlined" aria-hidden="true">
-                    delete
+                    close
                   </span>
-                  <span>Remove Hotel {index + 1}</span>
+                  <span>Clear</span>
                 </button>
-              ) : null}
+
+                {agreements.length > 1 ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-error-container px-3 py-1.5 text-xs font-semibold text-on-error-container transition hover:brightness-95"
+                    onClick={() => handleRemoveAgreement(city, index)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      delete
+                    </span>
+                    <span>Remove Hotel {index + 1}</span>
+                  </button>
+                ) : null}
+              </div>
             </div>
           </details>
         ))}
@@ -647,12 +749,7 @@ export function NewGroupScreen({
               </label>
               <label className={fieldClassName}>
                 <span>Syarikah</span>
-                <input
-                  className={controlClassName}
-                  type="text"
-                  {...register("syarikahName")}
-                  placeholder="Enter syarikah name"
-                />
+                <input className={controlClassName} type="text" {...register("syarikahName")} placeholder="Enter syarikah name" />
               </label>
               <label className={fieldClassName}>
                 <span>Visa Type</span>
@@ -776,13 +873,13 @@ export function NewGroupScreen({
 
           <section className={sectionClassName}>
             <h2 className="mb-4 font-display text-xl font-semibold text-on-surface">Payment</h2>
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface-container-high p-1">
               <button
                 type="button"
                 className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
                   paymentStatus === "Unpaid"
                     ? `${getInvoiceToneClasses(getPaymentStatusTone("Unpaid"))} shadow-sm`
-                    : "border-transparent text-on-surface-variant hover:border-slate-200 hover:bg-surface-container-lowest"
+                    : "border-transparent text-on-surface-variant hover:border-outline-variant/45 hover:bg-surface-container-lowest"
                 }`}
                 onClick={() => setValue("paymentStatus", "Unpaid", { shouldDirty: true })}
               >
@@ -796,7 +893,7 @@ export function NewGroupScreen({
                 className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
                   paymentStatus === "Paid"
                     ? `${getInvoiceToneClasses(getPaymentStatusTone("Paid"))} shadow-sm`
-                    : "border-transparent text-on-surface-variant hover:border-slate-200 hover:bg-surface-container-lowest"
+                    : "border-transparent text-on-surface-variant hover:border-outline-variant/45 hover:bg-surface-container-lowest"
                 }`}
                 onClick={() => setValue("paymentStatus", "Paid", { shouldDirty: true })}
               >
@@ -811,22 +908,24 @@ export function NewGroupScreen({
 
         {itinerarySectionBottom ? <div className="space-y-4">{itinerarySectionBottom}</div> : null}
 
-        <footer className="flex flex-wrap items-center justify-end gap-2">
-          {requireItineraryBeforeSave && !hasItineraryDraft ? (
-            <p className="w-full text-sm font-medium text-amber-700" role="status" aria-live="polite">
-              <span className="sm:hidden">Isi Add Schedule dulu untuk mengaktifkan Save.</span>
-              <span className="hidden sm:inline">
-                Isi itinerary di bagian Add Schedule terlebih dahulu untuk mengaktifkan Save Group.
-              </span>
-            </p>
-          ) : null}
-          <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="serene-btn-primary min-h-11 w-full sm:w-auto" disabled={isSaveDisabled}>
-            Save Group
-          </button>
-        </footer>
+        {!hideFooterActions ? (
+          <footer className="flex flex-wrap items-center justify-end gap-2">
+            {requireItineraryBeforeSave && !hasItineraryDraft ? (
+              <p className="w-full text-sm font-medium text-on-tertiary-fixed-variant" role="status" aria-live="polite">
+                <span className="sm:hidden">Isi Add Schedule dulu untuk mengaktifkan Save.</span>
+                <span className="hidden sm:inline">
+                  Isi itinerary di bagian Add Schedule terlebih dahulu untuk mengaktifkan Save Group.
+                </span>
+              </p>
+            ) : null}
+            <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="serene-btn-primary min-h-11 w-full sm:w-auto" disabled={isSaveDisabled}>
+              Save Group
+            </button>
+          </footer>
+        ) : null}
       </form>
     </div>
   );
@@ -839,11 +938,14 @@ export function AddGroupWorkspaceScreen({
   onSaveGroup: (group: GroupData) => void;
   onCancel: () => void;
 }) {
-  const { theme } = useThemeMode();
-  const isDarkMode = theme === "dark";
-  const itineraryScheduleSectionId = useId();
-  const [isItineraryVisible, setIsItineraryVisible] = useState(true);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [visitedSteps, setVisitedSteps] = useState<Record<1 | 2 | 3, boolean>>({
+    1: true,
+    2: false,
+    3: false,
+  });
   const [identityDraft, setIdentityDraft] = useState<NewGroupItineraryDraft | null>(null);
+  const [setupDraft, setSetupDraft] = useState<NewGroupSetupDraft | null>(null);
   const [itineraryDetailDraft, setItineraryDetailDraft] = useState<NewGroupItineraryDraft | null>(null);
   const [itineraryPrefill, setItineraryPrefill] = useState<ItineraryPrefill | null>(null);
 
@@ -855,65 +957,62 @@ export function AddGroupWorkspaceScreen({
         }
       : null;
 
-  const itineraryIdentitySectionTop = (
-    <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary identity form..." />}>
-      <LazyInputItineraryScreen
-        onSaveGroup={onSaveGroup}
-        hideHeader
-        hideSaveAction
-        sectionMode="identity-only"
-        onItineraryDraftChange={setIdentityDraft}
-      />
-    </Suspense>
+  const isIdentityStepComplete = Boolean(
+    identityDraft?.groupCode?.trim() &&
+      identityDraft?.groupName?.trim() &&
+      identityDraft?.packageName?.trim() &&
+      identityDraft?.startDate &&
+      identityDraft?.endDate &&
+      typeof identityDraft?.pax === "number" &&
+      identityDraft.pax > 0 &&
+      typeof identityDraft?.totalBuses === "number" &&
+      identityDraft.totalBuses > 0 &&
+      identityDraft?.musyrifName?.trim() &&
+      identityDraft?.musyrifPhone?.trim(),
   );
+  const canOpenSetupStep = isIdentityStepComplete;
+  const canOpenItineraryStep = isIdentityStepComplete && Boolean(setupDraft?.canProceed);
+  const isItineraryStepComplete = Boolean(itineraryDetailDraft?.itinerary?.length);
+  const canSaveGroup = canOpenItineraryStep && isItineraryStepComplete && Boolean(setupDraft);
 
-  const itineraryScheduleSectionBottom = (
-    <>
-      <section className="serene-section">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-semibold text-on-surface">Add Schedule</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              <span className="sm:hidden">Lengkapi itinerary setelah Visa.</span>
-              <span className="hidden sm:inline">Lengkapi itinerary setelah Visa Information.</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            className="serene-btn-secondary min-h-10 w-full sm:w-auto"
-            onClick={() => setIsItineraryVisible((current) => !current)}
-            aria-expanded={isItineraryVisible}
-            aria-controls={itineraryScheduleSectionId}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              {isItineraryVisible ? "expand_less" : "expand_more"}
-            </span>
-            <span className="sm:hidden">{isItineraryVisible ? "Hide Form" : "Add Detail"}</span>
-            <span className="hidden sm:inline">
-              {isItineraryVisible ? "Hide Schedule Form" : "Add Schedule Detail"}
-            </span>
-          </button>
-        </div>
-      </section>
+  useEffect(() => {
+    setVisitedSteps((currentVisitedSteps) =>
+      currentVisitedSteps[currentStep] ? currentVisitedSteps : { ...currentVisitedSteps, [currentStep]: true },
+    );
+  }, [currentStep]);
 
-      {isItineraryVisible ? (
-        <div id={itineraryScheduleSectionId}>
-          <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary schedule form..." />}>
-            <LazyInputItineraryScreen
-              onSaveGroup={onSaveGroup}
-              hideHeader
-              hideSaveAction
-              sectionMode="schedule-only"
-              identityDraft={identityDraft}
-              itineraryPrefill={itineraryPrefill}
-              emitIdentityInDraft={false}
-              onItineraryDraftChange={setItineraryDetailDraft}
-            />
-          </Suspense>
-        </div>
-      ) : null}
-    </>
-  );
+  useEffect(() => {
+    if (currentStep === 3 && !canOpenItineraryStep) {
+      setCurrentStep(2);
+      return;
+    }
+
+    if (currentStep === 2 && !canOpenSetupStep) {
+      setCurrentStep(1);
+    }
+  }, [canOpenItineraryStep, canOpenSetupStep, currentStep]);
+
+  const handleSaveWorkspaceGroup = () => {
+    if (!identityDraft || !setupDraft || !canSaveGroup) {
+      return;
+    }
+
+    onSaveGroup(
+      buildNewGroupPayload({
+        resolvedGroupCode: identityDraft.groupCode?.trim().toUpperCase() ?? "",
+        resolvedGroupName: identityDraft.groupName?.trim() ?? "",
+        safePax: setupDraft.safePax,
+        visaStatus: setupDraft.visaStatus,
+        syarikahName: setupDraft.syarikahName,
+        busStatus: setupDraft.busStatus === "Visa+" ? "Visa+" : undefined,
+        paymentStatus: setupDraft.paymentStatus,
+        makkahHotels: setupDraft.makkahHotels,
+        madinahHotels: setupDraft.madinahHotels,
+        raudhahDates: setupDraft.raudhahDates,
+        itineraryDraft,
+      }),
+    );
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
@@ -927,7 +1026,7 @@ export function AddGroupWorkspaceScreen({
             arrow_back
           </span>
           <span className="sm:hidden">Back</span>
-          <span className="hidden sm:inline">Back to Overview</span>
+          <span className="hidden sm:inline">Overview</span>
         </button>
 
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
@@ -935,11 +1034,7 @@ export function AddGroupWorkspaceScreen({
 
       <section className="serene-section p-5 sm:p-6">
         <div>
-          <p
-            className={`text-xs font-extrabold uppercase tracking-[0.16em] ${isDarkMode ? "text-primary/85" : "text-emerald-700/80"}`}
-          >
-            Group Workspace
-          </p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Group Workspace</p>
           <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl lg:text-4xl">
             Add New Group
           </h1>
@@ -950,17 +1045,135 @@ export function AddGroupWorkspaceScreen({
         </div>
       </section>
 
-      <NewGroupScreen
-        onSaveGroup={onSaveGroup}
-        onCancel={onCancel}
-        hideHeader
-        itineraryDraft={itineraryDraft}
-        itinerarySectionTop={itineraryIdentitySectionTop}
-        itinerarySectionBottom={itineraryScheduleSectionBottom}
-        hideGroupInformation
-        requireItineraryBeforeSave
-        onItineraryPrefillChange={setItineraryPrefill}
-      />
+      {visitedSteps[1] || currentStep === 1 ? (
+        <div className={currentStep === 1 ? "space-y-6" : "hidden"} aria-hidden={currentStep !== 1}>
+          <section className="serene-section p-5 sm:p-6">
+            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Step 1 of 3</p>
+            <h2 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface">Group Identity</h2>
+            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
+              Isi identitas group, rentang tanggal, kebutuhan bus, dan PIC musyrif sebelum masuk ke setup visa.
+            </p>
+          </section>
+
+          <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary identity form..." />}>
+            <LazyInputItineraryScreen
+              onSaveGroup={onSaveGroup}
+              hideHeader
+              hideSaveAction
+              sectionMode="identity-only"
+              onItineraryDraftChange={setIdentityDraft}
+            />
+          </Suspense>
+
+          <section className="serene-section">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="serene-btn-primary min-h-11 w-full sm:w-auto"
+                onClick={() => setCurrentStep(2)}
+                disabled={!canOpenSetupStep}
+              >
+                Next: Visa
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {visitedSteps[2] || currentStep === 2 ? (
+        <div className={currentStep === 2 ? "space-y-6" : "hidden"} aria-hidden={currentStep !== 2}>
+          <section className="serene-section p-5 sm:p-6">
+            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Step 2 of 3</p>
+            <h2 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface">
+              Visa & Booking Setup
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
+              Lengkapi visa, hotel agreement, raudhah, dan payment. Jika hotel agreement sudah siap, Anda bisa sync ke itinerary.
+            </p>
+          </section>
+
+          <NewGroupScreen
+            onSaveGroup={onSaveGroup}
+            onCancel={onCancel}
+            hideHeader
+            hideGroupInformation
+            hideFooterActions
+            itineraryDraft={itineraryDraft}
+            onItineraryPrefillChange={setItineraryPrefill}
+            onSetupDraftChange={setSetupDraft}
+          />
+
+          <section className="serene-section">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                className="serene-btn-secondary min-h-11 w-full sm:w-auto"
+                onClick={() => setCurrentStep(1)}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="serene-btn-primary min-h-11 w-full sm:w-auto"
+                onClick={() => setCurrentStep(3)}
+                disabled={!canOpenItineraryStep}
+              >
+                Next: Itinerary
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {visitedSteps[3] || currentStep === 3 ? (
+        <div className={currentStep === 3 ? "space-y-6" : "hidden"} aria-hidden={currentStep !== 3}>
+          <section className="serene-section p-5 sm:p-6">
+            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Step 3 of 3</p>
+            <h2 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface">
+              Itinerary / Add Schedule
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
+              Susun itinerary group. Setelah minimal satu itinerary terisi, group siap disimpan.
+            </p>
+          </section>
+
+          <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary schedule form..." />}>
+            <LazyInputItineraryScreen
+              onSaveGroup={onSaveGroup}
+              hideHeader
+              hideSaveAction
+              sectionMode="schedule-only"
+              identityDraft={identityDraft}
+              itineraryPrefill={itineraryPrefill}
+              emitIdentityInDraft={false}
+              onItineraryDraftChange={setItineraryDetailDraft}
+            />
+          </Suspense>
+
+          <section className="serene-section">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                className="serene-btn-secondary min-h-11 w-full sm:w-auto"
+                onClick={() => setCurrentStep(2)}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="serene-btn-primary min-h-11 w-full sm:w-auto"
+                onClick={handleSaveWorkspaceGroup}
+                disabled={!canSaveGroup}
+              >
+                Save Group
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

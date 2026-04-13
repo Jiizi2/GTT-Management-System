@@ -58,11 +58,15 @@ function ModalPortal({ children }: { children: ReactNode }) {
 }
 
 function shouldUseSaudiCityDropdown(category: string, field: "from" | "to"): boolean {
-  if (field === "from") {
-    return category === "transfer";
+  if (category === "arrival" || category === "transfer") {
+    return true;
   }
 
-  return category === "arrival" || category === "transfer";
+  if (category === "departure" && (field === "from" || field === "to")) {
+    return true;
+  }
+
+  return false;
 }
 
 export function MusyrifModal({
@@ -566,9 +570,8 @@ export function ScheduleModal({
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const showFlightNumberField = isFlightActivityType(form.category);
-  const showPrimaryHotelNameField =
-    form.category === "arrival" || form.category === "transfer" || form.category === "departure";
-  const showTransferHotelFields = isTransferActivityType(form.category);
+  const showPrimaryHotelNameField = form.category === "arrival" || form.category === "departure";
+  const showTransferHotelFields = false;
   const showSingleHotelNameField = showPrimaryHotelNameField && !showTransferHotelFields;
   const showDeparturePickupField = form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
@@ -1039,9 +1042,8 @@ export function EditScheduleModal({
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const showFlightNumberField = isFlightActivityType(form.category);
-  const showPrimaryHotelNameField =
-    form.category === "arrival" || form.category === "transfer" || form.category === "departure";
-  const showTransferHotelFields = isTransferActivityType(form.category);
+  const showPrimaryHotelNameField = form.category === "arrival" || form.category === "departure";
+  const showTransferHotelFields = false;
   const showSingleHotelNameField = showPrimaryHotelNameField && !showTransferHotelFields;
   const showDeparturePickupField = form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;

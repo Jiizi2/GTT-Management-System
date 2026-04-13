@@ -10,6 +10,7 @@ import {
   useUpdateMasterDataOptionMutation,
 } from "../hooks/use-master-data-query";
 import type { MasterDataCategoryKey, MasterDataOption } from "../hooks/use-master-data-backend";
+import { useThemeMode } from "../theme/theme-provider";
 
 type NoticeState = {
   tone: "success" | "error";
@@ -183,11 +184,15 @@ function createFormFromOption(option: MasterDataOption): MasterDataOptionFormVal
   };
 }
 
-function getStatusButtonClassName(isActive: boolean): string {
+function getStatusButtonClassName(isActive: boolean, isDarkMode: boolean): string {
   return `inline-flex min-w-[88px] justify-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition ${
     isActive
-      ? "border-emerald-200 bg-emerald-100/80 text-emerald-700 hover:bg-emerald-100"
-      : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
+      ? isDarkMode
+        ? "border-emerald-400/45 bg-emerald-500/18 text-emerald-100 hover:border-emerald-300/60 hover:bg-emerald-500/24"
+        : "border-emerald-200 bg-emerald-100/90 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100"
+      : isDarkMode
+        ? "border-slate-500/55 bg-slate-700/32 text-slate-100 hover:border-slate-400/70 hover:bg-slate-700/44"
+        : "border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400 hover:bg-slate-200"
   }`;
 }
 
@@ -299,6 +304,8 @@ function MasterDataOptionForm({
 }
 
 export function MasterDataScreen() {
+  const { theme } = useThemeMode();
+  const isDarkMode = theme === "dark";
   const categoriesQuery = useMasterDataCategoriesQuery();
   const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryKey | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -628,7 +635,7 @@ export function MasterDataScreen() {
 
                         <button
                           type="button"
-                          className={`${getStatusButtonClassName(option.isActive)} shrink-0`}
+                          className={`${getStatusButtonClassName(option.isActive, isDarkMode)} shrink-0`}
                           onClick={() => void handleToggleActive(option)}
                           disabled={updateMutation.isPending}
                         >
@@ -695,7 +702,7 @@ export function MasterDataScreen() {
                           <td className="whitespace-nowrap px-4 py-3">
                             <button
                               type="button"
-                              className={getStatusButtonClassName(option.isActive)}
+                              className={getStatusButtonClassName(option.isActive, isDarkMode)}
                               onClick={() => void handleToggleActive(option)}
                               disabled={updateMutation.isPending}
                             >

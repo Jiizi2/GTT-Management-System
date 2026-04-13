@@ -17,6 +17,7 @@ import {
   getMinimumBusCountForPax,
   isIsoDateValue,
   musyrifAvatar,
+  resolveVisaProvider,
   resolveVisaAgreementNumber,
   shiftIsoDate,
 } from "../shared/app-domain.js";
@@ -287,6 +288,14 @@ export function buildNewGroupPayload({
   const normalizedGroupName = resolvedGroupName;
   const normalizedMakkahHotels = normalizeAgreementForms(makkahHotels, "makkah", safePax, normalizedGroupCode);
   const normalizedMadinahHotels = normalizeAgreementForms(madinahHotels, "madinah", safePax, normalizedGroupCode);
+  const itineraryStartIso =
+    itineraryDraft?.startDate?.trim() && isIsoDateValue(itineraryDraft.startDate.trim())
+      ? itineraryDraft.startDate.trim()
+      : null;
+  const itineraryEndIso =
+    itineraryDraft?.endDate?.trim() && isIsoDateValue(itineraryDraft.endDate.trim())
+      ? itineraryDraft.endDate.trim()
+      : null;
 
   const allStartDates = [...normalizedMakkahHotels, ...normalizedMadinahHotels]
     .map((hotel) => hotel.stayStartIso)
@@ -295,8 +304,8 @@ export function buildNewGroupPayload({
     .map((hotel) => hotel.stayEndIso)
     .filter((isoDate) => isIsoDateValue(isoDate));
 
-  const groupStartIso = allStartDates.sort()[0] ?? getLocalIsoDateWithOffset(0);
-  const groupEndIso = allEndDates.sort().at(-1) ?? shiftIsoDate(groupStartIso, 7);
+  const groupStartIso = allStartDates.sort()[0] ?? itineraryStartIso ?? getLocalIsoDateWithOffset(0);
+  const groupEndIso = allEndDates.sort().at(-1) ?? itineraryEndIso ?? shiftIsoDate(groupStartIso, 7);
   const safeGroupEndIso = groupEndIso < groupStartIso ? groupStartIso : groupEndIso;
 
   const firstMakkahHotel = normalizedMakkahHotels[0];
@@ -441,13 +450,13 @@ export function buildNewGroupPayload({
       } => appointment !== null,
     );
 
+  const draftPackageName = itineraryDraft?.packageName?.trim() || "";
+  const resolvedSyarikahName = syarikahName.trim() || resolveVisaProvider(draftPackageName);
   const defaultPrimaryNote = "Itinerary drafted by operator and ready for operations review.";
   const itineraryPrimaryNote = itineraryDraft?.notes?.map((note) => note.trim()).find(Boolean) ?? "";
   const notes = [
     itineraryPrimaryNote || defaultPrimaryNote,
-    syarikahName.trim()
-      ? `Syarikah provider: ${syarikahName.trim()}.`
-      : "Syarikah provider is still pending confirmation.",
+    `Syarikah provider: ${resolvedSyarikahName}.`,
     `Bus status: ${busStatus === "Visa+" ? "Visa+" : "Visa Only"}.`,
   ];
 
@@ -480,7 +489,7 @@ export function buildNewGroupPayload({
     itineraryDraft?.durationDays && itineraryDraft.durationDays > 0 ? itineraryDraft.durationDays : durationDays;
   const mergedNotes = notes;
 
-  const mergedPackageName = itineraryDraft?.packageName?.trim() || syarikahName.trim() || "Custom Group Package";
+  const mergedPackageName = draftPackageName || syarikahName.trim() || "Custom Group Package";
   const mergedTotalBuses =
     itineraryDraft?.totalBuses && itineraryDraft.totalBuses > 0
       ? itineraryDraft.totalBuses
@@ -512,7 +521,7 @@ export function buildNewGroupPayload({
     visaSetup: {
       visaStatus,
       issuedDate,
-      syarikah: syarikahName.trim(),
+      syarikah: resolvedSyarikahName,
       busStatus,
       paymentStatus,
       makkahHotels: normalizedMakkahHotels,

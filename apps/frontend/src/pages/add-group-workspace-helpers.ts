@@ -371,8 +371,7 @@ export function buildInputItineraryValidationState({
   const isGroupReadyForItinerary = isGroupInformationComplete && !hasInvalidDateRange && !isTotalBusBelowMinimum;
 
   const showFlightNumberField = isFlightActivityType(form.category);
-  const showHotelNameField =
-    form.category === "arrival" || form.category === "transfer" || form.category === "departure";
+  const showHotelNameField = form.category === "arrival" || form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
   const showDeparturePickupField = form.category === "departure";
   const showCityTourCityField = isCityTourActivityType(form.category);
@@ -417,7 +416,7 @@ export function shouldUseSaudiCityDropdown(category: string, field: "from" | "to
     return true;
   }
 
-  if (category === "departure" && field === "from") {
+  if (category === "departure" && (field === "from" || field === "to")) {
     return true;
   }
 
@@ -430,8 +429,7 @@ export function isBaseTripDraftInvalid(item: BaseTripDraft): boolean {
   }
 
   const isFlightNumberRequired = isFlightActivityType(item.category) && !item.flightNumber.trim();
-  const isHotelNameRequired =
-    item.category === "arrival" || item.category === "transfer" || item.category === "departure";
+  const isHotelNameRequired = item.category === "arrival" || item.category === "departure";
   const isHotelNameMissing = isHotelNameRequired && !(item.hotelName?.trim() ?? "");
   const isDepartureFlightTimeRequired = item.category === "departure" && !item.time.trim();
   const isDeparturePickupTimeRequired = item.category === "departure" && !item.hotelPickupRequestTime.trim();

@@ -44,19 +44,19 @@ function getVisaStatusClasses(status: VisaTrackingRow["visaStatus"], isDarkMode:
 
   if (status === "Pending") {
     return isDarkMode
-      ? "border-outline-variant/60 bg-surface-container-high text-on-surface-variant"
+      ? "border-secondary/35 bg-secondary/16 text-secondary"
       : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return "border-slate-300 bg-slate-100 text-slate-700";
+  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
-function getVisaTypeClasses(visaType: "Visa+" | "Visa Only"): string {
+function getVisaTypeClasses(visaType: "Visa+" | "Visa Only", isDarkMode: boolean): string {
   if (visaType === "Visa+") {
-    return "border-sky-200 bg-sky-100 text-sky-800";
+    return isDarkMode ? "border-sky-400/35 bg-sky-500/14 text-sky-200" : "border-sky-200 bg-sky-100 text-sky-800";
   }
 
-  return "border-slate-300 bg-slate-100 text-slate-700";
+  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
 function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Only" {
@@ -71,7 +71,7 @@ function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval"
   }
 
   return isDarkMode
-    ? "border-outline-variant/60 bg-surface-container-high text-on-surface-variant"
+    ? "border-secondary/35 bg-secondary/16 text-secondary"
     : "border-amber-200 bg-amber-100 text-amber-800";
 }
 
@@ -84,11 +84,11 @@ function getRaudhahStatusClasses(status: GroupRaudhahStatus, isDarkMode: boolean
 
   if (status === "Before") {
     return isDarkMode
-      ? "border-outline-variant/60 bg-surface-container-high text-on-surface-variant"
+      ? "border-secondary/35 bg-secondary/16 text-secondary"
       : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return "border-slate-300 bg-slate-100 text-slate-700";
+  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
 function toAgreementStatusSelectValue(status: AgreementApprovalStatus): "approved" | "waiting" {
@@ -315,6 +315,18 @@ export function VisaTrackingScreen({
   const summaryIconClassName = isDarkMode
     ? "material-symbols-outlined text-primary"
     : "material-symbols-outlined text-emerald-700";
+  const actionRequiredSummaryCardClassName = isDarkMode
+    ? "flex items-center gap-3 rounded-2xl bg-primary p-4 text-on-primary shadow-ambient"
+    : "flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4";
+  const actionRequiredIconClassName = isDarkMode
+    ? "material-symbols-outlined text-on-primary"
+    : "material-symbols-outlined text-amber-700";
+  const actionRequiredLabelClassName = isDarkMode
+    ? "text-xs font-bold uppercase tracking-[0.14em] text-on-primary/75"
+    : "text-xs font-semibold uppercase tracking-wide text-amber-700";
+  const actionRequiredValueClassName = isDarkMode
+    ? "text-xl font-extrabold text-on-primary"
+    : "text-xl font-bold text-amber-900";
 
   useEffect(() => {
     setCurrentPage(1);
@@ -513,16 +525,16 @@ export function VisaTrackingScreen({
           </div>
         </article>
 
-        <article className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <span className="material-symbols-outlined text-amber-700" aria-hidden="true">
+        <article className={actionRequiredSummaryCardClassName}>
+          <span className={actionRequiredIconClassName} aria-hidden="true">
             warning
           </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            <p className={actionRequiredLabelClassName}>
               <span className="sm:hidden">Need Action</span>
               <span className="hidden sm:inline">Action Required</span>
             </p>
-            <strong className="text-xl font-bold text-amber-900">{actionRequiredCount}</strong>
+            <strong className={actionRequiredValueClassName}>{actionRequiredCount}</strong>
           </div>
         </article>
 
@@ -696,7 +708,10 @@ export function VisaTrackingScreen({
                     <div className="rounded-xl bg-surface-container-lowest p-2">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
                       <span
-                        className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaTypeClasses(visaTypeLabel)}`}
+                        className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaTypeClasses(
+                          visaTypeLabel,
+                          isDarkMode,
+                        )}`}
                       >
                         {visaTypeLabel}
                       </span>
@@ -866,7 +881,10 @@ export function VisaTrackingScreen({
 
                         <div>
                           <span
-                            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaTypeClasses(visaTypeLabel)}`}
+                            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaTypeClasses(
+                              visaTypeLabel,
+                              isDarkMode,
+                            )}`}
                           >
                             {visaTypeLabel}
                           </span>

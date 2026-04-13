@@ -153,8 +153,7 @@ function validateManualSchedule(values: ManualScheduleValidationValues, context:
     });
   }
 
-  const isHotelNameRequired =
-    values.category === "arrival" || values.category === "transfer" || values.category === "departure";
+  const isHotelNameRequired = values.category === "arrival" || values.category === "departure";
   if (isHotelNameRequired && !(values.hotelName?.trim() ?? "")) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
@@ -737,8 +736,7 @@ export function InputItineraryScreen({
 
     const typeOption = getScheduleTypeOption(values.category);
     const nextFlightNumber = showFlightNumberField ? values.flightNumber.trim() : "";
-    const isHotelNameRequired =
-      values.category === "arrival" || values.category === "transfer" || values.category === "departure";
+    const isHotelNameRequired = values.category === "arrival" || values.category === "departure";
     const nextHotelName = isHotelNameRequired ? values.hotelName?.trim() || resolveSuggestedHotelName(values) : "";
     const nextHotelPickupRequestTime = values.category === "departure" ? values.hotelPickupRequestTime.trim() : "";
     const isTransferByTrain = isTransferActivityType(values.category) && values.transferByTrain;
@@ -789,8 +787,7 @@ export function InputItineraryScreen({
       const typeOption = getScheduleTypeOption(item.category);
       const isTransferByTrain = isTransferActivityType(item.category) && item.transferByTrain;
       const scheduleTime = isTransferByTrain ? item.trainDepartureTime : item.time;
-      const isHotelNameRequired =
-        item.category === "arrival" || item.category === "transfer" || item.category === "departure";
+      const isHotelNameRequired = item.category === "arrival" || item.category === "departure";
       const nextHotelName = isHotelNameRequired ? item.hotelName?.trim() || resolveSuggestedHotelName(item) : "";
       const hotelPickupRequestTime = item.category === "departure" ? item.hotelPickupRequestTime.trim() : "";
 
@@ -985,47 +982,80 @@ export function InputItineraryScreen({
     "md:col-span-2 inline-flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-medium text-on-surface-variant";
   const transferTrainCardClassName = "md:col-span-2 rounded-2xl bg-surface-container-high p-3";
   const transferTrainGridClassName = "mt-2 grid gap-3 md:grid-cols-2";
+  const neutralItinerarySectionClass = "border-outline-variant/45 bg-surface-container-high/70";
+  const activityTypeAccentLineClassMap: Record<string, string> = {
+    arrival: "bg-primary/80",
+    transfer: "bg-secondary/80",
+    "city-tour": "bg-tertiary-fixed/90",
+    departure: "bg-error-container/90",
+  };
+  const activityTypeIconClassMap: Record<string, string> = {
+    arrival: "bg-primary-fixed/75 text-primary",
+    transfer: "bg-secondary/18 text-secondary",
+    "city-tour": "bg-tertiary-fixed/18 text-on-tertiary-fixed-variant",
+    departure: "bg-error-container/18 text-on-error-container",
+  };
+  const activityTypeTextToneClassMap: Record<string, string> = {
+    arrival: "text-primary",
+    transfer: "text-secondary",
+    "city-tour": "text-on-tertiary-fixed-variant",
+    departure: "text-on-error-container",
+  };
   const itineraryTagClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    transfer: "border-slate-200 bg-slate-50 text-slate-700",
-    "city-tour": "border-amber-200 bg-amber-50 text-amber-700",
-    departure: "border-rose-200 bg-rose-50 text-rose-700",
+    arrival: "border-primary/35 bg-primary-fixed/12 text-primary",
+    transfer: "border-secondary/35 bg-secondary/12 text-secondary",
+    "city-tour": "border-tertiary-fixed/45 bg-tertiary-fixed/12 text-on-tertiary-fixed-variant",
+    departure: "border-error-container/45 bg-error-container/12 text-on-error-container",
   };
   const itineraryCardClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-50/60",
-    transfer: "border-slate-200 bg-slate-50/70",
-    "city-tour": "border-amber-200 bg-amber-50/60",
-    departure: "border-rose-200 bg-rose-50/60",
+    arrival: neutralItinerarySectionClass,
+    transfer: neutralItinerarySectionClass,
+    "city-tour": neutralItinerarySectionClass,
+    departure: neutralItinerarySectionClass,
   };
   const activityTypeCardClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-50/60",
-    transfer: "border-slate-200 bg-slate-50/70",
-    "city-tour": "border-amber-200 bg-amber-50/60",
-    departure: "border-rose-200 bg-rose-50/60",
+    arrival: neutralItinerarySectionClass,
+    transfer: neutralItinerarySectionClass,
+    "city-tour": neutralItinerarySectionClass,
+    departure: neutralItinerarySectionClass,
   };
   const activityTypeBannerClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    transfer: "border-slate-200 bg-slate-50 text-slate-700",
-    "city-tour": "border-amber-200 bg-amber-50 text-amber-700",
-    departure: "border-rose-200 bg-rose-50 text-rose-700",
+    arrival: "border-primary/35 bg-primary-fixed/12 text-primary",
+    transfer: "border-secondary/35 bg-secondary/12 text-secondary",
+    "city-tour": "border-tertiary-fixed/45 bg-tertiary-fixed/12 text-on-tertiary-fixed-variant",
+    departure: "border-error-container/45 bg-error-container/12 text-on-error-container",
   };
   const activityTypeTitleClassMap: Record<string, string> = {
-    arrival: "text-emerald-700",
-    transfer: "text-slate-700",
-    "city-tour": "text-amber-700",
-    departure: "text-rose-700",
+    arrival: "text-on-surface",
+    transfer: "text-on-surface",
+    "city-tour": "text-on-surface",
+    departure: "text-on-surface",
   };
   const activityTypeBadgeClassMap: Record<string, string> = {
-    arrival: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    transfer: "border-slate-200 bg-slate-50 text-slate-700",
-    "city-tour": "border-amber-200 bg-amber-50 text-amber-700",
-    departure: "border-rose-200 bg-rose-50 text-rose-700",
+    arrival: "border-primary/30 bg-surface-container-lowest text-primary",
+    transfer: "border-secondary/35 bg-surface-container-lowest text-secondary",
+    "city-tour": "border-tertiary-fixed/40 bg-surface-container-lowest text-on-tertiary-fixed-variant",
+    departure: "border-error-container/40 bg-surface-container-lowest text-on-error-container",
+  };
+  const activityTypeOptionClassMap: Record<string, string> = {
+    arrival: "border-primary/30 bg-surface-container-lowest text-primary hover:border-primary/45 hover:bg-primary-fixed/12",
+    transfer: "border-secondary/35 bg-surface-container-lowest text-secondary hover:border-secondary/55 hover:bg-secondary/12",
+    "city-tour":
+      "border-tertiary-fixed/40 bg-surface-container-lowest text-on-tertiary-fixed-variant hover:border-tertiary-fixed/65 hover:bg-tertiary-fixed/12",
+    departure:
+      "border-error-container/40 bg-surface-container-lowest text-on-error-container hover:border-error-container/65 hover:bg-error-container/12",
   };
   const activityTypeActiveStepClassMap: Record<string, string> = {
-    arrival: "border-emerald-300 bg-emerald-100 text-emerald-800",
-    transfer: "border-slate-300 bg-slate-100 text-slate-800",
-    "city-tour": "border-amber-300 bg-amber-100 text-amber-800",
-    departure: "border-rose-300 bg-rose-100 text-rose-800",
+    arrival: "border-primary/45 bg-surface-container-lowest text-on-surface",
+    transfer: "border-secondary/45 bg-surface-container-lowest text-on-surface",
+    "city-tour": "border-tertiary-fixed/60 bg-surface-container-lowest text-on-surface",
+    departure: "border-error-container/60 bg-surface-container-lowest text-on-surface",
+  };
+  const activityTypeCompletedStepClassMap: Record<string, string> = {
+    arrival: "border-primary/35 bg-surface-container-lowest text-on-surface",
+    transfer: "border-secondary/35 bg-surface-container-lowest text-on-surface",
+    "city-tour": "border-tertiary-fixed/45 bg-surface-container-lowest text-on-surface",
+    departure: "border-error-container/45 bg-surface-container-lowest text-on-surface",
   };
   const activityTypeFocusLabelMap: Record<string, string> = {
     arrival: "Start Trip - Arrival (Paling Penting)",
@@ -1033,6 +1063,24 @@ export function InputItineraryScreen({
     "city-tour": "Activity Focus - City Tour",
     departure: "End Trip - Departure",
   };
+  const manualScheduleFieldClassName = `${fieldClassName} rounded-2xl border p-3 shadow-sm ${
+    activityTypeCardClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-lowest"
+  }`;
+  const manualScheduleWideFieldClassName = `${wideFieldClassName} rounded-2xl border p-3 shadow-sm ${
+    activityTypeCardClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-lowest"
+  }`;
+  const manualScheduleInfoClassName = `md:col-span-2 flex items-start gap-2 rounded-2xl border p-3 text-sm ${
+    activityTypeBannerClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-high text-on-surface"
+  }`;
+  const manualScheduleCheckClassName = `md:col-span-2 inline-flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-medium ${
+    activityTypeBannerClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-high text-on-surface"
+  }`;
+  const manualScheduleRouteHintClassName = `md:col-span-2 rounded-2xl border px-3 py-2 text-xs font-medium leading-relaxed ${
+    activityTypeCardClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-lowest"
+  } text-on-surface-variant`;
+  const manualScheduleTransferTrainCardClassName = `md:col-span-2 rounded-2xl border p-3 ${
+    activityTypeCardClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-high"
+  }`;
 
   const containerClassName = hideHeader ? "space-y-6" : "mx-auto max-w-7xl space-y-6";
 
@@ -1042,11 +1090,11 @@ export function InputItineraryScreen({
         {!hideHeader ? (
           <section className="serene-section p-6">
             <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700/80">Operations Form</p>
-              <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Operations Form</p>
+              <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl lg:text-4xl">
                 Input Itinerary
               </h1>
-              <p className="mt-2 text-sm text-slate-600 sm:text-base">
+              <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
                 <span className="sm:hidden">Fill group info and travel plan.</span>
                 <span className="hidden sm:inline">
                   Fill in group information and travel plan for operational execution.
@@ -1060,7 +1108,7 @@ export function InputItineraryScreen({
           <>
             <section className="serene-section">
               <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-xl font-semibold text-slate-900">Group Information</h2>
+                <h2 className="text-xl font-semibold text-on-surface">Group Information</h2>
               </div>
 
               <div className={gridClassName}>
@@ -1201,7 +1249,7 @@ export function InputItineraryScreen({
 
             <section className="serene-section">
               <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-xl font-semibold text-slate-900">Musyrif Information</h2>
+                <h2 className="text-xl font-semibold text-on-surface">Musyrif Information</h2>
               </div>
 
               <div className={gridClassName}>
@@ -1236,16 +1284,16 @@ export function InputItineraryScreen({
         ) : null}
 
         {!isIdentityOnlyMode && !isGroupReadyForItinerary ? (
-          <section className="flex items-start gap-3 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <section className="flex items-start gap-3 rounded-3xl border border-tertiary-fixed/70 bg-tertiary-fixed/70 p-4 text-on-tertiary-fixed-variant">
             <div
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-800"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container-lowest text-on-tertiary-fixed-variant"
               aria-hidden="true"
             >
               <span className="material-symbols-outlined">assignment_turned_in</span>
             </div>
             <div>
               <h3 className="text-base font-semibold">Complete Group Information First</h3>
-              <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
+              <p className="mt-1 text-sm leading-relaxed text-on-tertiary-fixed-variant/90">
                 <span className="sm:hidden">Complete group info before adding itinerary.</span>
                 <span className="hidden sm:inline">
                   Please fill in Group Number, Group Name, Package Type, Pax, Total Bus, date range, and Musyrif
@@ -1260,8 +1308,8 @@ export function InputItineraryScreen({
           <>
             <section className="serene-section">
               <div className="mb-4 flex items-center gap-3">
-                <h2 className="text-xl font-semibold text-slate-900">Itinerary</h2>
-                <div className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+                <h2 className="text-xl font-semibold text-on-surface">Itinerary</h2>
+                <div className="h-px flex-1 bg-outline-variant/35" aria-hidden="true" />
               </div>
 
               <div className="space-y-3">
@@ -1283,31 +1331,39 @@ export function InputItineraryScreen({
                       <div key={item.id} className="grid grid-cols-[44px_1fr] gap-3">
                         <div className="flex flex-col items-center pt-0.5">
                           <span
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary text-brand-neutral"
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${
+                              activityTypeIconClassMap[item.categoryKey] ?? "bg-primary-fixed text-primary"
+                            }`}
                             aria-hidden="true"
                           >
                             <span className="material-symbols-outlined text-base">{item.icon}</span>
                           </span>
                           {index < itineraryItems.length - 1 ? (
-                            <span className="mt-2 h-full min-h-[54px] w-px bg-slate-200" aria-hidden="true" />
+                            <span className="mt-2 h-full min-h-[54px] w-px bg-outline-variant/35" aria-hidden="true" />
                           ) : null}
                         </div>
 
                         <article
-                          className={`rounded-2xl border p-4 shadow-sm ${
-                            itineraryCardClassMap[item.categoryKey] ?? "border-slate-200 bg-surface-container-lowest"
+                          className={`relative overflow-hidden rounded-2xl border p-4 shadow-sm ${
+                            itineraryCardClassMap[item.categoryKey] ?? "border-outline-variant/45 bg-surface-container-lowest"
                           }`}
                         >
+                          <span
+                            className={`absolute inset-x-0 top-0 h-0.5 ${
+                              activityTypeAccentLineClassMap[item.categoryKey] ?? "bg-primary/80"
+                            }`}
+                            aria-hidden="true"
+                          />
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <h3 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                              <h3 className="text-xl font-bold tracking-tight text-on-surface sm:text-2xl">
                                 {displayDate.date} {displayDate.year}
                               </h3>
                               <div className="mt-1 flex flex-wrap items-center gap-2">
                                 <span
                                   className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
                                     itineraryTagClassMap[item.categoryKey] ??
-                                    "border-slate-200 bg-slate-50 text-slate-700"
+                                    "border-outline-variant/45 bg-surface-container-high text-on-surface"
                                   }`}
                                 >
                                   <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -1315,15 +1371,15 @@ export function InputItineraryScreen({
                                   </span>
                                   {item.category}
                                 </span>
-                                <p className="text-sm font-semibold text-slate-700">{routeSummary}</p>
+                                <p className="text-sm font-semibold text-on-surface">{routeSummary}</p>
                               </div>
-                              <p className="mt-2 text-sm italic text-slate-600">{item.notes || fallbackMetaLine}</p>
+                              <p className="mt-2 text-sm italic text-on-surface-variant">{item.notes || fallbackMetaLine}</p>
                             </div>
 
                             <div className="flex shrink-0 items-center gap-1">
                               <button
                                 type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-brand-primary/10 hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-45"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-primary-fixed hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
                                 aria-label={`Edit ${item.category} itinerary`}
                                 onClick={() => handleEditItem(item)}
                                 disabled={!isGroupReadyForItinerary}
@@ -1335,7 +1391,7 @@ export function InputItineraryScreen({
 
                               <button
                                 type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary disabled:cursor-not-allowed disabled:opacity-45"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-error-container/75 hover:text-on-error-container disabled:cursor-not-allowed disabled:opacity-45"
                                 aria-label={`Delete ${item.category} itinerary`}
                                 onClick={() => handleDeleteItem(item.id)}
                                 disabled={!isGroupReadyForItinerary}
@@ -1352,15 +1408,15 @@ export function InputItineraryScreen({
                   })
                 ) : isBaseTripFormVisible ? (
                   <div className="space-y-4">
-                    <div className="flex items-start gap-3 rounded-xl bg-slate-50 px-3 py-3">
-                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <div className="flex items-start gap-3 rounded-xl bg-surface-container-high px-3 py-3">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
                         <span className="material-symbols-outlined" aria-hidden="true">
                           route
                         </span>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-900">Structured 5 Base Trips</h3>
-                        <p className="mt-1 text-sm text-slate-600">
+                        <h3 className="text-lg font-semibold text-on-surface">Structured 5 Base Trips</h3>
+                        <p className="mt-1 text-sm text-on-surface-variant">
                           <span className="sm:hidden">Isi trip step 1-5. Yang tidak dipakai bisa di-skip.</span>
                           <span className="hidden sm:inline">
                             Isi trip secara bertahap dari step 1 sampai 5. Trip yang tidak dipakai bisa di-skip.
@@ -1370,16 +1426,16 @@ export function InputItineraryScreen({
                     </div>
 
                     <div className="space-y-4">
-                      <div className="rounded-xl bg-slate-50 p-3">
+                      <div className="rounded-xl bg-surface-container-high p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-800">
+                          <p className="text-sm font-semibold text-on-surface">
                             Step {currentBaseTripStepIndex + 1} of {baseTripDrafts.length || 5}
                           </p>
                           {activeBaseTrip ? (
                             <span
                               className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
                                 activityTypeBadgeClassMap[activeBaseTrip.category] ??
-                                "border-slate-300 bg-slate-50 text-slate-700"
+                                "border-outline-variant/45 bg-surface-container-lowest text-on-surface"
                               }`}
                             >
                               <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -1392,7 +1448,7 @@ export function InputItineraryScreen({
                           ) : null}
                         </div>
 
-                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant">
                           Activity type per trip
                         </p>
 
@@ -1403,10 +1459,13 @@ export function InputItineraryScreen({
                             const isCompletedStep = !isBaseTripDraftInvalid(trip);
                             const stepToneClass =
                               activityTypeBadgeClassMap[trip.category] ??
-                              "border-slate-300 bg-surface-container-lowest text-slate-600";
+                              "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant";
                             const activeStepToneClass =
                               activityTypeActiveStepClassMap[trip.category] ??
-                              "border-brand-primary/40 bg-brand-primary/10 text-brand-primary";
+                              "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant";
+                            const completedStepToneClass =
+                              activityTypeCompletedStepClassMap[trip.category] ??
+                              "border-primary/35 bg-surface-container-lowest text-primary";
                             const tripTypeLabel = `${getScheduleTypeOption(trip.category).cardLabel}${
                               trip.category === "city-tour" ? ` ${index === 1 ? "1" : "2"}` : ""
                             }`;
@@ -1415,24 +1474,39 @@ export function InputItineraryScreen({
                               <button
                                 key={trip.id}
                                 type="button"
-                                className={`inline-flex min-h-12 items-center justify-start gap-2 rounded-xl border-2 px-3 text-left text-sm font-semibold transition ${
+                                className={`relative inline-flex min-h-12 items-center justify-start gap-2 overflow-hidden rounded-xl border-2 px-3 text-left text-sm font-semibold transition ${
                                   isCurrentStep
                                     ? activeStepToneClass
                                     : isDisabledStep
-                                      ? "border-slate-200 bg-slate-100 text-slate-400"
+                                      ? "border-outline-variant/25 bg-surface-container-low text-on-surface-variant/45"
                                       : isCompletedStep
-                                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                                        : `${stepToneClass} hover:border-brand-primary hover:text-brand-primary`
+                                        ? completedStepToneClass
+                                        : `${stepToneClass} hover:border-primary/45 hover:text-primary`
                                 }`}
                                 onClick={() => handleJumpToBaseTripStep(index)}
                                 disabled={!isGroupReadyForItinerary}
                                 aria-label={`Go to step ${index + 1}`}
                               >
-                                <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-surface-container-lowest px-2 text-xs font-bold text-brand-primary shadow-sm">
+                                <span
+                                  className={`absolute inset-x-0 top-0 h-0.5 ${
+                                    activityTypeAccentLineClassMap[trip.category] ?? "bg-primary/80"
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                                <span
+                                  className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-bold shadow-sm ${
+                                    activityTypeIconClassMap[trip.category] ?? "bg-primary-fixed text-primary"
+                                  }`}
+                                >
                                   {index + 1}
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                                  <span
+                                    className={`material-symbols-outlined text-base ${
+                                      activityTypeTextToneClassMap[trip.category] ?? "text-primary"
+                                    }`}
+                                    aria-hidden="true"
+                                  >
                                     {getScheduleTypeOption(trip.category).icon}
                                   </span>
                                   <span className="text-xs sm:text-sm">{tripTypeLabel}</span>
@@ -1445,16 +1519,15 @@ export function InputItineraryScreen({
 
                       {(activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
                         const showFlightNumberInput = isFlightActivityType(item.category);
-                        const showHotelNameInput =
-                          item.category === "arrival" || item.category === "transfer" || item.category === "departure";
+                        const showHotelNameInput = item.category === "arrival" || item.category === "departure";
                         const showDeparturePickupRequestInput = item.category === "departure";
                         const showTransferTrainInputs = isTransferActivityType(item.category) && item.transferByTrain;
                         const showCityTourCityInput = isCityTourActivityType(item.category);
                         const activityCardToneClass =
-                          activityTypeCardClassMap[item.category] ?? "border-slate-200 bg-surface-container-lowest";
+                          activityTypeCardClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-lowest";
                         const activityBannerToneClass =
-                          activityTypeBannerClassMap[item.category] ?? "border-slate-200 bg-slate-50 text-slate-700";
-                        const activityTitleToneClass = activityTypeTitleClassMap[item.category] ?? "text-slate-900";
+                          activityTypeBannerClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-high text-on-surface";
+                        const activityTitleToneClass = activityTypeTitleClassMap[item.category] ?? "text-on-surface";
                         const activityFocusLabel =
                           activityTypeFocusLabelMap[item.category] ??
                           `Activity Focus - ${getScheduleTypeOption(item.category).cardLabel}`;
@@ -1464,8 +1537,14 @@ export function InputItineraryScreen({
                         return (
                           <article
                             key={item.id}
-                            className={`rounded-2xl border-2 p-4 shadow-sm ${activityCardToneClass}`}
+                            className={`relative overflow-hidden rounded-2xl border-2 p-4 shadow-sm ${activityCardToneClass}`}
                           >
+                            <span
+                              className={`absolute inset-x-0 top-0 h-0.5 ${
+                                activityTypeAccentLineClassMap[item.category] ?? "bg-primary/80"
+                              }`}
+                              aria-hidden="true"
+                            />
                             <div
                               className={`mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${activityBannerToneClass}`}
                             >
@@ -1478,23 +1557,28 @@ export function InputItineraryScreen({
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div>
                                 <h4 className={`text-base font-semibold ${activityTitleToneClass}`}>{item.title}</h4>
-                                <p className="text-xs text-slate-600">{item.description}</p>
+                                <p className="text-xs text-on-surface-variant">{item.description}</p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span
                                   className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
                                     activityTypeBadgeClassMap[item.category] ??
-                                    "border-slate-300 bg-slate-50 text-slate-700"
+                                    "border-outline-variant/45 bg-surface-container-high text-on-surface"
                                   }`}
                                 >
-                                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                                  <span
+                                    className={`material-symbols-outlined text-base ${
+                                      activityTypeTextToneClassMap[item.category] ?? "text-primary"
+                                    }`}
+                                    aria-hidden="true"
+                                  >
                                     {getScheduleTypeOption(item.category).icon}
                                   </span>
                                   {getScheduleTypeOption(item.category).cardLabel}
                                 </span>
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant/45 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-on-surface">
                                   <input
-                                    className="h-3.5 w-3.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary/25"
+                                    className="h-3.5 w-3.5 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
                                     type="checkbox"
                                     checked={item.isEnabled}
                                     onChange={(event) =>
@@ -1594,7 +1678,7 @@ export function InputItineraryScreen({
                                   <span>City Tour City</span>
                                   <div className="relative">
                                     <span
-                                      className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                                      className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
                                       aria-hidden="true"
                                     >
                                       location_city
@@ -1636,7 +1720,7 @@ export function InputItineraryScreen({
 
                                   <label className={checkClassName}>
                                     <input
-                                      className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                                      className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
                                       type="checkbox"
                                       checked={item.transferByTrain}
                                       onChange={(event) =>
@@ -1660,7 +1744,7 @@ export function InputItineraryScreen({
                                 {shouldUseSaudiCityDropdown(item.category, "from") ? (
                                   <div className="relative">
                                     <span
-                                      className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                                      className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
                                       aria-hidden="true"
                                     >
                                       location_city
@@ -1700,7 +1784,7 @@ export function InputItineraryScreen({
                                 {shouldUseSaudiCityDropdown(item.category, "to") ? (
                                   <div className="relative">
                                     <span
-                                      className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                                      className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
                                       aria-hidden="true"
                                     >
                                       location_city
@@ -1794,7 +1878,7 @@ export function InputItineraryScreen({
 
                               <label className={checkClassName}>
                                 <input
-                                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                                  className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
                                   type="checkbox"
                                   checked={showTransferTrainInputs ? true : item.requiresBus}
                                   onChange={(event) =>
@@ -1823,7 +1907,7 @@ export function InputItineraryScreen({
                             </div>
 
                             {!item.isEnabled ? (
-                              <p className="mt-3 text-xs font-medium text-slate-500">
+                              <p className="mt-3 text-xs font-medium text-on-surface-variant">
                                 Trip ini di-skip dan tidak akan masuk ke itinerary.
                               </p>
                             ) : null}
@@ -1832,10 +1916,10 @@ export function InputItineraryScreen({
                       })}
                     </div>
 
-                    <div className="space-y-2 rounded-xl bg-slate-50 px-3 py-3">
+                    <div className="space-y-2 rounded-xl bg-surface-container-high px-3 py-3">
                       <p
                         className={`text-xs font-medium ${
-                          isActiveBaseTripInvalid ? "text-amber-700" : "text-emerald-700"
+                          isActiveBaseTripInvalid ? "text-on-tertiary-fixed-variant" : "text-primary"
                         }`}
                       >
                         {enabledBaseTripCount === 0
@@ -1858,7 +1942,7 @@ export function InputItineraryScreen({
 
                           <button
                             type="button"
-                            className="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-4 py-2 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+                            className="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-primary/35 bg-primary-fixed px-4 py-2 text-sm font-semibold text-on-primary-fixed-variant transition hover:bg-primary-fixed/80 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
                             onClick={() => handleBaseTripStepChange("next")}
                             disabled={!isGroupReadyForItinerary || isLastBaseTripStep}
                           >
@@ -1866,7 +1950,7 @@ export function InputItineraryScreen({
                           </button>
                         </div>
 
-                        <div className="grid w-full grid-cols-1 gap-2 border-t border-slate-200 pt-3 sm:flex sm:w-auto sm:items-center sm:border-0 sm:pt-0">
+                        <div className="grid w-full grid-cols-1 gap-2 border-t border-outline-variant/35 pt-3 sm:flex sm:w-auto sm:items-center sm:border-0 sm:pt-0">
                           <button
                             type="button"
                             className="serene-btn-primary min-h-10 w-full sm:w-auto"
@@ -1889,12 +1973,12 @@ export function InputItineraryScreen({
                     </div>
                   </div>
                 ) : (
-                  <article className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-7 text-center">
+                  <article className="rounded-2xl border border-dashed border-outline-variant/45 bg-surface-container-high px-4 py-7 text-center">
                     <span className="material-symbols-outlined" aria-hidden="true">
                       search_off
                     </span>
-                    <h2 className="mt-2 text-lg font-semibold text-slate-900">No itinerary found</h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <h2 className="mt-2 text-lg font-semibold text-on-surface">No itinerary found</h2>
+                    <p className="mt-1 text-sm text-on-surface-variant">
                       <span className="sm:hidden">Add schedule below to start itinerary.</span>
                       <span className="hidden sm:inline">
                         Add a new schedule below to start building this itinerary.
@@ -1948,18 +2032,18 @@ export function InputItineraryScreen({
                       aria-label={editingItemId ? "Edit schedule details" : "Add schedule details"}
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
+                      <div className="flex items-start justify-between gap-3 border-b border-outline-variant/35 px-4 py-4 sm:px-5">
                         <div className="flex items-start gap-3">
-                          <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                          <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
                             <span className="material-symbols-outlined" aria-hidden="true">
                               event_note
                             </span>
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-slate-900">
+                            <h3 className="text-lg font-semibold text-on-surface">
                               {editingItemId ? "Edit Schedule Details" : "Schedule Details"}
                             </h3>
-                            <p className="mt-1 text-sm text-slate-600">
+                            <p className="mt-1 text-sm text-on-surface-variant">
                               <span className="sm:hidden">Set timeline details.</span>
                               <span className="hidden sm:inline">Set timeline details for this group itinerary.</span>
                             </p>
@@ -1982,17 +2066,19 @@ export function InputItineraryScreen({
                         <div className={gridClassName}>
                           <input type="hidden" {...registerSchedule("category")} />
                           <input type="hidden" {...registerSchedule("fromHotelName")} />
-                          <div className={wideFieldClassName}>
+                          <div className={manualScheduleWideFieldClassName}>
                             <span>Activity Type</span>
                             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                               {scheduleTypeOptions.map((option) => (
                                 <button
                                   key={option.value}
                                   type="button"
-                                  className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                                  className={`relative inline-flex min-h-11 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                                     form.category === option.value
-                                      ? "border-primary bg-emerald-50 text-primary"
-                                      : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                                      ? activityTypeActiveStepClassMap[option.value] ??
+                                        "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant"
+                                      : activityTypeOptionClassMap[option.value] ??
+                                        "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-high hover:text-on-surface"
                                   }`}
                                   onClick={() => {
                                     const current = getScheduleValues();
@@ -2022,7 +2108,18 @@ export function InputItineraryScreen({
                                   }}
                                   disabled={!isGroupReadyForItinerary}
                                 >
-                                  <span className="material-symbols-outlined" aria-hidden="true">
+                                  <span
+                                    className={`absolute inset-x-0 top-0 h-0.5 ${
+                                      activityTypeAccentLineClassMap[option.value] ?? "bg-primary/80"
+                                    }`}
+                                    aria-hidden="true"
+                                  />
+                                  <span
+                                    className={`material-symbols-outlined ${
+                                      activityTypeTextToneClassMap[option.value] ?? "text-primary"
+                                    }`}
+                                    aria-hidden="true"
+                                  >
                                     {option.icon}
                                   </span>
                                   <span>{option.modalLabel}</span>
@@ -2031,7 +2128,7 @@ export function InputItineraryScreen({
                             </div>
                           </div>
 
-                          <label className={fieldClassName}>
+                          <label className={manualScheduleFieldClassName}>
                             <span>Date</span>
                             <Controller
                               name="date"
@@ -2051,7 +2148,7 @@ export function InputItineraryScreen({
                           </label>
 
                           {!showTransferTrainFields ? (
-                            <label className={fieldClassName}>
+                            <label className={manualScheduleFieldClassName}>
                               <span>{form.category === "departure" ? "Flight Return Time" : "Time (Optional)"}</span>
                               <Controller
                                 name="time"
@@ -2072,7 +2169,7 @@ export function InputItineraryScreen({
                           ) : null}
 
                           {showFlightNumberField ? (
-                            <label className={wideFieldClassName}>
+                            <label className={manualScheduleWideFieldClassName}>
                               <span>Flight Number</span>
                               <Controller
                                 name="flightNumber"
@@ -2097,7 +2194,7 @@ export function InputItineraryScreen({
                           ) : null}
 
                           {showHotelNameField ? (
-                            <label className={wideFieldClassName}>
+                            <label className={manualScheduleWideFieldClassName}>
                               <span>Hotel Name</span>
                               <Controller
                                 name="hotelName"
@@ -2120,11 +2217,11 @@ export function InputItineraryScreen({
                           ) : null}
 
                           {showCityTourCityField ? (
-                            <label className={wideFieldClassName}>
+                            <label className={manualScheduleWideFieldClassName}>
                               <span>City Tour City</span>
                               <div className="relative">
                                 <span
-                                  className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                                  className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
                                   aria-hidden="true"
                                 >
                                   location_city
@@ -2149,7 +2246,9 @@ export function InputItineraryScreen({
                                   )}
                                 />
                               </div>
-                              <p className="text-xs text-slate-600">Select the city where the city tour takes place.</p>
+                              <p className="text-xs text-on-surface-variant">
+                                Select the city where the city tour takes place.
+                              </p>
                               {scheduleErrors.cityTourCity ? (
                                 <p className="text-xs font-semibold text-error">
                                   {scheduleErrors.cityTourCity.message}
@@ -2159,7 +2258,7 @@ export function InputItineraryScreen({
                           ) : null}
 
                           {showDeparturePickupField ? (
-                            <label className={wideFieldClassName}>
+                            <label className={manualScheduleWideFieldClassName}>
                               <span>Hotel Pickup Request Time</span>
                               <Controller
                                 name="hotelPickupRequestTime"
@@ -2192,7 +2291,7 @@ export function InputItineraryScreen({
 
                           {isTransferActivityType(form.category) ? (
                             <>
-                              <div className={infoClassName}>
+                              <div className={manualScheduleInfoClassName}>
                                 <span className="material-symbols-outlined" aria-hidden="true">
                                   info
                                 </span>
@@ -2202,13 +2301,13 @@ export function InputItineraryScreen({
                                 </p>
                               </div>
 
-                              <label className={checkClassName}>
+                              <label className={manualScheduleCheckClassName}>
                                 <Controller
                                   name="transferByTrain"
                                   control={scheduleControl}
                                   render={({ field }) => (
                                     <input
-                                      className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                                      className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
                                       type="checkbox"
                                       checked={field.value}
                                       onChange={(event) => {
@@ -2232,12 +2331,12 @@ export function InputItineraryScreen({
                             </>
                           ) : null}
 
-                          <label className={fieldClassName}>
+                          <label className={manualScheduleFieldClassName}>
                             <span>{routeFieldConfig.fromLabel}</span>
                             {shouldUseSaudiCityDropdown(form.category, "from") ? (
                               <div className="relative">
                                 <span
-                                  className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                                  className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
                                   aria-hidden="true"
                                 >
                                   location_city
@@ -2283,12 +2382,12 @@ export function InputItineraryScreen({
                             ) : null}
                           </label>
 
-                          <label className={fieldClassName}>
+                          <label className={manualScheduleFieldClassName}>
                             <span>{routeFieldConfig.toLabel}</span>
                             {shouldUseSaudiCityDropdown(form.category, "to") ? (
                               <div className="relative">
                                 <span
-                                  className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                                  className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
                                   aria-hidden="true"
                                 >
                                   location_city
@@ -2335,17 +2434,17 @@ export function InputItineraryScreen({
                           </label>
 
                           {routeFieldConfig.helperText ? (
-                            <p className={routeHintClassName}>{routeFieldConfig.helperText}</p>
+                            <p className={manualScheduleRouteHintClassName}>{routeFieldConfig.helperText}</p>
                           ) : null}
 
                           {showTransferTrainFields ? (
-                            <div className={transferTrainCardClassName}>
-                              <p className="text-sm font-semibold text-primary">
+                            <div className={manualScheduleTransferTrainCardClassName}>
+                              <p className={`text-sm font-semibold ${activityTypeTitleClassMap[form.category] ?? "text-primary"}`}>
                                 High-speed train transfer operational details
                               </p>
 
                               <div className={transferTrainGridClassName}>
-                                <label className={fieldClassName}>
+                                <label className={manualScheduleFieldClassName}>
                                   <span>Train Departure Time</span>
                                   <Controller
                                     name="trainDepartureTime"
@@ -2366,7 +2465,7 @@ export function InputItineraryScreen({
                                   ) : null}
                                 </label>
 
-                                <label className={fieldClassName}>
+                                <label className={manualScheduleFieldClassName}>
                                   <span>Destination Station Pickup Time</span>
                                   <Controller
                                     name="destinationPickupTime"
@@ -2390,13 +2489,13 @@ export function InputItineraryScreen({
                             </div>
                           ) : null}
 
-                          <label className={checkClassName}>
+                          <label className={manualScheduleCheckClassName}>
                             <Controller
                               name="requiresBus"
                               control={scheduleControl}
                               render={({ field }) => (
                                 <input
-                                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-200"
+                                  className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
                                   type="checkbox"
                                   checked={showTransferTrainFields ? true : field.value}
                                   onChange={(event) => handleFormChange("requiresBus", event.target.checked)}
@@ -2409,7 +2508,7 @@ export function InputItineraryScreen({
                             </span>
                           </label>
 
-                          <label className={wideFieldClassName}>
+                          <label className={manualScheduleWideFieldClassName}>
                             <span>Notes</span>
                             <Controller
                               name="notes"
@@ -2428,7 +2527,7 @@ export function InputItineraryScreen({
                           </label>
                         </div>
 
-                        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-outline-variant/35 pt-4">
                           <button
                             type="button"
                             className="serene-btn-primary min-h-10 w-full sm:w-auto"
@@ -2463,7 +2562,7 @@ export function InputItineraryScreen({
                 >
                   Save Itinerary
                 </button>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-on-surface-variant">
                   <span className="sm:hidden">Saved data will appear on Overview.</span>
                   <span className="hidden sm:inline">
                     After saving, the group data will appear on the Overview page.
