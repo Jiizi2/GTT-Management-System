@@ -327,6 +327,7 @@ export function VisaTrackingScreen({
   const actionRequiredValueClassName = isDarkMode
     ? "text-xl font-extrabold text-on-primary"
     : "text-xl font-bold text-amber-900";
+  const agreementDateTextClassName = isDarkMode ? "text-white" : "text-slate-500";
 
   useEffect(() => {
     setCurrentPage(1);
@@ -606,7 +607,7 @@ export function VisaTrackingScreen({
                       <strong className="mt-1 block text-xs font-semibold text-slate-800">
                         {makkahAgreementNumber}
                       </strong>
-                      <small className="block text-xs text-slate-500">
+                      <small className={`block text-xs ${agreementDateTextClassName}`}>
                         {formatVisaShortDate(agreementDateRange.makkahStartIso)} -{" "}
                         {formatVisaShortDate(agreementDateRange.makkahEndIso)}
                       </small>
@@ -637,7 +638,7 @@ export function VisaTrackingScreen({
                       <strong className="mt-1 block text-xs font-semibold text-slate-800">
                         {madinahAgreementNumber}
                       </strong>
-                      <small className="block text-xs text-slate-500">
+                      <small className={`block text-xs ${agreementDateTextClassName}`}>
                         {formatVisaShortDate(agreementDateRange.madinahStartIso)} -{" "}
                         {formatVisaShortDate(agreementDateRange.madinahEndIso)}
                       </small>
@@ -788,7 +789,7 @@ export function VisaTrackingScreen({
                           <strong className="block break-all text-[13px] font-semibold leading-tight text-slate-800">
                             {makkahAgreementNumber}
                           </strong>
-                          <small className="block text-[11px] leading-tight text-slate-500">
+                          <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
                             {formatVisaShortDate(agreementDateRange.makkahStartIso)} -{" "}
                             {formatVisaShortDate(agreementDateRange.makkahEndIso)}
                           </small>
@@ -816,7 +817,7 @@ export function VisaTrackingScreen({
                           <strong className="block break-all text-[13px] font-semibold leading-tight text-slate-800">
                             {madinahAgreementNumber}
                           </strong>
-                          <small className="block text-[11px] leading-tight text-slate-500">
+                          <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
                             {formatVisaShortDate(agreementDateRange.madinahStartIso)} -{" "}
                             {formatVisaShortDate(agreementDateRange.madinahEndIso)}
                           </small>

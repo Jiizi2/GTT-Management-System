@@ -27,6 +27,7 @@ export type InvoiceWorkspaceInitialData = {
   issuedDateIso: string;
   dueDateIso: string;
   amount: number;
+  downPaymentIdr: number;
   status: InvoiceStatus;
   items: Array<
     BackendInvoiceItem & {
@@ -274,6 +275,25 @@ export function resolveBankAccountLabel(
   return options.find((option) => option.value === value)?.label ?? value;
 }
 
+export function resolveInvoiceDownPaymentIdr(row: Pick<InvoiceRow, "amount" | "status" | "downPaymentIdr">): number {
+  const normalizedAmount = Math.max(0, Math.round(row.amount));
+  const normalizedDownPayment = Math.min(normalizedAmount, Math.max(0, Math.round(row.downPaymentIdr ?? 0)));
+
+  if (normalizedDownPayment > 0) {
+    return normalizedDownPayment;
+  }
+
+  return row.status === "Paid" ? normalizedAmount : 0;
+}
+
+export function resolveInvoiceRemainingBalanceIdr(amount: number, downPaymentIdr: number): number {
+  return Math.max(0, Math.round(amount) - Math.max(0, Math.round(downPaymentIdr)));
+}
+
+export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number): string {
+  return Math.max(0, Math.round(downPaymentIdr)) > 0 ? "Sisa Tagihan" : "Tagihan";
+}
+
 export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
   const items: Array<BackendInvoiceItem & { id: string }> = Array.isArray(row.items)
     ? row.items.map((item, index) => ({
@@ -297,6 +317,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     issuedDateIso: row.issuedDateIso,
     dueDateIso: row.dueDateIso,
     amount: Math.max(0, Math.round(row.amount)),
+    downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
     status: row.status,
     items,
   };
@@ -330,6 +351,7 @@ export async function viewInvoicePdfFromRow({
             totalPriceIdr: row.amount,
           },
         ];
+  const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
   const { exportInvoicePdf } = await import("./invoice-export");
 
   return exportInvoicePdf(
@@ -349,8 +371,8 @@ export async function viewInvoicePdfFromRow({
       subtotalIdr: row.amount,
       taxIdr: 0,
       totalPayableIdr: row.amount,
-      downPaymentIdr: row.status === "Paid" ? row.amount : 0,
-      remainingBalanceIdr: row.status === "Paid" ? 0 : row.amount,
+      downPaymentIdr,
+      remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
       items: printableItems,
     },
     { printWindow },

@@ -6,6 +6,7 @@ import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
+import { PageHeroSection } from "../components/page-hero-section";
 import { PaginationControls } from "../components/pagination-controls";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
@@ -22,6 +23,9 @@ import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import {
   isMasterDataClientOptionId,
   mergeInvoiceClientsWithMasterData,
+  resolveInvoiceDownPaymentIdr,
+  resolveInvoiceOutstandingBalanceLabel,
+  resolveInvoiceRemainingBalanceIdr,
 } from "./invoice-page-shared";
 
 const INVOICE_PAGE_SIZE = 8;
@@ -62,6 +66,7 @@ type InvoiceWorkspaceInitialData = {
   issuedDateIso: string;
   dueDateIso: string;
   amount: number;
+  downPaymentIdr: number;
   status: InvoiceStatus;
   items: InvoiceDraftItem[];
 };
@@ -105,6 +110,7 @@ const invoiceWorkspaceFormSchema = z
     selectedGroupCode: z.string(),
     address: z.string(),
     bankAccount: z.string(),
+    downPaymentIdr: z.number().min(0),
     notes: z.string(),
     items: z.array(invoiceDraftItemSchema),
   })
@@ -443,6 +449,7 @@ function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceIni
     issuedDateIso: row.issuedDateIso,
     dueDateIso: row.dueDateIso,
     amount: Math.max(0, Math.round(row.amount)),
+    downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
     status: row.status,
     items: mapBackendInvoiceItemsToDraftItems(row.items),
   };
@@ -519,6 +526,7 @@ async function viewInvoicePdfFromRow({
   const description = linkedGroup
     ? `${linkedGroup.packageName} Package - ${linkedGroup.durationDays} Days`
     : `Invoice ${row.invoiceNumber}`;
+  const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
   const { exportInvoicePdf } = await import("./invoice-export");
 
   return exportInvoicePdf({
@@ -537,8 +545,8 @@ async function viewInvoicePdfFromRow({
     subtotalIdr: row.amount,
     taxIdr: 0,
     totalPayableIdr: row.amount,
-    downPaymentIdr: row.status === "Paid" ? row.amount : 0,
-    remainingBalanceIdr: row.status === "Paid" ? 0 : row.amount,
+    downPaymentIdr,
+    remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
     items: [
       {
         description,
@@ -664,6 +672,7 @@ export function CreateInvoiceWorkspace({
       selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
       address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
       bankAccount: isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "",
+      downPaymentIdr: resolvedInitialInvoice?.downPaymentIdr ?? 0,
       notes: "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
     },
@@ -675,6 +684,7 @@ export function CreateInvoiceWorkspace({
   const selectedGroupCode = watch("selectedGroupCode");
   const address = watch("address");
   const bankAccount = watch("bankAccount");
+  const downPaymentIdr = watch("downPaymentIdr");
   const items = watch("items");
   const {
     fields: itemFields,
@@ -849,6 +859,21 @@ export function CreateInvoiceWorkspace({
   const subtotalIdr = useMemo(() => calculateSubtotalIdr({ items, usdToIdr, sarToIdr }), [items, usdToIdr, sarToIdr]);
   const taxAmount = 0;
   const totalPayable = subtotalIdr + taxAmount;
+  const normalizedDownPaymentIdr = Math.min(totalPayable, Math.max(0, Math.round(downPaymentIdr)));
+  const downPaymentCoveragePercent =
+    totalPayable > 0 ? Math.min(100, Math.round((normalizedDownPaymentIdr / totalPayable) * 100)) : 0;
+  const remainingBalanceIdr = resolveInvoiceRemainingBalanceIdr(totalPayable, normalizedDownPaymentIdr);
+
+  useEffect(() => {
+    if (downPaymentIdr <= totalPayable) {
+      return;
+    }
+
+    setValue("downPaymentIdr", totalPayable, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  }, [downPaymentIdr, totalPayable, setValue]);
 
   const addItemRow = () => {
     const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
@@ -930,6 +955,7 @@ export function CreateInvoiceWorkspace({
         issuedDateIso: values.issueDateIso,
         dueDateIso: values.dueDateIso,
         amount: totalPayable,
+        downPaymentIdr: normalizedDownPaymentIdr,
         status: values.invoiceStatus ? (values.invoiceStatus as InvoiceStatus) : "Pending",
         notes: values.notes,
         items: printableItems,
@@ -1017,6 +1043,7 @@ export function CreateInvoiceWorkspace({
                 issuedDateIso: values.issueDateIso,
                 dueDateIso: values.dueDateIso,
                 amount: totalPayable,
+                downPaymentIdr: normalizedDownPaymentIdr,
                 status: values.invoiceStatus as InvoiceStatus,
                 notes: values.notes,
                 items: printableItems,
@@ -1029,6 +1056,7 @@ export function CreateInvoiceWorkspace({
               issuedDateIso: values.issueDateIso,
               dueDateIso: values.dueDateIso,
               amount: totalPayable,
+              downPaymentIdr: normalizedDownPaymentIdr,
               status: values.invoiceStatus as InvoiceStatus,
               notes: values.notes,
               items: printableItems,
@@ -1052,8 +1080,8 @@ export function CreateInvoiceWorkspace({
           subtotalIdr,
           taxIdr: taxAmount,
           totalPayableIdr: totalPayable,
-          downPaymentIdr: 0,
-          remainingBalanceIdr: totalPayable,
+          downPaymentIdr: savedInvoice.downPaymentIdr,
+          remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(savedInvoice.amount, savedInvoice.downPaymentIdr),
           items: printableItems,
         },
         {
@@ -1700,7 +1728,7 @@ export function CreateInvoiceWorkspace({
         </section>
 
         <aside className="col-span-12 space-y-4 lg:col-span-3">
-          <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm lg:sticky lg:top-20">
+          <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5">
             <h3 className="mb-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/65">
               <span>Summary</span>
               <span className="material-symbols-outlined text-base text-on-surface-variant/35" aria-hidden="true">
@@ -1720,7 +1748,7 @@ export function CreateInvoiceWorkspace({
               <div className="h-px bg-outline-variant/25" />
               <div className="pt-1">
                 <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/65">
-                  Total Payable
+                  Yang harus dibayarkan
                 </span>
                 <div className="mt-1 flex items-baseline gap-1">
                   <span className="text-xs font-bold text-primary">IDR</span>
@@ -1728,6 +1756,70 @@ export function CreateInvoiceWorkspace({
                     {formatNumberInput(totalPayable)}
                   </span>
                 </div>
+              </div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-800">
+                      <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
+                        account_balance
+                      </span>
+                      DP / Uang muka
+                    </span>
+                    <p className="text-[10px] leading-snug text-amber-900/70">
+                      Masukkan nominal DP yang sudah diterima dari customer.
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                      normalizedDownPaymentIdr > 0
+                        ? "border-amber-200 bg-white text-amber-800"
+                        : "border-outline-variant/30 bg-white text-on-surface-variant/60"
+                    }`}
+                  >
+                    {normalizedDownPaymentIdr > 0 ? `${downPaymentCoveragePercent}%` : "Opsional"}
+                  </span>
+                </div>
+
+                <label className="mt-2 block space-y-1.5">
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700/80">
+                      IDR
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-sm font-extrabold text-amber-900 outline-none ring-0 placeholder:text-amber-900/30 focus:ring-0"
+                      value={formatNumberInput(downPaymentIdr)}
+                      onChange={(event) =>
+                        setValue("downPaymentIdr", Math.max(0, parseNumberInput(event.target.value)), {
+                          shouldDirty: true,
+                          shouldValidate: false,
+                        })
+                      }
+                      aria-label="Down payment amount"
+                    />
+                  </div>
+                </label>
+
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-amber-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-[width] duration-300 ease-out"
+                    style={{ width: `${downPaymentCoveragePercent}%` }}
+                  />
+                </div>
+
+                <p className="mt-1.5 text-[10px] font-medium text-amber-700">
+                  {normalizedDownPaymentIdr > 0
+                    ? `DP menutup ${downPaymentCoveragePercent}% dari total tagihan.`
+                    : "DP belum diisi, jadi total pembayaran masih utuh."}
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 px-3 py-2">
+                <span className="text-xs font-medium text-on-surface-variant">
+                  {resolveInvoiceOutstandingBalanceLabel(normalizedDownPaymentIdr)}
+                </span>
+                <strong className="text-xs font-bold text-primary">{formatNumberInput(remainingBalanceIdr)}</strong>
               </div>
             </div>
           </article>
@@ -2168,21 +2260,19 @@ export function InvoiceScreen({
         <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
       </header>
 
-      <section className="space-y-2">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
-              Invoice List
-            </h1>
-            <p className="text-sm text-on-surface-variant sm:text-base">
-              <span className="sm:hidden">Track all issued invoices.</span>
-              <span className="hidden sm:inline">Manage and track all issued invoices.</span>
-            </p>
-          </div>
-
+      <PageHeroSection
+        eyebrow="Invoice Workspace"
+        title="Invoice List"
+        description={
+          <>
+            <span className="sm:hidden">Track all issued invoices.</span>
+            <span className="hidden sm:inline">Manage and track all issued invoices.</span>
+          </>
+        }
+        actions={
           <button
             type="button"
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition ${
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition sm:w-auto ${
               isInvoiceBackendAvailable ? "bg-primary hover:bg-primary-container" : "cursor-not-allowed bg-slate-300"
             }`}
             aria-label="Create new invoice"
@@ -2202,8 +2292,8 @@ export function InvoiceScreen({
             </span>
             <span>New Invoice</span>
           </button>
-        </div>
-      </section>
+        }
+      />
 
       <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
         <article className="rounded-2xl border border-outline-variant/45 bg-surface-container-low p-4 shadow-ambient sm:p-5">

@@ -19,6 +19,9 @@ type InvoiceDashboardData = {
   rows: BackendInvoiceRow[];
 };
 
+// Invoice is edited from multiple browsers/devices, so keep this dashboard fresh.
+const INVOICE_DASHBOARD_REFRESH_INTERVAL_MS = 15_000;
+
 function sortInvoiceRows(rows: BackendInvoiceRow[]): BackendInvoiceRow[] {
   return [...rows].sort((left, right) => {
     const dueDateDiff = right.dueDateIso.localeCompare(left.dueDateIso);
@@ -48,7 +51,9 @@ export function useInvoiceDashboardQuery() {
     },
     retry: false,
     staleTime: 15_000,
-    refetchOnWindowFocus: false,
+    refetchInterval: INVOICE_DASHBOARD_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -69,6 +74,7 @@ export function useCreateInvoiceMutation() {
           rows: sortInvoiceRows([createdInvoice, ...current.rows]),
         };
       });
+      void queryClient.invalidateQueries({ queryKey: invoiceQueryKeys.dashboard });
     },
   });
 }
@@ -91,6 +97,7 @@ export function useUpdateInvoiceMutation() {
           rows: sortInvoiceRows(current.rows.map((row) => (row.id === updatedInvoice.id ? updatedInvoice : row))),
         };
       });
+      void queryClient.invalidateQueries({ queryKey: invoiceQueryKeys.dashboard });
     },
   });
 }

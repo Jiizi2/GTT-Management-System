@@ -32,6 +32,11 @@ export function useModalFocusTrap<T extends HTMLElement>({
 }) {
   const dialogRef = useRef<T | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isActive || typeof document === "undefined") {
@@ -57,7 +62,7 @@ export function useModalFocusTrap<T extends HTMLElement>({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
 
@@ -101,7 +106,7 @@ export function useModalFocusTrap<T extends HTMLElement>({
         elementToRestore.focus();
       }
     };
-  }, [isActive, onClose]);
+  }, [isActive]);
 
   return dialogRef;
 }

@@ -65,6 +65,16 @@ export class CreateInvoiceDto {
   amount!: number;
 
   @ApiPropertyOptional({
+    description: "Nominal DP invoice dalam rupiah.",
+    example: 50000000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  downPaymentIdr?: number;
+
+  @ApiPropertyOptional({
     description: "Status awal invoice.",
     enum: InvoiceStatus,
     example: InvoiceStatus.PENDING,

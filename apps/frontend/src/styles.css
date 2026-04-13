@@ -489,6 +489,32 @@ img {
     color: rgb(var(--color-text-secondary));
   }
 
+  :root[data-theme="dark"] .checklist-need-attention-body {
+    background-color: rgb(var(--color-surface-container-lowest));
+    color: rgb(var(--color-text-primary));
+  }
+
+  :root[data-theme="dark"] .checklist-need-attention-body .checklist-need-panel-title,
+  :root[data-theme="dark"] .checklist-need-attention-body .checklist-need-panel-label {
+    color: rgb(var(--color-text-primary));
+  }
+
+  :root[data-theme="dark"] .checklist-need-attention-body .serene-input {
+    color: rgb(var(--color-text-primary));
+  }
+
+  :root[data-theme="dark"] .checklist-need-attention-body .serene-input::placeholder {
+    color: rgb(var(--color-text-primary) / 0.55);
+  }
+
+  :root[data-theme="dark"] .checklist-need-attention-warning,
+  :root[data-theme="dark"] .checklist-need-attention-required,
+  :root[data-theme="dark"] .checklist-need-attention-status-pending {
+    border-color: rgb(var(--color-outline-variant) / 0.32);
+    background-color: rgb(var(--color-surface-container-high));
+    color: rgb(var(--color-text-primary));
+  }
+
   :root[data-theme="dark"] .checklist-need-attention-status-complete {
     border-color: rgb(var(--color-primary) / 0.24);
     background-color: rgb(var(--color-primary) / 0.12);

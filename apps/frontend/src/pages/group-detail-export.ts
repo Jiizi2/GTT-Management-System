@@ -128,6 +128,48 @@ function formatItinerarySupportDetail(
   return fallbackSegments.join(" | ");
 }
 
+function schedulePrint(printableWindow: Window): void {
+  let printTriggered = false;
+  const triggerPrint = () => {
+    if (printTriggered || printableWindow.closed) {
+      return;
+    }
+
+    printTriggered = true;
+    printableWindow.focus();
+    printableWindow.print();
+  };
+
+  try {
+    printableWindow.addEventListener(
+      "load",
+      () => {
+        window.setTimeout(triggerPrint, 180);
+      },
+      { once: true },
+    );
+  } catch {
+    // Some popup handles expose a restricted event API.
+  }
+
+  try {
+    const fontReady = printableWindow.document.fonts?.ready;
+    if (fontReady) {
+      void fontReady
+        .then(() => {
+          window.setTimeout(triggerPrint, 120);
+        })
+        .catch(() => {
+          // Ignore font-loading failures and fall back to the timeout below.
+        });
+    }
+  } catch {
+    // Some popup handles expose a restricted document.fonts API.
+  }
+
+  window.setTimeout(triggerPrint, 1800);
+}
+
 export function exportGroupDetailPdf({
   group,
   itineraryItems,
@@ -419,56 +461,77 @@ export function exportGroupDetailPdf({
       * {
         box-sizing: border-box;
       }
-      body {
+      @page {
+        size: A4 portrait;
         margin: 0;
-        min-height: 100vh;
-        padding: 44px 14px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 18px;
-        background: var(--surface);
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
         color: var(--on-surface);
         font-family: "Inter", Arial, sans-serif;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
+      body {
+        display: block;
+      }
       .material-symbols-outlined {
         font-family: "Material Symbols Outlined";
+        font-size: 24px;
+        font-style: normal;
+        font-weight: normal;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
         font-variation-settings:
           "FILL" 0,
           "wght" 400,
           "GRAD" 0,
           "opsz" 24;
+        font-feature-settings: "liga";
+        -webkit-font-feature-settings: "liga";
+        -webkit-font-smoothing: antialiased;
+        font-synthesis: none;
         vertical-align: middle;
       }
       .doc {
-        width: 100%;
-        max-width: 210mm;
+        width: 210mm;
         min-height: 297mm;
+        height: auto;
+        margin: 0;
         background: var(--surface-lowest);
-        border: 1px solid #d7d9d3;
-        box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
-        padding: 46px 42px 30px;
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
       }
       .doc-header {
+        flex: 0 0 auto;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 20px;
-        padding-bottom: 22px;
-        margin-bottom: 26px;
+        gap: 16px;
+        padding: 12px 16px 10px;
+        margin-bottom: 10px;
         border-bottom: 2px solid rgba(13, 99, 27, 0.2);
       }
       .brand {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
       }
       .brand-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -479,7 +542,7 @@ export function exportGroupDetailPdf({
         margin: 0;
         color: var(--primary);
         font-family: "Manrope", sans-serif;
-        font-size: 18px;
+        font-size: 15px;
         font-weight: 800;
         letter-spacing: -0.02em;
         text-transform: uppercase;
@@ -487,7 +550,7 @@ export function exportGroupDetailPdf({
       .brand-sub {
         margin: 2px 0 0;
         color: var(--on-surface-variant);
-        font-size: 10px;
+        font-size: 8px;
         font-weight: 600;
         letter-spacing: 0.2em;
         text-transform: uppercase;
@@ -498,7 +561,7 @@ export function exportGroupDetailPdf({
       .doc-title h1 {
         margin: 0;
         font-family: "Manrope", sans-serif;
-        font-size: 30px;
+        font-size: 24px;
         font-weight: 800;
         letter-spacing: -0.03em;
         text-transform: uppercase;
@@ -507,34 +570,33 @@ export function exportGroupDetailPdf({
       .doc-title p {
         margin: 6px 0 0;
         color: var(--primary);
-        font-size: 11px;
+        font-size: 9px;
         font-weight: 800;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
-      .group-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.6fr) minmax(178px, 1fr);
-        gap: 0;
-        padding: 18px 20px;
-        margin-bottom: 28px;
+      .group-summary {
+        flex: 0 0 auto;
+        margin: 0 16px 10px;
+        padding: 10px 14px;
         border-radius: 12px;
         border: 1px solid rgba(191, 202, 186, 0.45);
         background: rgba(245, 243, 239, 0.55);
       }
-      .group-cell {
-        padding: 0 14px;
-        min-width: 0;
+      .group-summary-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(0, 1.12fr);
+        gap: 14px;
+        align-items: start;
       }
-      .group-cell--id,
-      .group-cell--meta {
-        border-right: 1px solid rgba(191, 202, 186, 0.55);
+      .group-summary-identity {
+        min-width: 0;
       }
       .small-label {
         display: block;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         color: var(--on-surface-variant);
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 800;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -546,97 +608,69 @@ export function exportGroupDetailPdf({
         font-weight: 800;
         letter-spacing: -0.03em;
         line-height: 1.1;
-        font-size: clamp(24px, 3.5vw, 34px);
+        font-size: clamp(20px, 2.6vw, 28px);
         overflow-wrap: anywhere;
         word-break: break-word;
       }
       .group-name {
-        margin: 8px 0 0;
+        margin: 5px 0 0;
         color: var(--on-surface);
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 700;
-        line-height: 1.45;
+        line-height: 1.3;
         overflow-wrap: anywhere;
         word-break: break-word;
       }
-      .meta-grid {
+      .group-summary-detail-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        align-items: flex-start;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 10px;
       }
-      .meta-value {
+      .group-summary-detail-card {
+        min-width: 0;
+        padding: 2px 0 0;
+      }
+      .group-summary-detail-card .small-label {
+        margin-bottom: 5px;
+      }
+      .group-summary-detail-value,
+      .group-summary-detail-sub {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .group-summary-detail-value {
+        -webkit-line-clamp: 1;
         color: var(--on-surface);
-        font-size: 14px;
-        font-weight: 700;
-        line-height: 1.35;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.15;
         overflow-wrap: anywhere;
         word-break: break-word;
       }
-      .meta-sub {
+      .group-summary-detail-sub {
+        -webkit-line-clamp: 1;
         margin-top: 3px;
         color: var(--on-surface-variant);
-        font-size: 11px;
+        font-size: 8px;
         font-weight: 600;
-        line-height: 1.45;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-      .meta-right {
-        text-align: right;
-        min-width: 126px;
-      }
-      .meta-value--pax {
-        font-size: 22px;
-        font-family: "Manrope", sans-serif;
-        font-weight: 800;
-      }
-      .meta-value--pax span {
-        color: var(--on-surface-variant);
-        font-size: 11px;
-        font-weight: 600;
-      }
-      .period-stack {
-        display: grid;
-        gap: 9px;
-        align-content: center;
-      }
-      .period-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 8px;
-      }
-      .period-label {
-        color: var(--on-surface-variant);
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        flex-shrink: 0;
-        padding-top: 2px;
-      }
-      .period-value {
-        color: var(--on-surface);
-        font-size: 11px;
-        font-weight: 700;
-        text-align: right;
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        line-height: 1.2;
       }
       .timeline-section {
-        margin-bottom: 22px;
+        flex: 0 0 auto;
+        margin: 0 16px 8px;
       }
       .timeline-head {
         display: flex;
         align-items: center;
         gap: 14px;
-        margin-bottom: 18px;
+        margin-bottom: 8px;
       }
       .timeline-head h3 {
         margin: 0;
         font-family: "Manrope", sans-serif;
-        font-size: 24px;
+        font-size: 18px;
         font-weight: 800;
         letter-spacing: -0.02em;
         text-transform: uppercase;
@@ -647,30 +681,30 @@ export function exportGroupDetailPdf({
         background: rgba(191, 202, 186, 0.8);
       }
       .timeline-wrap {
-        margin-left: 10px;
+        margin-left: 4px;
       }
       .timeline-item {
         display: flex;
-        gap: 24px;
+        gap: 14px;
       }
       .timeline-date-col {
-        width: 96px;
+        width: 82px;
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding-top: 4px;
+        padding-top: 1px;
       }
       .timeline-date {
         font-family: "Manrope", sans-serif;
-        font-size: 20px;
+        font-size: 16px;
         font-weight: 800;
         line-height: 1.05;
       }
       .timeline-day {
         margin-top: 3px;
         color: var(--on-surface-variant);
-        font-size: 10px;
+        font-size: 8px;
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -679,7 +713,7 @@ export function exportGroupDetailPdf({
         position: relative;
         width: 1px;
         flex: 1;
-        margin-top: 10px;
+        margin-top: 8px;
         background: var(--outline);
       }
       .timeline-line.is-last {
@@ -689,11 +723,11 @@ export function exportGroupDetailPdf({
         position: absolute;
         top: 0;
         left: 50%;
-        width: 15px;
-        height: 15px;
+        width: 13px;
+        height: 13px;
         border-radius: 50%;
         transform: translate(-50%, 0);
-        border: 4px solid var(--surface-lowest);
+        border: 3px solid var(--surface-lowest);
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
       }
       .dot-arrival {
@@ -712,28 +746,32 @@ export function exportGroupDetailPdf({
         background: var(--on-surface-variant);
       }
       .timeline-content {
-        flex: 1;
-        padding-bottom: 28px;
+        flex: 1 1 auto;
+        min-width: 0;
+        padding-bottom: 10px;
+      }
+      .timeline-item:last-child .timeline-content {
+        padding-bottom: 0;
       }
       .timeline-top {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 12px;
+        gap: 8px;
       }
       .timeline-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 5px 11px;
+        padding: 3px 8px;
         border-radius: 999px;
-        font-size: 10px;
+        font-size: 8px;
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
       .timeline-badge .material-symbols-outlined {
-        font-size: 14px;
+        font-size: 12px;
       }
       .badge-arrival {
         background: #cbffc2;
@@ -759,55 +797,56 @@ export function exportGroupDetailPdf({
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 7px 10px;
+        padding: 4px 8px;
         border-radius: 8px;
         background: #eae8e4;
       }
       .timeline-time-value {
         color: var(--on-surface);
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 800;
         font-variant-numeric: tabular-nums;
       }
       .timeline-title-text {
-        margin: 10px 0 0;
+        margin: 6px 0 0;
         color: var(--on-surface);
         font-family: "Manrope", sans-serif;
-        font-size: 20px;
+        font-size: 16px;
         font-weight: 800;
         letter-spacing: -0.03em;
-        line-height: 1.22;
+        line-height: 1.15;
       }
       .timeline-route {
-        margin: 7px 0 0;
+        margin: 4px 0 0;
         color: var(--on-surface-variant);
-        font-size: 14px;
+        font-size: 11px;
         font-weight: 600;
-        line-height: 1.45;
+        line-height: 1.3;
         overflow-wrap: anywhere;
       }
       .timeline-detail {
-        margin: 8px 0 0;
+        margin: 4px 0 0;
         color: var(--on-surface-variant);
-        font-size: 12px;
-        line-height: 1.55;
+        font-size: 10px;
+        line-height: 1.35;
         overflow-wrap: anywhere;
       }
       .empty-row {
         margin: 0;
         color: var(--on-surface-variant);
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 600;
       }
       .guideline-section {
-        margin-top: 8px;
-        padding-top: 20px;
+        flex: 0 0 auto;
+        margin: 0 16px 6px;
+        padding-top: 8px;
         border-top: 1px solid rgba(191, 202, 186, 0.6);
       }
       .guideline-section h3 {
-        margin: 0 0 12px;
+        margin: 0 0 8px;
         color: var(--on-surface);
-        font-size: 11px;
+        font-size: 9px;
         font-weight: 900;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -815,13 +854,13 @@ export function exportGroupDetailPdf({
       .guideline-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
+        gap: 4px;
       }
       .guideline-item {
         display: flex;
         align-items: flex-start;
-        gap: 10px;
-        padding: 2px 6px;
+        gap: 6px;
+        padding: 0 2px;
       }
       .guideline-item.is-middle {
         border-left: 1px solid rgba(191, 202, 186, 0.55);
@@ -829,54 +868,55 @@ export function exportGroupDetailPdf({
       }
       .guideline-item .material-symbols-outlined {
         color: var(--primary);
-        font-size: 18px;
+        font-size: 14px;
         flex-shrink: 0;
       }
       .guideline-item p {
         margin: 0;
         color: var(--on-surface);
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 600;
-        line-height: 1.55;
+        line-height: 1.3;
       }
       .guideline-raudhah {
-        margin-top: 10px;
-        padding: 10px 12px;
+        margin-top: 6px;
+        padding: 6px 8px;
         border-radius: 10px;
         border: 1px solid rgba(191, 202, 186, 0.65);
         background: rgba(245, 243, 239, 0.65);
         display: flex;
         align-items: flex-start;
-        gap: 10px;
+        gap: 6px;
       }
       .guideline-raudhah .material-symbols-outlined {
         color: var(--primary);
-        font-size: 18px;
+        font-size: 14px;
         flex-shrink: 0;
       }
       .guideline-raudhah p {
         margin: 0;
         color: var(--on-surface);
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 600;
-        line-height: 1.55;
+        line-height: 1.3;
       }
       .guideline-raudhah strong {
         color: var(--on-surface);
         font-weight: 800;
       }
       .doc-footer {
-        margin-top: 20px;
-        padding-top: 14px;
+        flex: 0 0 auto;
+        margin: 0 16px 8px;
+        padding-top: 8px;
         border-top: 1px solid #eceee7;
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
-        gap: 20px;
+        gap: 14px;
       }
       .foot-label {
         color: #9aa091;
-        font-size: 9px;
+        font-size: 7px;
         font-weight: 800;
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -884,7 +924,7 @@ export function exportGroupDetailPdf({
       .foot-value {
         margin-top: 4px;
         color: #5e6458;
-        font-size: 11px;
+        font-size: 9px;
         font-weight: 700;
       }
       .foot-right {
@@ -893,7 +933,7 @@ export function exportGroupDetailPdf({
       .signature-line {
         margin-top: 8px;
         margin-left: auto;
-        width: 130px;
+        width: 110px;
         border-bottom: 1px solid #d8ddd0;
       }
       .copyright {
@@ -904,7 +944,7 @@ export function exportGroupDetailPdf({
         text-transform: uppercase;
         opacity: 0.4;
       }
-      @media (max-width: 900px) {
+      @media screen and (max-width: 900px) {
         .doc-header {
           flex-direction: column;
           align-items: flex-start;
@@ -912,38 +952,58 @@ export function exportGroupDetailPdf({
         .doc-title {
           text-align: left;
         }
-        .group-grid {
+        .group-summary-layout {
           grid-template-columns: 1fr;
-          gap: 14px;
         }
-        .group-cell {
-          padding: 0;
-        }
-        .group-cell--id,
-        .group-cell--meta {
-          border-right: 0;
-          border-bottom: 1px solid rgba(191, 202, 186, 0.55);
-          padding-bottom: 12px;
-        }
-        .meta-right {
-          text-align: left;
-        }
-        .period-value {
-          text-align: left;
+        .group-summary-detail-grid {
+          grid-template-columns: 1fr 1fr;
         }
       }
       @media print {
+        html,
         body {
-          background: #ffffff;
+          width: 100%;
+          min-height: 100%;
+          height: auto;
+          margin: 0;
           padding: 0;
+          overflow: visible;
+          background: #ffffff;
+        }
+        body {
+          display: block;
         }
         .doc {
-          width: 100%;
+          width: 210mm;
+          min-height: 297mm;
+          height: auto;
           max-width: none;
-          min-height: auto;
+          overflow: visible;
           box-shadow: none;
           border: 0;
-          padding: 34px 28px 20px;
+          padding: 0;
+        }
+        .doc-header {
+          flex-direction: row;
+          align-items: flex-start;
+        }
+        .doc-title {
+          margin-left: auto;
+          text-align: right;
+        }
+        .group-summary-layout {
+          grid-template-columns: minmax(0, 1.08fr) minmax(0, 1.12fr);
+        }
+        .group-summary-detail-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .doc-header,
+        .group-summary,
+        .guideline-section,
+        .doc-footer,
+        .timeline-item {
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
         .print-hidden {
           display: none;
@@ -966,48 +1026,36 @@ export function exportGroupDetailPdf({
         </div>
       </header>
 
-      <section class="group-grid">
-        <article class="group-cell group-cell--id">
+      <section class="group-summary">
+        <div class="group-summary-layout">
+          <article class="group-summary-identity">
           <span class="small-label">Primary Group ID</span>
           <h2 class="group-code">${escapeHtml(group.code)}</h2>
           <p class="group-name">${escapeHtml(group.name)}</p>
-        </article>
-
-        <article class="group-cell group-cell--meta">
-          <div class="meta-grid">
-            <div>
-              <span class="small-label">Musyrif</span>
-              <div class="meta-value">${escapeHtml(musyrifProfile.name)}</div>
-              <div class="meta-sub">${escapeHtml(musyrifProfile.phone)}</div>
-            </div>
-            <div class="meta-right">
+          </article>
+          <div class="group-summary-detail-grid" aria-label="Group summary details">
+            <article class="group-summary-detail-card">
               <span class="small-label">Pax Count</span>
-              <div class="meta-value meta-value--pax">${group.pax}</div>
-              <div class="meta-sub">${resolvedTotalBuses} Bus</div>
-            </div>
+              <span class="group-summary-detail-value">${group.pax}</span>
+              <span class="group-summary-detail-sub">${resolvedTotalBuses} Bus</span>
+            </article>
+            <article class="group-summary-detail-card">
+              <span class="small-label">Musyrif</span>
+              <span class="group-summary-detail-value">${escapeHtml(musyrifProfile.name)}</span>
+              <span class="group-summary-detail-sub">${escapeHtml(musyrifProfile.phone)}</span>
+            </article>
+            <article class="group-summary-detail-card">
+              <span class="small-label">Depart</span>
+              <span class="group-summary-detail-value">${escapeHtml(departDateLabel)}</span>
+              <span class="group-summary-detail-sub">Flight In ${escapeHtml(arrivalFlightNumber)}</span>
+            </article>
+            <article class="group-summary-detail-card">
+              <span class="small-label">Return</span>
+              <span class="group-summary-detail-value">${escapeHtml(returnDateLabel)}</span>
+              <span class="group-summary-detail-sub">Flight Out ${escapeHtml(returnFlightNumber)}</span>
+            </article>
           </div>
-        </article>
-
-        <article class="group-cell group-cell--period">
-          <div class="period-stack">
-            <div class="period-row">
-              <span class="period-label">Depart</span>
-              <span class="period-value">${escapeHtml(departDateLabel)}</span>
-            </div>
-            <div class="period-row">
-              <span class="period-label">Flight In</span>
-              <span class="period-value">${escapeHtml(arrivalFlightNumber)}</span>
-            </div>
-            <div class="period-row">
-              <span class="period-label">Return</span>
-              <span class="period-value">${escapeHtml(returnDateLabel)}</span>
-            </div>
-            <div class="period-row">
-              <span class="period-label">Flight Out</span>
-              <span class="period-value">${escapeHtml(returnFlightNumber)}</span>
-            </div>
-          </div>
-        </article>
+        </div>
       </section>
 
       <section class="timeline-section">
@@ -1050,10 +1098,7 @@ export function exportGroupDetailPdf({
   printableWindow.document.write(printableHtml);
   printableWindow.document.close();
 
-  window.setTimeout(() => {
-    printableWindow.focus();
-    printableWindow.print();
-  }, 450);
+  schedulePrint(printableWindow);
 
   return true;
 }

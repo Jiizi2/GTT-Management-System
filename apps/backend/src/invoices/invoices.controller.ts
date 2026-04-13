@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Res,
 } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
@@ -32,6 +33,10 @@ import {
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
 import { InvoicesService } from "./invoices.service";
 
+type ResponseLike = {
+  setHeader: (name: string, value: string | readonly string[]) => void;
+};
+
 @ApiTags("Invoices")
 @ApiBearerAuth("access-token")
 @ApiCookieAuth("auth-cookie")
@@ -50,7 +55,8 @@ export class InvoicesController {
     type: InvoiceListItemResponseDto,
     isArray: true,
   })
-  findAll() {
+  findAll(@Res({ passthrough: true }) response: ResponseLike) {
+    response.setHeader("Cache-Control", "no-store, private");
     return this.invoicesService.findAll();
   }
 
@@ -64,7 +70,8 @@ export class InvoicesController {
     type: InvoiceClientListItemResponseDto,
     isArray: true,
   })
-  listClients() {
+  listClients(@Res({ passthrough: true }) response: ResponseLike) {
+    response.setHeader("Cache-Control", "no-store, private");
     return this.invoicesService.listClients();
   }
 

@@ -261,6 +261,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
         issuedDate: todayIso,
         dueDate: dueDateIso,
         amount: 777000,
+        downPaymentIdr: 250000,
         items: [
           {
             description: "Primary Package",
@@ -279,13 +280,15 @@ async function testPrismaIntegrationFlow(): Promise<void> {
       clientId?: string;
       clientName?: string;
       amount?: number;
+      downPaymentIdr?: number;
       status?: string;
       items?: Array<{ description?: string }>;
     };
     assert.equal(typeof createdInvoice.id, "string", "Created invoice should include id.");
     assert.equal(typeof createdInvoice.clientId, "string", "Created invoice should include clientId.");
     assert.equal(createdInvoice.clientName, testClientName);
-    assert.equal(createdInvoice.amount, 777000);
+    assert.equal(createdInvoice.amount, 600000);
+    assert.equal(createdInvoice.downPaymentIdr, 250000);
     assert.equal(createdInvoice.status, "Pending");
     assert.equal(createdInvoice.items?.length, 1);
     assert.equal(createdInvoice.items?.[0]?.description, "Primary Package");
@@ -306,22 +309,25 @@ async function testPrismaIntegrationFlow(): Promise<void> {
       },
       body: JSON.stringify({
         amount: 888000,
+        downPaymentIdr: 120000,
         status: "PAID",
       }),
     });
     assert.equal(updateResponse.status, 200, `Update invoice failed: ${updateResponse.text}`);
-    const updatedInvoice = updateResponse.json as { amount?: number; status?: string };
+    const updatedInvoice = updateResponse.json as { amount?: number; downPaymentIdr?: number; status?: string };
     assert.equal(updatedInvoice.amount, 888000);
+    assert.equal(updatedInvoice.downPaymentIdr, 120000);
     assert.equal(updatedInvoice.status, "Paid");
     assert.equal((updateResponse.json as { items?: Array<{ description?: string }> }).items?.length, 1);
 
     const listResponse = await requestJson(server.baseUrl, "/api/invoices");
     assert.equal(listResponse.status, 200, `List invoices failed: ${listResponse.text}`);
-    const invoices = listResponse.json as Array<{ id?: string; amount?: number; status?: string }>;
+    const invoices = listResponse.json as Array<{ id?: string; amount?: number; downPaymentIdr?: number; status?: string }>;
     assert.equal(Array.isArray(invoices), true, "Invoice list payload should be an array.");
     const matched = invoices.find((invoice) => invoice.id === createdInvoiceId);
     assert.equal(Boolean(matched), true, "Expected created invoice in /api/invoices.");
     assert.equal(matched?.amount, 888000);
+    assert.equal(matched?.downPaymentIdr, 120000);
     assert.equal(matched?.status, "Paid");
   } finally {
     activeAuthCookie = null;
