@@ -102,10 +102,13 @@ export class GroupsService {
   async remove(idOrCode: string): Promise<void> {
     const existing = await this.queryService.findOneByIdOrCode(idOrCode);
     await this.commandService.remove(idOrCode);
-    await this.writeAuditLog("group.deleted", "group", existing, {
+    const auditGroupIdentity = {
+      groupCode: extractGroupCode(existing),
+    };
+    await this.writeAuditLog("group.deleted", "group", auditGroupIdentity, {
       idOrCode,
     });
-    this.logMutation("group.deleted", existing, {
+    this.logMutation("group.deleted", auditGroupIdentity, {
       idOrCode,
     });
   }
@@ -231,7 +234,10 @@ export class GroupsService {
     payload: ConfirmChecklistDriverDto,
   ): Promise<ChecklistAssignmentSyncResult> {
     const confirmed = await this.commandService.confirmChecklistDriver(idOrCode, payload);
-    await this.writeAuditLog("checklist.driver.confirmed", "checklistAssignment", confirmed, {
+    const auditGroupIdentity = {
+      groupCode: confirmed.groupCode,
+    };
+    await this.writeAuditLog("checklist.driver.confirmed", "checklistAssignment", auditGroupIdentity, {
       idOrCode,
       assignmentId: confirmed.id,
       tripDate: confirmed.tripDate,
@@ -239,7 +245,7 @@ export class GroupsService {
       scheduledTime: confirmed.scheduledTime,
       slotCount: confirmed.drivers.length,
     });
-    this.logMutation("checklist.driver.confirmed", confirmed, {
+    this.logMutation("checklist.driver.confirmed", auditGroupIdentity, {
       idOrCode,
       assignmentId: confirmed.id,
       slotCount: confirmed.drivers.length,
@@ -253,14 +259,17 @@ export class GroupsService {
     payload: ResetChecklistDriverDto,
   ): Promise<ChecklistAssignmentSyncResult> {
     const resetResult = await this.commandService.resetChecklistDriver(idOrCode, payload);
-    await this.writeAuditLog("checklist.driver.reset", "checklistAssignment", resetResult, {
+    const auditGroupIdentity = {
+      groupCode: resetResult.groupCode,
+    };
+    await this.writeAuditLog("checklist.driver.reset", "checklistAssignment", auditGroupIdentity, {
       idOrCode,
       assignmentId: resetResult.id,
       tripDate: resetResult.tripDate,
       activity: payload.activity?.trim(),
       scheduledTime: resetResult.scheduledTime,
     });
-    this.logMutation("checklist.driver.reset", resetResult, {
+    this.logMutation("checklist.driver.reset", auditGroupIdentity, {
       idOrCode,
       assignmentId: resetResult.id,
       scheduledTime: resetResult.scheduledTime,

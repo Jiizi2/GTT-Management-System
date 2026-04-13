@@ -848,6 +848,141 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
   }
 }
 
+async function testPrismaChecklistAuditLogsUseGroupCodeIdentity(): Promise<void> {
+  let auditCreateArgs: Record<string, unknown> | null = null;
+  let assignmentStatus: ChecklistAssignmentStatus = ChecklistAssignmentStatus.NOT_COMPLETE;
+
+  const prismaMock = {
+    group: {
+      findFirst: async () => ({
+        id: "grp-1",
+        code: "GRP-PRISMA",
+      }),
+    },
+    groupAuditLog: {
+      create: async (args: Record<string, unknown>) => {
+        auditCreateArgs = args;
+        return {};
+      },
+      findMany: async () => [],
+    },
+    $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
+      const tx = {
+        checklistAssignment: {
+          findFirst: async () => ({
+            id: "assign-1",
+            tripDate: new Date("2026-05-20T00:00:00.000Z"),
+            activity: "Transfer",
+            tripLabel: "Makkah to Madinah",
+            requiredBusCount: 1,
+            scheduledTime: "08:00",
+            transferByTrain: false,
+            trainDepartureTime: null,
+            stationPickupTime: null,
+            status: assignmentStatus,
+            drivers: [],
+          }),
+          update: async (args: Record<string, unknown>) => {
+            const data = (args as { data?: { status?: ChecklistAssignmentStatus } }).data;
+            if (data?.status) {
+              assignmentStatus = data.status;
+            }
+
+            return {
+              id: "assign-1",
+              tripDate: new Date("2026-05-20T00:00:00.000Z"),
+              activity: "Transfer",
+              tripLabel: "Makkah to Madinah",
+              requiredBusCount: 1,
+              scheduledTime: "08:00",
+              transferByTrain: false,
+              trainDepartureTime: null,
+              stationPickupTime: null,
+              status: assignmentStatus,
+              drivers:
+                assignmentStatus === ChecklistAssignmentStatus.ASSIGNED
+                  ? [
+                      {
+                        slotNumber: 1,
+                        name: "Driver One",
+                        phone: "+62-888-111",
+                        plateNumber: "B 1234 CD",
+                        isVerified: true,
+                      },
+                    ]
+                  : [],
+            };
+          },
+          findUniqueOrThrow: async () => ({
+            id: "assign-1",
+            tripDate: new Date("2026-05-20T00:00:00.000Z"),
+            activity: "Transfer",
+            tripLabel: "Makkah to Madinah",
+            requiredBusCount: 1,
+            scheduledTime: "08:00",
+            transferByTrain: false,
+            trainDepartureTime: null,
+            stationPickupTime: null,
+            status: assignmentStatus,
+            drivers: [
+              {
+                slotNumber: 1,
+                name: "Driver One",
+                phone: "+62-888-111",
+                plateNumber: "B 1234 CD",
+                isVerified: true,
+              },
+            ],
+          }),
+        },
+        checklistDriver: {
+          create: async () => ({ id: "driver-1" }),
+        },
+      };
+      return callback(tx);
+    },
+  } as unknown as PrismaService;
+
+  const { service, restore } = createPrismaGroupsService(prismaMock);
+  try {
+    const result = await service.confirmChecklistDriver(
+      "GRP-PRISMA",
+      createConfirmChecklistPayload({
+        requiredBusCount: 1,
+        transferByTrain: false,
+        trainDepartureTime: "",
+        stationPickupTime: "",
+      }),
+    );
+
+    assert.equal(result.groupCode, "GRP-PRISMA");
+    assert.equal(result.status, ChecklistAssignmentStatus.ASSIGNED);
+    assert.ok(auditCreateArgs);
+
+    const auditData = (auditCreateArgs as {
+      data: {
+        groupId?: string;
+        groupCode?: string;
+        action?: string;
+        entity?: string;
+        payload?: {
+          assignmentId?: string;
+          slotCount?: number;
+        };
+      };
+    }).data;
+
+    assert.equal(auditData.groupId, undefined);
+    assert.equal(auditData.groupCode, "GRP-PRISMA");
+    assert.equal(auditData.action, "checklist.driver.confirmed");
+    assert.equal(auditData.entity, "checklistAssignment");
+    assert.equal(auditData.payload?.assignmentId, "assign-1");
+    assert.equal(auditData.payload?.slotCount, 1);
+  } finally {
+    restore();
+  }
+}
+
 async function testPrismaListAuditLogsReadsPersistentEntries(): Promise<void> {
   let findManyArgs: Record<string, unknown> | null = null;
   const prismaMock = {
@@ -909,6 +1044,7 @@ async function main(): Promise<void> {
   await runCase("groups prisma findAll where + pagination branches", testPrismaFindAllWhereAndPaginationBranches);
   await runCase("groups prisma confirm checklist driver paths", testPrismaConfirmChecklistDriverPaths);
   await runCase("groups prisma reset checklist driver paths", testPrismaResetChecklistDriverPaths);
+  await runCase("groups prisma checklist audit logs use group code identity", testPrismaChecklistAuditLogsUseGroupCodeIdentity);
   await runCase("groups prisma listAuditLogs reads persistent entries", testPrismaListAuditLogsReadsPersistentEntries);
 }
 

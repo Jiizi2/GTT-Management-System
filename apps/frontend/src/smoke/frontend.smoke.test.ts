@@ -26,6 +26,7 @@ import {
 import {
   buildAgreementItineraryPrefill,
   buildNewGroupPayload,
+  getAgreementSaveValidationError,
   validateConnectedAgreementDates,
 } from "../pages/new-group-screen-helpers.js";
 import { runCase } from "../test/run-case.js";
@@ -879,6 +880,142 @@ async function testNewGroupPrefillFromAgreements(): Promise<void> {
   assertEqual(prefill?.trips?.["base-transfer"]?.to, "Pullman Zamzam Madinah");
 }
 
+async function testNewGroupPrefillUsesFirstPopulatedAgreement(): Promise<void> {
+  const prefill = buildAgreementItineraryPrefill(
+    [
+      {
+        id: "mak-empty",
+        hotelName: "",
+        agreementNumber: "",
+        pax: "",
+        status: "Waiting for Approval",
+        stayStartIso: "",
+        stayEndIso: "",
+      },
+      {
+        id: "mak-real",
+        hotelName: "Makkah Skyline Hotel",
+        agreementNumber: "AG-MAK-REAL",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-08-01",
+        stayEndIso: "2026-08-03",
+      },
+    ],
+    [
+      {
+        id: "mad-real",
+        hotelName: "Madinah Noor Hotel",
+        agreementNumber: "AG-MAD-REAL",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-08-03",
+        stayEndIso: "2026-08-06",
+      },
+    ],
+  );
+
+  assertTruthy(prefill);
+  assertEqual(prefill?.trips?.["base-arrival"]?.to, "Makkah Skyline Hotel");
+  assertEqual(prefill?.trips?.["base-transfer"]?.to, "Madinah Noor Hotel");
+}
+
+async function testAgreementSaveValidation(): Promise<void> {
+  const blankAgreementError = getAgreementSaveValidationError(
+    [
+      {
+        id: "mak-blank",
+        hotelName: "",
+        agreementNumber: "",
+        pax: "",
+        status: "Waiting for Approval",
+        stayStartIso: "",
+        stayEndIso: "",
+      },
+    ],
+    [
+      {
+        id: "mad-blank",
+        hotelName: "",
+        agreementNumber: "",
+        pax: "",
+        status: "Waiting for Approval",
+        stayStartIso: "",
+        stayEndIso: "",
+      },
+    ],
+  );
+  assertTruthy(blankAgreementError);
+
+  const incompleteAgreementError = getAgreementSaveValidationError(
+    [
+      {
+        id: "mak-incomplete",
+        hotelName: "Swissotel Al Maqam",
+        agreementNumber: "",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-07-10",
+        stayEndIso: "2026-07-12",
+      },
+    ],
+    [],
+  );
+  assertEqual(incompleteAgreementError, "Makkah hotel 1: agreement number wajib diisi.");
+
+  const disconnectedAgreementError = getAgreementSaveValidationError(
+    [
+      {
+        id: "mak-disconnected",
+        hotelName: "Swissotel Al Maqam",
+        agreementNumber: "AG-MAK-1",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-07-10",
+        stayEndIso: "2026-07-12",
+      },
+    ],
+    [
+      {
+        id: "mad-disconnected",
+        hotelName: "Pullman Zamzam Madinah",
+        agreementNumber: "AG-MAD-1",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-07-13",
+        stayEndIso: "2026-07-16",
+      },
+    ],
+  );
+  assertTruthy(Boolean(disconnectedAgreementError));
+
+  const connectedAgreementError = getAgreementSaveValidationError(
+    [
+      {
+        id: "mak-connected",
+        hotelName: "Swissotel Al Maqam",
+        agreementNumber: "AG-MAK-2",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-07-10",
+        stayEndIso: "2026-07-12",
+      },
+    ],
+    [
+      {
+        id: "mad-connected",
+        hotelName: "Pullman Zamzam Madinah",
+        agreementNumber: "AG-MAD-2",
+        pax: "45",
+        status: "Approved",
+        stayStartIso: "2026-07-12",
+        stayEndIso: "2026-07-16",
+      },
+    ],
+  );
+  assertEqual(connectedAgreementError, null);
+}
+
 async function testConnectedAgreementDateValidation(): Promise<void> {
   const multiMakkahConnectedToMadinah = validateConnectedAgreementDates(
     [
@@ -1239,6 +1376,8 @@ describe("frontend smoke", () => {
   runCase("effective identity mode helper rules", testEffectiveIdentityModeHelpers);
   runCase("input validation helper rules", testInputValidationHelpers);
   runCase("new group prefill builder", testNewGroupPrefillFromAgreements);
+  runCase("new group prefill skips blank agreement cards", testNewGroupPrefillUsesFirstPopulatedAgreement);
+  runCase("agreement save validation", testAgreementSaveValidation);
   runCase("connected agreement date validation", testConnectedAgreementDateValidation);
   runCase("new group payload builder", testNewGroupPayloadBuild);
 });

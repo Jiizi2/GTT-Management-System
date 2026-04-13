@@ -567,6 +567,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
 async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
   {
     let deletedGroupId: string | null = null;
+    let auditCreateArgs: Record<string, unknown> | null = null;
     const existingGroup: PrismaGroupRecord = {
       id: "grp-1",
       code: "GRP-REMOVE",
@@ -579,12 +580,19 @@ async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
       group: {
         findFirst: createGroupFindFirstMock({
           includeLookup: () => existingGroup,
-          selectLookup: () => ({ id: "grp-1" }),
+          selectLookup: (select) => ("code" in select ? existingGroup : { id: "grp-1" }),
         }),
         delete: async (args: { where: { id: string } }) => {
           deletedGroupId = args.where.id;
           return {};
         },
+      },
+      groupAuditLog: {
+        create: async (args: Record<string, unknown>) => {
+          auditCreateArgs = args;
+          return {};
+        },
+        findMany: async () => [],
       },
     } as unknown as PrismaService;
 
@@ -592,6 +600,17 @@ async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
     try {
       await service.remove("GRP-REMOVE");
       assert.equal(deletedGroupId, "grp-1");
+      assert.ok(auditCreateArgs);
+      const auditData = (auditCreateArgs as {
+        data: {
+          groupId?: string;
+          groupCode?: string;
+          action?: string;
+        };
+      }).data;
+      assert.equal(auditData.groupId, undefined);
+      assert.equal(auditData.groupCode, "GRP-REMOVE");
+      assert.equal(auditData.action, "group.deleted");
     } finally {
       restore();
     }

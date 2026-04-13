@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
@@ -43,15 +44,20 @@ const LazyVisaStatusModal = lazy(async () => ({
 }));
 
 function VisaDetailModalFallback() {
-  return (
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-4">
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="serene-modal-overlay z-[140] flex items-center justify-center p-4">
       <div className="inline-flex items-center gap-2 rounded-xl bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface shadow-ambient">
         <span className="material-symbols-outlined animate-pulse text-brand-primary" aria-hidden="true">
           hourglass_top
         </span>
         <span>Loading modal...</span>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

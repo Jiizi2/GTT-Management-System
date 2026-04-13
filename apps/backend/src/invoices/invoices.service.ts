@@ -106,6 +106,11 @@ const invoiceSummarySelect = {
   },
 } satisfies Prisma.InvoiceSelect;
 
+const invoiceSummarySelectWithDownPayment = {
+  ...invoiceSummarySelect,
+  downPaymentIdr: true,
+} satisfies Prisma.InvoiceSelect;
+
 type PrismaInvoiceSummaryRow = Prisma.InvoiceGetPayload<{
   select: typeof invoiceSummarySelect;
 }>;
@@ -115,7 +120,6 @@ type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & 
 };
 
 type PrismaInvoiceDownPaymentRow = {
-  id: string;
   downPaymentIdr: Prisma.Decimal | number | null;
 };
 
@@ -872,34 +876,6 @@ export class InvoicesService implements OnModuleInit {
     }
   }
 
-  private async readPrismaInvoiceDownPaymentMap(): Promise<Map<string, number>> {
-    const canReadColumn = await this.ensurePrismaInvoiceDownPaymentColumn();
-    if (!canReadColumn || typeof this.prisma.$queryRaw !== "function") {
-      return new Map();
-    }
-
-    try {
-      const downPaymentRows = await this.prisma.$queryRaw<PrismaInvoiceDownPaymentRow[]>`
-        SELECT "id", "downPaymentIdr"
-        FROM "Invoice"
-      `;
-
-      return new Map(
-        downPaymentRows.map((row) => [row.id, Math.max(0, Math.round(toNumberAmount(row.downPaymentIdr)))]),
-      );
-    } catch (error: unknown) {
-      this.logger.warn(
-        {
-          action: "invoice.down-payment-column.read-failed",
-          dataSource: this.dataSource,
-          error,
-        },
-        "Invoice down payment values could not be loaded.",
-      );
-      return new Map();
-    }
-  }
-
   private resolvePrismaInvoiceInlineDownPayment(
     invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment,
   ): number | undefined {
@@ -911,20 +887,16 @@ export class InvoicesService implements OnModuleInit {
   }
 
   private async findAllWithPrisma(): Promise<InvoiceListItem[]> {
-    const invoices = await this.prisma.invoice.findMany({
-      select: invoiceSummarySelect,
+    const canReadInlineDownPayment = await this.ensurePrismaInvoiceDownPaymentColumn();
+    const invoices = (await this.prisma.invoice.findMany({
+      select: canReadInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
-    });
-    const downPaymentByInvoiceId = await this.readPrismaInvoiceDownPaymentMap();
+    })) as PrismaInvoiceSummaryRowWithOptionalDownPayment[];
 
     return invoices.map((invoice) => {
-      const inlineDownPaymentIdr = this.resolvePrismaInvoiceInlineDownPayment(
-        invoice as PrismaInvoiceSummaryRowWithOptionalDownPayment,
-      );
-      const downPaymentIdr =
-        downPaymentByInvoiceId.get(invoice.id) ?? inlineDownPaymentIdr ?? 0;
+      const downPaymentIdr = this.resolvePrismaInvoiceInlineDownPayment(invoice) ?? 0;
 
-      return this.mapPrismaInvoiceToListItem(invoice as PrismaInvoiceSummaryRowWithOptionalDownPayment, downPaymentIdr);
+      return this.mapPrismaInvoiceToListItem(invoice, downPaymentIdr);
     });
   }
 

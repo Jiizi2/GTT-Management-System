@@ -33,6 +33,20 @@ type AgreementDateSegment = AgreementDateRange & {
   city: AgreementDateCity;
 };
 
+function hasAgreementFormInput(form: NewGroupAgreementFormState): boolean {
+  return [
+    form.hotelName.trim(),
+    form.agreementNumber.trim(),
+    form.pax.trim(),
+    form.stayStartIso.trim(),
+    form.stayEndIso.trim(),
+  ].some(Boolean);
+}
+
+function getAgreementFormsWithInput(forms: NewGroupAgreementFormState[]): NewGroupAgreementFormState[] {
+  return forms.filter((form) => hasAgreementFormInput(form));
+}
+
 export type AgreementDateConnectionValidation = {
   cityWarnings: {
     makkah: string | null;
@@ -147,13 +161,106 @@ export function validateConnectedAgreementDates(
   };
 }
 
+function getAgreementFieldValidationError(
+  city: AgreementDateCity,
+  forms: NewGroupAgreementFormState[],
+): string | null {
+  const populatedForms = getAgreementFormsWithInput(forms);
+  for (const form of populatedForms) {
+    const agreementIndex = forms.findIndex((entry) => entry.id === form.id);
+    const hotelNumber = agreementIndex >= 0 ? agreementIndex + 1 : populatedForms.indexOf(form) + 1;
+    const cityLabel = toAgreementCityLabel(city);
+    const labelPrefix = `${cityLabel} hotel ${hotelNumber}`;
+    const hotelName = form.hotelName.trim();
+    const agreementNumber = form.agreementNumber.trim();
+    const pax = form.pax.trim();
+    const stayStartIso = form.stayStartIso.trim();
+    const stayEndIso = form.stayEndIso.trim();
+
+    if (!hotelName) {
+      return `${labelPrefix}: hotel name wajib diisi.`;
+    }
+
+    if (!agreementNumber) {
+      return `${labelPrefix}: agreement number wajib diisi.`;
+    }
+
+    if (!pax) {
+      return `${labelPrefix}: total pax wajib diisi.`;
+    }
+
+    const parsedPax = Number.parseInt(pax, 10);
+    if (!Number.isInteger(parsedPax) || parsedPax <= 0) {
+      return `${labelPrefix}: total pax harus lebih dari 0.`;
+    }
+
+    if (!stayStartIso) {
+      return `${labelPrefix}: stay start wajib diisi.`;
+    }
+
+    if (!isIsoDateValue(stayStartIso)) {
+      return `${labelPrefix}: stay start tidak valid.`;
+    }
+
+    if (!stayEndIso) {
+      return `${labelPrefix}: stay end wajib diisi.`;
+    }
+
+    if (!isIsoDateValue(stayEndIso)) {
+      return `${labelPrefix}: stay end tidak valid.`;
+    }
+
+    if (stayEndIso < stayStartIso) {
+      return `${labelPrefix}: stay end tidak boleh sebelum stay start.`;
+    }
+  }
+
+  return null;
+}
+
+export function getAgreementSaveValidationError(
+  makkahHotels: NewGroupAgreementFormState[],
+  madinahHotels: NewGroupAgreementFormState[],
+): string | null {
+  const populatedMakkahHotels = getAgreementFormsWithInput(makkahHotels);
+  const populatedMadinahHotels = getAgreementFormsWithInput(madinahHotels);
+  const hasAnyAgreementInput = populatedMakkahHotels.length > 0 || populatedMadinahHotels.length > 0;
+
+  if (!hasAnyAgreementInput) {
+    return "Isi agreement hotel terlebih dahulu sebelum menekan save.";
+  }
+
+  const makkahFieldError = getAgreementFieldValidationError("makkah", makkahHotels);
+  if (makkahFieldError) {
+    return makkahFieldError;
+  }
+
+  const madinahFieldError = getAgreementFieldValidationError("madinah", madinahHotels);
+  if (madinahFieldError) {
+    return madinahFieldError;
+  }
+
+  const connectionValidation = validateConnectedAgreementDates(populatedMakkahHotels, populatedMadinahHotels);
+  return (
+    connectionValidation.cityWarnings.makkah ??
+    connectionValidation.cityWarnings.madinah ??
+    connectionValidation.crossCityWarning
+  );
+}
+
 export function buildAgreementItineraryPrefill(
   makkahHotels: NewGroupAgreementFormState[],
   madinahHotels: NewGroupAgreementFormState[],
 ): ItineraryPrefill | null {
+  const populatedAndSortedMakkahHotels = getAgreementFormsWithInput(makkahHotels).sort((left, right) =>
+    left.stayStartIso.localeCompare(right.stayStartIso),
+  );
+  const populatedAndSortedMadinahHotels = getAgreementFormsWithInput(madinahHotels).sort((left, right) =>
+    left.stayStartIso.localeCompare(right.stayStartIso),
+  );
+  const firstMakkah = populatedAndSortedMakkahHotels[0];
+  const firstMadinah = populatedAndSortedMadinahHotels[0];
   const isValidIso = (value: string) => isIsoDateValue(value.trim());
-  const firstMakkah = makkahHotels[0];
-  const firstMadinah = madinahHotels[0];
   const makkahStart = isValidIso(firstMakkah?.stayStartIso ?? "") ? firstMakkah.stayStartIso.trim() : "";
   const makkahEnd = isValidIso(firstMakkah?.stayEndIso ?? "") ? firstMakkah.stayEndIso.trim() : "";
   const madinahStart = isValidIso(firstMadinah?.stayStartIso ?? "") ? firstMadinah.stayStartIso.trim() : "";
