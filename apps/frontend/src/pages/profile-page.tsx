@@ -171,7 +171,7 @@ function EditProfileModal({
         aria-label="Edit profile"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3">
+        <header className="serene-dialog-header">
           <div>
             <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Edit Profile</h3>
             <p className="mt-1 text-sm text-on-surface-variant">
@@ -181,7 +181,7 @@ function EditProfileModal({
           </div>
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high"
+            className="serene-dialog-close"
             aria-label="Close edit profile modal"
             onClick={onClose}
           >
@@ -191,7 +191,7 @@ function EditProfileModal({
           </button>
         </header>
 
-        <form className="mt-5" onSubmit={handleSubmit((values) => onSave(values))}>
+        <form className="serene-dialog-body" onSubmit={handleSubmit((values) => onSave(values))}>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="serene-field sm:col-span-2">
               <span className="text-sm font-semibold text-on-surface-variant">Full Name</span>
@@ -241,7 +241,7 @@ function EditProfileModal({
             </p>
           ) : null}
 
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="serene-dialog-footer">
             <button type="button" className="serene-btn-secondary" onClick={onClose}>
               Cancel
             </button>
@@ -287,7 +287,7 @@ function ChangePasswordModal({ onClose, onSave }: { onClose: () => void; onSave:
         aria-label="Change password"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3">
+        <header className="serene-dialog-header">
           <div>
             <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Change Password</h3>
             <p className="mt-1 text-sm text-on-surface-variant">
@@ -297,7 +297,7 @@ function ChangePasswordModal({ onClose, onSave }: { onClose: () => void; onSave:
           </div>
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high"
+            className="serene-dialog-close"
             aria-label="Close change password modal"
             onClick={onClose}
           >
@@ -307,7 +307,7 @@ function ChangePasswordModal({ onClose, onSave }: { onClose: () => void; onSave:
           </button>
         </header>
 
-        <form className="mt-5" onSubmit={handleSubmit(() => onSave())}>
+        <form className="serene-dialog-body" onSubmit={handleSubmit(() => onSave())}>
           <div className="grid gap-3">
             <label className="serene-field">
               <span className="text-sm font-semibold text-on-surface-variant">Current Password</span>
@@ -331,7 +331,7 @@ function ChangePasswordModal({ onClose, onSave }: { onClose: () => void; onSave:
             </p>
           ) : null}
 
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="serene-dialog-footer">
             <button type="button" className="serene-btn-secondary" onClick={onClose}>
               Cancel
             </button>
@@ -659,32 +659,34 @@ export function ProfileScreen({
             aria-label="Sign out confirmation"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-error-container text-on-error-container">
+            <div className="serene-dialog-icon bg-error-container text-on-error-container">
               <span className="material-symbols-outlined" aria-hidden="true">
                 logout
               </span>
             </div>
 
-            <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-on-surface">Sign Out Session?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-              <span className="sm:hidden">Kamu akan keluar dan kembali ke overview.</span>
-              <span className="hidden sm:inline">Kamu akan keluar dari halaman profile dan kembali ke overview.</span>
-            </p>
+            <div className="serene-dialog-body">
+              <div>
+                <h3 className="font-display text-2xl font-bold tracking-tight text-on-surface">Sign Out Session?</h3>
+                <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                  <span className="sm:hidden">Kamu akan keluar dan kembali ke overview.</span>
+                  <span className="hidden sm:inline">
+                    Kamu akan keluar dari halaman profile dan kembali ke overview.
+                  </span>
+                </p>
+              </div>
 
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" className="serene-btn-secondary" onClick={closeSignOutModal}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-error-container px-4 py-2 text-sm font-semibold text-on-error-container transition hover:brightness-95"
-                onClick={handleConfirmSignOut}
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  logout
-                </span>
-                Sign Out
-              </button>
+              <div className="serene-dialog-actions-stacked">
+                <button type="button" className="serene-btn-secondary" onClick={closeSignOutModal}>
+                  Cancel
+                </button>
+                <button type="button" className="serene-btn-danger" onClick={handleConfirmSignOut}>
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    logout
+                  </span>
+                  Sign Out
+                </button>
+              </div>
             </div>
           </section>
         </ProfileModalOverlay>

@@ -23,6 +23,7 @@ import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import {
   isMasterDataClientOptionId,
   mergeInvoiceClientsWithMasterData,
+  openInvoiceExportWindow,
   resolveInvoiceDownPaymentIdr,
   resolveInvoiceOutstandingBalanceLabel,
   resolveInvoiceRemainingBalanceIdr,
@@ -561,7 +562,7 @@ async function viewInvoicePdfFromRow({
 }
 
 function openPendingInvoicePdfWindow(): Window | null {
-  const pendingWindow = window.open("", "_blank", "width=1180,height=860");
+  const pendingWindow = openInvoiceExportWindow();
   if (!pendingWindow) {
     return null;
   }
@@ -1165,7 +1166,7 @@ export function CreateInvoiceWorkspace({
           </section>
         ) : null}
 
-        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+        <div className="serene-form-section">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <nav className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
@@ -1180,7 +1181,7 @@ export function CreateInvoiceWorkspace({
               </h1>
             </div>
 
-            <div className="flex flex-wrap gap-2 rounded-xl bg-surface-container-low p-2">
+            <div className="serene-form-actions rounded-xl bg-surface-container-low p-2">
               {!isEditMode ? (
                 <button
                   type="button"
@@ -1233,8 +1234,8 @@ export function CreateInvoiceWorkspace({
       <div className="grid grid-cols-12 gap-5">
         <section className="col-span-12 space-y-5 lg:col-span-9">
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
-              <h3 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
+            <article className="serene-form-section">
+              <h3 className="serene-form-section-header text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
                 <span className="material-symbols-outlined text-sm" aria-hidden="true">
                   confirmation_number
                 </span>
@@ -1374,8 +1375,8 @@ export function CreateInvoiceWorkspace({
               </div>
             </article>
 
-            <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
-              <h3 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
+            <article className="serene-form-section">
+              <h3 className="serene-form-section-header text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
                 <span className="material-symbols-outlined text-sm" aria-hidden="true">
                   person_pin
                 </span>
@@ -1488,7 +1489,7 @@ export function CreateInvoiceWorkspace({
             </article>
           </div>
 
-          <article className="overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+          <article className="serene-table-shell">
             <div className="flex items-center justify-between border-b border-outline-variant/20 px-5 py-3">
               <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
                 <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -1621,7 +1622,7 @@ export function CreateInvoiceWorkspace({
 
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 space-y-5 xl:col-span-7">
-              <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+              <article className="serene-form-section">
                 <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/70">
                   Bank Disbursement
                 </h3>
@@ -1664,7 +1665,7 @@ export function CreateInvoiceWorkspace({
                 </div>
               </article>
 
-              <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm">
+              <article className="serene-form-section">
                 <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/70">
                   Live Exchange Rates
                 </h3>
@@ -1696,7 +1697,7 @@ export function CreateInvoiceWorkspace({
             </div>
 
             <div className="col-span-12 xl:col-span-5 xl:h-full">
-              <article className="rounded-xl border border-primary/20 bg-surface-container-low p-4 shadow-sm ring-1 ring-primary/10 xl:flex xl:h-full xl:flex-col">
+              <article className="serene-form-section border-primary/20 bg-surface-container-low ring-1 ring-primary/10 xl:flex xl:h-full xl:flex-col">
                 <div className="mb-2 flex items-center gap-2.5">
                   <div className="flex items-center gap-2.5">
                     <span
@@ -1728,7 +1729,7 @@ export function CreateInvoiceWorkspace({
         </section>
 
         <aside className="col-span-12 space-y-4 lg:col-span-3">
-          <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5">
+          <article className="serene-form-section p-5">
             <h3 className="mb-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/65">
               <span>Summary</span>
               <span className="material-symbols-outlined text-base text-on-surface-variant/35" aria-hidden="true">
@@ -1824,7 +1825,7 @@ export function CreateInvoiceWorkspace({
             </div>
           </article>
 
-          <article className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 text-center shadow-sm">
+          <article className="serene-form-section p-5 text-center">
             <div className="mb-3 border-b border-outline-variant/20 pb-6">
               <span className="material-symbols-outlined mx-auto text-4xl text-primary/20" aria-hidden="true">
                 approval_delegation
@@ -1836,7 +1837,7 @@ export function CreateInvoiceWorkspace({
             </p>
           </article>
 
-          <article className="rounded-xl border border-primary/15 bg-primary/5 p-4">
+          <article className="serene-form-section border-primary/15 bg-primary/5">
             <p className="text-[10px] italic leading-relaxed text-primary/75">
               Note: Ensure all pilgrim PAX counts match the visa manifestations before generating the final document.
             </p>
@@ -1860,7 +1861,7 @@ export function CreateInvoiceWorkspace({
                 className="serene-modal-shell w-full max-w-[32rem] overflow-hidden"
                 onClick={(event) => event.stopPropagation()}
               >
-                <header className="flex items-center gap-3 border-b border-outline-variant/35 bg-surface-container-lowest px-4 py-4 sm:px-5">
+                <header className="serene-dialog-header border-b border-outline-variant/35 bg-surface-container-lowest px-4 py-4 sm:px-5">
                   <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800">
                     <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
                       warning
@@ -1879,17 +1880,17 @@ export function CreateInvoiceWorkspace({
 
                 <div
                   id="invoice-cancel-confirmation-description"
-                  className="space-y-2 bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed text-on-surface-variant sm:px-5"
+                  className="serene-dialog-body bg-surface-container-lowest px-4 py-4 text-sm leading-relaxed text-on-surface-variant sm:px-5"
                 >
                   <p>Invoice ini akan disimpan sebagai Cancelled. Lanjutkan penyimpanan?</p>
                   <p>Status cancelled akan menandai invoice sebagai dibatalkan.</p>
                   <p>Amount invoice juga akan otomatis menjadi 0 saat disimpan.</p>
                 </div>
 
-                <footer className="flex flex-wrap items-center justify-end gap-2 bg-surface-container-lowest px-4 py-4 sm:px-5">
+                <footer className="serene-dialog-footer-bar bg-surface-container-lowest px-4 py-4 sm:px-5">
                   <button
                     type="button"
-                    className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-emerald-100 px-6 py-2 text-lg font-semibold text-emerald-800 transition hover:bg-emerald-200"
+                    className="serene-btn-secondary min-h-10 rounded-2xl px-6 py-2 text-lg font-semibold"
                     onClick={() => setIsCancelConfirmationOpen(false)}
                     disabled={isSubmitting}
                   >
@@ -1897,7 +1898,7 @@ export function CreateInvoiceWorkspace({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-emerald-700 px-6 py-2 text-lg font-bold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="serene-btn-primary min-h-10 rounded-2xl px-6 py-2 text-lg font-bold"
                     onClick={handleConfirmCancelledStatus}
                     disabled={isSubmitting}
                   >
@@ -2257,7 +2258,7 @@ export function InvoiceScreen({
           </label>
         </div>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </header>
 
       <PageHeroSection

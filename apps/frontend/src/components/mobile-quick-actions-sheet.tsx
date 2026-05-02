@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, type ReactNode } from "react";
 import type { NavId } from "../shared/app-domain";
 import type { SessionAccessTier } from "../shared/app-domain";
+import { useModalFocusTrap } from "./use-modal-focus-trap";
 
 type QuickAction = {
   id: NavId;
@@ -67,6 +68,10 @@ export function MobileQuickActionsSheet({
   onClose: () => void;
   onSelectAction: (navId: NavId) => void;
 }) {
+  const dialogRef = useModalFocusTrap<HTMLElement>({
+    isActive: open,
+    onClose,
+  });
   const visibleQuickActions = quickActions.filter(
     (action) => !action.requiresSuperAdmin || sessionAccessTier === "super-admin",
   );
@@ -101,12 +106,15 @@ export function MobileQuickActionsSheet({
       <div
         className="serene-modal-overlay z-[100] flex items-end justify-center px-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3"
         onClick={onClose}
+        role="presentation"
       >
         <section
+          ref={dialogRef}
           className="flex max-h-[calc(100dvh-0.75rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-outline-variant/70 bg-surface-container-lowest shadow-float"
           role="dialog"
           aria-modal="true"
           aria-labelledby="mobile-quick-actions-title"
+          tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="px-5 pt-4">

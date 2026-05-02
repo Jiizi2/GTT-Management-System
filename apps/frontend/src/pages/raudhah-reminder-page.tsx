@@ -851,9 +851,7 @@ export function RaudhahReminderScreen({
     onOpenVisaDetail(visaRow);
   };
 
-  const heroSectionClassName = isDarkMode
-    ? "serene-section flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
-    : "flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-surface-container-lowest p-5 shadow-sm md:flex-row md:items-end md:justify-between";
+  const heroSectionClassName = "serene-section flex flex-col gap-4 md:flex-row md:items-end md:justify-between";
   const heroLabelClassName = isDarkMode ? "text-primary/85" : "text-emerald-700";
   const heroTitleClassName = isDarkMode
     ? "mt-2 text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl"
@@ -928,7 +926,7 @@ export function RaudhahReminderScreen({
             </button>
           ) : null}
 
-          <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary" />
+          <ThemeToggleButton />
         </div>
       </header>
 
@@ -973,7 +971,7 @@ export function RaudhahReminderScreen({
       </section>
 
       {filteredItems.length === 0 ? (
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-surface-container-lowest p-10 text-center">
+        <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
             search_off
           </span>

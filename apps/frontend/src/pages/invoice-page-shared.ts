@@ -294,6 +294,11 @@ export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number): s
   return Math.max(0, Math.round(downPaymentIdr)) > 0 ? "Sisa Tagihan" : "Tagihan";
 }
 
+export function openInvoiceExportWindow(): Window | null {
+  const isCompactViewport = typeof window !== "undefined" && window.innerWidth < 768;
+  return isCompactViewport ? window.open("", "_blank") : window.open("", "_blank", "width=1180,height=860");
+}
+
 export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
   const items: Array<BackendInvoiceItem & { id: string }> = Array.isArray(row.items)
     ? row.items.map((item, index) => ({
@@ -354,7 +359,7 @@ export async function viewInvoicePdfFromRow({
   const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
   const { exportInvoicePdf } = await import("./invoice-export");
 
-  return exportInvoicePdf(
+  return await exportInvoicePdf(
     {
       invoiceNumber: row.invoiceNumber,
       issueDateIso: row.issuedDateIso,

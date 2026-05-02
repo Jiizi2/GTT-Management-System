@@ -2,6 +2,13 @@
 
 Dokumen ini menjelaskan arsitektur frontend yang aktif saat ini, alur data per modul, aturan aman saat menambah fitur, dan checklist deploy/auth untuk production.
 
+Dokumen pendamping untuk konsistensi desain:
+
+- `docs/frontend-design-guidelines.md`
+- `docs/frontend-design-refactor-plan.md`
+- `docs/frontend-design-phase-1-checklist.md`
+- `docs/frontend-design-phase-2-checklist.md`
+
 ## 1. Ringkasan Teknis
 
 - Lokasi: `apps/frontend`

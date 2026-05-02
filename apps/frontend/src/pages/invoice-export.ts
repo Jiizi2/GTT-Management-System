@@ -36,6 +36,10 @@ type InvoiceExportWindowOptions = {
   printWindow?: Window | null;
 };
 
+const PRINT_TRIGGER_DELAY_MS = 180;
+const PRINT_FALLBACK_TIMEOUT_MS = 4_500;
+const RESOURCE_WAIT_TIMEOUT_MS = 2_500;
+
 const companyProfile = {
   brandName: "Ghaniya Tour and Travel",
   directorName: "Husein Ghanim",
@@ -179,7 +183,125 @@ function resolvePrintableWindow(options: InvoiceExportWindowOptions): Window | n
   return window.open("", "_blank", "width=1180,height=860");
 }
 
-function schedulePrint(printableWindow: Window): void {
+function waitForTimeout(timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, timeoutMs);
+  });
+}
+
+function waitForDocumentLoad(printableWindow: Window): Promise<void> {
+  const document = printableWindow.document;
+  if (document.readyState === "complete") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) {
+        return;
+      }
+
+      resolved = true;
+      resolve();
+    };
+
+    try {
+      printableWindow.addEventListener("load", finish, { once: true });
+    } catch {
+      finish();
+      return;
+    }
+
+    window.setTimeout(finish, RESOURCE_WAIT_TIMEOUT_MS);
+  });
+}
+
+function waitForStylesheets(printableWindow: Window): Promise<void> {
+  const styleLinks = Array.from(printableWindow.document.querySelectorAll('link[rel="stylesheet"]'));
+  if (styleLinks.length === 0) {
+    return Promise.resolve();
+  }
+
+  return Promise.all(
+    styleLinks.map(
+      (link) =>
+        new Promise<void>((resolve) => {
+          if ((link as HTMLLinkElement).sheet) {
+            resolve();
+            return;
+          }
+
+          let settled = false;
+          const finish = () => {
+            if (settled) {
+              return;
+            }
+
+            settled = true;
+            resolve();
+          };
+
+          link.addEventListener("load", finish, { once: true });
+          link.addEventListener("error", finish, { once: true });
+          window.setTimeout(finish, RESOURCE_WAIT_TIMEOUT_MS);
+        }),
+    ),
+  ).then(() => undefined);
+}
+
+function waitForFonts(printableWindow: Window): Promise<void> {
+  try {
+    const fontsReady = printableWindow.document.fonts?.ready;
+    if (fontsReady) {
+      return Promise.race([fontsReady.then(() => undefined), waitForTimeout(RESOURCE_WAIT_TIMEOUT_MS)]);
+    }
+  } catch {
+    // Some popup handles expose a restricted document.fonts API.
+  }
+
+  return Promise.resolve();
+}
+
+function waitForImages(printableWindow: Window): Promise<void> {
+  const images = Array.from(printableWindow.document.images);
+  if (images.length === 0) {
+    return Promise.resolve();
+  }
+
+  return Promise.all(
+    images.map(
+      (image) =>
+        new Promise<void>((resolve) => {
+          if (image.complete) {
+            if (typeof image.decode === "function") {
+              void image.decode().catch(() => undefined).finally(resolve);
+              return;
+            }
+
+            resolve();
+            return;
+          }
+
+          let settled = false;
+          const finish = () => {
+            if (settled) {
+              return;
+            }
+
+            settled = true;
+            resolve();
+          };
+
+          image.addEventListener("load", finish, { once: true });
+          image.addEventListener("error", finish, { once: true });
+          window.setTimeout(finish, RESOURCE_WAIT_TIMEOUT_MS);
+        }),
+    ),
+  ).then(() => undefined);
+}
+
+async function finalizePrintWindow(printableWindow: Window): Promise<void> {
   let printTriggered = false;
   const triggerPrint = () => {
     if (printTriggered || printableWindow.closed) {
@@ -191,22 +313,26 @@ function schedulePrint(printableWindow: Window): void {
     printableWindow.print();
   };
 
-  try {
-    printableWindow.addEventListener(
-      "load",
-      () => {
-        window.setTimeout(triggerPrint, 180);
-      },
-      { once: true },
-    );
-  } catch {
-    // Some browser contexts expose restricted event APIs on popup proxies.
+  const waitForResources = Promise.allSettled([
+    waitForDocumentLoad(printableWindow),
+    waitForStylesheets(printableWindow),
+    waitForFonts(printableWindow),
+    waitForImages(printableWindow),
+  ]);
+
+  await Promise.race([waitForResources, waitForTimeout(PRINT_FALLBACK_TIMEOUT_MS)]);
+
+  if (printableWindow.closed) {
+    return;
   }
 
-  window.setTimeout(triggerPrint, 1600);
+  window.setTimeout(triggerPrint, PRINT_TRIGGER_DELAY_MS);
 }
 
-export function exportInvoicePdf(payload: InvoiceExportPayload, options: InvoiceExportWindowOptions = {}): boolean {
+export async function exportInvoicePdf(
+  payload: InvoiceExportPayload,
+  options: InvoiceExportWindowOptions = {},
+): Promise<boolean> {
   const printableWindow = resolvePrintableWindow(options);
   if (!printableWindow) {
     return false;
@@ -257,7 +383,13 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
 <html lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="light only" name="color-scheme"/>
 <title>Invoice - Ghaniya Tour and Travel</title>
+<link as="style" href="${escapeHtml(fontsCssUrl)}" rel="preload"/>
+<link as="style" href="${escapeHtml(appCssUrl)}" rel="preload"/>
+<link as="image" href="${escapeHtml(logoUrl)}" rel="preload"/>
+<link as="image" href="${escapeHtml(capUrl)}" rel="preload"/>
+<link as="image" href="${escapeHtml(signatureUrl)}" rel="preload"/>
 <link href="${escapeHtml(fontsCssUrl)}" rel="stylesheet"/>
 <link href="${escapeHtml(appCssUrl)}" rel="stylesheet"/>
 <style>
@@ -290,6 +422,13 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
         body {
             color: var(--invoice-ink);
             display: block;
+            text-rendering: geometricPrecision;
+            -webkit-font-smoothing: subpixel-antialiased;
+            font-smooth: always;
+        }
+        img {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: high-quality;
         }
         .print-container {
             width: 210mm;
@@ -307,6 +446,34 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
             background: #ffffff;
             page-break-after: avoid;
             break-after: avoid;
+        }
+        @media screen {
+            html,
+            body {
+                height: auto;
+                min-height: 100%;
+                overflow: auto;
+                background: #f3f4f6;
+            }
+            body {
+                padding: 12px;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+            }
+            .print-container {
+                margin: 0 auto;
+                box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+            }
+        }
+        @media screen and (max-width: 767px) {
+            body {
+                padding: 8px;
+                justify-content: flex-start;
+            }
+            .print-container {
+                margin: 0;
+            }
         }
         @media print {
             html,
@@ -554,7 +721,7 @@ export function exportInvoicePdf(payload: InvoiceExportPayload, options: Invoice
 <div class="print-container bg-white rub-el-hizb-pattern border border-stone-200">
 <header class="w-full luxury-gradient flex justify-between items-center px-10 py-7 relative z-10 border-b-4 border-gold-primary">
 <div class="flex items-center gap-6">
-<img alt="Logo" class="h-16 w-auto object-contain" src="${escapeHtml(logoUrl)}"/>
+<img alt="Logo" class="h-16 w-auto object-contain" decoding="sync" fetchpriority="high" src="${escapeHtml(logoUrl)}"/>
 <div class="flex flex-col">
 <span class="invoice-header-brand font-bold text-xl uppercase tracking-[0.3em] font-headline">Ghaniya Tour</span>
 <span class="invoice-header-subtitle font-manrope text-xl font-light tracking-tight">Umrah Group Summary</span>
@@ -670,8 +837,8 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
 </div>
 <div class="invoice-signature-block flex flex-col items-center justify-start pt-1">
 <div class="w-48 border-b-2 border-gold-primary mb-2 relative pb-2 pt-3 flex justify-center">
-<img alt="Cap Ghaniya" class="h-16 w-auto object-contain opacity-25 absolute -top-6 left-1/2 -translate-x-1/2" src="${escapeHtml(capUrl)}"/>
-<img alt="Tanda Tangan Husein" class="h-14 w-auto object-contain relative z-10" src="${escapeHtml(signatureUrl)}"/>
+<img alt="Cap Ghaniya" class="h-16 w-auto object-contain opacity-25 absolute -top-6 left-1/2 -translate-x-1/2" decoding="sync" fetchpriority="high" src="${escapeHtml(capUrl)}"/>
+<img alt="Tanda Tangan Husein" class="h-14 w-auto object-contain relative z-10" decoding="sync" fetchpriority="high" src="${escapeHtml(signatureUrl)}"/>
 </div>
 <p class="font-bold text-luxury-black uppercase tracking-[0.25em] text-[10px]">${escapeHtml(companyProfile.directorName)}</p>
 <p class="invoice-section-accent text-[8px] font-bold uppercase tracking-widest mt-1">${escapeHtml(companyProfile.directorTitle)}</p>
@@ -686,7 +853,21 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
   printableWindow.document.open();
   printableWindow.document.write(printableHtml);
   printableWindow.document.close();
-  schedulePrint(printableWindow);
+
+  void finalizePrintWindow(printableWindow).catch(() => {
+    if (printableWindow.closed) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (printableWindow.closed) {
+        return;
+      }
+
+      printableWindow.focus();
+      printableWindow.print();
+    }, PRINT_TRIGGER_DELAY_MS);
+  });
 
   return true;
 }

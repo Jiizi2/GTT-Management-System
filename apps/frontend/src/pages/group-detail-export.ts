@@ -287,7 +287,6 @@ export function exportGroupDetailPdf({
     makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
     madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
   };
-  const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const resolveHotelNameByCity = (cityInput: string): string => {
     const cityKey = normalizeAgreementCityKey(cityInput);
     if (!cityKey) {
@@ -346,36 +345,6 @@ export function exportGroupDetailPdf({
       const { dateLabel, dayLabel } = formatTimelineDate(itemIso);
       const categoryKey = inferCategoryKey(item);
       const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item) : "";
-      const badgeClass =
-        categoryKey === "arrival"
-          ? "badge-arrival"
-          : categoryKey === "city-tour"
-            ? "badge-tour"
-            : categoryKey === "transfer"
-              ? "badge-transfer"
-              : categoryKey === "departure"
-                ? "badge-departure"
-                : "badge-default";
-      const dotClass =
-        categoryKey === "arrival"
-          ? "dot-arrival"
-          : categoryKey === "city-tour"
-            ? "dot-tour"
-            : categoryKey === "transfer"
-              ? "dot-transfer"
-              : categoryKey === "departure"
-                ? "dot-departure"
-                : "dot-default";
-      const badgeIcon =
-        categoryKey === "arrival"
-          ? "check_circle"
-          : categoryKey === "city-tour"
-            ? "map"
-            : categoryKey === "transfer"
-              ? "train"
-              : categoryKey === "departure"
-                ? "flight_takeoff"
-                : "event";
       const badgeLabel = categoryKey === "city-tour" && cityTourCity ? `City Tour / ${cityTourCity}` : item.category;
       const activityHeading = formatItineraryActivityHeading(item, categoryKey, item.category);
       const compactSummary = formatItineraryCompactSummary(item, categoryKey);
@@ -384,29 +353,16 @@ export function exportGroupDetailPdf({
       const timelineTime = formatTime24(timeSource);
 
       return `
-          <article class="timeline-item">
-            <div class="timeline-date-col">
-              <span class="timeline-date">${escapeHtml(dateLabel)}</span>
-              <span class="timeline-day">${escapeHtml(dayLabel)}</span>
-              <div class="timeline-line${index === sortedItinerary.length - 1 ? " is-last" : ""}">
-                <span class="timeline-dot ${dotClass}"></span>
-              </div>
-            </div>
-            <div class="timeline-content">
-              <div class="timeline-top">
-                <span class="timeline-badge ${badgeClass}">
-                  <span class="material-symbols-outlined">${badgeIcon}</span>
-                  <span>${escapeHtml(badgeLabel)}</span>
-                </span>
-                <div class="timeline-time-box">
-                  <span class="timeline-time-value">${escapeHtml(timelineTime)}</span>
-                </div>
-              </div>
-              <h4 class="timeline-title-text">${escapeHtml(activityHeading)}</h4>
-              <p class="timeline-route">${escapeHtml(compactSummary)}</p>
-              ${detailText ? `<p class="timeline-detail">${escapeHtml(detailText)}</p>` : ""}
-            </div>
-          </article>
+          <tr>
+            <td class="cell-center">${index + 1}</td>
+            <td>${escapeHtml(dateLabel)}</td>
+            <td>${escapeHtml(dayLabel)}</td>
+            <td class="cell-center">${escapeHtml(timelineTime)}</td>
+            <td>${escapeHtml(badgeLabel)}</td>
+            <td>${escapeHtml(activityHeading)}</td>
+            <td>${escapeHtml(compactSummary)}</td>
+            <td>${escapeHtml(detailText || "-")}</td>
+          </tr>
         `;
     })
     .join("");
@@ -422,18 +378,7 @@ export function exportGroupDetailPdf({
     noteItems.length > 0
       ? noteItems.slice(0, 3).map((note) => `${note.text}${note.pinned ? " (Pinned)" : ""}`)
       : defaultGuidelines;
-  const guidelineIcons = ["groups", "confirmation_number", "badge"];
-  const noteRows = noteHighlightItems
-    .map((text, index) => {
-      const icon = guidelineIcons[index] ?? "info";
-      return `
-          <article class="guideline-item${index === 1 ? " is-middle" : ""}">
-            <span class="material-symbols-outlined">${icon}</span>
-            <p>${escapeHtml(text)}</p>
-          </article>
-        `;
-    })
-    .join("");
+  const noteRows = noteHighlightItems.map((text) => `<li>${escapeHtml(text)}</li>`).join("");
 
   const printableHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -441,572 +386,138 @@ export function exportGroupDetailPdf({
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ghaniya Tour And Travel - ${escapeHtml(group.code)}</title>
-    <link href="${escapeHtml(fontsCssUrl)}" rel="stylesheet" />
     <style>
       :root {
-        --on-surface: #1b1a17;
-        --on-surface-variant: #495247;
-        --primary: #2e7d32;
-        --primary-container: #3b8f40;
-        --secondary-container: #d9efd9;
-        --tertiary-fixed: #f6d9de;
-        --tertiary-text: #74273e;
-        --error-container: #f9ddd8;
-        --error-text: #7e251f;
-        --surface: #fcfaf5;
-        --surface-low: #f6f2e9;
-        --surface-lowest: #fffdf9;
-        --outline: #b1b8a8;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --line: #d1d5db;
+        --surface: #ffffff;
+        --soft: #f9fafb;
+        --header: #f3f4f6;
       }
       * {
         box-sizing: border-box;
       }
       @page {
         size: A4 portrait;
-        margin: 0;
+        margin: 12mm;
       }
-      html,
       body {
-        width: 100%;
-        height: 100%;
         margin: 0;
-        padding: 0;
-        background: #ffffff;
-        color: var(--on-surface);
-        font-family: "Inter", Arial, sans-serif;
+        padding: 20px;
+        background: var(--surface);
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      body {
-        display: block;
-      }
-      .material-symbols-outlined {
-        font-family: "Material Symbols Outlined";
-        font-size: 24px;
-        font-style: normal;
-        font-weight: normal;
-        line-height: 1;
-        letter-spacing: normal;
-        text-transform: none;
-        display: inline-block;
-        white-space: nowrap;
-        word-wrap: normal;
-        direction: ltr;
-        font-variation-settings:
-          "FILL" 0,
-          "wght" 400,
-          "GRAD" 0,
-          "opsz" 24;
-        font-feature-settings: "liga";
-        -webkit-font-feature-settings: "liga";
-        -webkit-font-smoothing: antialiased;
-        font-synthesis: none;
-        vertical-align: middle;
-      }
       .doc {
-        width: 210mm;
-        min-height: 297mm;
-        height: auto;
         margin: 0;
-        background: var(--surface-lowest);
-        display: flex;
-        flex-direction: column;
-        overflow: visible;
+        width: 100%;
       }
       .doc-header {
-        flex: 0 0 auto;
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        padding: 12px 16px 10px;
         margin-bottom: 10px;
-        border-bottom: 2px solid rgba(13, 99, 27, 0.2);
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
       }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .brand-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--primary);
-        color: #ffffff;
-      }
-      .brand-title {
+      .doc-header h1 {
         margin: 0;
-        color: var(--primary);
-        font-family: "Manrope", sans-serif;
-        font-size: 15px;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        text-transform: uppercase;
-      }
-      .brand-sub {
-        margin: 2px 0 0;
-        color: var(--on-surface-variant);
-        font-size: 8px;
-        font-weight: 600;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-      }
-      .doc-title {
-        text-align: right;
-      }
-      .doc-title h1 {
-        margin: 0;
-        font-family: "Manrope", sans-serif;
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        text-transform: uppercase;
-        line-height: 1;
-      }
-      .doc-title p {
-        margin: 6px 0 0;
-        color: var(--primary);
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-      .group-summary {
-        flex: 0 0 auto;
-        margin: 0 16px 10px;
-        padding: 10px 14px;
-        border-radius: 12px;
-        border: 1px solid rgba(191, 202, 186, 0.45);
-        background: rgba(245, 243, 239, 0.55);
-      }
-      .group-summary-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(0, 1.12fr);
-        gap: 14px;
-        align-items: start;
-      }
-      .group-summary-identity {
-        min-width: 0;
-      }
-      .small-label {
-        display: block;
-        margin-bottom: 4px;
-        color: var(--on-surface-variant);
-        font-size: 8px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-      .group-code {
-        margin: 0;
-        color: var(--primary);
-        font-family: "Manrope", sans-serif;
-        font-weight: 800;
-        letter-spacing: -0.03em;
+        font-size: 20px;
         line-height: 1.1;
-        font-size: clamp(20px, 2.6vw, 28px);
-        overflow-wrap: anywhere;
-        word-break: break-word;
       }
-      .group-name {
-        margin: 5px 0 0;
-        color: var(--on-surface);
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 1.3;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-      .group-summary-detail-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px 10px;
-      }
-      .group-summary-detail-card {
-        min-width: 0;
-        padding: 2px 0 0;
-      }
-      .group-summary-detail-card .small-label {
-        margin-bottom: 5px;
-      }
-      .group-summary-detail-value,
-      .group-summary-detail-sub {
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .group-summary-detail-value {
-        -webkit-line-clamp: 1;
-        color: var(--on-surface);
-        font-size: 11px;
-        font-weight: 800;
-        line-height: 1.15;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-      .group-summary-detail-sub {
-        -webkit-line-clamp: 1;
-        margin-top: 3px;
-        color: var(--on-surface-variant);
-        font-size: 8px;
-        font-weight: 600;
-        line-height: 1.2;
-      }
-      .timeline-section {
-        flex: 0 0 auto;
-        margin: 0 16px 8px;
-      }
-      .timeline-head {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 8px;
-      }
-      .timeline-head h3 {
-        margin: 0;
-        font-family: "Manrope", sans-serif;
-        font-size: 18px;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        text-transform: uppercase;
-      }
-      .timeline-head-line {
-        height: 1px;
-        flex: 1;
-        background: rgba(191, 202, 186, 0.8);
-      }
-      .timeline-wrap {
-        margin-left: 4px;
-      }
-      .timeline-item {
-        display: flex;
-        gap: 14px;
-      }
-      .timeline-date-col {
-        width: 82px;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding-top: 1px;
-      }
-      .timeline-date {
-        font-family: "Manrope", sans-serif;
-        font-size: 16px;
-        font-weight: 800;
-        line-height: 1.05;
-      }
-      .timeline-day {
-        margin-top: 3px;
-        color: var(--on-surface-variant);
-        font-size: 8px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .timeline-line {
-        position: relative;
-        width: 1px;
-        flex: 1;
-        margin-top: 8px;
-        background: var(--outline);
-      }
-      .timeline-line.is-last {
-        background: transparent;
-      }
-      .timeline-dot {
-        position: absolute;
-        top: 0;
-        left: 50%;
-        width: 13px;
-        height: 13px;
-        border-radius: 50%;
-        transform: translate(-50%, 0);
-        border: 3px solid var(--surface-lowest);
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
-      }
-      .dot-arrival {
-        background: var(--primary);
-      }
-      .dot-tour {
-        background: #476644;
-      }
-      .dot-transfer {
-        background: #923357;
-      }
-      .dot-departure {
-        background: #ba1a1a;
-      }
-      .dot-default {
-        background: var(--on-surface-variant);
-      }
-      .timeline-content {
-        flex: 1 1 auto;
-        min-width: 0;
-        padding-bottom: 10px;
-      }
-      .timeline-item:last-child .timeline-content {
-        padding-bottom: 0;
-      }
-      .timeline-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 8px;
-      }
-      .timeline-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        font-size: 8px;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .timeline-badge .material-symbols-outlined {
-        font-size: 12px;
-      }
-      .badge-arrival {
-        background: #cbffc2;
-        color: #005312;
-      }
-      .badge-tour {
-        background: var(--secondary-container);
-        color: #304e2e;
-      }
-      .badge-transfer {
-        background: var(--tertiary-fixed);
-        color: var(--tertiary-text);
-      }
-      .badge-departure {
-        background: var(--error-container);
-        color: var(--error-text);
-      }
-      .badge-default {
-        background: var(--surface-low);
-        color: var(--on-surface-variant);
-      }
-      .timeline-time-box {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 8px;
-        border-radius: 8px;
-        background: #eae8e4;
-      }
-      .timeline-time-value {
-        color: var(--on-surface);
-        font-size: 11px;
-        font-weight: 800;
-        font-variant-numeric: tabular-nums;
-      }
-      .timeline-title-text {
-        margin: 6px 0 0;
-        color: var(--on-surface);
-        font-family: "Manrope", sans-serif;
-        font-size: 16px;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        line-height: 1.15;
-      }
-      .timeline-route {
+      .doc-header p {
         margin: 4px 0 0;
-        color: var(--on-surface-variant);
         font-size: 11px;
-        font-weight: 600;
-        line-height: 1.3;
-        overflow-wrap: anywhere;
+        color: var(--muted);
       }
-      .timeline-detail {
-        margin: 4px 0 0;
-        color: var(--on-surface-variant);
-        font-size: 10px;
-        line-height: 1.35;
-        overflow-wrap: anywhere;
-      }
-      .empty-row {
-        margin: 0;
-        color: var(--on-surface-variant);
-        font-size: 11px;
-        font-weight: 600;
-      }
-      .guideline-section {
-        flex: 0 0 auto;
-        margin: 0 16px 6px;
-        padding-top: 8px;
-        border-top: 1px solid rgba(191, 202, 186, 0.6);
-      }
-      .guideline-section h3 {
-        margin: 0 0 8px;
-        color: var(--on-surface);
-        font-size: 9px;
-        font-weight: 900;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-      .guideline-grid {
+      .meta-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 4px;
+        gap: 6px 8px;
+        margin-bottom: 12px;
       }
-      .guideline-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 6px;
-        padding: 0 2px;
-      }
-      .guideline-item.is-middle {
-        border-left: 1px solid rgba(191, 202, 186, 0.55);
-        border-right: 1px solid rgba(191, 202, 186, 0.55);
-      }
-      .guideline-item .material-symbols-outlined {
-        color: var(--primary);
-        font-size: 14px;
-        flex-shrink: 0;
-      }
-      .guideline-item p {
-        margin: 0;
-        color: var(--on-surface);
-        font-size: 10px;
-        font-weight: 600;
-        line-height: 1.3;
-      }
-      .guideline-raudhah {
-        margin-top: 6px;
+      .meta-item {
         padding: 6px 8px;
-        border-radius: 10px;
-        border: 1px solid rgba(191, 202, 186, 0.65);
-        background: rgba(245, 243, 239, 0.65);
-        display: flex;
-        align-items: flex-start;
-        gap: 6px;
+        border: 1px solid var(--line);
+        background: var(--soft);
       }
-      .guideline-raudhah .material-symbols-outlined {
-        color: var(--primary);
-        font-size: 14px;
-        flex-shrink: 0;
-      }
-      .guideline-raudhah p {
-        margin: 0;
-        color: var(--on-surface);
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
         font-size: 10px;
-        font-weight: 600;
-        line-height: 1.3;
-      }
-      .guideline-raudhah strong {
-        color: var(--on-surface);
-        font-weight: 800;
-      }
-      .doc-footer {
-        flex: 0 0 auto;
-        margin: 0 16px 8px;
-        padding-top: 8px;
-        border-top: 1px solid #eceee7;
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        gap: 14px;
-      }
-      .foot-label {
-        color: #9aa091;
-        font-size: 7px;
-        font-weight: 800;
-        letter-spacing: 0.1em;
+        font-weight: 700;
+        color: var(--muted);
         text-transform: uppercase;
       }
-      .foot-value {
-        margin-top: 4px;
-        color: #5e6458;
-        font-size: 9px;
+      .meta-value {
+        font-size: 12px;
         font-weight: 700;
+        overflow-wrap: anywhere;
       }
-      .foot-right {
-        text-align: right;
+      .section {
+        margin-top: 12px;
       }
-      .signature-line {
-        margin-top: 8px;
-        margin-left: auto;
-        width: 110px;
-        border-bottom: 1px solid #d8ddd0;
+      .section h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        line-height: 1.15;
       }
-      .copyright {
-        color: var(--on-surface-variant);
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 0.1em;
+      .itinerary-section h2 {
+        margin-bottom: 10px;
+        font-size: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 9px 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        vertical-align: top;
+        word-break: break-word;
+      }
+      th {
+        background: var(--header);
+        text-align: left;
+        font-size: 11px;
+        letter-spacing: 0.02em;
         text-transform: uppercase;
-        opacity: 0.4;
       }
-      @media screen and (max-width: 900px) {
-        .doc-header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .doc-title {
-          text-align: left;
-        }
-        .group-summary-layout {
-          grid-template-columns: 1fr;
-        }
-        .group-summary-detail-grid {
-          grid-template-columns: 1fr 1fr;
-        }
+      .cell-center {
+        text-align: center;
+      }
+      .notes-list {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .notes-list li {
+        margin: 0 0 6px;
+        font-size: 11px;
+        line-height: 1.4;
+      }
+      .footer {
+        margin-top: 18px;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .empty {
+        text-align: center;
+        color: var(--muted);
       }
       @media print {
-        html,
         body {
-          width: 100%;
-          min-height: 100%;
-          height: auto;
-          margin: 0;
-          padding: 0;
-          overflow: visible;
-          background: #ffffff;
-        }
-        body {
-          display: block;
-        }
-        .doc {
-          width: 210mm;
-          min-height: 297mm;
-          height: auto;
-          max-width: none;
-          overflow: visible;
-          box-shadow: none;
-          border: 0;
           padding: 0;
         }
-        .doc-header {
-          flex-direction: row;
-          align-items: flex-start;
-        }
-        .doc-title {
-          margin-left: auto;
-          text-align: right;
-        }
-        .group-summary-layout {
-          grid-template-columns: minmax(0, 1.08fr) minmax(0, 1.12fr);
-        }
-        .group-summary-detail-grid {
+      }
+      @media screen and (max-width: 900px) {
+        .meta-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .doc-header,
-        .group-summary,
-        .guideline-section,
-        .doc-footer,
-        .timeline-item {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-        .print-hidden {
-          display: none;
         }
       }
     </style>
@@ -1014,83 +525,93 @@ export function exportGroupDetailPdf({
   <body>
     <main class="doc">
       <header class="doc-header">
-        <div class="brand">
-          <span class="brand-icon material-symbols-outlined">mosque</span>
-          <div>
-            <p class="brand-title">Ghaniya Tour And Travel</p>
-            <p class="brand-sub">GTT Operations Desk</p>
-          </div>
-        </div>
-        <div class="doc-title">
-          <h1>Package Info</h1>
-        </div>
+        <h1>Package Info</h1>
+        <p>Ghaniya Tour And Travel</p>
       </header>
 
-      <section class="group-summary">
-        <div class="group-summary-layout">
-          <article class="group-summary-identity">
-          <span class="small-label">Primary Group ID</span>
-          <h2 class="group-code">${escapeHtml(group.code)}</h2>
-          <p class="group-name">${escapeHtml(group.name)}</p>
-          </article>
-          <div class="group-summary-detail-grid" aria-label="Group summary details">
-            <article class="group-summary-detail-card">
-              <span class="small-label">Pax Count</span>
-              <span class="group-summary-detail-value">${group.pax}</span>
-              <span class="group-summary-detail-sub">${resolvedTotalBuses} Bus</span>
-            </article>
-            <article class="group-summary-detail-card">
-              <span class="small-label">Musyrif</span>
-              <span class="group-summary-detail-value">${escapeHtml(musyrifProfile.name)}</span>
-              <span class="group-summary-detail-sub">${escapeHtml(musyrifProfile.phone)}</span>
-            </article>
-            <article class="group-summary-detail-card">
-              <span class="small-label">Depart</span>
-              <span class="group-summary-detail-value">${escapeHtml(departDateLabel)}</span>
-              <span class="group-summary-detail-sub">Flight In ${escapeHtml(arrivalFlightNumber)}</span>
-            </article>
-            <article class="group-summary-detail-card">
-              <span class="small-label">Return</span>
-              <span class="group-summary-detail-value">${escapeHtml(returnDateLabel)}</span>
-              <span class="group-summary-detail-sub">Flight Out ${escapeHtml(returnFlightNumber)}</span>
-            </article>
-          </div>
+      <section class="meta-grid" aria-label="Group summary details">
+        <div class="meta-item">
+          <span class="meta-label">Primary Group ID</span>
+          <div class="meta-value">${escapeHtml(group.code)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Group Name</span>
+          <div class="meta-value">${escapeHtml(group.name)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Pax Count</span>
+          <div class="meta-value">${group.pax}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Total Bus</span>
+          <div class="meta-value">${resolvedTotalBuses}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Musyrif</span>
+          <div class="meta-value">${escapeHtml(musyrifProfile.name)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Musyrif Phone</span>
+          <div class="meta-value">${escapeHtml(musyrifProfile.phone)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Depart</span>
+          <div class="meta-value">${escapeHtml(departDateLabel)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Flight In</span>
+          <div class="meta-value">${escapeHtml(arrivalFlightNumber)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Return</span>
+          <div class="meta-value">${escapeHtml(returnDateLabel)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Flight Out</span>
+          <div class="meta-value">${escapeHtml(returnFlightNumber)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Raudhah Dates</span>
+          <div class="meta-value">${escapeHtml(raudhahDateSummary)}</div>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Generated</span>
+          <div class="meta-value">${escapeHtml(generatedTimestamp)}</div>
         </div>
       </section>
 
-      <section class="timeline-section">
-        <div class="timeline-head">
-          <h3>Full Itinerary</h3>
-          <div class="timeline-head-line"></div>
-        </div>
-        <div class="timeline-wrap">
-          ${itineraryTimelineRows || '<p class="empty-row">No itinerary data available.</p>'}
-        </div>
+      <section class="section itinerary-section">
+        <h2>Full Itinerary</h2>
+        <table aria-label="Full itinerary table">
+          <thead>
+            <tr>
+              <th style="width: 34px;">No</th>
+              <th style="width: 72px;">Date</th>
+              <th style="width: 68px;">Day</th>
+              <th style="width: 58px;">Time</th>
+              <th style="width: 90px;">Category</th>
+              <th style="width: 130px;">Activity</th>
+              <th style="width: 145px;">Route / Summary</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itineraryTimelineRows || '<tr><td class="empty" colspan="8">No itinerary data available.</td></tr>'}
+          </tbody>
+        </table>
       </section>
 
-      <section class="guideline-section">
-        <h3>Crucial Operational Guidelines</h3>
-        <div class="guideline-grid">
+      <section class="section">
+        <h2>Operational Notes</h2>
+        <ol class="notes-list">
           ${noteRows}
-        </div>
-        <div class="guideline-raudhah">
-          <span class="material-symbols-outlined">event_available</span>
-          <p><strong>Raudhah Dates:</strong> ${escapeHtml(raudhahDateSummary)}</p>
-        </div>
+        </ol>
       </section>
 
-      <footer class="doc-footer">
-        <div>
-          <div class="foot-label">Document Timestamp</div>
-          <div class="foot-value">${escapeHtml(generatedTimestamp)}</div>
-        </div>
-        <div class="foot-right">
-          <div class="foot-label">Office Signature / Seal</div>
-          <div class="signature-line"></div>
-        </div>
+      <footer class="footer">
+        Document Timestamp: ${escapeHtml(generatedTimestamp)}
       </footer>
     </main>
-    <div class="copyright print-hidden">(c) 2026 Ghaniya Tour and Travel | Confidential Package Info</div>
   </body>
 </html>`;
 

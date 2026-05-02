@@ -73,7 +73,7 @@ export function DashboardWorkspaceShell({
 
       {shouldShowFloatingThemeToggle ? (
         <div className="pointer-events-none fixed right-6 top-4 z-[120] sm:right-8 sm:top-5 lg:right-10">
-          <ThemeToggleButton className="pointer-events-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest/90 text-on-surface-variant shadow-ambient backdrop-blur-serene transition hover:-translate-y-0.5 hover:text-primary" />
+          <ThemeToggleButton variant="floating" className="pointer-events-auto" />
         </div>
       ) : null}
 

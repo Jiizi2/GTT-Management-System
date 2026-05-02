@@ -8,6 +8,7 @@ import type {
   VisaTrackingRow,
 } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
+import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useThemeMode } from "../theme/theme-provider";
@@ -220,9 +221,12 @@ export function VisaTrackingScreen({
   const [issuedMonthFilter, setIssuedMonthFilter] = useState(() => currentIssuedMonthKey);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const visaRows = buildVisaTrackingRowsFromGroups(groups);
-  const groupByCode = new Map(groups.map((group) => [group.code, group] as const));
-  const durationByGroupCode = new Map(groups.map((group) => [group.code, group.durationDays] as const));
+  const visaRows = useMemo(() => buildVisaTrackingRowsFromGroups(groups), [groups]);
+  const groupByCode = useMemo(() => new Map(groups.map((group) => [group.code, group] as const)), [groups]);
+  const durationByGroupCode = useMemo(
+    () => new Map(groups.map((group) => [group.code, group.durationDays] as const)),
+    [groups],
+  );
   const normalizedQuery = query.trim().toLowerCase();
   const queriedRows = visaRows.filter((row) => {
     if (!normalizedQuery) {
@@ -316,8 +320,8 @@ export function VisaTrackingScreen({
     ? "material-symbols-outlined text-primary"
     : "material-symbols-outlined text-emerald-700";
   const actionRequiredSummaryCardClassName = isDarkMode
-    ? "flex items-center gap-3 rounded-2xl bg-primary p-4 text-on-primary shadow-ambient"
-    : "flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4";
+    ? "serene-accent-card flex items-center gap-3 bg-primary p-4 text-on-primary"
+    : "serene-stat-card border-amber-200 bg-amber-50";
   const actionRequiredIconClassName = isDarkMode
     ? "material-symbols-outlined text-on-primary"
     : "material-symbols-outlined text-amber-700";
@@ -385,10 +389,10 @@ export function VisaTrackingScreen({
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <header className="flex items-center gap-3">
+      <header className="serene-page-toolbar">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label
-            className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
+            className="serene-page-search"
             aria-label="Search groups"
           >
             <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
@@ -396,7 +400,7 @@ export function VisaTrackingScreen({
             </span>
             <input
               type="text"
-              className="w-full border-none bg-transparent text-sm font-medium text-on-surface-variant outline-none placeholder:text-on-surface-variant/50"
+              className="serene-page-search-input"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search groups..."
@@ -404,22 +408,22 @@ export function VisaTrackingScreen({
           </label>
         </div>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </header>
 
-      <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-surface-container-lowest p-5 shadow-sm backdrop-blur md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className={heroLabelClassName}>Visa Control Board</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Visa Tracking</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+      <PageHeroSection
+        eyebrow="Visa Control Board"
+        title="Visa Tracking"
+        description={
+          <>
             <span className="sm:hidden">Monitor visa status, agreement, and payment.</span>
             <span className="hidden sm:inline">
               Monitor group agreement numbers, visa issuance, and payment progress in one board.
             </span>
-          </p>
-        </div>
-
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end sm:self-start">
+          </>
+        }
+        className="backdrop-blur"
+        actions={
           <button
             type="button"
             className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition sm:w-auto ${
@@ -436,8 +440,8 @@ export function VisaTrackingScreen({
             <span className="sm:hidden">Export PDF</span>
             <span className="hidden sm:inline">Export to PDF</span>
           </button>
-        </div>
-      </section>
+        }
+      />
 
       <section className="flex flex-wrap items-center gap-2" aria-label="Visa tracking filters">
         <button
@@ -500,7 +504,7 @@ export function VisaTrackingScreen({
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Visa tracking summary">
-        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4">
+        <article className="serene-stat-card">
           <span className={summaryIconClassName} aria-hidden="true">
             group
           </span>
@@ -513,7 +517,7 @@ export function VisaTrackingScreen({
           </div>
         </article>
 
-        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4">
+        <article className="serene-stat-card">
           <span className={summaryIconClassName} aria-hidden="true">
             task_alt
           </span>
@@ -539,7 +543,7 @@ export function VisaTrackingScreen({
           </div>
         </article>
 
-        <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4">
+        <article className="serene-stat-card">
           <span className={summaryIconClassName} aria-hidden="true">
             payments
           </span>
@@ -554,7 +558,7 @@ export function VisaTrackingScreen({
       </section>
 
       {filteredRows.length === 0 ? (
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-surface-container-lowest p-10 text-center">
+        <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
             search_off
           </span>
@@ -732,7 +736,7 @@ export function VisaTrackingScreen({
           </section>
 
           <section
-            className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-sm md:block"
+            className="serene-table-shell hidden md:block"
             aria-label="Visa tracking table"
           >
             <div className="overflow-x-auto">

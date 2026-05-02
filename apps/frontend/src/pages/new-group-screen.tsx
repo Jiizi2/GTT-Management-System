@@ -896,7 +896,7 @@ export function NewGroupScreen({
               <p>{agreementSaveStatus.message}</p>
             </div>
           ) : null}
-          <div className="mt-4 flex justify-stretch sm:justify-end">
+          <div className="serene-form-actions mt-4 serene-form-actions-fill">
             <button type="button" className="serene-btn-primary min-h-10 w-full sm:w-auto" onClick={handleSaveAgreement}>
               <span className="material-symbols-outlined text-base" aria-hidden="true">
                 task_alt
@@ -1000,7 +1000,7 @@ export function NewGroupScreen({
         {itinerarySectionBottom ? <div className="space-y-4">{itinerarySectionBottom}</div> : null}
 
         {!hideFooterActions ? (
-          <footer className="flex flex-wrap items-center justify-end gap-2">
+          <footer className="serene-form-actions">
             {requireItineraryBeforeSave && !hasItineraryDraft ? (
               <p className="w-full text-sm font-medium text-on-tertiary-fixed-variant" role="status" aria-live="polite">
                 <span className="sm:hidden">Isi Add Schedule dulu untuk mengaktifkan Save.</span>
@@ -1128,7 +1128,7 @@ export function AddGroupWorkspaceScreen({
           <span className="hidden sm:inline">Overview</span>
         </button>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </div>
 
       <section className="serene-section p-5 sm:p-6">
@@ -1165,7 +1165,7 @@ export function AddGroupWorkspaceScreen({
           </Suspense>
 
           <section className="serene-section">
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="serene-form-actions serene-form-actions-fill">
               <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
                 Cancel
               </button>
@@ -1206,7 +1206,7 @@ export function AddGroupWorkspaceScreen({
           />
 
           <section className="serene-section">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="serene-form-actions-split serene-form-actions-fill">
               <button
                 type="button"
                 className="serene-btn-secondary min-h-11 w-full sm:w-auto"
@@ -1253,7 +1253,7 @@ export function AddGroupWorkspaceScreen({
           </Suspense>
 
           <section className="serene-section">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="serene-form-actions-split serene-form-actions-fill">
               <button
                 type="button"
                 className="serene-btn-secondary min-h-11 w-full sm:w-auto"

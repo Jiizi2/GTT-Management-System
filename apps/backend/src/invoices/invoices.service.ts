@@ -391,6 +391,10 @@ function getTrimmedString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeInvoiceClientName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 @Injectable()
 export class InvoicesService implements OnModuleInit {
   private readonly dataSource: "memory" | "prisma";
@@ -478,7 +482,7 @@ export class InvoicesService implements OnModuleInit {
       return matchedClient;
     }
 
-    const requestedClientName = getTrimmedString(payload.clientName);
+    const requestedClientName = normalizeInvoiceClientName(getTrimmedString(payload.clientName));
     if (!requestedClientName) {
       throw new BadRequestException("Either clientId or clientName is required.");
     }
@@ -525,7 +529,7 @@ export class InvoicesService implements OnModuleInit {
       };
     }
 
-    const requestedClientName = getTrimmedString(payload.clientName);
+    const requestedClientName = normalizeInvoiceClientName(getTrimmedString(payload.clientName));
     if (!requestedClientName) {
       throw new BadRequestException("Either clientId or clientName is required.");
     }
@@ -539,12 +543,13 @@ export class InvoicesService implements OnModuleInit {
   }
 
   private async createInvoiceClientWithPrisma(clientName: string): Promise<ResolvedPrismaInvoiceClient> {
+    const normalizedClientName = normalizeInvoiceClientName(clientName);
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(async (tx) => {
-          await this.acquirePrismaTransactionLock(tx, "invoice-client-name", clientName);
+          await this.acquirePrismaTransactionLock(tx, "invoice-client-name", normalizedClientName.toLowerCase());
 
-          const existingByName = await this.findPrismaInvoiceClientByName(clientName, tx);
+          const existingByName = await this.findPrismaInvoiceClientByName(normalizedClientName, tx);
           if (existingByName) {
             return existingByName;
           }
@@ -557,7 +562,7 @@ export class InvoicesService implements OnModuleInit {
           const nextSortOrder = (maxSortOrderAggregate._max.sortOrder ?? 0) + 1;
           const createdClient = await tx.invoiceClient.create({
             data: {
-              name: clientName,
+              name: normalizedClientName,
               sortOrder: nextSortOrder,
             },
             select: {
@@ -571,7 +576,7 @@ export class InvoicesService implements OnModuleInit {
               action: "invoice-client.created",
               dataSource: this.dataSource,
               clientId: createdClient.id,
-              clientName,
+              clientName: normalizedClientName,
               sortOrder: nextSortOrder,
             },
             "Invoice client created.",
@@ -674,7 +679,7 @@ export class InvoicesService implements OnModuleInit {
 
     const currentInvoice = this.memoryInvoices[invoiceIndex];
     const requestedClientId = getTrimmedString(payload.clientId);
-    const requestedClientName = getTrimmedString(payload.clientName);
+      const requestedClientName = normalizeInvoiceClientName(getTrimmedString(payload.clientName));
     let resolvedClient: MemoryInvoiceClient | undefined;
 
     if (requestedClientId) {
@@ -1310,9 +1315,13 @@ export class InvoicesService implements OnModuleInit {
     clientName: string,
     prismaClient: Pick<PrismaService, "invoiceClient"> = this.prisma,
   ): Promise<ResolvedPrismaInvoiceClient | null> {
+    const normalizedClientName = normalizeInvoiceClientName(clientName);
     const matchedClient = await prismaClient.invoiceClient.findFirst({
       where: {
-        name: clientName,
+        name: {
+          equals: normalizedClientName,
+          mode: "insensitive",
+        },
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: {

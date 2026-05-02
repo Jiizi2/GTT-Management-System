@@ -183,6 +183,26 @@ async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<voi
   }
 }
 
+async function testCreateReusesExistingClientCaseInsensitively(): Promise<void> {
+  const { service, restore } = createMemoryInvoicesService();
+  try {
+    const created = await service.create({
+      clientName: "  yAsSiR  ",
+      issuedDate: "2099-08-01",
+      dueDate: "2099-08-10",
+      amount: 200_000,
+    });
+
+    assert.equal(created.clientName, "Yassir");
+    assert.equal(created.clientLabel, "01. Yassir");
+
+    const clients = await service.listClients();
+    assert.equal(clients.length, 3);
+  } finally {
+    restore();
+  }
+}
+
 async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
   const { service, restore } = createMemoryInvoicesService();
   try {
@@ -744,6 +764,82 @@ async function testPrismaCreateReusesClientFoundInsideLockedTransaction(): Promi
   }
 }
 
+async function testPrismaClientLookupIsCaseInsensitive(): Promise<void> {
+  let clientLookupCount = 0;
+  let lastClientLookupArgs: Record<string, unknown> | null = null;
+
+  const prismaMock = withPrismaTransactionMocks({
+    invoiceClient: {
+      findFirst: async (args: Record<string, unknown>) => {
+        clientLookupCount += 1;
+        lastClientLookupArgs = args;
+        return {
+          id: "cli-existing",
+          groupId: null,
+        };
+      },
+    },
+    group: {
+      findUnique: async () => null,
+    },
+    invoice: {
+      findFirst: async () => ({
+        invoiceNumber: "GTT/INV/2099/0009",
+      }),
+      create: async (args: Record<string, unknown>) => {
+        const data = args.data as {
+          invoiceNumber: string;
+          clientId: string;
+          issuedDate: Date;
+          dueDate: Date;
+          amount: number;
+          status: InvoiceStatus;
+          notes: string | null;
+        };
+
+        return {
+          id: "inv-ci-existing",
+          invoiceNumber: data.invoiceNumber,
+          clientId: data.clientId,
+          client: {
+            name: "Existing Client",
+            sortOrder: 6,
+          },
+          group: null,
+          issuedDate: data.issuedDate,
+          dueDate: data.dueDate,
+          amount: data.amount,
+          status: data.status,
+          notes: data.notes,
+        };
+      },
+    },
+  }) as unknown as PrismaService;
+
+  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  try {
+    const created = await service.create({
+      clientName: "  existing CLIENT ",
+      issuedDate: "2099-09-01",
+      dueDate: "2099-09-15",
+      amount: 510_000,
+    });
+
+    assert.equal(created.clientId, "cli-existing");
+    assert.equal(clientLookupCount >= 1, true);
+    const lookupWhere = lastClientLookupArgs as { where?: { name?: { equals?: string; mode?: string } } } | null;
+    assert.deepEqual(
+      lookupWhere?.where?.name,
+      {
+        equals: "existing CLIENT",
+        mode: "insensitive",
+      },
+    );
+  } finally {
+    restore();
+  }
+}
+
 async function testPrismaCreateErrorMappings(): Promise<void> {
   const prismaMockUnknownGroup = {
     invoiceClient: {
@@ -1010,6 +1106,7 @@ async function main(): Promise<void> {
   await runCase("invoice list clients seeded labels", testListClientsReturnsSeededSortedLabels);
   await runCase("invoice create existing client sequential numbering", testCreateUsesExistingClientAndGeneratesSequentialNumbers);
   await runCase("invoice create new clients and status rules", testCreateCanCreateNewClientAndResolvesStatusRules);
+  await runCase("invoice create reuses existing client case-insensitively", testCreateReusesExistingClientCaseInsensitively);
   await runCase("invoice create and update persist items", testCreateAndUpdatePersistInvoiceItems);
   await runCase("invoice create validation errors", testCreateValidationErrors);
   await runCase("invoice update status client and group rules", testUpdateSupportsClientSwitchStatusAndGroupRules);
@@ -1022,6 +1119,7 @@ async function main(): Promise<void> {
     "invoice prisma create reuses client found inside locked transaction",
     testPrismaCreateReusesClientFoundInsideLockedTransaction,
   );
+  await runCase("invoice prisma client lookup is case-insensitive", testPrismaClientLookupIsCaseInsensitive);
   await runCase("invoice prisma create error mapping", testPrismaCreateErrorMappings);
   await runCase("invoice prisma update success and error mapping", testPrismaUpdateSuccessAndErrorMappings);
 }

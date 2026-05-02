@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { sidebarAccountItem, sidebarItems } from "../shared/app-domain";
+import { useModalFocusTrap } from "./use-modal-focus-trap";
 import type { NavId, SessionAccessTier } from "../shared/app-domain";
 
 function SidebarModalPortal({ children }: { children: ReactNode }) {
@@ -50,6 +51,10 @@ export function AppSidebar({
     ? "mx-auto h-px w-8 bg-surface-container-high/75"
     : "mx-2 h-px bg-surface-container-high/75";
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const logoutDialogRef = useModalFocusTrap<HTMLElement>({
+    isActive: isLogoutModalOpen,
+    onClose: () => setIsLogoutModalOpen(false),
+  });
 
   useEffect(() => {
     if (!isLogoutModalOpen || typeof window === "undefined") {
@@ -248,13 +253,15 @@ export function AppSidebar({
           <div
             className="serene-modal-overlay fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-4"
             onClick={closeLogoutModal}
-            aria-hidden="true"
+            role="presentation"
           >
             <section
+              ref={logoutDialogRef}
               className="serene-modal-shell w-full max-w-md p-5 sm:p-6"
               role="dialog"
               aria-modal="true"
               aria-label="Logout confirmation"
+              tabIndex={-1}
               onClick={(event) => event.stopPropagation()}
             >
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-error-container text-on-error-container">

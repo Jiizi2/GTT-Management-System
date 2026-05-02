@@ -90,7 +90,7 @@ export function LoginScreen({
   return (
     <main className="flex min-h-screen bg-surface text-on-surface">
       <div className="fixed right-6 top-4 z-[120] sm:right-8 sm:top-6">
-        <ThemeToggleButton className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest/90 text-on-surface-variant shadow-ambient backdrop-blur-serene transition hover:-translate-y-0.5 hover:text-primary" />
+        <ThemeToggleButton variant="floating" />
       </div>
 
       <section className="relative hidden w-1/2 overflow-hidden border-r border-outline-variant/20 bg-surface-container-low p-12 lg:flex lg:flex-col lg:items-center lg:justify-center">

@@ -23,6 +23,7 @@ import {
   mapMasterDataToInvoiceStatusOptions,
   mapMasterDataToSelectOptions,
   mergeInvoiceClientsWithMasterData,
+  openInvoiceExportWindow,
   resolveDateRangeLabel,
   shiftMonthKey,
   viewInvoicePdfFromRow,
@@ -213,7 +214,7 @@ export function InvoiceScreen({
     : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
 
   const handleViewPdf = (row: InvoiceRow) => {
-    const printableWindow = window.open("", "_blank", "width=1180,height=860");
+    const printableWindow = openInvoiceExportWindow();
     if (!printableWindow) {
       setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
       return;
@@ -371,10 +372,10 @@ export function InvoiceScreen({
         </section>
       ) : null}
 
-      <header className="flex items-center gap-3">
+      <header className="serene-page-toolbar">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label
-            className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14"
+            className="serene-page-search"
             aria-label="Search invoices"
           >
             <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
@@ -382,7 +383,7 @@ export function InvoiceScreen({
             </span>
             <input
               type="text"
-              className="w-full border-none bg-transparent text-sm font-medium text-on-surface-variant outline-none placeholder:text-on-surface-variant/50"
+              className="serene-page-search-input"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search invoices or clients..."
@@ -390,7 +391,7 @@ export function InvoiceScreen({
           </label>
         </div>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </header>
 
       <PageHeroSection
@@ -429,7 +430,7 @@ export function InvoiceScreen({
       />
 
       <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
-        <article className="rounded-2xl border border-outline-variant/45 bg-surface-container-low p-4 shadow-ambient sm:p-5">
+        <article className="serene-filter-panel">
           <div className="grid gap-4 md:grid-cols-[1fr_0.9fr_auto] md:items-end">
             <label className="space-y-1">
               <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
@@ -509,7 +510,7 @@ export function InvoiceScreen({
           </div>
         </article>
 
-        <article className="relative overflow-hidden rounded-2xl bg-primary p-5 text-on-primary shadow-ambient">
+        <article className="serene-accent-card bg-primary text-on-primary">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/85">
             <span className="sm:hidden">Monthly Revenue</span>
             <span className="hidden sm:inline">Total Monthly Revenue</span>
@@ -532,7 +533,7 @@ export function InvoiceScreen({
       </section>
 
       {filteredRows.length === 0 ? (
-        <article className="rounded-3xl border border-dashed border-slate-300 bg-surface-container-lowest p-10 text-center">
+        <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
             receipt_long
           </span>
@@ -657,7 +658,7 @@ export function InvoiceScreen({
           </section>
 
           <section
-            className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-sm lg:block"
+            className="serene-table-shell hidden lg:block"
             aria-label="Invoice list table"
           >
             <div className="overflow-x-auto">

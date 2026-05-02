@@ -386,6 +386,7 @@ async function testPrismaConfirmChecklistDriverPaths(): Promise<void> {
     let assignmentCreatePayload: Record<string, unknown> | null = null;
     let statusUpdatePayload: Record<string, unknown> | null = null;
     let checklistDriverCreateCalls = 0;
+    let lockCalls = 0;
 
     const prismaMock = {
       group: {
@@ -396,6 +397,10 @@ async function testPrismaConfirmChecklistDriverPaths(): Promise<void> {
       },
       $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
         const tx = {
+          $executeRaw: async () => {
+            lockCalls += 1;
+            return 1;
+          },
           checklistAssignment: {
             findFirst: async () => null,
             create: async (args: Record<string, unknown>) => {
@@ -498,6 +503,7 @@ async function testPrismaConfirmChecklistDriverPaths(): Promise<void> {
       );
 
       assert.equal(checklistDriverCreateCalls, 2);
+      assert.equal(lockCalls, 1);
       assert.ok(assignmentCreatePayload);
       assert.ok(statusUpdatePayload);
 
@@ -545,6 +551,7 @@ async function testPrismaConfirmChecklistDriverPaths(): Promise<void> {
       },
       $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
         const tx = {
+          $executeRaw: async () => 1,
           checklistAssignment: {
             findFirst: async () => ({
               id: "assign-2",
@@ -663,9 +670,13 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
           code: "GRP-PRISMA",
         }),
       },
-      checklistAssignment: {
-        findFirst: async () => null,
-      },
+      $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        callback({
+          $executeRaw: async () => 1,
+          checklistAssignment: {
+            findFirst: async () => null,
+          },
+        }),
     } as unknown as PrismaService;
 
     const { service, restore } = createPrismaGroupsService(prismaMock);
@@ -699,41 +710,34 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
           code: "GRP-PRISMA",
         }),
       },
-      checklistAssignment: {
-        findFirst: async (args: Record<string, unknown>) => {
-          findFirstArgs = args;
-          return {
-            id: "assign-1",
-            tripDate: new Date("2026-05-20T00:00:00.000Z"),
-            activity: "Transfer",
-            tripLabel: "Makkah to Madinah",
-            requiredBusCount: 2,
-            scheduledTime: "08:00",
-            transferByTrain: true,
-            trainDepartureTime: "09:00",
-            stationPickupTime: "07:00",
-            status: ChecklistAssignmentStatus.ASSIGNED,
-            drivers: [
-              {
-                slotNumber: 1,
-                name: "Driver One",
-                phone: "+62-888-111",
-                plateNumber: "B 1234 CD",
-                isVerified: true,
-              },
-            ],
-          };
-        },
-      },
       $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
         const tx = {
-          checklistDriver: {
-            deleteMany: async (args: { where: { checklistAssignmentId: string } }) => {
-              deletedAssignmentId = args.where.checklistAssignmentId;
-              return { count: 1 };
-            },
-          },
+          $executeRaw: async () => 1,
           checklistAssignment: {
+            findFirst: async (args: Record<string, unknown>) => {
+              findFirstArgs = args;
+              return {
+                id: "assign-1",
+                tripDate: new Date("2026-05-20T00:00:00.000Z"),
+                activity: "Transfer",
+                tripLabel: "Makkah to Madinah",
+                requiredBusCount: 2,
+                scheduledTime: "08:00",
+                transferByTrain: true,
+                trainDepartureTime: "09:00",
+                stationPickupTime: "07:00",
+                status: ChecklistAssignmentStatus.ASSIGNED,
+                drivers: [
+                  {
+                    slotNumber: 1,
+                    name: "Driver One",
+                    phone: "+62-888-111",
+                    plateNumber: "B 1234 CD",
+                    isVerified: true,
+                  },
+                ],
+              };
+            },
             update: async () => ({
               id: "assign-1",
               tripDate: new Date("2026-05-20T00:00:00.000Z"),
@@ -747,6 +751,12 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
               status: ChecklistAssignmentStatus.NOT_COMPLETE,
               drivers: [],
             }),
+          },
+          checklistDriver: {
+            deleteMany: async (args: { where: { checklistAssignmentId: string } }) => {
+              deletedAssignmentId = args.where.checklistAssignmentId;
+              return { count: 1 };
+            },
           },
         };
         return callback(tx);
@@ -791,30 +801,26 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
           code: "GRP-PRISMA",
         }),
       },
-      checklistAssignment: {
-        findFirst: async (args: Record<string, unknown>) => {
-          findFirstArgs = args;
-          return {
-            id: "assign-2",
-            tripDate: new Date("2026-05-20T00:00:00.000Z"),
-            activity: "Arrival",
-            tripLabel: "Arrival",
-            requiredBusCount: 1,
-            scheduledTime: "08:00",
-            transferByTrain: false,
-            trainDepartureTime: null,
-            stationPickupTime: null,
-            status: ChecklistAssignmentStatus.ASSIGNED,
-            drivers: [],
-          };
-        },
-      },
       $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
         const tx = {
-          checklistDriver: {
-            deleteMany: async () => ({ count: 0 }),
-          },
+          $executeRaw: async () => 1,
           checklistAssignment: {
+            findFirst: async (args: Record<string, unknown>) => {
+              findFirstArgs = args;
+              return {
+                id: "assign-2",
+                tripDate: new Date("2026-05-20T00:00:00.000Z"),
+                activity: "Arrival",
+                tripLabel: "Arrival",
+                requiredBusCount: 1,
+                scheduledTime: "08:00",
+                transferByTrain: false,
+                trainDepartureTime: null,
+                stationPickupTime: null,
+                status: ChecklistAssignmentStatus.ASSIGNED,
+                drivers: [],
+              };
+            },
             update: async () => ({
               id: "assign-2",
               tripDate: new Date("2026-05-20T00:00:00.000Z"),
@@ -828,6 +834,9 @@ async function testPrismaResetChecklistDriverPaths(): Promise<void> {
               status: ChecklistAssignmentStatus.NOT_COMPLETE,
               drivers: [],
             }),
+          },
+          checklistDriver: {
+            deleteMany: async () => ({ count: 0 }),
           },
         };
         return callback(tx);
@@ -868,6 +877,7 @@ async function testPrismaChecklistAuditLogsUseGroupCodeIdentity(): Promise<void>
     },
     $transaction: async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
       const tx = {
+        $executeRaw: async () => 1,
         checklistAssignment: {
           findFirst: async () => ({
             id: "assign-1",

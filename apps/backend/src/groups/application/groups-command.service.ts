@@ -211,8 +211,20 @@ export class GroupsCommandService {
       plateNumber: payload.driver.plateNumber.trim(),
     };
     const tripDate = new Date(`${normalizedTripDate}T00:00:00.000Z`);
+    const assignmentIdentity = buildChecklistAssignmentIdentity({
+      tripDateIso: normalizedTripDate,
+      scheduledTime: normalizedScheduledTime,
+      activity: normalizedActivity,
+      tripLabel: normalizedTripLabel,
+    });
 
     const syncedAssignment = await this.prisma.$transaction(async (tx) => {
+      await this.acquirePrismaTransactionLock(
+        tx,
+        "checklist-assignment",
+        `${group.id}|${assignmentIdentity}`,
+      );
+
       let assignment = await tx.checklistAssignment.findFirst({
         where: {
           groupId: group.id,
@@ -377,39 +389,45 @@ export class GroupsCommandService {
     const normalizedActivity = payload.activity?.trim().toLowerCase();
     const tripDate = new Date(`${normalizedTripDate}T00:00:00.000Z`);
 
-    const assignment = await this.prisma.checklistAssignment.findFirst({
-      where: {
-        groupId: group.id,
-        tripDate,
-        scheduledTime: normalizedScheduledTime,
-        ...(normalizedActivity
-          ? {
-              activity: {
-                equals: normalizedActivity,
-                mode: "insensitive",
-              },
-            }
-          : {}),
-      },
-      include: {
-        drivers: {
-          orderBy: {
-            slotNumber: "asc",
+    const resetAssignment = await this.prisma.$transaction(async (tx) => {
+      await this.acquirePrismaTransactionLock(
+        tx,
+        "checklist-assignment-reset",
+        `${group.id}|${normalizedTripDate}|${normalizedScheduledTime}|${normalizedActivity ?? "*"}`,
+      );
+
+      const assignment = await tx.checklistAssignment.findFirst({
+        where: {
+          groupId: group.id,
+          tripDate,
+          scheduledTime: normalizedScheduledTime,
+          ...(normalizedActivity
+            ? {
+                activity: {
+                  equals: normalizedActivity,
+                  mode: "insensitive",
+                },
+              }
+            : {}),
+        },
+        include: {
+          drivers: {
+            orderBy: {
+              slotNumber: "asc",
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-    if (!assignment) {
-      throw new NotFoundException(
-        `Checklist assignment for '${idOrCode}' on '${normalizedTripDate}' at '${normalizedScheduledTime}' not found.`,
-      );
-    }
+      if (!assignment) {
+        throw new NotFoundException(
+          `Checklist assignment for '${idOrCode}' on '${normalizedTripDate}' at '${normalizedScheduledTime}' not found.`,
+        );
+      }
 
-    const resetAssignment = await this.prisma.$transaction(async (tx) => {
       await tx.checklistDriver.deleteMany({
         where: {
           checklistAssignmentId: assignment.id,
@@ -500,6 +518,16 @@ export class GroupsCommandService {
     });
 
     return latest ? latest.sortOrder + 1 : 0;
+  }
+
+  private async acquirePrismaTransactionLock(
+    prismaClient: Pick<PrismaService, "$executeRaw">,
+    namespace: string,
+    key: string,
+  ): Promise<void> {
+    await prismaClient.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${namespace}), hashtext(${key}))
+    `;
   }
 
   private async addItineraryItemWithPrisma(

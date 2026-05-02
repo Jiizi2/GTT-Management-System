@@ -230,7 +230,7 @@ function MasterDataOptionForm({
 
   return (
     <form
-      className="grid gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4"
+      className="serene-form-section grid gap-3"
       onSubmit={handleSubmit((values) => void onSubmit(values))}
     >
       <div className="grid gap-3 sm:grid-cols-2">
@@ -283,13 +283,13 @@ function MasterDataOptionForm({
         </label>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="serene-form-actions-split">
         <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
           <input type="checkbox" className="h-4 w-4 rounded border-outline-variant/55" {...register("isActive")} />
           Aktif
         </label>
 
-        <div className="flex items-center gap-2">
+        <div className="serene-form-actions">
           {onCancel ? (
             <button type="button" className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs" onClick={onCancel}>
               Batal
@@ -490,7 +490,7 @@ export function MasterDataScreen() {
         title="Master Data"
         description="Kelola opsi dropdown untuk invoice, user management, dan kota Saudi tanpa ubah kode."
         actions={
-          <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary" />
+          <ThemeToggleButton />
         }
       />
 

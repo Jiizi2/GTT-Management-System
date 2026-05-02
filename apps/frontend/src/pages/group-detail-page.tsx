@@ -922,7 +922,7 @@ export function GroupDetail({
           <span className="hidden sm:inline">Back to Groups</span>
         </button>
 
-        <ThemeToggleButton className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:mr-5" />
+        <ThemeToggleButton className="ml-auto sm:mr-5" />
       </div>
 
       <header className="flex flex-col gap-4 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient backdrop-blur md:flex-row md:items-start md:justify-between">
