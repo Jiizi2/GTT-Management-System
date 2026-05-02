@@ -170,22 +170,23 @@ function schedulePrint(printableWindow: Window): void {
   window.setTimeout(triggerPrint, 1800);
 }
 
-export function exportGroupDetailPdf({
-  group,
-  itineraryItems,
-  noteItems,
-  musyrifProfile,
-}: {
-  group: GroupData;
-  itineraryItems: ItineraryItem[];
-  noteItems: NoteItem[];
-  musyrifProfile: Musyrif;
-}, options: { printWindow?: Window | null } = {}): boolean {
+export function exportGroupDetailPdf(
+  {
+    group,
+    itineraryItems,
+    noteItems,
+    musyrifProfile,
+  }: {
+    group: GroupData;
+    itineraryItems: ItineraryItem[];
+    noteItems: NoteItem[];
+    musyrifProfile: Musyrif;
+  },
+  options: { printWindow?: Window | null } = {},
+): boolean {
   const reusableWindow = options.printWindow;
   const printableWindow =
-    reusableWindow && !reusableWindow.closed
-      ? reusableWindow
-      : window.open("", "_blank", "width=1120,height=760");
+    reusableWindow && !reusableWindow.closed ? reusableWindow : window.open("", "_blank", "width=1120,height=760");
   if (!printableWindow) {
     return false;
   }

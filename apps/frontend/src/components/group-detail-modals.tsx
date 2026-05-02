@@ -39,8 +39,7 @@ const modalHeaderBarClassName = "flex items-start justify-between gap-3 border-b
 const modalHeaderBarCenteredClassName = "flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4";
 const modalBodyClassName = "serene-dialog-body px-5 py-4";
 const modalScrollableBodyClassName = "serene-dialog-body overflow-y-auto px-5 py-4";
-const modalSecondaryButtonClassName =
-  "serene-btn-secondary rounded-xl px-4 py-2 text-sm font-semibold";
+const modalSecondaryButtonClassName = "serene-btn-secondary rounded-xl px-4 py-2 text-sm font-semibold";
 const modalDangerButtonClassName = "serene-btn-danger rounded-xl";
 const modalDangerBrandButtonClassName =
   "inline-flex items-center gap-1.5 rounded-xl bg-brand-tertiary px-4 py-2 text-sm font-semibold text-brand-neutral transition hover:bg-brand-tertiary/90";
@@ -78,7 +77,12 @@ function createGroupEditModalSchema() {
     .superRefine((values, context) => {
       const parsedPax = Number.parseInt(values.pax, 10);
       const parsedTotalBuses = Number.parseInt(values.totalBuses, 10);
-      if (!Number.isFinite(parsedPax) || parsedPax <= 0 || !Number.isFinite(parsedTotalBuses) || parsedTotalBuses <= 0) {
+      if (
+        !Number.isFinite(parsedPax) ||
+        parsedPax <= 0 ||
+        !Number.isFinite(parsedTotalBuses) ||
+        parsedTotalBuses <= 0
+      ) {
         return;
       }
 
@@ -189,11 +193,7 @@ export function MusyrifModal({
                     errorMessage: nameErrorMessage,
                   })}
                 />
-                <FieldErrorMessage
-                  fieldId="musyrif-name"
-                  message={nameErrorMessage}
-                  className={modalErrorClassName}
-                />
+                <FieldErrorMessage fieldId="musyrif-name" message={nameErrorMessage} className={modalErrorClassName} />
               </label>
 
               <label className={modalFieldClassName}>
@@ -231,11 +231,7 @@ export function MusyrifModal({
                 </p>
               ) : null}
 
-              <button
-                type="button"
-                className={modalSecondaryButtonClassName}
-                onClick={onClose}
-              >
+              <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
                 Cancel
               </button>
             </div>
@@ -316,22 +312,14 @@ export function DeleteConfirmModal({
           </div>
 
           <div className="serene-dialog-footer-bar">
-            <button
-              type="button"
-              className={modalDangerButtonClassName}
-              onClick={onConfirm}
-            >
+            <button type="button" className={modalDangerButtonClassName} onClick={onConfirm}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 delete
               </span>
               <span>Delete Itinerary</span>
             </button>
 
-            <button
-              type="button"
-              className={modalSecondaryButtonClassName}
-              onClick={onClose}
-            >
+            <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -407,22 +395,14 @@ export function DeleteGroupModal({
           </div>
 
           <div className="serene-dialog-footer-bar">
-            <button
-              type="button"
-              className={modalDangerBrandButtonClassName}
-              onClick={onConfirm}
-            >
+            <button type="button" className={modalDangerBrandButtonClassName} onClick={onConfirm}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 delete
               </span>
               <span>Delete Group</span>
             </button>
 
-            <button
-              type="button"
-              className={modalSecondaryButtonClassName}
-              onClick={onClose}
-            >
+            <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -560,11 +540,7 @@ export function GroupEditModal({
                 })}
               />
             </label>
-            <FieldErrorMessage
-              fieldId="group-edit-code"
-              message={codeErrorMessage}
-              className={modalErrorClassName}
-            />
+            <FieldErrorMessage fieldId="group-edit-code" message={codeErrorMessage} className={modalErrorClassName} />
 
             <label className={modalFieldClassName}>
               <span>Group Name</span>
@@ -581,11 +557,7 @@ export function GroupEditModal({
                 })}
               />
             </label>
-            <FieldErrorMessage
-              fieldId="group-edit-name"
-              message={nameErrorMessage}
-              className={modalErrorClassName}
-            />
+            <FieldErrorMessage fieldId="group-edit-name" message={nameErrorMessage} className={modalErrorClassName} />
 
             <label className={modalFieldClassName}>
               <span>Total Pax</span>
@@ -648,11 +620,7 @@ export function GroupEditModal({
                 </p>
               ) : null}
 
-              <button
-                type="button"
-                className={modalSecondaryButtonClassName}
-                onClick={onClose}
-              >
+              <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
                 Cancel
               </button>
             </div>
@@ -1121,11 +1089,7 @@ export function ScheduleModal({
               <span>Save Schedule</span>
             </button>
 
-            <button
-              type="button"
-              className={modalSecondaryButtonClassName}
-              onClick={onClose}
-            >
+            <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -1554,11 +1518,7 @@ export function EditScheduleModal({
               Save Changes
             </button>
 
-            <button
-              type="button"
-              className={modalSecondaryButtonClassName}
-              onClick={onClose}
-            >
+            <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -1706,11 +1666,7 @@ export function NoteModal({
               </p>
             ) : null}
 
-            <button
-              type="button"
-              className={modalSecondaryButtonClassName}
-              onClick={onClose}
-            >
+            <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
               Cancel
             </button>
           </div>

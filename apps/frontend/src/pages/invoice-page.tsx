@@ -13,7 +13,11 @@ import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import { useThemeMode } from "../theme/theme-provider";
-import { type BackendInvoiceClient, type BackendInvoiceItem, type BackendInvoiceRow } from "../hooks/use-invoice-backend";
+import {
+  type BackendInvoiceClient,
+  type BackendInvoiceItem,
+  type BackendInvoiceRow,
+} from "../hooks/use-invoice-backend";
 import {
   useCreateInvoiceMutation,
   useInvoiceDashboardQuery,
@@ -530,35 +534,38 @@ async function viewInvoicePdfFromRow({
   const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
   const { exportInvoicePdf } = await import("./invoice-export");
 
-  return exportInvoicePdf({
-    invoiceNumber: row.invoiceNumber,
-    issueDateIso: row.issuedDateIso,
-    dueDateIso: row.dueDateIso,
-    statusLabel: row.status,
-    issuingOffice: "Bekasi Office",
-    clientName: row.clientName,
-    clientCode: row.groupCode ?? row.clientLabel,
-    address: row.clientLabel,
-    bankAccountLabel: resolveBankAccountLabel("bsi"),
-    notes: row.groupCode ? `Linked group: ${row.groupCode}` : "",
-    usdToIdr: 15_845,
-    sarToIdr: 4_225,
-    subtotalIdr: row.amount,
-    taxIdr: 0,
-    totalPayableIdr: row.amount,
-    downPaymentIdr,
-    remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
-    items: [
-      {
-        description,
-        pax: 1,
-        currency: "IDR",
-        unitPrice: row.amount,
-        totalPrice: row.amount,
-        totalPriceIdr: row.amount,
-      },
-    ],
-  }, { printWindow });
+  return exportInvoicePdf(
+    {
+      invoiceNumber: row.invoiceNumber,
+      issueDateIso: row.issuedDateIso,
+      dueDateIso: row.dueDateIso,
+      statusLabel: row.status,
+      issuingOffice: "Bekasi Office",
+      clientName: row.clientName,
+      clientCode: row.groupCode ?? row.clientLabel,
+      address: row.clientLabel,
+      bankAccountLabel: resolveBankAccountLabel("bsi"),
+      notes: row.groupCode ? `Linked group: ${row.groupCode}` : "",
+      usdToIdr: 15_845,
+      sarToIdr: 4_225,
+      subtotalIdr: row.amount,
+      taxIdr: 0,
+      totalPayableIdr: row.amount,
+      downPaymentIdr,
+      remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
+      items: [
+        {
+          description,
+          pax: 1,
+          currency: "IDR",
+          unitPrice: row.amount,
+          totalPrice: row.amount,
+          totalPriceIdr: row.amount,
+        },
+      ],
+    },
+    { printWindow },
+  );
 }
 
 function openPendingInvoicePdfWindow(): Window | null {
@@ -1599,7 +1606,9 @@ export function CreateInvoiceWorkspace({
                           </div>
                         </td>
                         <td className="px-5 py-3 text-xs font-bold text-on-surface">{lineSubtotalLabel}</td>
-                        <td className="px-5 py-3 text-xs font-bold text-on-surface">{formatIdr(currentTotals.totalPriceIdr)}</td>
+                        <td className="px-5 py-3 text-xs font-bold text-on-surface">
+                          {formatIdr(currentTotals.totalPriceIdr)}
+                        </td>
                         <td className="px-5 py-3">
                           <button
                             type="button"
@@ -1784,9 +1793,7 @@ export function CreateInvoiceWorkspace({
 
                 <label className="mt-2 block space-y-1.5">
                   <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700/80">
-                      IDR
-                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700/80">IDR</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -2091,19 +2098,21 @@ export function InvoiceScreen({
       return;
     }
 
-    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow }).then((exported) => {
-      if (!exported) {
+    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow })
+      .then((exported) => {
+        if (!exported) {
+          if (!printableWindow.closed) {
+            printableWindow.close();
+          }
+          setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+        }
+      })
+      .catch(() => {
         if (!printableWindow.closed) {
           printableWindow.close();
         }
-        setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
-      }
-    }).catch(() => {
-      if (!printableWindow.closed) {
-        printableWindow.close();
-      }
-      setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
-    });
+        setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
+      });
   };
 
   const handleOpenEditInvoice = (row: InvoiceRow) => {

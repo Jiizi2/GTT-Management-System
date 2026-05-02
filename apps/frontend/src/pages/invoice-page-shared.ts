@@ -110,7 +110,10 @@ function normalizeClientName(value: string): string {
 
 function buildMasterDataInvoiceClientId(value: string, label: string): string {
   const candidateKey = value.trim() || label.trim();
-  const sanitizedKey = candidateKey.replace(/\s+/g, "_").replace(/[^\w-]/g, "").toLowerCase();
+  const sanitizedKey = candidateKey
+    .replace(/\s+/g, "_")
+    .replace(/[^\w-]/g, "")
+    .toLowerCase();
   return `${MASTER_DATA_INVOICE_CLIENT_ID_PREFIX}${sanitizedKey || "client"}`;
 }
 

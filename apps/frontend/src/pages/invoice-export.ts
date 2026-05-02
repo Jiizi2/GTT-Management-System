@@ -275,7 +275,10 @@ function waitForImages(printableWindow: Window): Promise<void> {
         new Promise<void>((resolve) => {
           if (image.complete) {
             if (typeof image.decode === "function") {
-              void image.decode().catch(() => undefined).finally(resolve);
+              void image
+                .decode()
+                .catch(() => undefined)
+                .finally(resolve);
               return;
             }
 

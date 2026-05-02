@@ -354,8 +354,7 @@ export function GroupDetail({
   const isScheduleFlightNumberMissing =
     isFlightActivityType(scheduleForm.category) && !scheduleForm.flightNumber.trim();
   const isScheduleHotelNameMissing =
-    (scheduleForm.category === "arrival" || scheduleForm.category === "departure") &&
-    !scheduleForm.hotelName.trim();
+    (scheduleForm.category === "arrival" || scheduleForm.category === "departure") && !scheduleForm.hotelName.trim();
   const isScheduleFromHotelNameMissing = false;
   const isScheduleDeparturePickupTimeMissing =
     scheduleForm.category === "departure" && !scheduleForm.hotelPickupRequestTime.trim();
@@ -566,7 +565,10 @@ export function GroupDetail({
     () => resolveNextActivityFromItinerary(itineraryItems, group.nextActivity),
     [itineraryItems, group.nextActivity],
   );
-  const requiredBusCount = useMemo(() => resolveTotalBusCount(group.pax, group.totalBuses), [group.pax, group.totalBuses]);
+  const requiredBusCount = useMemo(
+    () => resolveTotalBusCount(group.pax, group.totalBuses),
+    [group.pax, group.totalBuses],
+  );
 
   const persistGroupSnapshot = ({
     nextItinerary = itineraryItems,
@@ -884,27 +886,29 @@ export function GroupDetail({
       return;
     }
 
-    void import("./group-detail-export").then(({ exportGroupDetailPdf }) => {
-      const exported = exportGroupDetailPdf(
-        {
-          group,
-          itineraryItems,
-          noteItems,
-          musyrifProfile,
-        },
-        {
-          printWindow: printableWindow,
-        },
-      );
+    void import("./group-detail-export")
+      .then(({ exportGroupDetailPdf }) => {
+        const exported = exportGroupDetailPdf(
+          {
+            group,
+            itineraryItems,
+            noteItems,
+            musyrifProfile,
+          },
+          {
+            printWindow: printableWindow,
+          },
+        );
 
-      if (!exported && !printableWindow.closed) {
-        printableWindow.close();
-      }
-    }).catch(() => {
-      if (!printableWindow.closed) {
-        printableWindow.close();
-      }
-    });
+        if (!exported && !printableWindow.closed) {
+          printableWindow.close();
+        }
+      })
+      .catch(() => {
+        if (!printableWindow.closed) {
+          printableWindow.close();
+        }
+      });
   };
 
   return (
@@ -1033,7 +1037,9 @@ export function GroupDetail({
                 <div className="flex items-start justify-between gap-3 border-b border-outline-variant/20 py-0 pb-3 sm:border-b-0 sm:border-l sm:border-outline-variant/35 sm:px-4 sm:pb-0">
                   <div>
                     <span className={detailKickerClassName}>Trip Duration</span>
-                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{group.durationDays} Days</p>
+                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">
+                      {group.durationDays} Days
+                    </p>
                   </div>
                   <span className="material-symbols-outlined text-xl text-on-surface-variant/70" aria-hidden="true">
                     calendar_today

@@ -692,9 +692,7 @@ export function UserManagementScreen() {
           eyebrow="User Access Control"
           title="User Management"
           description="Kelola akun pengguna, tambah user baru, dan atur role untuk kebutuhan operasional."
-          actions={
-            <ThemeToggleButton />
-          }
+          actions={<ThemeToggleButton />}
         />
 
         {notice ? (

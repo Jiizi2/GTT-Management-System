@@ -205,7 +205,11 @@ function cloneAgreementForms(forms: NewGroupAgreementFormState[]): NewGroupAgree
 function ItinerarySectionFallback({ label }: { label: string }) {
   return (
     <section className="serene-section">
-      <div className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant" role="status" aria-live="polite">
+      <div
+        className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant"
+        role="status"
+        aria-live="polite"
+      >
         <span className="material-symbols-outlined animate-pulse text-base text-primary" aria-hidden="true">
           sync
         </span>
@@ -478,7 +482,11 @@ export function NewGroupScreen({
   const totalPaxErrorMessage = errors.totalPax?.message;
   const groupNameErrorMessage = errors.groupName?.message;
   const canProceedFromSetupStep =
-    isAgreementReadyForContinue && !savedAgreementDateConnection.hasWarning && !!resolvedGroupCode && !!resolvedGroupName && hasValidPax;
+    isAgreementReadyForContinue &&
+    !savedAgreementDateConnection.hasWarning &&
+    !!resolvedGroupCode &&
+    !!resolvedGroupName &&
+    hasValidPax;
   const agreementSaveStatus =
     agreementSaveFeedback?.tone === "error"
       ? agreementSaveFeedback
@@ -831,7 +839,12 @@ export function NewGroupScreen({
               </label>
               <label className={fieldClassName}>
                 <span>Syarikah</span>
-                <input className={controlClassName} type="text" {...register("syarikahName")} placeholder="Enter syarikah name" />
+                <input
+                  className={controlClassName}
+                  type="text"
+                  {...register("syarikahName")}
+                  placeholder="Enter syarikah name"
+                />
               </label>
               <label className={fieldClassName}>
                 <span>Visa Type</span>
@@ -891,13 +904,21 @@ export function NewGroupScreen({
               aria-live="polite"
             >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
-                {agreementSaveStatus.tone === "success" ? "check_circle" : agreementSaveStatus.tone === "error" ? "error" : "info"}
+                {agreementSaveStatus.tone === "success"
+                  ? "check_circle"
+                  : agreementSaveStatus.tone === "error"
+                    ? "error"
+                    : "info"}
               </span>
               <p>{agreementSaveStatus.message}</p>
             </div>
           ) : null}
           <div className="serene-form-actions mt-4 serene-form-actions-fill">
-            <button type="button" className="serene-btn-primary min-h-10 w-full sm:w-auto" onClick={handleSaveAgreement}>
+            <button
+              type="button"
+              className="serene-btn-primary min-h-10 w-full sm:w-auto"
+              onClick={handleSaveAgreement}
+            >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
                 task_alt
               </span>
@@ -1058,16 +1079,16 @@ export function AddGroupWorkspaceScreen({
 
   const isIdentityStepComplete = Boolean(
     identityDraft?.groupCode?.trim() &&
-      identityDraft?.groupName?.trim() &&
-      identityDraft?.packageName?.trim() &&
-      identityDraft?.startDate &&
-      identityDraft?.endDate &&
-      typeof identityDraft?.pax === "number" &&
-      identityDraft.pax > 0 &&
-      typeof identityDraft?.totalBuses === "number" &&
-      identityDraft.totalBuses > 0 &&
-      identityDraft?.musyrifName?.trim() &&
-      identityDraft?.musyrifPhone?.trim(),
+    identityDraft?.groupName?.trim() &&
+    identityDraft?.packageName?.trim() &&
+    identityDraft?.startDate &&
+    identityDraft?.endDate &&
+    typeof identityDraft?.pax === "number" &&
+    identityDraft.pax > 0 &&
+    typeof identityDraft?.totalBuses === "number" &&
+    identityDraft.totalBuses > 0 &&
+    identityDraft?.musyrifName?.trim() &&
+    identityDraft?.musyrifPhone?.trim(),
   );
   const canOpenSetupStep = isIdentityStepComplete;
   const canOpenItineraryStep = isIdentityStepComplete && Boolean(setupDraft?.canProceed);
@@ -1190,7 +1211,8 @@ export function AddGroupWorkspaceScreen({
               Visa & Booking Setup
             </h2>
             <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-              Lengkapi visa, hotel agreement, raudhah, dan payment. Jika hotel agreement sudah siap, klik save untuk validasi lalu sync ke itinerary.
+              Lengkapi visa, hotel agreement, raudhah, dan payment. Jika hotel agreement sudah siap, klik save untuk
+              validasi lalu sync ke itinerary.
             </p>
           </section>
 

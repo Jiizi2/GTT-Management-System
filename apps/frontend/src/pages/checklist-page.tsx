@@ -177,27 +177,27 @@ const syncChecklistDriverToBackend = async ({
   const { response, payload } = await fetchBackendParsed(
     `/groups/${encodeURIComponent(groupCode)}/checklist/confirm-driver`,
     {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      tripDate: checklistItem.tripDate,
-      activity: checklistItem.activity,
-      tripLabel: checklistItem.trip,
-      requiredBusCount: checklistItem.transferByTrain
-        ? Math.max(2, checklistItem.requiredBusCount)
-        : checklistItem.requiredBusCount,
-      scheduledTime: checklistItem.scheduledTime,
-      transferByTrain: checklistItem.transferByTrain,
-      trainDepartureTime: checklistItem.trainDepartureTime || undefined,
-      stationPickupTime: checklistItem.stationPickupTime || undefined,
-      driver: {
-        name: driver.name,
-        phone: driver.phone,
-        plateNumber: driver.plateNumber,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    }),
+      body: JSON.stringify({
+        tripDate: checklistItem.tripDate,
+        activity: checklistItem.activity,
+        tripLabel: checklistItem.trip,
+        requiredBusCount: checklistItem.transferByTrain
+          ? Math.max(2, checklistItem.requiredBusCount)
+          : checklistItem.requiredBusCount,
+        scheduledTime: checklistItem.scheduledTime,
+        transferByTrain: checklistItem.transferByTrain,
+        trainDepartureTime: checklistItem.trainDepartureTime || undefined,
+        stationPickupTime: checklistItem.stationPickupTime || undefined,
+        driver: {
+          name: driver.name,
+          phone: driver.phone,
+          plateNumber: driver.plateNumber,
+        },
+      }),
     },
   );
 
@@ -226,9 +226,7 @@ const syncChecklistResetToBackend = async ({
   groupCode: string;
   checklistItem: ChecklistItem;
 }): Promise<void> => {
-  const { response } = await fetchBackendParsed(
-    `/groups/${encodeURIComponent(groupCode)}/checklist/reset-driver`,
-    {
+  const { response } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}/checklist/reset-driver`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -238,8 +236,7 @@ const syncChecklistResetToBackend = async ({
       activity: checklistItem.activity,
       scheduledTime: checklistItem.scheduledTime,
     }),
-    },
-  );
+  });
 
   if (!response.ok) {
     throw new Error(`Checklist reset failed (${response.status})`);
@@ -708,14 +705,8 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               <h4 className="text-lg font-bold leading-snug text-slate-900">{item.activity}</h4>
               <p className="truncate text-sm font-semibold text-slate-900">{item.groupName}</p>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>
-                  {serviceType}
-                </span>
-                {isTwoDaysAway ? (
-                  <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>
-                    2 Hari Lagi
-                  </span>
-                ) : null}
+                <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>{serviceType}</span>
+                {isTwoDaysAway ? <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>2 Hari Lagi</span> : null}
               </div>
             </div>
 
@@ -999,11 +990,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                               Visa Only
                             </span>
                           ) : null}
-                          {isTwoDaysAway ? (
-                            <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>
-                              2 Hari Lagi
-                            </span>
-                          ) : null}
+                          {isTwoDaysAway ? <span className={CHECKLIST_NEUTRAL_BADGE_CLASS}>2 Hari Lagi</span> : null}
                         </div>
                         {isExternalTransport ? (
                           <p className="mt-1 text-[10px] font-semibold text-on-surface-variant">

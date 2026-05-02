@@ -161,10 +161,7 @@ export function validateConnectedAgreementDates(
   };
 }
 
-function getAgreementFieldValidationError(
-  city: AgreementDateCity,
-  forms: NewGroupAgreementFormState[],
-): string | null {
+function getAgreementFieldValidationError(city: AgreementDateCity, forms: NewGroupAgreementFormState[]): string | null {
   const populatedForms = getAgreementFormsWithInput(forms);
   for (const form of populatedForms) {
     const agreementIndex = forms.findIndex((entry) => entry.id === form.id);

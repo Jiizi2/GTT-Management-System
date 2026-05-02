@@ -1861,9 +1861,7 @@ export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form:
       : currentItem.title;
   const nextFlightNumber = isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
   const shouldPersistHotelName =
-    form.category === "arrival" ||
-    form.category === "city-tour" ||
-    form.category === "departure";
+    form.category === "arrival" || form.category === "city-tour" || form.category === "departure";
   const nextHotelName = shouldPersistHotelName ? (form.hotelName?.trim() ?? "") : "";
   const nextFromHotelName = "";
   const nextHotelPickupRequestTime = isDepartureActivityType(form.category) ? form.hotelPickupRequestTime.trim() : "";
@@ -1955,7 +1953,8 @@ export function getRouteFieldConfigByCategory(category: string): {
       toLabel: "Destination Airport City",
       fromPlaceholder: "e.g. Madinah",
       toPlaceholder: "e.g. Jeddah",
-      helperText: "Select the departure city and airport city in Saudi, then fill flight return time and hotel pickup request time.",
+      helperText:
+        "Select the departure city and airport city in Saudi, then fill flight return time and hotel pickup request time.",
     };
   }
 

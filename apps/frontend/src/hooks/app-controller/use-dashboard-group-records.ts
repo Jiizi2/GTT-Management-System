@@ -349,7 +349,8 @@ export function useDashboardGroupRecords({
     selectedVisaGroupCode,
   });
   const requestedProjectionRef = useRef(requestedProjection);
-  const shouldUseRemoteOverviewActiveOnly = activeNav === "overview" && requestedProjection === "summary" && isActiveOnly;
+  const shouldUseRemoteOverviewActiveOnly =
+    activeNav === "overview" && requestedProjection === "summary" && isActiveOnly;
   const shouldUseRemoteOverviewActiveOnlyRef = useRef(shouldUseRemoteOverviewActiveOnly);
   const backendSyncRequestIdRef = useRef(0);
   const currentDashboardDate = useCurrentDashboardDate();
@@ -399,10 +400,7 @@ export function useDashboardGroupRecords({
         const next = updater(current);
         groupRecordsRef.current = next;
         groupRecordsProjectionRef.current = requestedProjection;
-        queryClient.setQueryData(
-          groupQueryKeys.list(requestedProjection, shouldUseRemoteOverviewActiveOnly),
-          next,
-        );
+        queryClient.setQueryData(groupQueryKeys.list(requestedProjection, shouldUseRemoteOverviewActiveOnly), next);
         return next;
       });
       void queryClient.invalidateQueries({ queryKey: groupQueryKeys.searchRoot });
@@ -518,11 +516,7 @@ export function useDashboardGroupRecords({
         }
 
         if (rollbackSnapshot) {
-          syncGroupRecords(
-            rollbackSnapshot.groupRecords,
-            rollbackSnapshot.projection,
-            rollbackSnapshot.activeOnly,
-          );
+          syncGroupRecords(rollbackSnapshot.groupRecords, rollbackSnapshot.projection, rollbackSnapshot.activeOnly);
         }
 
         console.warn("Failed to restore group state from backend.", error);
@@ -569,8 +563,7 @@ export function useDashboardGroupRecords({
             await syncGroupsFromBackendOrRestore(requestId, rollbackSnapshot);
           }
 
-          const resolvedFailureMessage =
-            typeof failureMessage === "function" ? failureMessage(error) : failureMessage;
+          const resolvedFailureMessage = typeof failureMessage === "function" ? failureMessage(error) : failureMessage;
           showSyncFeedback("error", resolvedFailureMessage);
           if (allowLocalFallback) {
             console.warn(resolvedFailureMessage, error);
@@ -783,8 +776,7 @@ export function useDashboardGroupRecords({
   );
 
   const summaryMessage = useMemo(() => {
-    const monthMessage =
-      overviewMonthFilter === "all" ? "across all months" : `for ${selectedOverviewMonthLabel}`;
+    const monthMessage = overviewMonthFilter === "all" ? "across all months" : `for ${selectedOverviewMonthLabel}`;
 
     if (normalizedQuery) {
       return `${filteredGroups.length} groups match your search${isActiveOnly ? " (active only)" : ""} ${monthMessage}. ${overviewMetrics.totalTripsThisWeek} trips are scheduled this week (${weekStartIso} - ${weekEndIso}). ${overviewMetrics.peakTripSummary}`;
