@@ -693,7 +693,7 @@ export function UserManagementScreen() {
           title="User Management"
           description="Kelola akun pengguna, tambah user baru, dan atur role untuk kebutuhan operasional."
           actions={
-            <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary" />
+            <ThemeToggleButton />
           }
         />
 
@@ -1161,8 +1161,8 @@ export function UserManagementScreen() {
                 </div>
               </div>
 
-              <div className="border-t border-outline-variant/25 px-5 py-4 sm:px-6">
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <div className="serene-dialog-footer-bar">
+                <div className="serene-dialog-actions-stacked">
                   <button
                     type="button"
                     className="serene-btn-secondary"
@@ -1202,7 +1202,7 @@ export function UserManagementScreen() {
               aria-label={`Edit user ${editingUser.name}`}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed">
+              <div className="serene-dialog-icon bg-primary-fixed text-on-primary-fixed">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   edit_square
                 </span>
@@ -1214,7 +1214,7 @@ export function UserManagementScreen() {
               </p>
 
               <form
-                className="mt-5 grid gap-3"
+                className="serene-dialog-body"
                 onSubmit={editForm.handleSubmit((values) => void handleSubmitEditUser(values))}
               >
                 <div className="grid gap-1.5">
@@ -1283,7 +1283,7 @@ export function UserManagementScreen() {
                   </p>
                 ) : null}
 
-                <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <div className="serene-dialog-footer">
                   <button
                     type="button"
                     className="serene-btn-secondary"
@@ -1319,7 +1319,7 @@ export function UserManagementScreen() {
               aria-label={`${passwordTargetUser.hasPassword ? "Reset" : "Set"} password ${passwordTargetUser.name}`}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-secondary-container text-on-secondary-container">
+              <div className="serene-dialog-icon bg-secondary-container text-on-secondary-container">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   password
                 </span>
@@ -1334,7 +1334,7 @@ export function UserManagementScreen() {
                   : `Buat password awal untuk ${passwordTargetUser.name} agar akun ini siap dipakai.`}
               </p>
 
-              <div className="mt-4 rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3 text-xs font-medium leading-relaxed text-on-surface-variant">
+              <div className="serene-dialog-section text-xs font-medium leading-relaxed text-on-surface-variant">
                 <p className="font-semibold text-on-surface">{passwordTargetUser.email}</p>
                 <p className="mt-1">
                   Status saat ini: {passwordTargetUser.hasPassword ? "sudah punya password" : "belum punya password"}.
@@ -1342,7 +1342,7 @@ export function UserManagementScreen() {
               </div>
 
               <form
-                className="mt-5 grid gap-3"
+                className="serene-dialog-body"
                 onSubmit={passwordForm.handleSubmit((values) => void handleSubmitManagedUserPassword(values))}
               >
                 <div className="grid gap-1.5">
@@ -1385,7 +1385,7 @@ export function UserManagementScreen() {
                   ) : null}
                 </div>
 
-                <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <div className="serene-dialog-footer">
                   <button
                     type="button"
                     className="serene-btn-secondary"
@@ -1425,7 +1425,7 @@ export function UserManagementScreen() {
               aria-label={`Hapus user ${deleteTargetUser.name}`}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-error-container text-on-error-container">
+              <div className="serene-dialog-icon bg-error-container text-on-error-container">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   delete_forever
                 </span>
@@ -1437,7 +1437,7 @@ export function UserManagementScreen() {
                 dibatalkan.
               </p>
 
-              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <div className="serene-dialog-footer">
                 <button
                   type="button"
                   className="serene-btn-secondary"
@@ -1448,7 +1448,7 @@ export function UserManagementScreen() {
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-error-container px-4 py-2 text-sm font-semibold text-on-error-container transition hover:brightness-95"
+                  className="serene-btn-danger"
                   onClick={handleConfirmDeleteUser}
                   disabled={deleteManagedUserMutation.isPending}
                 >

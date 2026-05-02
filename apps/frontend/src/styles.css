@@ -341,6 +341,26 @@ img {
     background-image: var(--serene-card-gradient);
   }
 
+  .serene-page-toolbar {
+    @apply flex items-center gap-3;
+  }
+
+  .serene-page-search {
+    @apply flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14;
+  }
+
+  .serene-page-search-input {
+    @apply w-full border-none bg-transparent text-sm font-medium text-on-surface-variant outline-none placeholder:text-on-surface-variant/50;
+  }
+
+  .serene-theme-toggle-shell {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary;
+  }
+
+  .serene-theme-toggle-floating {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest/90 text-on-surface-variant shadow-ambient backdrop-blur-serene transition hover:-translate-y-0.5 hover:text-primary;
+  }
+
   .serene-accordion {
     @apply overflow-hidden rounded-2xl bg-surface-container-lowest;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
@@ -421,6 +441,68 @@ img {
 
   .serene-chip-alert {
     @apply inline-flex items-center rounded-full bg-error-container px-2.5 py-1 text-xs font-semibold text-on-error-container;
+  }
+
+  .serene-stat-card {
+    @apply flex items-center gap-3 rounded-2xl bg-surface-container-lowest p-4 shadow-sm;
+    border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
+    background-image: var(--serene-card-gradient);
+  }
+
+  .serene-filter-panel {
+    @apply rounded-2xl bg-surface-container-low p-4 shadow-ambient sm:p-5;
+    border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
+  }
+
+  .serene-summary-strip {
+    @apply flex flex-col gap-3 rounded-2xl bg-surface-container-low p-4 shadow-ambient sm:flex-row sm:items-center sm:justify-between;
+    border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
+  }
+
+  .serene-accent-card {
+    @apply relative overflow-hidden rounded-2xl p-5 shadow-ambient;
+  }
+
+  .serene-empty-state {
+    @apply rounded-3xl border border-dashed p-10 text-center;
+    border-color: rgb(var(--color-outline-variant) / 0.45);
+    background-color: rgb(var(--color-surface-container-lowest));
+    background-image: var(--serene-card-gradient);
+    box-shadow: var(--serene-shadow-ambient);
+  }
+
+  .serene-table-shell {
+    @apply overflow-hidden rounded-3xl bg-surface-container-lowest shadow-sm;
+    border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
+    background-image: var(--serene-card-gradient);
+  }
+
+  .serene-form-section {
+    @apply rounded-2xl bg-surface-container-lowest p-4 shadow-sm sm:p-5;
+    border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
+    background-image: var(--serene-card-gradient);
+  }
+
+  .serene-form-section-header {
+    @apply mb-3 flex items-start gap-2;
+  }
+
+  .serene-form-actions {
+    @apply flex flex-col-reverse gap-2 sm:flex-row sm:justify-end;
+  }
+
+  .serene-form-actions-split {
+    @apply flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .serene-form-footer-bar {
+    @apply mt-4 flex flex-col gap-2 sm:flex-row sm:items-center;
+    border-top: 1px solid rgb(var(--color-outline-variant) / 0.35);
+    padding-top: 1rem;
+  }
+
+  .serene-form-actions-fill > * {
+    @apply w-full sm:w-auto;
   }
 
   .checklist-need-section {
@@ -698,6 +780,56 @@ img {
     @apply overflow-hidden rounded-3xl shadow-float;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background: var(--serene-floating-surface);
+  }
+
+  .serene-dialog-header {
+    @apply flex items-start justify-between gap-3;
+  }
+
+  .serene-dialog-body {
+    @apply mt-5 grid gap-4;
+  }
+
+  .serene-dialog-section {
+    @apply rounded-2xl border px-4 py-3;
+    border-color: rgb(var(--color-outline-variant) / 0.35);
+    background: rgb(var(--color-surface-container-low));
+  }
+
+  .serene-dialog-icon {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-xl;
+  }
+
+  .serene-dialog-close {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high;
+  }
+
+  .serene-dialog-close-shell {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full border bg-surface-container-lowest text-on-surface-variant transition hover:text-primary;
+    border-color: rgb(var(--color-outline-variant) / 0.6);
+  }
+
+  .serene-dialog-footer {
+    @apply mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end;
+  }
+
+  .serene-dialog-actions-stacked {
+    @apply flex flex-col-reverse gap-2 sm:flex-row sm:justify-end;
+  }
+
+  .serene-dialog-footer-bar {
+    @apply flex flex-wrap items-center justify-end gap-2 px-5 py-4;
+    border-top: 1px solid rgb(var(--color-outline-variant) / 0.45);
+  }
+
+  .serene-btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition hover:brightness-95;
+    background: rgb(var(--color-error-container));
+    color: rgb(var(--color-on-error-container));
+  }
+
+  .serene-btn-danger:disabled {
+    @apply cursor-not-allowed opacity-45;
   }
 
   .serene-login-pattern {

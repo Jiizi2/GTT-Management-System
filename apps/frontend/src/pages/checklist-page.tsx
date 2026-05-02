@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import * as Domain from "../shared/app-domain";
+import { fetchBackendParsed } from "../shared/api-client";
 import type {
   ChecklistDriverAssignment,
   ChecklistDriverDraft,
@@ -21,8 +22,6 @@ const {
   getChecklistDayLabel,
   getLocalIsoDateWithOffset,
 } = Domain;
-
-const CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY = "gtt-h1-checklist-confirmed-drivers-v1";
 
 const resolveGroupServiceType = (group: GroupData | undefined): "Visa+" | "Visa Only" =>
   group?.visaSetup?.busStatus === "Visa+" ? "Visa+" : "Visa Only";
@@ -61,74 +60,6 @@ const groupChecklistItemsByGroup = (items: ChecklistItem[]): ChecklistItemsGroup
   });
 
   return Array.from(groupedItems.values());
-};
-
-const sanitizeConfirmedDrivers = (source: unknown): Record<string, ChecklistDriverAssignment> => {
-  if (!source || typeof source !== "object") {
-    return {};
-  }
-
-  return Object.entries(source as Record<string, unknown>).reduce<Record<string, ChecklistDriverAssignment>>(
-    (accumulator, [itemId, assignmentValue]) => {
-      if (!assignmentValue || typeof assignmentValue !== "object") {
-        return accumulator;
-      }
-
-      const driversValue = (assignmentValue as { drivers?: unknown }).drivers;
-      if (!Array.isArray(driversValue)) {
-        return accumulator;
-      }
-
-      const drivers = driversValue
-        .map((driverValue) => {
-          if (!driverValue || typeof driverValue !== "object") {
-            return null;
-          }
-
-          const rawDriver = driverValue as {
-            name?: unknown;
-            phone?: unknown;
-            plateNumber?: unknown;
-          };
-
-          if (
-            typeof rawDriver.name !== "string" ||
-            typeof rawDriver.phone !== "string" ||
-            typeof rawDriver.plateNumber !== "string"
-          ) {
-            return null;
-          }
-
-          return {
-            name: rawDriver.name,
-            phone: rawDriver.phone,
-            plateNumber: rawDriver.plateNumber,
-          };
-        })
-        .filter((driver): driver is ChecklistDriverProfile => Boolean(driver));
-
-      accumulator[itemId] = { drivers };
-      return accumulator;
-    },
-    {},
-  );
-};
-
-const loadPersistedConfirmedDrivers = (): Record<string, ChecklistDriverAssignment> => {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const persistedValue = window.localStorage.getItem(CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY);
-    if (!persistedValue) {
-      return {};
-    }
-
-    return sanitizeConfirmedDrivers(JSON.parse(persistedValue));
-  } catch {
-    return {};
-  }
 };
 
 const readTrimmedString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
@@ -226,20 +157,6 @@ const buildConfirmedDriversFromBackendAssignments = (
   }, {});
 };
 
-const resolveChecklistApiBaseUrl = (): string => {
-  const customUrl = (globalThis as { __GTT_API_BASE_URL__?: string }).__GTT_API_BASE_URL__;
-  if (customUrl?.trim()) {
-    return customUrl.trim().replace(/\/+$/, "");
-  }
-
-  const hostname = globalThis.location?.hostname ?? "";
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://localhost:3001/api";
-  }
-
-  return "/api";
-};
-
 const ChecklistModalPortal = ({ children }: { children: ReactNode }) => {
   if (typeof document === "undefined") {
     return null;
@@ -257,8 +174,9 @@ const syncChecklistDriverToBackend = async ({
   checklistItem: ChecklistItem;
   driver: ChecklistDriverProfile;
 }): Promise<ChecklistDriverProfile[] | null> => {
-  const apiBaseUrl = resolveChecklistApiBaseUrl();
-  const response = await fetch(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}/checklist/confirm-driver`, {
+  const { response, payload } = await fetchBackendParsed(
+    `/groups/${encodeURIComponent(groupCode)}/checklist/confirm-driver`,
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -280,13 +198,13 @@ const syncChecklistDriverToBackend = async ({
         plateNumber: driver.plateNumber,
       },
     }),
-  });
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`Checklist sync failed (${response.status})`);
   }
 
-  const payload = (await response.json()) as unknown;
   if (typeof payload !== "object" || payload === null) {
     return null;
   }
@@ -308,8 +226,9 @@ const syncChecklistResetToBackend = async ({
   groupCode: string;
   checklistItem: ChecklistItem;
 }): Promise<void> => {
-  const apiBaseUrl = resolveChecklistApiBaseUrl();
-  const response = await fetch(`${apiBaseUrl}/groups/${encodeURIComponent(groupCode)}/checklist/reset-driver`, {
+  const { response } = await fetchBackendParsed(
+    `/groups/${encodeURIComponent(groupCode)}/checklist/reset-driver`,
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -319,7 +238,8 @@ const syncChecklistResetToBackend = async ({
       activity: checklistItem.activity,
       scheduledTime: checklistItem.scheduledTime,
     }),
-  });
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`Checklist reset failed (${response.status})`);
@@ -327,7 +247,7 @@ const syncChecklistResetToBackend = async ({
 };
 
 export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
-  const checklistItems = buildChecklistItemsFromGroups(groups);
+  const checklistItems = useMemo(() => buildChecklistItemsFromGroups(groups), [groups]);
   const dayAfterTomorrowIso = getLocalIsoDateWithOffset(2);
   const groupsByCode = useMemo(
     () => new Map(groups.map((group) => [group.code.trim().toUpperCase(), group])),
@@ -339,9 +259,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     [groups, checklistItems],
   );
   const [driverDrafts, setDriverDrafts] = useState<Record<string, ChecklistDriverDraft>>({});
-  const [confirmedDrivers, setConfirmedDrivers] = useState<Record<string, ChecklistDriverAssignment>>(() =>
-    loadPersistedConfirmedDrivers(),
-  );
+  const [confirmedDrivers, setConfirmedDrivers] = useState<Record<string, ChecklistDriverAssignment>>({});
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const copiedItemTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [cancelTargetItemId, setCancelTargetItemId] = useState<string | null>(null);
@@ -414,29 +332,12 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       );
 
       Object.entries(backendConfirmedDrivers).forEach(([itemId, assignment]) => {
-        const localDriverCount = nextCurrent[itemId]?.drivers.length ?? 0;
-        const backendDriverCount = assignment.drivers.length;
-
-        if (backendDriverCount >= localDriverCount) {
-          nextCurrent[itemId] = assignment;
-        }
+        nextCurrent[itemId] = assignment;
       });
 
       return nextCurrent;
     });
   }, [checklistItems, backendConfirmedDrivers]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(CHECKLIST_CONFIRMED_DRIVERS_STORAGE_KEY, JSON.stringify(confirmedDrivers));
-    } catch {
-      // No-op if storage is blocked or full.
-    }
-  }, [confirmedDrivers]);
 
   useEffect(
     () => () => {
@@ -848,7 +749,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </p>
               </div>
             ) : null}
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="serene-form-actions-split">
               <span className="checklist-need-panel-title text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant/90">
                 Assign Transport (Driver {assignedProgressCount}/{requiredDriverCount})
               </span>
@@ -939,15 +840,15 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <section className="flex items-center gap-3" aria-label="Search checklist items">
+      <section className="serene-page-toolbar" aria-label="Search checklist items">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
-          <label className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14">
+          <label className="serene-page-search">
             <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
               search
             </span>
             <input
               type="text"
-              className="w-full border-none bg-transparent text-sm font-medium text-on-surface-variant outline-none placeholder:text-on-surface-variant/50"
+              className="serene-page-search-input"
               value={groupCodeQuery}
               onChange={(event) => setGroupCodeQuery(event.target.value)}
               placeholder="Search group number, e.g. 901794508"
@@ -955,7 +856,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
           </label>
         </div>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </section>
 
       <header className="serene-card rounded-3xl p-5">
@@ -1213,16 +1114,16 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             role="presentation"
           >
             <div
-              className="serene-card w-full max-w-md rounded-2xl p-5 shadow-2xl"
+              className="serene-modal-shell w-full max-w-md p-5"
               role="dialog"
               aria-modal="true"
               aria-labelledby="cancel-assignment-title"
               aria-describedby="cancel-assignment-description"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start gap-3">
+              <div className="serene-dialog-header">
                 <span
-                  className="checklist-warning-button material-symbols-outlined rounded-full p-2"
+                  className="serene-dialog-icon checklist-warning-button material-symbols-outlined"
                   aria-hidden="true"
                 >
                   warning
@@ -1238,7 +1139,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <div className="serene-dialog-footer">
                 <button
                   type="button"
                   className="checklist-secondary-button rounded-xl px-3 py-2 text-sm font-semibold transition"
@@ -1248,7 +1149,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700"
+                  className="serene-btn-danger rounded-xl"
                   onClick={() => {
                     void handleConfirmCancelAssignment();
                   }}

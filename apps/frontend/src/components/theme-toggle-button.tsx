@@ -2,16 +2,22 @@ import { useThemeMode } from "../theme/theme-provider";
 
 type ThemeToggleButtonProps = {
   className?: string;
+  variant?: "page" | "floating";
 };
 
-export function ThemeToggleButton({ className }: ThemeToggleButtonProps) {
+function joinClasses(...values: Array<string | undefined>): string {
+  return values.filter((value) => typeof value === "string" && value.trim().length > 0).join(" ");
+}
+
+export function ThemeToggleButton({ className, variant = "page" }: ThemeToggleButtonProps) {
   const { theme, toggleTheme } = useThemeMode();
 
   const isDarkMode = theme === "dark";
   const nextThemeLabel = isDarkMode ? "light" : "dark";
-  const buttonClassName =
-    className?.trim() ||
-    "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container-lowest hover:text-primary";
+  const buttonClassName = joinClasses(
+    variant === "floating" ? "serene-theme-toggle-floating" : "serene-theme-toggle-shell",
+    className,
+  );
 
   return (
     <button

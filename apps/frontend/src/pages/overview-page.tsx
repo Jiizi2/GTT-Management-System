@@ -3,6 +3,7 @@ import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
 import { GroupCard } from "../components/group-card";
+import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 
@@ -112,9 +113,9 @@ export function OverviewScreen({
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <header className="flex items-center gap-3">
+      <header className="serene-page-toolbar">
         <label
-          className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 shadow-ambient sm:h-14 sm:max-w-xl"
+          className="serene-page-search sm:max-w-xl"
           aria-label="Search groups"
         >
           <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
@@ -122,32 +123,31 @@ export function OverviewScreen({
           </span>
           <input
             type="text"
-            className="w-full border-none bg-transparent text-sm font-medium text-on-surface-variant outline-none placeholder:text-on-surface-variant/50"
+            className="serene-page-search-input"
             placeholder="Search groups..."
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
           />
         </label>
 
-        <ThemeToggleButton className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary sm:ml-auto sm:mr-5" />
+        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </header>
 
-      <section className="space-y-2 pt-2">
-        <div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl lg:text-5xl">
-            Itinerary Overview
-          </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base lg:text-lg">
+      <PageHeroSection
+        eyebrow="Operations Overview"
+        title="Itinerary Overview"
+        description={
+          <>
             <span className="sm:hidden">Track your active Umrah groups in real-time.</span>
             <span className="hidden sm:inline">
               Manage your ongoing Umrah groups and track live itinerary status in real-time.
             </span>
-          </p>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.95fr_1fr_1fr_1fr]" aria-label="Weekly summary">
-        <article className="flex min-h-[11rem] flex-col rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-4 shadow-ambient sm:min-h-[12.25rem] sm:p-6">
+        <article className="serene-card flex min-h-[11rem] flex-col p-4 sm:min-h-[12.25rem] sm:p-6">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
               <span className="material-symbols-outlined text-xl" aria-hidden="true">
@@ -213,10 +213,7 @@ export function OverviewScreen({
         ))}
       </section>
 
-      <section
-        className="flex flex-col gap-3 rounded-2xl bg-surface-container-low p-4 shadow-ambient sm:flex-row sm:items-center sm:justify-between"
-        aria-label="Search results summary"
-      >
+      <section className="serene-summary-strip" aria-label="Search results summary">
         <div className="flex items-end gap-2 text-sm text-on-surface-variant">
           <strong className="text-2xl font-bold leading-none text-on-surface">{filteredGroups.length}</strong>
           <span className="sm:hidden">{filteredGroups.length === 1 ? "group" : "groups"}</span>
@@ -291,7 +288,7 @@ export function OverviewScreen({
         {filteredGroups.length > 0 ? (
           paginatedGroups.map((group) => <GroupCard key={group.code} group={group} onOpenDetail={onOpenDetail} />)
         ) : (
-          <article className="col-span-full rounded-2xl bg-surface-container-low p-10 text-center">
+          <article className="serene-empty-state col-span-full">
             <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
               search_off
             </span>

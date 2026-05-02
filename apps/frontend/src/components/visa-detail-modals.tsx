@@ -21,6 +21,14 @@ const modalSelectClassName = "serene-select";
 const modalButtonClassName = "serene-btn-primary";
 const modalCancelButtonClassName = "serene-btn-secondary";
 const modalErrorClassName = "text-xs font-medium text-brand-tertiary";
+const modalCloseButtonClassName = "serene-dialog-close-shell hover:border-primary";
+const modalHeaderBarClassName = "serene-dialog-header shrink-0 bg-surface-container-low px-5 py-4";
+const modalBodyClassName = "serene-dialog-body overflow-y-auto px-5 py-4";
+const modalFooterBarClassName = "serene-dialog-footer-bar shrink-0 bg-surface-container-low";
+const modalInfoCardClassName = "serene-dialog-section text-sm text-on-surface-variant";
+const modalDashedCardClassName =
+  "rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600";
+const modalItemCardClassName = "rounded-2xl border border-slate-200 bg-surface-container-lowest p-3";
 
 const syarikahModalSchema = z.object({
   value: z.string().trim().min(1, "Syarikah wajib diisi."),
@@ -111,7 +119,7 @@ function ModalShell({
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 bg-surface-container-low px-5 py-4">
+          <div className={modalHeaderBarClassName}>
             <div className="flex items-start gap-3">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                 <span className="material-symbols-outlined" aria-hidden="true">
@@ -131,7 +139,7 @@ function ModalShell({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant transition hover:text-primary"
+              className={modalCloseButtonClassName}
               onClick={onClose}
               aria-label={`Close ${title.toLowerCase()} popup`}
             >
@@ -141,9 +149,9 @@ function ModalShell({
             </button>
           </div>
 
-          <div className="space-y-4 overflow-y-auto px-5 py-4">{children}</div>
+          <div className={modalBodyClassName}>{children}</div>
 
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 bg-surface-container-low px-5 py-4">
+          <div className={modalFooterBarClassName}>
             {footer}
           </div>
         </div>
@@ -590,7 +598,7 @@ export function VisaRaudhahModal({
     >
       <div className="space-y-3">
         {fields.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+          <div className={modalDashedCardClassName}>
             Belum ada target tanggal Raudhah. Klik tombol "Add Date" untuk menambahkan target date.
           </div>
         ) : null}
@@ -598,7 +606,7 @@ export function VisaRaudhahModal({
         {fields.map((appointment, index) => (
           <div
             key={appointment.fieldId}
-            className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-3"
+            className={modalItemCardClassName}
           >
             <input type="hidden" {...register(`appointments.${index}.id`)} />
             <input type="hidden" {...register(`appointments.${index}.tasrehPrinted`)} />

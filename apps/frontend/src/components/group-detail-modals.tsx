@@ -34,6 +34,19 @@ const modalSelectClassName = "serene-select";
 const modalTextareaClassName = "serene-textarea";
 const modalOverlayClassName = "serene-modal-overlay z-[120]";
 const modalErrorClassName = "text-xs font-medium text-brand-tertiary";
+const modalShellClassName = "serene-modal-shell";
+const modalHeaderBarClassName = "flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4";
+const modalHeaderBarCenteredClassName = "flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4";
+const modalBodyClassName = "serene-dialog-body px-5 py-4";
+const modalScrollableBodyClassName = "serene-dialog-body overflow-y-auto px-5 py-4";
+const modalSecondaryButtonClassName =
+  "serene-btn-secondary rounded-xl px-4 py-2 text-sm font-semibold";
+const modalDangerButtonClassName = "serene-btn-danger rounded-xl";
+const modalDangerBrandButtonClassName =
+  "inline-flex items-center gap-1.5 rounded-xl bg-brand-tertiary px-4 py-2 text-sm font-semibold text-brand-neutral transition hover:bg-brand-tertiary/90";
+const modalInfoSectionClassName = "serene-dialog-section text-sm";
+const modalMetaSectionClassName =
+  "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2";
 
 const musyrifModalSchema = z.object({
   name: z.string().trim().min(1, "Musyrif name wajib diisi."),
@@ -137,21 +150,21 @@ export function MusyrifModal({
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
           ref={dialogRef}
-          className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
+          className={`${modalShellClassName} w-full max-w-2xl`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-musyrif-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div className={modalHeaderBarCenteredClassName}>
             <h2 id="edit-musyrif-title" className="text-2xl font-bold tracking-tight text-slate-900">
               Edit Musyrif
             </h2>
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-primary hover:text-primary"
+              className="serene-dialog-close-shell hover:border-primary"
               onClick={onClose}
               aria-label="Close edit musyrif popup"
             >
@@ -161,7 +174,7 @@ export function MusyrifModal({
             </button>
           </div>
 
-          <form className="space-y-4 px-5 py-4" onSubmit={handleSubmit((values) => void onSave(values))}>
+          <form className={modalBodyClassName} onSubmit={handleSubmit((values) => void onSave(values))}>
             <div className="grid gap-3 md:grid-cols-2">
               <label className={modalFieldClassName}>
                 <span>Musyrif Name</span>
@@ -204,7 +217,7 @@ export function MusyrifModal({
               </label>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+            <div className="serene-dialog-footer-bar">
               <button
                 type="submit"
                 className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
@@ -220,7 +233,7 @@ export function MusyrifModal({
 
               <button
                 type="button"
-                className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                className={modalSecondaryButtonClassName}
                 onClick={onClose}
               >
                 Cancel
@@ -249,14 +262,14 @@ export function DeleteConfirmModal({
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
           ref={dialogRef}
-          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
+          className={`${modalShellClassName} w-full max-w-xl`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-itinerary-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
               <span className="material-symbols-outlined" aria-hidden="true">
                 delete_forever
@@ -265,7 +278,7 @@ export function DeleteConfirmModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-primary hover:text-primary"
+              className="serene-dialog-close-shell hover:border-primary"
               onClick={onClose}
               aria-label="Close delete confirmation popup"
             >
@@ -275,7 +288,7 @@ export function DeleteConfirmModal({
             </button>
           </div>
 
-          <div className="space-y-3 px-5 py-4">
+          <div className={modalBodyClassName}>
             <h2 id="delete-itinerary-title" className="text-2xl font-bold tracking-tight text-slate-900">
               Delete this itinerary?
             </h2>
@@ -284,7 +297,7 @@ export function DeleteConfirmModal({
               continuing.
             </p>
 
-            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div className={`${modalInfoSectionClassName} grid gap-2`}>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Date</span>
                 <strong className="mt-1 block text-sm text-slate-900">
@@ -302,10 +315,10 @@ export function DeleteConfirmModal({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <div className="serene-dialog-footer-bar">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700"
+              className={modalDangerButtonClassName}
               onClick={onConfirm}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
@@ -316,7 +329,7 @@ export function DeleteConfirmModal({
 
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+              className={modalSecondaryButtonClassName}
               onClick={onClose}
             >
               Cancel
@@ -346,14 +359,14 @@ export function DeleteGroupModal({
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
           ref={dialogRef}
-          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
+          className={`${modalShellClassName} w-full max-w-xl`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-group-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-tertiary/15 text-brand-tertiary">
               <span className="material-symbols-outlined" aria-hidden="true">
                 warning
@@ -362,7 +375,7 @@ export function DeleteGroupModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
+              className="serene-dialog-close-shell hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
               aria-label="Close delete group confirmation popup"
             >
@@ -372,7 +385,7 @@ export function DeleteGroupModal({
             </button>
           </div>
 
-          <div className="space-y-3 px-5 py-4">
+          <div className={modalBodyClassName}>
             <h2 id="delete-group-title" className="text-2xl font-bold tracking-tight text-slate-900">
               Delete this group?
             </h2>
@@ -381,7 +394,7 @@ export function DeleteGroupModal({
               undone.
             </p>
 
-            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div className={`${modalInfoSectionClassName} grid gap-2`}>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Group Code</span>
                 <strong className="mt-1 block text-sm text-slate-900">{groupCode}</strong>
@@ -393,10 +406,10 @@ export function DeleteGroupModal({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <div className="serene-dialog-footer-bar">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-tertiary px-4 py-2 text-sm font-semibold text-brand-neutral transition hover:bg-brand-tertiary/90"
+              className={modalDangerBrandButtonClassName}
               onClick={onConfirm}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
@@ -407,7 +420,7 @@ export function DeleteGroupModal({
 
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+              className={modalSecondaryButtonClassName}
               onClick={onClose}
             >
               Cancel
@@ -483,14 +496,14 @@ export function GroupEditModal({
         <div
           id="group-edit-modal"
           ref={dialogRef}
-          className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
+          className={`${modalShellClassName} w-full max-w-xl`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="group-edit-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary">
               <span className="material-symbols-outlined" aria-hidden="true">
                 edit
@@ -499,7 +512,7 @@ export function GroupEditModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
+              className="serene-dialog-close-shell hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
               aria-label="Close edit group popup"
             >
@@ -510,7 +523,7 @@ export function GroupEditModal({
           </div>
 
           <form
-            className="space-y-4 px-5 py-4"
+            className={modalBodyClassName}
             onSubmit={handleSubmit(async (values) => {
               const result = await onSave({
                 code: values.code.trim().toUpperCase(),
@@ -621,7 +634,7 @@ export function GroupEditModal({
               </p>
             ) : null}
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+            <div className="serene-dialog-footer-bar">
               <button
                 type="submit"
                 className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
@@ -637,7 +650,7 @@ export function GroupEditModal({
 
               <button
                 type="button"
-                className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+                className={modalSecondaryButtonClassName}
                 onClick={onClose}
               >
                 Cancel
@@ -699,14 +712,14 @@ export function ScheduleModal({
       >
         <div
           ref={dialogRef}
-          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+          className={`${modalShellClassName} flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col sm:max-h-[calc(100dvh-2rem)]`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="schedule-modal-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-surface-container-lowest px-5 py-4">
+          <div className={`${modalHeaderBarClassName} shrink-0 bg-surface-container-lowest`}>
             <div className="flex items-start gap-3">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <span className="material-symbols-outlined" aria-hidden="true">
@@ -726,7 +739,7 @@ export function ScheduleModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
+              className="serene-dialog-close-shell hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
               aria-label="Close add schedule popup"
             >
@@ -736,7 +749,7 @@ export function ScheduleModal({
             </button>
           </div>
 
-          <div className="space-y-4 overflow-y-auto px-5 py-4">
+          <div className={modalScrollableBodyClassName}>
             {scheduleStatusMessage ? (
               <div className={modalWarnClassName} role="status" aria-live="polite">
                 <span className="material-symbols-outlined" aria-hidden="true">
@@ -1095,7 +1108,7 @@ export function ScheduleModal({
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-surface-container-lowest px-5 py-4">
+          <div className="serene-dialog-footer-bar shrink-0 bg-surface-container-lowest">
             <button
               type="button"
               className="serene-btn-primary gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
@@ -1110,7 +1123,7 @@ export function ScheduleModal({
 
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+              className={modalSecondaryButtonClassName}
               onClick={onClose}
             >
               Cancel
@@ -1168,21 +1181,21 @@ export function EditScheduleModal({
       >
         <div
           ref={dialogRef}
-          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+          className={`${modalShellClassName} flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col sm:max-h-[calc(100dvh-2rem)]`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-schedule-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-surface-container-lowest px-5 py-4">
+          <div className={`${modalHeaderBarCenteredClassName} shrink-0 bg-surface-container-lowest`}>
             <h2 id="edit-schedule-title" className="text-2xl font-bold tracking-tight text-slate-900">
               Edit Schedule
             </h2>
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
+              className="serene-dialog-close-shell hover:border-brand-primary hover:text-brand-primary"
               onClick={onClose}
               aria-label="Close edit schedule popup"
             >
@@ -1192,7 +1205,7 @@ export function EditScheduleModal({
             </button>
           </div>
 
-          <div className="space-y-4 overflow-y-auto px-5 py-4">
+          <div className={modalScrollableBodyClassName}>
             {scheduleStatusMessage ? (
               <div className={modalWarnClassName} role="status" aria-live="polite">
                 <span className="material-symbols-outlined" aria-hidden="true">
@@ -1531,7 +1544,7 @@ export function EditScheduleModal({
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-surface-container-lowest px-5 py-4">
+          <div className="serene-dialog-footer-bar shrink-0 bg-surface-container-lowest">
             <button
               type="button"
               className="serene-btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
@@ -1543,7 +1556,7 @@ export function EditScheduleModal({
 
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+              className={modalSecondaryButtonClassName}
               onClick={onClose}
             >
               Cancel
@@ -1585,14 +1598,14 @@ export function NoteModal({
       <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
         <div
           ref={dialogRef}
-          className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest shadow-2xl"
+          className={`${modalShellClassName} w-full max-w-2xl`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="note-modal-title"
           tabIndex={-1}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div className={modalHeaderBarCenteredClassName}>
             <div className="flex items-center gap-2">
               <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <span className="material-symbols-outlined" aria-hidden="true">
@@ -1607,7 +1620,7 @@ export function NoteModal({
 
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-primary hover:text-primary"
+              className="serene-dialog-close-shell hover:border-primary"
               onClick={onClose}
               aria-label="Close add note popup"
             >
@@ -1617,7 +1630,7 @@ export function NoteModal({
             </button>
           </div>
 
-          <div className="space-y-4 px-5 py-4">
+          <div className={modalBodyClassName}>
             <label className={modalFieldClassName}>
               <span>Operational Note</span>
               <div className="space-y-1.5">
@@ -1641,7 +1654,7 @@ export function NoteModal({
               </div>
             </label>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className={modalMetaSectionClassName}>
               <div className="inline-flex items-center gap-1.5 text-sm text-slate-600">
                 <span className="material-symbols-outlined" aria-hidden="true">
                   visibility
@@ -1675,7 +1688,7 @@ export function NoteModal({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <div className="serene-dialog-footer-bar">
             <button
               type="button"
               className="serene-btn-primary gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
@@ -1695,7 +1708,7 @@ export function NoteModal({
 
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+              className={modalSecondaryButtonClassName}
               onClick={onClose}
             >
               Cancel
