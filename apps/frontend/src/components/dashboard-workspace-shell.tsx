@@ -20,6 +20,7 @@ export function DashboardWorkspaceShell({
     controller.activeNav === "overview" ||
     controller.activeNav === "checklist" ||
     (controller.activeNav === "visa" && !controller.selectedVisaRow) ||
+    controller.activeNav === "agreement-inbox" ||
     controller.activeNav === "invoice" ||
     controller.activeNav === "raudhah-reminder" ||
     controller.activeNav === "new-group" ||

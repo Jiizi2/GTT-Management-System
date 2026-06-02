@@ -83,41 +83,40 @@ export function OverviewScreen({
       return;
     }
 
-    void import("./overview-export").then(({ exportOverviewReportPdf }) => {
-      const exported = exportOverviewReportPdf(
-        {
-          groups: filteredGroups,
-          query,
-          isActiveOnly,
-          monthLabel: selectedOverviewMonthLabel,
-          summaryMessage,
-        },
-        {
-          printWindow: printableWindow,
-        },
-      );
+    void import("./overview-export")
+      .then(({ exportOverviewReportPdf }) => {
+        const exported = exportOverviewReportPdf(
+          {
+            groups: filteredGroups,
+            query,
+            isActiveOnly,
+            monthLabel: selectedOverviewMonthLabel,
+            summaryMessage,
+          },
+          {
+            printWindow: printableWindow,
+          },
+        );
 
-      if (!exported) {
+        if (!exported) {
+          if (!printableWindow.closed) {
+            printableWindow.close();
+          }
+          window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
+        }
+      })
+      .catch(() => {
         if (!printableWindow.closed) {
           printableWindow.close();
         }
-        window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export Report lagi.");
-      }
-    }).catch(() => {
-      if (!printableWindow.closed) {
-        printableWindow.close();
-      }
-      window.alert("Gagal menyiapkan report export. Coba lagi.");
-    });
+        window.alert("Gagal menyiapkan report export. Coba lagi.");
+      });
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
       <header className="serene-page-toolbar">
-        <label
-          className="serene-page-search sm:max-w-xl"
-          aria-label="Search groups"
-        >
+        <label className="serene-page-search sm:max-w-xl" aria-label="Search groups">
           <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
             search
           </span>

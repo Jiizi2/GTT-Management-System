@@ -229,10 +229,7 @@ function MasterDataOptionForm({
   }, [initialValues, reset, resetToken]);
 
   return (
-    <form
-      className="serene-form-section grid gap-3"
-      onSubmit={handleSubmit((values) => void onSubmit(values))}
-    >
+    <form className="serene-form-section grid gap-3" onSubmit={handleSubmit((values) => void onSubmit(values))}>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1">
           <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
@@ -489,9 +486,7 @@ export function MasterDataScreen() {
         eyebrow="Master Data Control"
         title="Master Data"
         description="Kelola opsi dropdown untuk invoice, user management, dan kota Saudi tanpa ubah kode."
-        actions={
-          <ThemeToggleButton />
-        }
+        actions={<ThemeToggleButton />}
       />
 
       {notice ? (

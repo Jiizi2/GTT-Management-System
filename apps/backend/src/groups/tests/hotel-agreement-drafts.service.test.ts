@@ -1,0 +1,163 @@
+import assert from "node:assert/strict";
+import { AgreementApprovalStatus, AgreementCity } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { GroupsService } from "../application/groups.service";
+import { HotelAgreementDraftsService } from "../application/hotel-agreement-drafts.service";
+import type { CreateGroupDto } from "../dto/create-group.dto";
+
+async function createMemoryServices(): Promise<{
+  groupsService: GroupsService;
+  draftsService: HotelAgreementDraftsService;
+  restore: () => void;
+}> {
+  const previous = process.env.DATA_SOURCE;
+  process.env.DATA_SOURCE = "memory";
+  const groupsService = new GroupsService({} as PrismaService);
+  const draftsService = new HotelAgreementDraftsService({} as PrismaService, groupsService);
+
+  const existingGroups = await groupsService.findAll();
+  if (Array.isArray(existingGroups)) {
+    for (const group of existingGroups) {
+      const code = (group as { code?: unknown }).code;
+      if (typeof code === "string" && code.trim()) {
+        await groupsService.remove(code);
+      }
+    }
+  }
+
+  return {
+    groupsService,
+    draftsService,
+    restore: () => {
+      if (previous === undefined) {
+        delete process.env.DATA_SOURCE;
+      } else {
+        process.env.DATA_SOURCE = previous;
+      }
+    },
+  };
+}
+
+function createGroupPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto {
+  return {
+    code: "DRAFT-G-001",
+    name: "Draft Target Group",
+    status: "Active",
+    arrivalDate: "2026-06-10",
+    returnDate: "2026-06-18",
+    pax: 45,
+    packageName: "Standard Gold",
+    durationDays: 9,
+    timeline: [],
+    itinerary: [],
+    notes: [],
+    checklistAssignments: [],
+    ...overrides,
+  };
+}
+
+async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
+  await fn();
+  console.log(`PASS ${name}`);
+}
+
+async function testCreateUpdateDeleteDraft(): Promise<void> {
+  const { draftsService, restore } = await createMemoryServices();
+
+  try {
+    const created = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Al Maqam",
+      agreementNumber: "AG-DRAFT-001",
+      pax: 45,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
+      notes: "Received before group code.",
+    })) as {
+      id: string;
+      agreementNumber: string;
+      assignmentStatus: string;
+    };
+
+    assert.equal(created.agreementNumber, "AG-DRAFT-001");
+    assert.equal(created.assignmentStatus, "UNASSIGNED");
+
+    const updated = (await draftsService.update(created.id, {
+      city: AgreementCity.MAKKAH,
+      hotelName: "Makkah Clock Tower",
+      agreementNumber: "AG-DRAFT-001A",
+      pax: 46,
+      status: AgreementApprovalStatus.APPROVED,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
+    })) as {
+      hotelName: string;
+      agreementNumber: string;
+      status: string;
+    };
+
+    assert.equal(updated.hotelName, "Makkah Clock Tower");
+    assert.equal(updated.agreementNumber, "AG-DRAFT-001A");
+    assert.equal(updated.status, AgreementApprovalStatus.APPROVED);
+
+    await draftsService.remove(created.id);
+    const drafts = await draftsService.findAll();
+    assert.equal(drafts.length, 0);
+  } finally {
+    restore();
+  }
+}
+
+async function testAssignDraftToGroup(): Promise<void> {
+  const { groupsService, draftsService, restore } = await createMemoryServices();
+
+  try {
+    await groupsService.create(createGroupPayload());
+    const created = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Al Maqam",
+      agreementNumber: "AG-ASSIGN-001",
+      pax: 45,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
+    })) as {
+      id: string;
+    };
+
+    const assigned = (await draftsService.assign(created.id, {
+      groupCode: "DRAFT-G-001",
+    })) as {
+      assignmentStatus: string;
+      groupCode: string;
+    };
+
+    assert.equal(assigned.assignmentStatus, "ASSIGNED");
+    assert.equal(assigned.groupCode, "DRAFT-G-001");
+
+    const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as {
+      visaSetup?: {
+        hotelAgreements?: Array<{
+          agreementNumber: string;
+          city: AgreementCity;
+        }>;
+      };
+    };
+    assert.equal(group.visaSetup?.hotelAgreements?.length, 1);
+    assert.equal(group.visaSetup?.hotelAgreements?.[0]?.agreementNumber, "AG-ASSIGN-001");
+    assert.equal(group.visaSetup?.hotelAgreements?.[0]?.city, AgreementCity.MAKKAH);
+  } finally {
+    restore();
+  }
+}
+
+async function main(): Promise<void> {
+  await runCase("hotel agreement draft create update delete", testCreateUpdateDeleteDraft);
+  await runCase("hotel agreement draft assign to group", testAssignDraftToGroup);
+}
+
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

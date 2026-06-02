@@ -179,12 +179,7 @@ function EditProfileModal({
               <span className="hidden sm:inline">Perbarui informasi akun operator.</span>
             </p>
           </div>
-          <button
-            type="button"
-            className="serene-dialog-close"
-            aria-label="Close edit profile modal"
-            onClick={onClose}
-          >
+          <button type="button" className="serene-dialog-close" aria-label="Close edit profile modal" onClick={onClose}>
             <span className="material-symbols-outlined text-base" aria-hidden="true">
               close
             </span>

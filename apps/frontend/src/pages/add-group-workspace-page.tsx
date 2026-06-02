@@ -1038,8 +1038,10 @@ export function InputItineraryScreen({
     departure: "border-error-container/40 bg-surface-container-lowest text-on-error-container",
   };
   const activityTypeOptionClassMap: Record<string, string> = {
-    arrival: "border-primary/30 bg-surface-container-lowest text-primary hover:border-primary/45 hover:bg-primary-fixed/12",
-    transfer: "border-secondary/35 bg-surface-container-lowest text-secondary hover:border-secondary/55 hover:bg-secondary/12",
+    arrival:
+      "border-primary/30 bg-surface-container-lowest text-primary hover:border-primary/45 hover:bg-primary-fixed/12",
+    transfer:
+      "border-secondary/35 bg-surface-container-lowest text-secondary hover:border-secondary/55 hover:bg-secondary/12",
     "city-tour":
       "border-tertiary-fixed/40 bg-surface-container-lowest text-on-tertiary-fixed-variant hover:border-tertiary-fixed/65 hover:bg-tertiary-fixed/12",
     departure:
@@ -1345,7 +1347,8 @@ export function InputItineraryScreen({
 
                         <article
                           className={`relative overflow-hidden rounded-2xl border p-4 shadow-sm ${
-                            itineraryCardClassMap[item.categoryKey] ?? "border-outline-variant/45 bg-surface-container-lowest"
+                            itineraryCardClassMap[item.categoryKey] ??
+                            "border-outline-variant/45 bg-surface-container-lowest"
                           }`}
                         >
                           <span
@@ -1373,7 +1376,9 @@ export function InputItineraryScreen({
                                 </span>
                                 <p className="text-sm font-semibold text-on-surface">{routeSummary}</p>
                               </div>
-                              <p className="mt-2 text-sm italic text-on-surface-variant">{item.notes || fallbackMetaLine}</p>
+                              <p className="mt-2 text-sm italic text-on-surface-variant">
+                                {item.notes || fallbackMetaLine}
+                              </p>
                             </div>
 
                             <div className="flex shrink-0 items-center gap-1">
@@ -1524,9 +1529,11 @@ export function InputItineraryScreen({
                         const showTransferTrainInputs = isTransferActivityType(item.category) && item.transferByTrain;
                         const showCityTourCityInput = isCityTourActivityType(item.category);
                         const activityCardToneClass =
-                          activityTypeCardClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-lowest";
+                          activityTypeCardClassMap[item.category] ??
+                          "border-outline-variant/45 bg-surface-container-lowest";
                         const activityBannerToneClass =
-                          activityTypeBannerClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-high text-on-surface";
+                          activityTypeBannerClassMap[item.category] ??
+                          "border-outline-variant/45 bg-surface-container-high text-on-surface";
                         const activityTitleToneClass = activityTypeTitleClassMap[item.category] ?? "text-on-surface";
                         const activityFocusLabel =
                           activityTypeFocusLabelMap[item.category] ??
@@ -2075,10 +2082,10 @@ export function InputItineraryScreen({
                                   type="button"
                                   className={`relative inline-flex min-h-11 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                                     form.category === option.value
-                                      ? activityTypeActiveStepClassMap[option.value] ??
-                                        "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant"
-                                      : activityTypeOptionClassMap[option.value] ??
-                                        "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-high hover:text-on-surface"
+                                      ? (activityTypeActiveStepClassMap[option.value] ??
+                                        "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant")
+                                      : (activityTypeOptionClassMap[option.value] ??
+                                        "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-high hover:text-on-surface")
                                   }`}
                                   onClick={() => {
                                     const current = getScheduleValues();
@@ -2439,7 +2446,9 @@ export function InputItineraryScreen({
 
                           {showTransferTrainFields ? (
                             <div className={manualScheduleTransferTrainCardClassName}>
-                              <p className={`text-sm font-semibold ${activityTypeTitleClassMap[form.category] ?? "text-primary"}`}>
+                              <p
+                                className={`text-sm font-semibold ${activityTypeTitleClassMap[form.category] ?? "text-primary"}`}
+                              >
                                 High-speed train transfer operational details
                               </p>
 

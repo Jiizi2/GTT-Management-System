@@ -39,24 +39,25 @@ function buildVisaExportRows(rows: VisaTrackingRow[], groups: GroupData[]): Visa
   }));
 }
 
-export function exportVisaTrackingReportPdf({
-  rows,
-  groups,
-  query,
-  activeFilter,
-  issuedMonthLabel,
-}: {
-  rows: VisaTrackingRow[];
-  groups: GroupData[];
-  query: string;
-  activeFilter: VisaFilterId;
-  issuedMonthLabel: string;
-}, options: { printWindow?: Window | null } = {}): boolean {
+export function exportVisaTrackingReportPdf(
+  {
+    rows,
+    groups,
+    query,
+    activeFilter,
+    issuedMonthLabel,
+  }: {
+    rows: VisaTrackingRow[];
+    groups: GroupData[];
+    query: string;
+    activeFilter: VisaFilterId;
+    issuedMonthLabel: string;
+  },
+  options: { printWindow?: Window | null } = {},
+): boolean {
   const reusableWindow = options.printWindow;
   const printableWindow =
-    reusableWindow && !reusableWindow.closed
-      ? reusableWindow
-      : window.open("", "_blank", "width=1120,height=760");
+    reusableWindow && !reusableWindow.closed ? reusableWindow : window.open("", "_blank", "width=1120,height=760");
   if (!printableWindow) {
     return false;
   }

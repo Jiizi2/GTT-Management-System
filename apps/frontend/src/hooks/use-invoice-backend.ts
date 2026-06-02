@@ -360,7 +360,8 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
       issuedDate: payload.issuedDateIso.trim(),
       dueDate: payload.dueDateIso.trim(),
       amount: Math.max(0, Math.round(payload.amount)),
-      downPaymentIdr: payload.downPaymentIdr !== undefined ? Math.max(0, Math.round(payload.downPaymentIdr)) : undefined,
+      downPaymentIdr:
+        payload.downPaymentIdr !== undefined ? Math.max(0, Math.round(payload.downPaymentIdr)) : undefined,
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
       items: normalizeBackendInvoiceItems(payload.items),

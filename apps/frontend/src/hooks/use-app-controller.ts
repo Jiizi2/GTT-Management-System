@@ -37,6 +37,10 @@ function resolveDocumentTitle({
     return "GTT | Visa Tracking";
   }
 
+  if (activeNav === "agreement-inbox") {
+    return "GTT | Agreement Inbox";
+  }
+
   if (activeNav === "new-group" || activeNav === "input") {
     return "GTT | Add New Group";
   }
@@ -94,6 +98,8 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     clearQuery: () => setQuery(""),
     navigateToOverview: routeState.navigateToOverview,
     navigateToGroupDetail: routeState.navigateToGroupDetail,
+    navigateToVisaTracking: routeState.navigateToVisaTracking,
+    navigateToVisaDetail: routeState.navigateToVisaDetail,
   });
 
   useEffect(() => {
@@ -126,6 +132,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleOpenDetail: routeState.handleOpenDetail,
     handleBackToOverview: routeState.handleBackToOverview,
     handleDeleteGroup: groupRecordsState.handleDeleteGroup,
+    handleDeleteVisaGroup: groupRecordsState.handleDeleteVisaGroup,
     handleOpenVisaDetail: routeState.handleOpenVisaDetail,
     handleUpdateAgreementStatus: groupRecordsState.handleUpdateAgreementStatus,
     handleUpdateVisaStatus: groupRecordsState.handleUpdateVisaStatus,
@@ -140,6 +147,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleOpenNewGroup: routeState.handleOpenNewGroup,
     handleSaveInputGroup: groupRecordsState.handleSaveInputGroup,
     handleSaveGroupDetail: groupRecordsState.handleSaveGroupDetail,
+    handleSaveVisaGroupDetail: groupRecordsState.handleSaveVisaGroupDetail,
     dismissSyncFeedback,
     handleQueryChange: setQuery,
     handleToggleActiveOnly: setIsActiveOnly,

@@ -220,19 +220,21 @@ export function InvoiceScreen({
       return;
     }
 
-    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow }).then((exported) => {
-      if (!exported) {
+    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow })
+      .then((exported) => {
+        if (!exported) {
+          if (!printableWindow.closed) {
+            printableWindow.close();
+          }
+          setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+        }
+      })
+      .catch(() => {
         if (!printableWindow.closed) {
           printableWindow.close();
         }
-        setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
-      }
-    }).catch(() => {
-      if (!printableWindow.closed) {
-        printableWindow.close();
-      }
-      setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
-    });
+        setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
+      });
   };
 
   const handleOpenEditInvoice = (row: InvoiceRow) => {
@@ -374,10 +376,7 @@ export function InvoiceScreen({
 
       <header className="serene-page-toolbar">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
-          <label
-            className="serene-page-search"
-            aria-label="Search invoices"
-          >
+          <label className="serene-page-search" aria-label="Search invoices">
             <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
               search
             </span>
@@ -657,10 +656,7 @@ export function InvoiceScreen({
             ))}
           </section>
 
-          <section
-            className="serene-table-shell hidden lg:block"
-            aria-label="Invoice list table"
-          >
+          <section className="serene-table-shell hidden lg:block" aria-label="Invoice list table">
             <div className="overflow-x-auto">
               <div className="min-w-full">
                 <div

@@ -232,6 +232,11 @@ export class CreateVisaHotelAgreementDto {
   @IsEnum(AgreementCity)
   city!: AgreementCity;
 
+  @ApiPropertyOptional({ example: "cldraftagreementid123" })
+  @IsOptional()
+  @IsString()
+  sourceDraftId?: string;
+
   @ApiProperty({ example: "Swissotel Al Maqam" })
   @IsString()
   @IsNotEmpty()

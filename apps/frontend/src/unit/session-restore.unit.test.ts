@@ -52,11 +52,17 @@ function testDoesNotBlockAfterInitialFetchSettlesWithoutSession(): void {
 }
 
 describe("session restore", () => {
-  runCase("blocks pending initial restore without session snapshot", testBlocksWhenNoSessionSnapshotAndInitialRequestIsPending);
+  runCase(
+    "blocks pending initial restore without session snapshot",
+    testBlocksWhenNoSessionSnapshotAndInitialRequestIsPending,
+  );
   runCase(
     "blocks background restore without session snapshot before first fetch completes",
     testBlocksWhenNoSessionSnapshotAndInitialBackgroundFetchHasNotSettled,
   );
-  runCase("keeps cached session usable while backend validation runs", testDoesNotBlockWhenSessionSnapshotAlreadyExists);
+  runCase(
+    "keeps cached session usable while backend validation runs",
+    testDoesNotBlockWhenSessionSnapshotAlreadyExists,
+  );
   runCase("stops blocking after the initial restore settles", testDoesNotBlockAfterInitialFetchSettlesWithoutSession);
 });

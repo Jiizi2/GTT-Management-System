@@ -151,9 +151,7 @@ function ModalShell({
 
           <div className={modalBodyClassName}>{children}</div>
 
-          <div className={modalFooterBarClassName}>
-            {footer}
-          </div>
+          <div className={modalFooterBarClassName}>{footer}</div>
         </div>
       </div>
     </ModalPortal>
@@ -604,10 +602,7 @@ export function VisaRaudhahModal({
         ) : null}
 
         {fields.map((appointment, index) => (
-          <div
-            key={appointment.fieldId}
-            className={modalItemCardClassName}
-          >
+          <div key={appointment.fieldId} className={modalItemCardClassName}>
             <input type="hidden" {...register(`appointments.${index}.id`)} />
             <input type="hidden" {...register(`appointments.${index}.tasrehPrinted`)} />
             <div className="mb-2 flex items-center justify-between gap-2">

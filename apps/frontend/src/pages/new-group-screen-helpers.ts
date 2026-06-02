@@ -161,10 +161,7 @@ export function validateConnectedAgreementDates(
   };
 }
 
-function getAgreementFieldValidationError(
-  city: AgreementDateCity,
-  forms: NewGroupAgreementFormState[],
-): string | null {
+function getAgreementFieldValidationError(city: AgreementDateCity, forms: NewGroupAgreementFormState[]): string | null {
   const populatedForms = getAgreementFormsWithInput(forms);
   for (const form of populatedForms) {
     const agreementIndex = forms.findIndex((entry) => entry.id === form.id);
@@ -354,6 +351,7 @@ export function normalizeAgreementForms(
 
     return {
       id: form.id,
+      sourceDraftId: form.sourceDraftId?.trim() || undefined,
       hotelName: form.hotelName.trim() || (city === "makkah" ? "Makkah Main Hotel" : "Madinah Main Hotel"),
       agreementNumber: form.agreementNumber.trim() || resolveVisaAgreementNumber({ groupCode }, undefined, city),
       pax: normalizedPax,

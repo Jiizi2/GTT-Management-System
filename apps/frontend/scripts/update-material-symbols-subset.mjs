@@ -322,7 +322,9 @@ function compareIconLists(expectedIconNames, actualIconNames) {
   return {
     missingFromManifest: expectedIconNames.filter((iconName) => !actualSet.has(iconName)),
     obsoleteInManifest: actualIconNames.filter((iconName) => !expectedSet.has(iconName)),
-    isEqual: expectedIconNames.length === actualIconNames.length && expectedIconNames.every((iconName, index) => iconName === actualIconNames[index]),
+    isEqual:
+      expectedIconNames.length === actualIconNames.length &&
+      expectedIconNames.every((iconName, index) => iconName === actualIconNames[index]),
   };
 }
 

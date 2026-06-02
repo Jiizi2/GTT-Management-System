@@ -13,6 +13,12 @@ export const groupQueryKeys = {
     ["groups", "search", projection, activeOnly ? "active" : "all", query] as const,
 };
 
+export const agreementDraftQueryKeys = {
+  all: ["agreement-drafts"] as const,
+  list: (query: string, status: "all" | "assigned" | "unassigned") =>
+    ["agreement-drafts", "list", status, query.trim().toLowerCase()] as const,
+};
+
 export const masterDataQueryKeys = {
   all: ["master-data"] as const,
   categories: ["master-data", "categories"] as const,

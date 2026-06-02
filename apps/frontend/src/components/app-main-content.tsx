@@ -10,6 +10,9 @@ const LazyAddGroupWorkspaceScreen = lazy(async () => ({
 const LazyChecklistScreen = lazy(async () => ({
   default: (await import("../pages/checklist-page")).ChecklistScreen,
 }));
+const LazyAgreementInboxScreen = lazy(async () => ({
+  default: (await import("../pages/agreement-inbox-page")).AgreementInboxScreen,
+}));
 const LazyInvoiceScreen = lazy(async () => ({
   default: (await import("../pages/invoice-list-page")).InvoiceScreen,
 }));
@@ -134,6 +137,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
         />
         <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
         <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
+        <Route path="/agreement-inbox" element={<LazyAgreementInboxScreen />} />
         <Route
           path="/visa"
           element={
@@ -152,6 +156,8 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 row={freshSelectedVisaRow}
                 groups={controller.groupRecords}
                 onBack={controller.handleBackToVisaTracking}
+                onDeleteGroup={controller.handleDeleteVisaGroup}
+                onSaveGroup={controller.handleSaveVisaGroupDetail}
                 onUpdateVisaStatus={controller.handleUpdateVisaStatus}
                 onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
                 onUpdateSyarikah={controller.handleUpdateSyarikah}

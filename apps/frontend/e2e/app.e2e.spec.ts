@@ -483,9 +483,7 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
   await saveGroupButton.click();
   const createGroupResponse = await createGroupResponsePromise;
   if (!createGroupResponse.ok()) {
-    throw new Error(
-      `Create group failed with ${createGroupResponse.status()}: ${await createGroupResponse.text()}`,
-    );
+    throw new Error(`Create group failed with ${createGroupResponse.status()}: ${await createGroupResponse.text()}`);
   }
 
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();

@@ -49,7 +49,9 @@ function getVisaStatusClasses(status: VisaTrackingRow["visaStatus"], isDarkMode:
       : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-slate-300 bg-slate-100 text-slate-700";
+  return isDarkMode
+    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
+    : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
 function getVisaTypeClasses(visaType: "Visa+" | "Visa Only", isDarkMode: boolean): string {
@@ -57,7 +59,9 @@ function getVisaTypeClasses(visaType: "Visa+" | "Visa Only", isDarkMode: boolean
     return isDarkMode ? "border-sky-400/35 bg-sky-500/14 text-sky-200" : "border-sky-200 bg-sky-100 text-sky-800";
   }
 
-  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-slate-300 bg-slate-100 text-slate-700";
+  return isDarkMode
+    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
+    : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
 function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Only" {
@@ -89,7 +93,9 @@ function getRaudhahStatusClasses(status: GroupRaudhahStatus, isDarkMode: boolean
       : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-slate-300 bg-slate-100 text-slate-700";
+  return isDarkMode
+    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
+    : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
 function toAgreementStatusSelectValue(status: AgreementApprovalStatus): "approved" | "waiting" {
@@ -359,42 +365,41 @@ export function VisaTrackingScreen({
       return;
     }
 
-    void import("./visa-tracking-export").then(({ exportVisaTrackingReportPdf }) => {
-      const exported = exportVisaTrackingReportPdf(
-        {
-          rows: filteredRows,
-          groups,
-          query,
-          activeFilter,
-          issuedMonthLabel: selectedIssuedMonthLabel,
-        },
-        {
-          printWindow: printableWindow,
-        },
-      );
+    void import("./visa-tracking-export")
+      .then(({ exportVisaTrackingReportPdf }) => {
+        const exported = exportVisaTrackingReportPdf(
+          {
+            rows: filteredRows,
+            groups,
+            query,
+            activeFilter,
+            issuedMonthLabel: selectedIssuedMonthLabel,
+          },
+          {
+            printWindow: printableWindow,
+          },
+        );
 
-      if (!exported) {
+        if (!exported) {
+          if (!printableWindow.closed) {
+            printableWindow.close();
+          }
+          window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
+        }
+      })
+      .catch(() => {
         if (!printableWindow.closed) {
           printableWindow.close();
         }
-        window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
-      }
-    }).catch(() => {
-      if (!printableWindow.closed) {
-        printableWindow.close();
-      }
-      window.alert("Gagal menyiapkan export PDF. Coba lagi.");
-    });
+        window.alert("Gagal menyiapkan export PDF. Coba lagi.");
+      });
   };
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
       <header className="serene-page-toolbar">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
-          <label
-            className="serene-page-search"
-            aria-label="Search groups"
-          >
+          <label className="serene-page-search" aria-label="Search groups">
             <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
               search
             </span>
@@ -735,10 +740,7 @@ export function VisaTrackingScreen({
             })}
           </section>
 
-          <section
-            className="serene-table-shell hidden md:block"
-            aria-label="Visa tracking table"
-          >
+          <section className="serene-table-shell hidden md:block" aria-label="Visa tracking table">
             <div className="overflow-x-auto">
               <div className="min-w-full">
                 <div

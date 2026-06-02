@@ -26,6 +26,12 @@ const quickActions: QuickAction[] = [
     icon: "notifications_active",
   },
   {
+    id: "agreement-inbox",
+    label: "Agreement Inbox",
+    description: "Input agreement hotel sebelum group number tersedia.",
+    icon: "inventory_2",
+  },
+  {
     id: "invoice",
     label: "Invoice List",
     description: "Kelola daftar invoice dan status pembayarannya.",
