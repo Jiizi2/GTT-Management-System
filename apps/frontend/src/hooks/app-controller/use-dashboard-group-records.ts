@@ -50,6 +50,8 @@ type UseDashboardGroupRecordsOptions = {
   clearQuery: () => void;
   navigateToOverview: (options?: { replace?: boolean }) => void;
   navigateToGroupDetail: (groupCode: string, options?: { replace?: boolean }) => void;
+  navigateToVisaTracking: (options?: { replace?: boolean }) => void;
+  navigateToVisaDetail: (groupCode: string, options?: { replace?: boolean }) => void;
 };
 
 type GroupRecordsSnapshot = {
@@ -330,6 +332,8 @@ export function useDashboardGroupRecords({
   clearQuery,
   navigateToOverview,
   navigateToGroupDetail,
+  navigateToVisaTracking,
+  navigateToVisaDetail,
 }: UseDashboardGroupRecordsOptions) {
   const queryClient = useQueryClient();
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
@@ -894,6 +898,26 @@ export function useDashboardGroupRecords({
     [captureGroupRecordsSnapshot, commitGroupRecords, deleteGroupMutation, navigateToOverview, runBackendSync],
   );
 
+  const handleDeleteVisaGroup = useCallback(
+    (groupCode: string) => {
+      const normalizedGroupCode = groupCode.trim().toUpperCase();
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+      commitGroupRecords((current) =>
+        current.filter((group) => group.code.trim().toUpperCase() !== normalizedGroupCode),
+      );
+      navigateToVisaTracking({ replace: true });
+
+      runBackendSync({
+        task: deleteGroupMutation.mutateAsync(groupCode),
+        successMessage: "Group berhasil dihapus.",
+        failureMessage: "Penghapusan group belum berhasil disimpan ke backend.",
+        rollbackSnapshot,
+        showSuccess: true,
+      });
+    },
+    [captureGroupRecordsSnapshot, commitGroupRecords, deleteGroupMutation, navigateToVisaTracking, runBackendSync],
+  );
+
   const handleUpdateAgreementStatus = useCallback(
     (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => {
       updateVisaSetupForGroupAndSync(groupCode, ({ group, row, visaSetup }) => {
@@ -1311,6 +1335,93 @@ export function useDashboardGroupRecords({
     [captureGroupRecordsSnapshot, commitGroupRecords, navigateToGroupDetail, replaceGroupMutation, runBackendSync],
   );
 
+  const handleSaveVisaGroupDetail = useCallback(
+    (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
+      const normalizedGroup = normalizeGroupStatus(group);
+      const normalizedSourceGroupCode = sourceGroupCode?.trim().toUpperCase();
+      const normalizedNextGroupCode = normalizedGroup.code.trim().toUpperCase();
+      const normalizedNextGroupName = normalizedGroup.name.trim();
+      const nextGroup: GroupData = {
+        ...normalizedGroup,
+        code: normalizedNextGroupCode,
+        name: normalizedNextGroupName,
+      };
+      if (!normalizedNextGroupCode) {
+        return {
+          ok: false,
+          message: "Group number tidak boleh kosong.",
+        };
+      }
+
+      if (!normalizedNextGroupName) {
+        return {
+          ok: false,
+          message: "Group name tidak boleh kosong.",
+        };
+      }
+
+      const hasDuplicateCode = groupRecordsRef.current.some(
+        (item) =>
+          item.code.trim().toUpperCase() === normalizedNextGroupCode &&
+          item.code.trim().toUpperCase() !== normalizedSourceGroupCode,
+      );
+      if (hasDuplicateCode) {
+        return {
+          ok: false,
+          message: "Group number sudah dipakai oleh group lain.",
+        };
+      }
+
+      const backendTargetGroupCode = normalizedSourceGroupCode ?? normalizedNextGroupCode;
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+
+      navigateToVisaDetail(nextGroup.code, { replace: true });
+
+      commitGroupRecords((current) => {
+        const existingIndex = current.findIndex((item) => item.code === nextGroup.code);
+        if (existingIndex !== -1) {
+          const next = [...current];
+          next[existingIndex] = nextGroup;
+
+          if (normalizedSourceGroupCode && normalizedSourceGroupCode !== nextGroup.code) {
+            const sourceIndex = next.findIndex(
+              (item, index) => index !== existingIndex && item.code.trim().toUpperCase() === normalizedSourceGroupCode,
+            );
+            if (sourceIndex !== -1) {
+              next.splice(sourceIndex, 1);
+            }
+          }
+
+          return next;
+        }
+
+        if (normalizedSourceGroupCode) {
+          const sourceIndex = current.findIndex((item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode);
+          if (sourceIndex !== -1) {
+            const next = [...current];
+            next[sourceIndex] = nextGroup;
+            return next;
+          }
+        }
+
+        return [nextGroup, ...current];
+      });
+
+      runBackendSync({
+        task: replaceGroupMutation.mutateAsync({
+          groupCode: backendTargetGroupCode,
+          group: nextGroup,
+        }),
+        successMessage: "Perubahan detail group berhasil disimpan.",
+        failureMessage: (error: unknown) =>
+          resolveDashboardSyncFailureMessage(error, "Perubahan detail group belum berhasil disimpan ke backend."),
+        rollbackSnapshot,
+      });
+      return { ok: true };
+    },
+    [captureGroupRecordsSnapshot, commitGroupRecords, navigateToVisaDetail, replaceGroupMutation, runBackendSync],
+  );
+
   return {
     groupRecords: visibleGroupRecords,
     isGroupRecordsLoading: isWaitingForDetailedRecords,
@@ -1321,6 +1432,7 @@ export function useDashboardGroupRecords({
     selectedGroup,
     selectedVisaRow,
     handleDeleteGroup,
+    handleDeleteVisaGroup,
     handleUpdateAgreementStatus,
     handleUpdateVisaStatus,
     handleUpdatePaymentStatus,
@@ -1332,5 +1444,6 @@ export function useDashboardGroupRecords({
     handleClearRaudhahAppointment,
     handleSaveInputGroup,
     handleSaveGroupDetail,
+    handleSaveVisaGroupDetail,
   };
 }

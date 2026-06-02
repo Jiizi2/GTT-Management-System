@@ -51,6 +51,7 @@ export type AppController = {
   handleOpenDetail: (groupCode: string) => void;
   handleBackToOverview: () => void;
   handleDeleteGroup: (groupCode: string) => void;
+  handleDeleteVisaGroup: (groupCode: string) => void;
   handleOpenVisaDetail: (row: VisaTrackingRow) => void;
   handleUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
   handleUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus) => void;
@@ -70,6 +71,10 @@ export type AppController = {
   handleOpenNewGroup: () => void;
   handleSaveInputGroup: (group: GroupData) => void;
   handleSaveGroupDetail: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
+  handleSaveVisaGroupDetail: (
+    group: GroupData,
+    sourceGroupCode?: string,
+  ) => { ok: true } | { ok: false; message: string };
   dismissSyncFeedback: () => void;
   handleQueryChange: (value: string) => void;
   handleToggleActiveOnly: (value: boolean) => void;

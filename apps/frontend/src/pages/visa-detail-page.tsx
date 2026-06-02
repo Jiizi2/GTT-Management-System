@@ -22,11 +22,18 @@ import type {
 const {
   formatVisaDateWithYear,
   getGroupAgreementHotelsByCity,
+  resolveTotalBusCount,
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
   resolveVisaProvider,
 } = Domain;
 
+const LazyDeleteGroupModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).DeleteGroupModal,
+}));
+const LazyGroupEditModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).GroupEditModal,
+}));
 const LazyPaymentStatusModal = lazy(async () => ({
   default: (await import("../components/visa-detail-modals")).PaymentStatusModal,
 }));
@@ -378,6 +385,8 @@ export function VisaTrackingDetailScreen({
   row,
   groups,
   onBack,
+  onDeleteGroup,
+  onSaveGroup,
   onUpdateVisaStatus,
   onUpdatePaymentStatus,
   onUpdateSyarikah,
@@ -389,6 +398,8 @@ export function VisaTrackingDetailScreen({
   row: VisaTrackingRow;
   groups: GroupData[];
   onBack: () => void;
+  onDeleteGroup: (groupCode: string) => void;
+  onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   onUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus) => void;
   onUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   onUpdateSyarikah: (groupCode: string, syarikah: string) => void;
@@ -411,6 +422,8 @@ export function VisaTrackingDetailScreen({
   const [hotelDraftId, setHotelDraftId] = useState<string | null>(null);
   const [hotelDraftSeed, setHotelDraftSeed] = useState<VisaHotelEditFormState | null>(null);
   const [addingHotelCity, setAddingHotelCity] = useState<"makkah" | "madinah" | null>(null);
+  const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
+  const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [deleteAgreementDraft, setDeleteAgreementDraft] = useState<{
     city: "makkah" | "madinah";
     agreement: GroupAgreementHotel;
@@ -418,7 +431,12 @@ export function VisaTrackingDetailScreen({
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
   const raudhahCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const hasBlockingModal = activeModal !== null || isClearRaudhahConfirmOpen || deleteAgreementDraft !== null;
+  const hasBlockingModal =
+    activeModal !== null ||
+    isGroupEditModalOpen ||
+    isDeleteGroupModalOpen ||
+    isClearRaudhahConfirmOpen ||
+    deleteAgreementDraft !== null;
   const clearRaudhahDialogRef = useModalFocusTrap<HTMLDivElement>({
     isActive: isClearRaudhahConfirmOpen,
     onClose: () => setIsClearRaudhahConfirmOpen(false),
@@ -435,6 +453,7 @@ export function VisaTrackingDetailScreen({
   );
 
   const totalPax = group?.pax ?? row.pax;
+  const requiredBusCount = resolveTotalBusCount(totalPax, group?.totalBuses);
   const durationDays = group?.durationDays ?? 8;
   const agreementDateRange = resolveVisaAgreementDateRange(row, durationDays, group ?? undefined);
   const departureIso = agreementDateRange.makkahStartIso;
@@ -649,6 +668,70 @@ export function VisaTrackingDetailScreen({
     setHotelDraftSeed(null);
   };
 
+  const openGroupEditModal = () => {
+    if (!group) {
+      return;
+    }
+
+    setIsGroupEditModalOpen(true);
+  };
+
+  const closeGroupEditModal = () => {
+    setIsGroupEditModalOpen(false);
+  };
+
+  const openDeleteGroupModal = () => {
+    if (!group) {
+      return;
+    }
+
+    setIsDeleteGroupModalOpen(true);
+  };
+
+  const closeDeleteGroupModal = () => {
+    setIsDeleteGroupModalOpen(false);
+  };
+
+  const confirmDeleteGroup = () => {
+    setIsDeleteGroupModalOpen(false);
+    onDeleteGroup(group?.code ?? row.groupCode);
+  };
+
+  const saveGroupEdit = ({
+    code,
+    name,
+    pax,
+    totalBuses,
+  }: {
+    code: string;
+    name: string;
+    pax: number;
+    totalBuses: number;
+  }): { ok: true } | { ok: false; message: string } => {
+    if (!group) {
+      return { ok: false, message: "Group belum tersedia." };
+    }
+
+    const normalizedPax = Math.max(1, Math.floor(pax));
+    const normalizedTotalBuses = resolveTotalBusCount(normalizedPax, totalBuses);
+    const result = onSaveGroup(
+      {
+        ...group,
+        code,
+        name,
+        pax: normalizedPax,
+        totalBuses: normalizedTotalBuses,
+      },
+      group.code,
+    );
+
+    if (result.ok) {
+      setIsGroupEditModalOpen(false);
+    }
+
+    return result;
+  };
+
   const saveVisaStatus = (nextValue: VisaStatus) => {
     onUpdateVisaStatus(row.groupCode, nextValue);
     closeModal();
@@ -740,6 +823,8 @@ export function VisaTrackingDetailScreen({
   useEffect(() => {
     setAddingHotelCity(null);
     setHotelDraftSeed(null);
+    setIsGroupEditModalOpen(false);
+    setIsDeleteGroupModalOpen(false);
     setDeleteAgreementDraft(null);
     setIsRaudhahTemplateCopied(false);
     setIsClearRaudhahConfirmOpen(false);
@@ -788,10 +873,34 @@ export function VisaTrackingDetailScreen({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start">
+        <div className="flex w-full flex-wrap items-center gap-2 self-start md:w-auto">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            onClick={openGroupEditModal}
+            disabled={!group}
+            aria-label={`Edit group info for ${row.groupCode}`}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              edit
+            </span>
+            <span>Edit Group</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3 py-2 text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/15 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            onClick={openDeleteGroupModal}
+            disabled={!group}
+            aria-label={`Delete group ${row.groupCode}`}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              delete
+            </span>
+            <span>Delete Group</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
             disabled
             title="Export PDF is coming soon."
           >
@@ -1292,6 +1401,30 @@ export function VisaTrackingDetailScreen({
           </button>
         </article>
       </section>
+
+      {isGroupEditModalOpen && group ? (
+        <Suspense fallback={<VisaDetailModalFallback />}>
+          <LazyGroupEditModal
+            groupCode={group.code}
+            groupName={group.name}
+            groupPax={group.pax}
+            requiredBusCount={requiredBusCount}
+            onClose={closeGroupEditModal}
+            onSave={saveGroupEdit}
+          />
+        </Suspense>
+      ) : null}
+
+      {isDeleteGroupModalOpen && group ? (
+        <Suspense fallback={<VisaDetailModalFallback />}>
+          <LazyDeleteGroupModal
+            groupCode={group.code}
+            groupName={group.name}
+            onClose={closeDeleteGroupModal}
+            onConfirm={confirmDeleteGroup}
+          />
+        </Suspense>
+      ) : null}
 
       {activeModal ? (
         <Suspense fallback={<VisaDetailModalFallback />}>

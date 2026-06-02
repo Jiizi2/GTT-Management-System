@@ -156,6 +156,8 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 row={freshSelectedVisaRow}
                 groups={controller.groupRecords}
                 onBack={controller.handleBackToVisaTracking}
+                onDeleteGroup={controller.handleDeleteVisaGroup}
+                onSaveGroup={controller.handleSaveVisaGroupDetail}
                 onUpdateVisaStatus={controller.handleUpdateVisaStatus}
                 onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
                 onUpdateSyarikah={controller.handleUpdateSyarikah}
