@@ -525,6 +525,13 @@ async function testBackendApiFlow(): Promise<void> {
       "Invoice client should include display label.",
     );
 
+    const invoiceIssuedIso = toIsoDateOnly(new Date());
+    const invoiceDueIso = addUtcDays(invoiceIssuedIso, 10);
+    const manualInvoiceIssuedIso = addUtcDays(invoiceIssuedIso, 1);
+    const manualInvoiceDueIso = addUtcDays(invoiceIssuedIso, 11);
+    const updateInvoiceDueIso = addUtcDays(invoiceIssuedIso, 20);
+    const invoiceYear = invoiceDueIso.slice(0, 4);
+
     const createInvoiceResponse = await requestJson(server.baseUrl, "/api/invoices", {
       method: "POST",
       headers: {
@@ -533,8 +540,8 @@ async function testBackendApiFlow(): Promise<void> {
       body: JSON.stringify({
         clientId: invoiceClients[0]?.id,
         groupCode,
-        issuedDate: "2026-04-08",
-        dueDate: "2026-04-22",
+        issuedDate: invoiceIssuedIso,
+        dueDate: invoiceDueIso,
         amount: 14500000,
       }),
     });
@@ -550,7 +557,7 @@ async function testBackendApiFlow(): Promise<void> {
       status?: string;
     };
     assert.equal(
-      /^GTT\/INV\/2026\/\d{4}$/.test(createdInvoice.invoiceNumber ?? ""),
+      new RegExp(`^GTT/INV/${invoiceYear}/\\d{4}$`).test(createdInvoice.invoiceNumber ?? ""),
       true,
       `Unexpected invoice number pattern: ${createInvoiceResponse.text}`,
     );
@@ -569,8 +576,8 @@ async function testBackendApiFlow(): Promise<void> {
       },
       body: JSON.stringify({
         clientName: "Manual E2E Client",
-        issuedDate: "2026-04-09",
-        dueDate: "2026-04-23",
+        issuedDate: manualInvoiceIssuedIso,
+        dueDate: manualInvoiceDueIso,
         amount: 2300000,
       }),
     });
@@ -603,7 +610,7 @@ async function testBackendApiFlow(): Promise<void> {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          dueDate: "2026-04-30",
+          dueDate: updateInvoiceDueIso,
           amount: 15100000,
           status: "CANCELLED",
         }),
@@ -619,7 +626,7 @@ async function testBackendApiFlow(): Promise<void> {
       amount?: number;
       status?: string;
     };
-    assert.equal(updatedInvoice.dueDateIso, "2026-04-30", `Unexpected update response: ${updateInvoiceResponse.text}`);
+    assert.equal(updatedInvoice.dueDateIso, updateInvoiceDueIso, `Unexpected update response: ${updateInvoiceResponse.text}`);
     assert.equal(updatedInvoice.amount, 0, `Unexpected update response: ${updateInvoiceResponse.text}`);
     assert.equal(updatedInvoice.status, "Cancelled", `Unexpected update response: ${updateInvoiceResponse.text}`);
 

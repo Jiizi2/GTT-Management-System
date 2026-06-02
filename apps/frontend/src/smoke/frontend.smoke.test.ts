@@ -166,7 +166,7 @@ function createSmokeGroup(): GroupData {
 async function testNavigationItems(): Promise<void> {
   assertStringArrayEqual(
     sidebarItems.map((item) => item.id),
-    ["overview", "checklist", "visa", "invoice", "raudhah-reminder"],
+    ["overview", "checklist", "visa", "agreement-inbox", "invoice", "raudhah-reminder"],
   );
   assertEqual(sidebarAccountItem.id, "profile");
   assertStringArrayEqual(
