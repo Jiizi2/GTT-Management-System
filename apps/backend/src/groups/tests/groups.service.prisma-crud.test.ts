@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { AgreementCity, Prisma } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
@@ -93,7 +93,8 @@ async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
 async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
   {
     let createPayload: Record<string, unknown> | null = null;
-    const prismaMock = {
+    const updateManyPayload: { current: Record<string, unknown> | null } = { current: null };
+    const tx = {
       group: {
         create: async (args: Record<string, unknown>) => {
           createPayload = args;
@@ -103,6 +104,16 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
           };
         },
       },
+      hotelAgreementDraft: {
+        updateMany: async (args: Record<string, unknown>) => {
+          updateManyPayload.current = args;
+          return { count: 1 };
+        },
+      },
+    };
+    const prismaMock = {
+      ...tx,
+      $transaction: async (callback: (transactionClient: typeof tx) => Promise<unknown>) => callback(tx),
     } as unknown as PrismaService;
 
     const { service, restore } = createPrismaGroupsService(prismaMock);
@@ -112,6 +123,20 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
           code: " grp-create ",
           name: " Group Create ",
           packageName: " Premium Package ",
+          visaSetup: {
+            syarikah: "Nusuk Premium",
+            hotelAgreements: [
+              {
+                city: AgreementCity.MAKKAH,
+                sourceDraftId: "draft-makkah-1",
+                hotelName: "Makkah Hotel",
+                agreementNumber: "AG-MAK-1",
+                pax: 40,
+                stayStart: "2026-04-10",
+                stayEnd: "2026-04-13",
+              },
+            ],
+          },
         }),
       )) as { code?: string };
 
@@ -127,18 +152,45 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
         data.searchDocument,
         "grp create grpcreate group create groupcreate active premium package premiumpackage",
       );
+      assert.ok(updateManyPayload.current);
+      const updateManyWhere = updateManyPayload.current.where as Record<string, unknown>;
+      const updateManyData = updateManyPayload.current.data as Record<string, unknown>;
+      assert.deepEqual(updateManyWhere, {
+        id: {
+          in: ["draft-makkah-1"],
+        },
+        groupId: null,
+      });
+      assert.equal(updateManyData.groupId, "grp-1");
+      assert.equal(updateManyData.assignedAt instanceof Date, true);
+      assert.deepEqual(updateManyPayload.current, {
+        where: {
+          id: {
+            in: ["draft-makkah-1"],
+          },
+          groupId: null,
+        },
+        data: {
+          groupId: "grp-1",
+          assignedAt: updateManyData.assignedAt,
+        },
+      });
     } finally {
       restore();
     }
   }
 
   {
-    const prismaMock = {
+    const tx = {
       group: {
         create: async () => {
           throw createPrismaKnownRequestError("P2002", "duplicate code");
         },
       },
+    };
+    const prismaMock = {
+      ...tx,
+      $transaction: async (callback: (transactionClient: typeof tx) => Promise<unknown>) => callback(tx),
     } as unknown as PrismaService;
 
     const { service, restore } = createPrismaGroupsService(prismaMock);

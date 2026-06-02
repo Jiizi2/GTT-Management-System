@@ -13,6 +13,7 @@
     "build:analyze": "npm run build && npm run analyze:bundle",
     "assets:icons": "node scripts/update-material-symbols-subset.mjs",
     "check:icons": "node scripts/update-material-symbols-subset.mjs --check",
+    "predev": "node scripts/release-dev-port.cjs",
     "dev": "node scripts/dev.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

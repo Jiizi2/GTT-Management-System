@@ -23,14 +23,16 @@ import type {
   VisaStatus,
   VisaTrackingRow,
 } from "../../shared/app-domain";
-import { groupQueryKeys } from "../../shared/query-keys";
+import { agreementDraftQueryKeys, groupQueryKeys } from "../../shared/query-keys";
 import { useGroupsQuery, useGroupsSearchQuery } from "../use-groups-query";
 import {
   createGroupInBackend,
   deleteGroupInBackend,
+  deleteVisaHotelAgreementInBackend,
   fetchGroupsFromBackend,
   getVisaAgreementValidationError,
   replaceGroupInBackend,
+  saveVisaHotelAgreementInBackend,
   sortHotelsByStayStart,
   type GroupFetchProjection,
 } from "../use-app-controller-backend";
@@ -378,6 +380,14 @@ export function useDashboardGroupRecords({
     mutationFn: (groupCode: string) => deleteGroupInBackend(groupCode),
     retry: false,
   });
+  const saveVisaHotelMutation = useMutation({
+    mutationFn: saveVisaHotelAgreementInBackend,
+    retry: false,
+  });
+  const deleteVisaHotelMutation = useMutation({
+    mutationFn: deleteVisaHotelAgreementInBackend,
+    retry: false,
+  });
 
   const syncGroupRecords = useCallback(
     (
@@ -549,6 +559,7 @@ export function useDashboardGroupRecords({
           }
 
           void queryClient.invalidateQueries({ queryKey: groupQueryKeys.all });
+          void queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all });
           if (showSuccess) {
             showSyncFeedback("success", successMessage);
           }
@@ -967,88 +978,148 @@ export function useDashboardGroupRecords({
 
   const handleUpdateVisaHotel = useCallback(
     (groupCode: string, city: "makkah" | "madinah", hotel: VisaHotelEditFormState, hotelId?: string) => {
-      updateVisaSetupForGroupAndSync(groupCode, ({ group, row, visaSetup }) => {
-        const cityKey = city === "makkah" ? "makkahHotels" : "madinahHotels";
-        const currentCityHotels = visaSetup[cityKey];
-        const agreementDateRange = resolveVisaAgreementDateRange(row, group.durationDays, group);
-        const parsedHotelPax = Number.parseInt(hotel.pax, 10);
-        const existingHotel = hotelId ? currentCityHotels.find((entry) => entry.id === hotelId) : undefined;
-        const fallbackEditableHotel: GroupAgreementHotel = {
-          id: existingHotel?.id ?? `${group.code}-${city}-${Date.now().toString(36)}`,
-          hotelName: city === "makkah" ? "Makkah Hotel" : "Madinah Hotel",
-          agreementNumber: resolveVisaAgreementNumber(row, group, city),
-          pax: group.pax,
-          status: "Waiting for Approval",
-          stayStartIso: city === "makkah" ? agreementDateRange.makkahStartIso : agreementDateRange.madinahStartIso,
-          stayEndIso: city === "makkah" ? agreementDateRange.makkahEndIso : agreementDateRange.madinahEndIso,
-        };
+      const latestGroupRecords = groupRecordsRef.current;
+      const currentGroup = latestGroupRecords.find((group) => group.code === groupCode);
+      if (!currentGroup) {
+        return;
+      }
 
-        const nextPrimaryHotel: GroupAgreementHotel = {
-          ...fallbackEditableHotel,
-          ...(existingHotel ?? {}),
-          hotelName: hotel.hotelName.trim() || fallbackEditableHotel.hotelName,
-          agreementNumber: hotel.agreementNumber.trim() || fallbackEditableHotel.agreementNumber,
-          pax: Number.isFinite(parsedHotelPax) && parsedHotelPax >= 0 ? parsedHotelPax : fallbackEditableHotel.pax,
-          status: hotel.status,
-          stayStartIso: hotel.stayStartIso,
-          stayEndIso: hotel.stayEndIso,
-        };
+      const currentRow = buildVisaTrackingRowsFromGroups(latestGroupRecords).find((row) => row.groupCode === groupCode);
+      if (!currentRow) {
+        return;
+      }
 
-        const nextCityHotels = sortHotelsByStayStart(
-          !hotelId
-            ? [...currentCityHotels, nextPrimaryHotel]
-            : existingHotel
-              ? currentCityHotels.map((entry) => (entry.id === hotelId ? nextPrimaryHotel : entry))
-              : [...currentCityHotels, nextPrimaryHotel],
-        );
-        const nextVisaSetup: GroupVisaSetup = {
-          ...visaSetup,
-          [cityKey]: nextCityHotels,
-        };
-        const validationError = getVisaAgreementValidationError(nextVisaSetup);
-        if (validationError) {
-          showSyncFeedback("error", validationError);
-          return visaSetup;
-        }
+      const visaSetup = currentGroup.visaSetup ?? createDefaultVisaSetup(currentGroup, currentRow);
+      const cityKey = city === "makkah" ? "makkahHotels" : "madinahHotels";
+      const currentCityHotels = visaSetup[cityKey];
+      const agreementDateRange = resolveVisaAgreementDateRange(currentRow, currentGroup.durationDays, currentGroup);
+      const parsedHotelPax = Number.parseInt(hotel.pax, 10);
+      const existingHotel = hotelId ? currentCityHotels.find((entry) => entry.id === hotelId) : undefined;
+      const fallbackEditableHotel: GroupAgreementHotel = {
+        id: existingHotel?.id ?? `${currentGroup.code}-${city}-${Date.now().toString(36)}`,
+        hotelName: city === "makkah" ? "Makkah Hotel" : "Madinah Hotel",
+        agreementNumber: resolveVisaAgreementNumber(currentRow, currentGroup, city),
+        pax: currentGroup.pax,
+        status: "Waiting for Approval",
+        stayStartIso: city === "makkah" ? agreementDateRange.makkahStartIso : agreementDateRange.madinahStartIso,
+        stayEndIso: city === "makkah" ? agreementDateRange.makkahEndIso : agreementDateRange.madinahEndIso,
+      };
 
-        return nextVisaSetup;
+      const nextPrimaryHotel: GroupAgreementHotel = {
+        ...fallbackEditableHotel,
+        ...(existingHotel ?? {}),
+        hotelName: hotel.hotelName.trim() || fallbackEditableHotel.hotelName,
+        agreementNumber: hotel.agreementNumber.trim() || fallbackEditableHotel.agreementNumber,
+        pax: Number.isFinite(parsedHotelPax) && parsedHotelPax >= 0 ? parsedHotelPax : fallbackEditableHotel.pax,
+        status: hotel.status,
+        stayStartIso: hotel.stayStartIso,
+        stayEndIso: hotel.stayEndIso,
+      };
+
+      const nextCityHotels = sortHotelsByStayStart(
+        !hotelId
+          ? [...currentCityHotels, nextPrimaryHotel]
+          : existingHotel
+            ? currentCityHotels.map((entry) => (entry.id === hotelId ? nextPrimaryHotel : entry))
+            : [...currentCityHotels, nextPrimaryHotel],
+      );
+      const nextVisaSetup: GroupVisaSetup = {
+        ...visaSetup,
+        [cityKey]: nextCityHotels,
+      };
+      const validationError = getVisaAgreementValidationError(nextVisaSetup);
+      if (validationError) {
+        showSyncFeedback("error", validationError);
+        return;
+      }
+
+      const nextGroup = normalizeGroupStatus({
+        ...currentGroup,
+        visaSetup: nextVisaSetup,
+      });
+
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+      commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
+
+      runBackendSync({
+        task: saveVisaHotelMutation
+          .mutateAsync({
+            groupCode,
+            city,
+            hotel,
+            hotelId: existingHotel ? hotelId : undefined,
+          })
+          .then((backendGroup) => {
+            const normalizedBackendGroup = normalizeGroupStatus(backendGroup);
+            commitGroupRecords((current) =>
+              current.map((group) => (group.code === groupCode ? normalizedBackendGroup : group)),
+            );
+          }),
+        successMessage: "Agreement hotel berhasil disimpan.",
+        failureMessage: "Agreement hotel belum berhasil disimpan ke backend.",
+        rollbackSnapshot,
       });
     },
-    [showSyncFeedback, updateVisaSetupForGroupAndSync],
+    [
+      captureGroupRecordsSnapshot,
+      commitGroupRecords,
+      createDefaultVisaSetup,
+      runBackendSync,
+      saveVisaHotelMutation,
+      showSyncFeedback,
+    ],
   );
 
   const handleDeleteVisaHotel = useCallback(
     (groupCode: string, city: "makkah" | "madinah", hotelId: string) => {
-      updateVisaSetupForGroupAndSync(
-        groupCode,
-        ({ visaSetup }) => {
-          const cityKey = city === "makkah" ? "makkahHotels" : "madinahHotels";
-          const currentCityHotels = visaSetup[cityKey];
-          const nextCityHotels = currentCityHotels.filter((entry) => entry.id !== hotelId);
+      const latestGroupRecords = groupRecordsRef.current;
+      const currentGroup = latestGroupRecords.find((group) => group.code === groupCode);
+      if (!currentGroup?.visaSetup) {
+        return;
+      }
 
-          if (nextCityHotels.length === currentCityHotels.length) {
-            return visaSetup;
-          }
+      const cityKey = city === "makkah" ? "makkahHotels" : "madinahHotels";
+      const currentCityHotels = currentGroup.visaSetup[cityKey];
+      const nextCityHotels = currentCityHotels.filter((entry) => entry.id !== hotelId);
+      if (nextCityHotels.length === currentCityHotels.length) {
+        return;
+      }
 
-          const nextVisaSetup: GroupVisaSetup = {
-            ...visaSetup,
-            [cityKey]: sortHotelsByStayStart(nextCityHotels),
-          };
-          const validationError = getVisaAgreementValidationError(nextVisaSetup);
-          if (validationError) {
-            showSyncFeedback("error", validationError);
-            return visaSetup;
-          }
+      const nextVisaSetup: GroupVisaSetup = {
+        ...currentGroup.visaSetup,
+        [cityKey]: sortHotelsByStayStart(nextCityHotels),
+      };
+      const validationError = getVisaAgreementValidationError(nextVisaSetup);
+      if (validationError) {
+        showSyncFeedback("error", validationError);
+        return;
+      }
 
-          return nextVisaSetup;
-        },
-        {
-          successMessage: "Agreement hotel berhasil dihapus.",
-          failureMessage: "Penghapusan agreement hotel belum berhasil disimpan ke backend.",
-        },
-      );
+      const nextGroup = normalizeGroupStatus({
+        ...currentGroup,
+        visaSetup: nextVisaSetup,
+      });
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+      commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
+
+      runBackendSync({
+        task: deleteVisaHotelMutation
+          .mutateAsync({
+            groupCode,
+            hotelId,
+          })
+          .then((backendGroup) => {
+            const normalizedBackendGroup = normalizeGroupStatus(backendGroup);
+            commitGroupRecords((current) =>
+              current.map((group) => (group.code === groupCode ? normalizedBackendGroup : group)),
+            );
+          }),
+        successMessage: "Agreement hotel berhasil dihapus.",
+        failureMessage: "Penghapusan agreement hotel belum berhasil disimpan ke backend.",
+        rollbackSnapshot,
+      });
     },
-    [showSyncFeedback, updateVisaSetupForGroupAndSync],
+    [captureGroupRecordsSnapshot, commitGroupRecords, deleteVisaHotelMutation, runBackendSync, showSyncFeedback],
   );
 
   const handleUpdateRaudhahAppointment = useCallback(

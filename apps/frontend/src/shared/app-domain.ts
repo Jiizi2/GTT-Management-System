@@ -33,6 +33,7 @@ export type NavId =
   | "input"
   | "checklist"
   | "visa"
+  | "agreement-inbox"
   | "new-group"
   | "invoice"
   | "raudhah-reminder"
@@ -108,6 +109,7 @@ export type BusStatus = "Visa+";
 
 export type GroupAgreementHotel = {
   id: string;
+  sourceDraftId?: string;
   hotelName: string;
   agreementNumber: string;
   pax: number;
@@ -256,6 +258,38 @@ export type VisaPaymentStatus = "Paid" | "Unpaid" | "Partial";
 
 export type VisaRaudhahTone = "good" | "warn" | "muted";
 
+export type AgreementDraftAssignmentStatus = "Unassigned" | "Assigned";
+
+export type HotelAgreementDraft = {
+  id: string;
+  city: "makkah" | "madinah";
+  agentName: string;
+  hotelName: string;
+  agreementNumber: string;
+  pax: number;
+  status: AgreementApprovalStatus;
+  stayStartIso: string;
+  stayEndIso: string;
+  notes: string;
+  groupCode?: string;
+  assignmentStatus: AgreementDraftAssignmentStatus;
+  assignedAtIso?: string;
+  createdAtIso: string;
+  updatedAtIso: string;
+};
+
+export type HotelAgreementDraftFormState = {
+  city: "makkah" | "madinah";
+  agentName: string;
+  hotelName: string;
+  agreementNumber: string;
+  pax: string;
+  status: AgreementApprovalStatus;
+  stayStartIso: string;
+  stayEndIso: string;
+  notes: string;
+};
+
 export type VisaTrackingRow = {
   id: string;
   groupCode: string;
@@ -388,6 +422,7 @@ export type ItineraryPrefill = {
 
 export type NewGroupAgreementFormState = {
   id: string;
+  sourceDraftId?: string;
   hotelName: string;
   agreementNumber: string;
   pax: string;
@@ -440,6 +475,7 @@ export const sidebarItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: "dashboard" },
   { id: "checklist", label: "H-1 Checklist", icon: "fact_check" },
   { id: "visa", label: "Visa Tracking", icon: "fact_check" },
+  { id: "agreement-inbox", label: "Agreement Inbox", icon: "inventory_2" },
   { id: "invoice", label: "Invoice", icon: "request_quote" },
   { id: "raudhah-reminder", label: "Raudhah Reminder", icon: "notifications_active" },
 ];

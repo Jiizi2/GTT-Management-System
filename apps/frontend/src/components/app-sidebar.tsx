@@ -36,7 +36,9 @@ export function AppSidebar({
   const primaryNavItems = sidebarItems.filter(
     (item) => item.id === "overview" || item.id === "checklist" || item.id === "visa",
   );
-  const utilityNavItems = sidebarItems.filter((item) => item.id === "invoice" || item.id === "raudhah-reminder");
+  const utilityNavItems = sidebarItems.filter(
+    (item) => item.id === "agreement-inbox" || item.id === "invoice" || item.id === "raudhah-reminder",
+  );
   const desktopOnlyAdminItems: Array<{ id: NavId; label: string; icon: string }> =
     sessionAccessTier === "super-admin"
       ? [

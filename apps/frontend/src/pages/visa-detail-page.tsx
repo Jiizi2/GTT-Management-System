@@ -409,14 +409,23 @@ export function VisaTrackingDetailScreen({
   const [hotelCityDraft, setHotelCityDraft] = useState<"makkah" | "madinah">("makkah");
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
   const [hotelDraftId, setHotelDraftId] = useState<string | null>(null);
+  const [hotelDraftSeed, setHotelDraftSeed] = useState<VisaHotelEditFormState | null>(null);
   const [addingHotelCity, setAddingHotelCity] = useState<"makkah" | "madinah" | null>(null);
+  const [deleteAgreementDraft, setDeleteAgreementDraft] = useState<{
+    city: "makkah" | "madinah";
+    agreement: GroupAgreementHotel;
+  } | null>(null);
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
   const raudhahCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const hasBlockingModal = activeModal !== null || isClearRaudhahConfirmOpen;
+  const hasBlockingModal = activeModal !== null || isClearRaudhahConfirmOpen || deleteAgreementDraft !== null;
   const clearRaudhahDialogRef = useModalFocusTrap<HTMLDivElement>({
     isActive: isClearRaudhahConfirmOpen,
     onClose: () => setIsClearRaudhahConfirmOpen(false),
+  });
+  const deleteAgreementDialogRef = useModalFocusTrap<HTMLDivElement>({
+    isActive: deleteAgreementDraft !== null,
+    onClose: () => setDeleteAgreementDraft(null),
   });
 
   const group = groups.find((item) => item.code === row.groupCode) ?? null;
@@ -553,6 +562,15 @@ export function VisaTrackingDetailScreen({
     };
   };
 
+  const buildHotelDraftFromAgreement = (agreement: GroupAgreementHotel): VisaHotelEditFormState => ({
+    hotelName: agreement.hotelName.trim(),
+    agreementNumber: agreement.agreementNumber.trim(),
+    pax: agreement.pax.toString(),
+    status: agreement.status,
+    stayStartIso: agreement.stayStartIso.trim(),
+    stayEndIso: agreement.stayEndIso.trim(),
+  });
+
   const buildRaudhahDraft = (): VisaRaudhahEditFormState => {
     return {
       appointments: (group?.visaSetup?.raudhahAppointments ?? [])
@@ -578,16 +596,43 @@ export function VisaTrackingDetailScreen({
     setActiveModal("syarikah");
   };
 
-  const openHotelModal = (city: "makkah" | "madinah", mode: "add" | "edit", hotelId?: string) => {
+  const openHotelModal = (
+    city: "makkah" | "madinah",
+    mode: "add" | "edit",
+    hotelId?: string,
+    seed?: VisaHotelEditFormState,
+  ) => {
     setAddingHotelCity(null);
     setHotelCityDraft(city);
     setHotelDraftMode(mode);
     setHotelDraftId(mode === "edit" ? (hotelId ?? null) : null);
+    setHotelDraftSeed(seed ?? null);
     setActiveModal("hotel");
+  };
+
+  const openAgreementEditor = (
+    city: "makkah" | "madinah",
+    agreement: GroupAgreementHotel,
+    isStoredAgreement: boolean,
+  ) => {
+    openHotelModal(city, "edit", isStoredAgreement ? agreement.id : undefined, buildHotelDraftFromAgreement(agreement));
+  };
+
+  const openDeleteAgreementConfirm = (
+    city: "makkah" | "madinah",
+    agreement: GroupAgreementHotel,
+    isStoredAgreement: boolean,
+  ) => {
+    if (!isStoredAgreement) {
+      return;
+    }
+
+    setDeleteAgreementDraft({ city, agreement });
   };
 
   const openAddHotelInline = (city: "makkah" | "madinah") => {
     setActiveModal(null);
+    setHotelDraftSeed(null);
     setAddingHotelCity(city);
   };
 
@@ -601,6 +646,7 @@ export function VisaTrackingDetailScreen({
 
   const closeModal = () => {
     setActiveModal(null);
+    setHotelDraftSeed(null);
   };
 
   const saveVisaStatus = (nextValue: VisaStatus) => {
@@ -645,6 +691,15 @@ export function VisaTrackingDetailScreen({
     closeModal();
   };
 
+  const deleteAgreement = () => {
+    if (!deleteAgreementDraft) {
+      return;
+    }
+
+    onDeleteVisaHotel(row.groupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
+    setDeleteAgreementDraft(null);
+  };
+
   const handleCopyRaudhahReminder = async () => {
     try {
       if (navigator.clipboard?.writeText) {
@@ -684,6 +739,8 @@ export function VisaTrackingDetailScreen({
 
   useEffect(() => {
     setAddingHotelCity(null);
+    setHotelDraftSeed(null);
+    setDeleteAgreementDraft(null);
     setIsRaudhahTemplateCopied(false);
     setIsClearRaudhahConfirmOpen(false);
   }, [row.id]);
@@ -697,6 +754,8 @@ export function VisaTrackingDetailScreen({
     },
     [],
   );
+
+  const deleteAgreementCityLabel = deleteAgreementDraft?.city === "makkah" ? "Makkah" : "Madinah";
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
@@ -864,6 +923,44 @@ export function VisaTrackingDetailScreen({
                       </p>
                     </div>
 
+                    <div
+                      className="flex shrink-0 items-center gap-1"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={getIconButtonClasses()}
+                        aria-label={`Edit Makkah agreement ${index + 1}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openAgreementEditor("makkah", agreement, canDeleteAgreement);
+                        }}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          edit
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
+                        aria-label={`Delete Makkah agreement ${index + 1}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openDeleteAgreementConfirm("makkah", agreement, canDeleteAgreement);
+                        }}
+                        disabled={!canDeleteAgreement}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          delete
+                        </span>
+                      </button>
+                    </div>
+
                     <span
                       className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
                       aria-hidden="true"
@@ -879,30 +976,6 @@ export function VisaTrackingDetailScreen({
                           group
                         </span>
                         <span>{agreement.pax} Pax</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className={getIconButtonClasses()}
-                          aria-label={`Edit Makkah agreement ${index + 1}`}
-                          onClick={() => openHotelModal("makkah", "edit", agreement.id)}
-                        >
-                          <span className="material-symbols-outlined" aria-hidden="true">
-                            edit
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
-                          aria-label={`Delete Makkah agreement ${index + 1}`}
-                          onClick={() => onDeleteVisaHotel(row.groupCode, "makkah", agreement.id)}
-                          disabled={!canDeleteAgreement}
-                        >
-                          <span className="material-symbols-outlined" aria-hidden="true">
-                            delete
-                          </span>
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -987,6 +1060,44 @@ export function VisaTrackingDetailScreen({
                       </p>
                     </div>
 
+                    <div
+                      className="flex shrink-0 items-center gap-1"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={getIconButtonClasses()}
+                        aria-label={`Edit Madinah agreement ${index + 1}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openAgreementEditor("madinah", agreement, canDeleteAgreement);
+                        }}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          edit
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
+                        aria-label={`Delete Madinah agreement ${index + 1}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openDeleteAgreementConfirm("madinah", agreement, canDeleteAgreement);
+                        }}
+                        disabled={!canDeleteAgreement}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          delete
+                        </span>
+                      </button>
+                    </div>
+
                     <span
                       className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
                       aria-hidden="true"
@@ -1002,30 +1113,6 @@ export function VisaTrackingDetailScreen({
                           group
                         </span>
                         <span>{agreement.pax} Pax</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className={getIconButtonClasses()}
-                          aria-label={`Edit Madinah agreement ${index + 1}`}
-                          onClick={() => openHotelModal("madinah", "edit", agreement.id)}
-                        >
-                          <span className="material-symbols-outlined" aria-hidden="true">
-                            edit
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
-                          aria-label={`Delete Madinah agreement ${index + 1}`}
-                          onClick={() => onDeleteVisaHotel(row.groupCode, "madinah", agreement.id)}
-                          disabled={!canDeleteAgreement}
-                        >
-                          <span className="material-symbols-outlined" aria-hidden="true">
-                            delete
-                          </span>
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -1224,7 +1311,9 @@ export function VisaTrackingDetailScreen({
             <LazyVisaHotelModal
               city={hotelCityDraft}
               mode={hotelDraftMode}
-              initialValue={buildHotelDraft(hotelCityDraft, hotelDraftMode, hotelDraftId ?? undefined)}
+              initialValue={
+                hotelDraftSeed ?? buildHotelDraft(hotelCityDraft, hotelDraftMode, hotelDraftId ?? undefined)
+              }
               onClose={closeModal}
               onSave={saveHotel}
             />
@@ -1240,6 +1329,60 @@ export function VisaTrackingDetailScreen({
             />
           ) : null}
         </Suspense>
+      ) : null}
+
+      {deleteAgreementDraft ? (
+        <div
+          ref={deleteAgreementDialogRef}
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-agreement-title"
+          aria-describedby="delete-agreement-description"
+          tabIndex={-1}
+          onClick={() => setDeleteAgreementDraft(null)}
+        >
+          <section
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
+                warning
+              </span>
+              <div className="min-w-0">
+                <h3 id="delete-agreement-title" className="text-lg font-extrabold text-slate-900">
+                  Delete {deleteAgreementCityLabel} Agreement?
+                </h3>
+                <p id="delete-agreement-description" className="mt-1 text-sm leading-relaxed text-slate-600">
+                  Agreement <strong>{deleteAgreementDraft.agreement.agreementNumber}</strong> untuk hotel{" "}
+                  <strong>{deleteAgreementDraft.agreement.hotelName}</strong> akan dihapus dari group{" "}
+                  <strong>{row.groupCode}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-surface-container-high"
+                onClick={() => setDeleteAgreementDraft(null)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700"
+                onClick={deleteAgreement}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  delete
+                </span>
+                <span>Delete Agreement</span>
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {isClearRaudhahConfirmOpen ? (

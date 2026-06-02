@@ -12,6 +12,7 @@ const DASHBOARD_PATH_BY_NAV: Record<NavId, string> = {
   input: "/new-group",
   checklist: "/checklist",
   visa: "/visa",
+  "agreement-inbox": "/agreement-inbox",
   "new-group": "/new-group",
   invoice: "/invoice",
   "raudhah-reminder": "/raudhah-reminder",
@@ -130,6 +131,15 @@ export function resolveDashboardRouteFromPathname(pathname: string): DashboardRo
       selectedGroupCode: null,
       selectedVisaGroupCode: null,
       canonicalPath: "/visa",
+    };
+  }
+
+  if (normalizedLowerPathname === "/agreement-inbox") {
+    return {
+      activeNav: "agreement-inbox",
+      selectedGroupCode: null,
+      selectedVisaGroupCode: null,
+      canonicalPath: "/agreement-inbox",
     };
   }
 

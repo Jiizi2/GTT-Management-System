@@ -18,6 +18,7 @@ import type {
   GroupData,
   GroupRaudhahAppointment,
   GroupVisaSetup,
+  VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaStatus,
 } from "../shared/app-domain";
@@ -93,6 +94,7 @@ type BackendCreateGroupPayload = {
     outstandingAmount?: number;
     hotelAgreements?: Array<{
       city: "MAKKAH" | "MADINAH";
+      sourceDraftId?: string;
       hotelName: string;
       agreementNumber: string;
       pax: number;
@@ -420,6 +422,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       hotelAgreements: [
         ...group.visaSetup.makkahHotels.map((hotel) => ({
           city: "MAKKAH" as const,
+          sourceDraftId: hotel.sourceDraftId?.trim() || undefined,
           hotelName: hotel.hotelName.trim(),
           agreementNumber: hotel.agreementNumber.trim(),
           pax: hotel.pax,
@@ -429,6 +432,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
         })),
         ...group.visaSetup.madinahHotels.map((hotel) => ({
           city: "MADINAH" as const,
+          sourceDraftId: hotel.sourceDraftId?.trim() || undefined,
           hotelName: hotel.hotelName.trim(),
           agreementNumber: hotel.agreementNumber.trim(),
           pax: hotel.pax,
@@ -1177,4 +1181,86 @@ export async function deleteGroupInBackend(groupCode: string): Promise<void> {
   if (!response.ok) {
     throw new Error(formatBackendRequestError(response.status, responsePayload, responseText, "Backend delete failed"));
   }
+}
+
+function mapVisaHotelEditFormToBackendPayload(city: "makkah" | "madinah", hotel: VisaHotelEditFormState) {
+  const parsedPax = Number.parseInt(hotel.pax, 10);
+  return {
+    city: city === "madinah" ? ("MADINAH" as const) : ("MAKKAH" as const),
+    hotelName: hotel.hotelName.trim(),
+    agreementNumber: hotel.agreementNumber.trim(),
+    pax: Number.isFinite(parsedPax) ? parsedPax : 1,
+    status: mapAgreementStatusToBackend(hotel.status),
+    stayStart: hotel.stayStartIso.trim(),
+    stayEnd: hotel.stayEndIso.trim(),
+  };
+}
+
+export async function saveVisaHotelAgreementInBackend({
+  groupCode,
+  city,
+  hotel,
+  hotelId,
+}: {
+  groupCode: string;
+  city: "makkah" | "madinah";
+  hotel: VisaHotelEditFormState;
+  hotelId?: string;
+}): Promise<GroupData> {
+  const endpoint = hotelId
+    ? `/groups/${encodeURIComponent(groupCode)}/visa/hotels/${encodeURIComponent(hotelId)}`
+    : `/groups/${encodeURIComponent(groupCode)}/visa/hotels`;
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(endpoint, {
+    method: hotelId ? "PATCH" : "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(mapVisaHotelEditFormToBackendPayload(city, hotel)),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Hotel agreement save failed"),
+    );
+  }
+
+  const mappedGroup = mapBackendGroupToFrontend(responsePayload as BackendGroupRecord);
+  if (!mappedGroup) {
+    throw new Error("Hotel agreement save failed: response is not a group record.");
+  }
+
+  return mappedGroup;
+}
+
+export async function deleteVisaHotelAgreementInBackend({
+  groupCode,
+  hotelId,
+}: {
+  groupCode: string;
+  hotelId: string;
+}): Promise<GroupData> {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}/visa/hotels/${encodeURIComponent(hotelId)}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Hotel agreement delete failed"),
+    );
+  }
+
+  const mappedGroup = mapBackendGroupToFrontend(responsePayload as BackendGroupRecord);
+  if (!mappedGroup) {
+    throw new Error("Hotel agreement delete failed: response is not a group record.");
+  }
+
+  return mappedGroup;
 }

@@ -37,6 +37,10 @@ function resolveDocumentTitle({
     return "GTT | Visa Tracking";
   }
 
+  if (activeNav === "agreement-inbox") {
+    return "GTT | Agreement Inbox";
+  }
+
   if (activeNav === "new-group" || activeNav === "input") {
     return "GTT | Add New Group";
   }

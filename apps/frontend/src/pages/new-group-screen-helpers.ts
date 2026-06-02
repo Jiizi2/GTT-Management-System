@@ -351,6 +351,7 @@ export function normalizeAgreementForms(
 
     return {
       id: form.id,
+      sourceDraftId: form.sourceDraftId?.trim() || undefined,
       hotelName: form.hotelName.trim() || (city === "makkah" ? "Makkah Main Hotel" : "Madinah Main Hotel"),
       agreementNumber: form.agreementNumber.trim() || resolveVisaAgreementNumber({ groupCode }, undefined, city),
       pax: normalizedPax,

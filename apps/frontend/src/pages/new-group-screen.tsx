@@ -7,11 +7,13 @@ import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../
 import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { useAgreementDraftsQuery } from "../hooks/use-agreement-drafts-query";
 import type {
   AgreementApprovalStatus,
   BusStatus,
   GroupData,
   GroupRaudhahStatus,
+  HotelAgreementDraft,
   ItineraryPrefill,
   NewGroupAgreementFormState,
   NewGroupItineraryDraft,
@@ -45,6 +47,7 @@ const raudhahStatusSchema = z.enum(["Free", "After", "Before"]);
 
 const newGroupAgreementFormSchema = z.object({
   id: z.string(),
+  sourceDraftId: z.string().optional(),
   hotelName: z.string(),
   agreementNumber: z.string(),
   pax: z.string(),
@@ -104,6 +107,32 @@ type NewGroupSetupDraft = {
 
 function toCityLabel(city: HotelCity): string {
   return city === "makkah" ? "Makkah" : "Madinah";
+}
+
+function formatAgreementDraftDateRange(draft: HotelAgreementDraft): string {
+  const startDate = draft.stayStartIso ? Domain.formatScheduleDate(draft.stayStartIso) : null;
+  const endDate = draft.stayEndIso ? Domain.formatScheduleDate(draft.stayEndIso) : null;
+
+  if (startDate && endDate) {
+    return `${startDate.date} ${startDate.year} - ${endDate.date} ${endDate.year}`;
+  }
+
+  if (startDate) {
+    return `Start ${startDate.date} ${startDate.year}`;
+  }
+
+  if (endDate) {
+    return `End ${endDate.date} ${endDate.year}`;
+  }
+
+  return "Stay dates pending";
+}
+
+function formatAgreementDraftOptionLabel(draft: HotelAgreementDraft): string {
+  const agentLabel = draft.agentName ? `${draft.agentName} - ` : "";
+  return `${agentLabel}${draft.hotelName} - ${draft.agreementNumber} - Pax ${draft.pax} - ${formatAgreementDraftDateRange(
+    draft,
+  )}`;
 }
 
 function getInvoiceToneClasses(tone: InvoiceTone): string {
@@ -308,6 +337,39 @@ export function NewGroupScreen({
   const makkahHotels = useMemo(() => watchedMakkahHotels ?? [], [watchedMakkahHotels]);
   const madinahHotels = useMemo(() => watchedMadinahHotels ?? [], [watchedMadinahHotels]);
   const raudhahDates = useMemo(() => watchedRaudhahDates ?? [], [watchedRaudhahDates]);
+  const agreementDraftsQuery = useAgreementDraftsQuery("", "unassigned");
+  const agreementDraftOptionsByCity = useMemo(() => {
+    const options: Record<HotelCity, HotelAgreementDraft[]> = {
+      makkah: [],
+      madinah: [],
+    };
+
+    for (const draft of agreementDraftsQuery.data ?? []) {
+      options[draft.city].push(draft);
+    }
+
+    return {
+      makkah: options.makkah.sort((left, right) =>
+        `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
+      ),
+      madinah: options.madinah.sort((left, right) =>
+        `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
+      ),
+    };
+  }, [agreementDraftsQuery.data]);
+  const agreementDraftOptionsById = useMemo(
+    () => new Map((agreementDraftsQuery.data ?? []).map((draft) => [draft.id, draft])),
+    [agreementDraftsQuery.data],
+  );
+  const selectedAgreementDraftIds = useMemo(
+    () =>
+      new Set(
+        [...makkahHotels, ...madinahHotels]
+          .map((agreement) => agreement.sourceDraftId?.trim())
+          .filter((draftId): draftId is string => Boolean(draftId)),
+      ),
+    [madinahHotels, makkahHotels],
+  );
   const fallbackPax = Number.parseInt(totalPax, 10);
   const safePax = Number.isFinite(itineraryPax) && (itineraryPax ?? 0) > 0 ? (itineraryPax as number) : fallbackPax;
   const hasValidPax = Number.isFinite(safePax) && safePax > 0;
@@ -347,6 +409,39 @@ export function NewGroupScreen({
     !hasValidPax ||
     !isAgreementReadyForContinue ||
     (requireItineraryBeforeSave && !hasItineraryDraft);
+
+  const handleAgreementDraftSelect = (city: HotelCity, agreementIndex: number, draftId: string) => {
+    setAgreementSaveFeedback(null);
+    const currentAgreements = city === "makkah" ? makkahHotels : madinahHotels;
+    const selectedDraft = draftId ? agreementDraftOptionsById.get(draftId) : undefined;
+    const nextAgreements = currentAgreements.map((agreement, index) => {
+      if (index !== agreementIndex) {
+        return agreement;
+      }
+
+      if (!selectedDraft) {
+        return {
+          ...agreement,
+          sourceDraftId: undefined,
+        };
+      }
+
+      return {
+        ...agreement,
+        sourceDraftId: selectedDraft.id,
+        hotelName: selectedDraft.hotelName,
+        agreementNumber: selectedDraft.agreementNumber,
+        pax: selectedDraft.pax.toString(),
+        status: selectedDraft.status,
+        stayStartIso: selectedDraft.stayStartIso,
+        stayEndIso: selectedDraft.stayEndIso,
+      };
+    });
+
+    setValue(city === "makkah" ? "makkahHotels" : "madinahHotels", nextAgreements, {
+      shouldDirty: true,
+    });
+  };
 
   const handleAgreementChange = <Key extends keyof NewGroupAgreementFormState>(
     city: HotelCity,
@@ -569,174 +664,204 @@ export function NewGroupScreen({
     return `End ${endDate?.date ?? ""} ${endDate?.year ?? ""}`.trim();
   };
 
-  const renderAgreementSection = (city: HotelCity, agreements: NewGroupAgreementFormState[]) => (
-    <div className="rounded-2xl bg-surface-container-low p-4 shadow-ambient">
-      <div className="mb-3 flex items-center gap-2 text-on-surface">
-        <span className="material-symbols-outlined text-primary" aria-hidden="true">
-          location_on
-        </span>
-        <h3 className="text-lg font-semibold">{toCityLabel(city)} Subsection</h3>
-      </div>
+  const renderAgreementSection = (city: HotelCity, agreements: NewGroupAgreementFormState[]) => {
+    const cityDraftOptions = agreementDraftOptionsByCity[city];
+    const draftSelectPlaceholder = agreementDraftsQuery.isLoading
+      ? "Loading agreements..."
+      : cityDraftOptions.length === 0
+        ? "No available agreements"
+        : "Select from Agreement Inbox";
 
-      <div className="space-y-3">
-        {agreements.map((agreement, index) => (
-          <details key={agreement.id} className="serene-accordion">
-            <summary className="serene-accordion-summary">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="truncate text-base font-semibold text-on-surface">
-                    {agreement.hotelName.trim() || `Hotel ${index + 1}`}
-                  </h4>
-                  <span className={getAgreementStatusChipClassName(agreement.status)}>{agreement.status}</span>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-                  {agreement.agreementNumber.trim() || "Agreement number pending"} · Pax {agreement.pax.trim() || "0"} ·{" "}
-                  {formatAgreementStayRange(agreement)}
-                </p>
-              </div>
-              <span
-                className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
-                aria-hidden="true"
-              >
-                expand_more
-              </span>
-            </summary>
+    return (
+      <div className="rounded-2xl bg-surface-container-low p-4 shadow-ambient">
+        <div className="mb-3 flex items-center gap-2 text-on-surface">
+          <span className="material-symbols-outlined text-primary" aria-hidden="true">
+            location_on
+          </span>
+          <h3 className="text-lg font-semibold">{toCityLabel(city)} Subsection</h3>
+        </div>
 
-            <div className="serene-accordion-content">
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className={`${fieldClassName} md:col-span-2`}>
-                  <span>Hotel Name</span>
-                  <input
-                    className={controlClassName}
-                    type="text"
-                    value={agreement.hotelName}
-                    onChange={(event) => handleAgreementChange(city, index, "hotelName", event.target.value)}
-                    placeholder={`e.g. ${toCityLabel(city)} Main Hotel`}
-                  />
-                </label>
-
-                <label className={`${fieldClassName} md:col-span-2`}>
-                  <span>Agreement Number</span>
-                  <input
-                    className={controlClassName}
-                    type="text"
-                    value={agreement.agreementNumber}
-                    onChange={(event) => handleAgreementChange(city, index, "agreementNumber", event.target.value)}
-                    placeholder={resolveVisaAgreementNumber(
-                      { groupCode: resolvedGroupCode || "901794508" },
-                      undefined,
-                      city,
-                    )}
-                  />
-                </label>
-
-                <label className={fieldClassName}>
-                  <span>Pax</span>
-                  <input
-                    className={controlClassName}
-                    type="number"
-                    min={0}
-                    value={agreement.pax}
-                    onChange={(event) => handleAgreementChange(city, index, "pax", event.target.value)}
-                    placeholder={String(safePax || 0)}
-                  />
-                </label>
-
-                <label className={fieldClassName}>
-                  <span>Status</span>
-                  <div className="relative">
-                    <span
-                      className={`${toneDotClassName} ${getInvoiceToneDotClasses(
-                        getAgreementStatusTone(agreement.status),
-                      )}`}
-                      aria-hidden="true"
-                    />
-                    <SereneSelect
-                      className={getToneSelectClassName(getAgreementStatusTone(agreement.status))}
-                      value={agreement.status}
-                      onChange={(event) =>
-                        handleAgreementChange(city, index, "status", event.target.value as AgreementApprovalStatus)
-                      }
-                    >
-                      <option value="Waiting for Approval">Waiting for Approval</option>
-                      <option value="Approved">Approved</option>
-                    </SereneSelect>
+        <div className="space-y-3">
+          {agreements.map((agreement, index) => (
+            <details key={agreement.id} className="serene-accordion">
+              <summary className="serene-accordion-summary">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="truncate text-base font-semibold text-on-surface">
+                      {agreement.hotelName.trim() || `Hotel ${index + 1}`}
+                    </h4>
+                    <span className={getAgreementStatusChipClassName(agreement.status)}>{agreement.status}</span>
                   </div>
-                </label>
-
-                <label className={fieldClassName}>
-                  <span>Stay Start</span>
-                  <DatePickerInput
-                    inputClassName={controlClassName}
-                    value={agreement.stayStartIso}
-                    onChange={(nextValue) => handleAgreementChange(city, index, "stayStartIso", nextValue)}
-                  />
-                </label>
-
-                <label className={fieldClassName}>
-                  <span>Stay End</span>
-                  <DatePickerInput
-                    inputClassName={controlClassName}
-                    value={agreement.stayEndIso}
-                    onChange={(nextValue) => handleAgreementChange(city, index, "stayEndIso", nextValue)}
-                  />
-                </label>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition hover:border-primary/35 hover:text-primary"
-                  onClick={() => handleClearAgreement(city, index)}
+                  <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                    {agreement.agreementNumber.trim() || "Agreement number pending"} · Pax {agreement.pax.trim() || "0"}{" "}
+                    · {formatAgreementStayRange(agreement)}
+                  </p>
+                </div>
+                <span
+                  className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
+                  aria-hidden="true"
                 >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    close
-                  </span>
-                  <span>Clear</span>
-                </button>
+                  expand_more
+                </span>
+              </summary>
 
-                {agreements.length > 1 ? (
+              <div className="serene-accordion-content">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className={`${fieldClassName} md:col-span-2`}>
+                    <span>Agreement Inbox</span>
+                    <SereneSelect
+                      className={selectClassName}
+                      value={agreement.sourceDraftId ?? ""}
+                      onChange={(event) => handleAgreementDraftSelect(city, index, event.target.value)}
+                      disabled={agreementDraftsQuery.isLoading && cityDraftOptions.length === 0}
+                    >
+                      <option value="">{draftSelectPlaceholder}</option>
+                      {cityDraftOptions.map((draft) => {
+                        const isDraftSelectedElsewhere =
+                          selectedAgreementDraftIds.has(draft.id) && agreement.sourceDraftId !== draft.id;
+                        return (
+                          <option key={draft.id} value={draft.id} disabled={isDraftSelectedElsewhere}>
+                            {formatAgreementDraftOptionLabel(draft)}
+                          </option>
+                        );
+                      })}
+                    </SereneSelect>
+                  </label>
+
+                  <label className={`${fieldClassName} md:col-span-2`}>
+                    <span>Hotel Name</span>
+                    <input
+                      className={controlClassName}
+                      type="text"
+                      value={agreement.hotelName}
+                      onChange={(event) => handleAgreementChange(city, index, "hotelName", event.target.value)}
+                      placeholder={`e.g. ${toCityLabel(city)} Main Hotel`}
+                    />
+                  </label>
+
+                  <label className={`${fieldClassName} md:col-span-2`}>
+                    <span>Agreement Number</span>
+                    <input
+                      className={controlClassName}
+                      type="text"
+                      value={agreement.agreementNumber}
+                      onChange={(event) => handleAgreementChange(city, index, "agreementNumber", event.target.value)}
+                      placeholder={resolveVisaAgreementNumber(
+                        { groupCode: resolvedGroupCode || "901794508" },
+                        undefined,
+                        city,
+                      )}
+                    />
+                  </label>
+
+                  <label className={fieldClassName}>
+                    <span>Pax</span>
+                    <input
+                      className={controlClassName}
+                      type="number"
+                      min={0}
+                      value={agreement.pax}
+                      onChange={(event) => handleAgreementChange(city, index, "pax", event.target.value)}
+                      placeholder={String(safePax || 0)}
+                    />
+                  </label>
+
+                  <label className={fieldClassName}>
+                    <span>Status</span>
+                    <div className="relative">
+                      <span
+                        className={`${toneDotClassName} ${getInvoiceToneDotClasses(
+                          getAgreementStatusTone(agreement.status),
+                        )}`}
+                        aria-hidden="true"
+                      />
+                      <SereneSelect
+                        className={getToneSelectClassName(getAgreementStatusTone(agreement.status))}
+                        value={agreement.status}
+                        onChange={(event) =>
+                          handleAgreementChange(city, index, "status", event.target.value as AgreementApprovalStatus)
+                        }
+                      >
+                        <option value="Waiting for Approval">Waiting for Approval</option>
+                        <option value="Approved">Approved</option>
+                      </SereneSelect>
+                    </div>
+                  </label>
+
+                  <label className={fieldClassName}>
+                    <span>Stay Start</span>
+                    <DatePickerInput
+                      inputClassName={controlClassName}
+                      value={agreement.stayStartIso}
+                      onChange={(nextValue) => handleAgreementChange(city, index, "stayStartIso", nextValue)}
+                    />
+                  </label>
+
+                  <label className={fieldClassName}>
+                    <span>Stay End</span>
+                    <DatePickerInput
+                      inputClassName={controlClassName}
+                      value={agreement.stayEndIso}
+                      onChange={(nextValue) => handleAgreementChange(city, index, "stayEndIso", nextValue)}
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-md bg-error-container px-3 py-1.5 text-xs font-semibold text-on-error-container transition hover:brightness-95"
-                    onClick={() => handleRemoveAgreement(city, index)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition hover:border-primary/35 hover:text-primary"
+                    onClick={() => handleClearAgreement(city, index)}
                   >
                     <span className="material-symbols-outlined" aria-hidden="true">
-                      delete
+                      close
                     </span>
-                    <span>Remove Hotel {index + 1}</span>
+                    <span>Clear</span>
                   </button>
-                ) : null}
+
+                  {agreements.length > 1 ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-error-container px-3 py-1.5 text-xs font-semibold text-on-error-container transition hover:brightness-95"
+                      onClick={() => handleRemoveAgreement(city, index)}
+                    >
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        delete
+                      </span>
+                      <span>Remove Hotel {index + 1}</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          </details>
-        ))}
-      </div>
-
-      {agreementDateConnection.cityWarnings[city] ? (
-        <div
-          className="mt-3 flex items-start gap-2 rounded-md bg-tertiary-fixed px-3 py-2 text-sm text-on-tertiary-fixed-variant"
-          role="status"
-          aria-live="polite"
-        >
-          <span className="material-symbols-outlined text-base" aria-hidden="true">
-            warning
-          </span>
-          <p>{agreementDateConnection.cityWarnings[city]}</p>
+            </details>
+          ))}
         </div>
-      ) : null}
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          className="inline-flex items-center text-sm font-semibold text-primary transition hover:text-primary/85 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-          onClick={() => handleAddAgreement(city)}
-        >
-          <span>Add Hotel</span>
-        </button>
+        {agreementDateConnection.cityWarnings[city] ? (
+          <div
+            className="mt-3 flex items-start gap-2 rounded-md bg-tertiary-fixed px-3 py-2 text-sm text-on-tertiary-fixed-variant"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              warning
+            </span>
+            <p>{agreementDateConnection.cityWarnings[city]}</p>
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            className="inline-flex items-center text-sm font-semibold text-primary transition hover:text-primary/85 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            onClick={() => handleAddAgreement(city)}
+          >
+            <span>Add Hotel</span>
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className={containerClassName}>
@@ -879,6 +1004,18 @@ export function NewGroupScreen({
 
         <section className={sectionClassName}>
           <h2 className="mb-4 font-display text-xl font-semibold text-on-surface">Agreement Hotel</h2>
+          {agreementDraftsQuery.isError ? (
+            <div
+              className="mb-4 flex items-start gap-2 rounded-md border border-error-container/65 bg-error-container px-3 py-2 text-sm text-on-error-container"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                error
+              </span>
+              <p>Agreement Inbox belum bisa dimuat. Input manual tetap tersedia.</p>
+            </div>
+          ) : null}
           {agreementDateConnection.crossCityWarning ? (
             <div
               className="mb-4 flex items-start gap-2 rounded-md bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant"

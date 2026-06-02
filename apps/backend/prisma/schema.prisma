@@ -140,6 +140,7 @@ model Group {
   auditLogs          GroupAuditLog[]
   invoiceClients     InvoiceClient[]
   invoices           Invoice[]
+  agreementDrafts    HotelAgreementDraft[]
 
   @@index([createdAt])
 }
@@ -312,6 +313,28 @@ model VisaHotelAgreement {
   visaSetup       VisaSetup               @relation(fields: [visaSetupId], references: [id], onDelete: Cascade)
 
   @@index([visaSetupId, city, stayStart])
+}
+
+model HotelAgreementDraft {
+  id              String                  @id @default(cuid())
+  groupId         String?
+  city            AgreementCity
+  agentName       String?
+  hotelName       String
+  agreementNumber String
+  pax             Int
+  status          AgreementApprovalStatus @default(WAITING)
+  stayStart       DateTime
+  stayEnd         DateTime
+  notes           String?
+  assignedAt      DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  group           Group?                  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([agreementNumber])
+  @@index([city, stayStart])
 }
 
 model RaudhahAppointment {
