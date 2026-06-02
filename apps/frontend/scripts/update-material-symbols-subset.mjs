@@ -1,4 +1,5 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -6,7 +7,10 @@ import ts from "typescript";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendDir = path.resolve(scriptDir, "..");
 const srcDir = path.join(frontendDir, "src");
-const fontOutputPath = path.join(frontendDir, "public", "fonts", "material-symbols-outlined.woff2");
+const fontsCssPath = path.join(frontendDir, "public", "fonts.css");
+const fontsDir = path.join(frontendDir, "public", "fonts");
+const materialSymbolsFontFileName = "material-symbols-outlined.woff2";
+const fontOutputPath = path.join(fontsDir, materialSymbolsFontFileName);
 const manifestOutputPath = path.join(frontendDir, "public", "fonts", "material-symbols-outlined.json");
 
 const SOURCE_FILE_EXTENSIONS = new Set([".ts", ".tsx"]);
@@ -17,6 +21,9 @@ const EXTRA_ICON_NAMES = ["map", "train", "directions_bus"];
 const ICON_NAME_PATTERN = /^[a-z0-9_]+$/u;
 const MAX_RESOLVED_VALUES = 32;
 const CHECK_MODE_FLAG = "--check";
+const MATERIAL_SYMBOLS_FONT_SRC_PATTERN =
+  /url\((["'])\.\/fonts\/material-symbols-outlined(?:\.(?<filenameVersion>[a-f0-9]+))?\.woff2(?:\?v=(?<queryVersion>[a-f0-9]+))?\1\)\s*format\(["']woff2["']\)/u;
+const VERSIONED_MATERIAL_SYMBOLS_FONT_PATTERN = /^material-symbols-outlined\.[a-f0-9]+\.woff2$/u;
 
 const ICON_PATTERNS = [
   /<span[^>]*material-symbols-outlined[^>]*>\s*(?<name>[a-z0-9_]+)\s*<\/span>/gisu,
@@ -328,6 +335,102 @@ function compareIconLists(expectedIconNames, actualIconNames) {
   };
 }
 
+function createFontVersion(fontBuffer) {
+  return createHash("sha256").update(fontBuffer).digest("hex").slice(0, 12);
+}
+
+function getVersionedFontFileName(fontVersion) {
+  return `material-symbols-outlined.${fontVersion}.woff2`;
+}
+
+function getVersionedFontOutputPath(fontVersion) {
+  return path.join(fontsDir, getVersionedFontFileName(fontVersion));
+}
+
+function buildMaterialSymbolsFontSource(fontVersion) {
+  return `url("./fonts/${getVersionedFontFileName(fontVersion)}") format("woff2")`;
+}
+
+async function readStoredFontBuffer() {
+  try {
+    return await readFile(fontOutputPath);
+  } catch {
+    throw new Error("Material Symbols subset font is missing. Run `npm run assets:icons --workspace frontend`.");
+  }
+}
+
+async function readFontsCss() {
+  try {
+    return await readFile(fontsCssPath, "utf8");
+  } catch {
+    throw new Error("fonts.css is missing. Run `npm run assets:icons --workspace frontend`.");
+  }
+}
+
+async function verifyFontsCssFontVersion() {
+  const fontBuffer = await readStoredFontBuffer();
+  const fontVersion = createFontVersion(fontBuffer);
+  const versionedFontPath = getVersionedFontOutputPath(fontVersion);
+  const versionedFontBuffer = await readFile(versionedFontPath);
+  const fontsCss = await readFontsCss();
+  const fontSourceMatch = fontsCss.match(MATERIAL_SYMBOLS_FONT_SRC_PATTERN);
+
+  if (createFontVersion(versionedFontBuffer) !== fontVersion) {
+    throw new Error("Versioned Material Symbols font does not match the generated subset font.");
+  }
+
+  if (!fontSourceMatch) {
+    throw new Error("Material Symbols font source is missing from fonts.css.");
+  }
+
+  if (fontSourceMatch.groups?.filenameVersion !== fontVersion) {
+    throw new Error(
+      "Material Symbols versioned font URL is out of date. Run `npm run assets:icons --workspace frontend`.",
+    );
+  }
+}
+
+async function pruneObsoleteVersionedFontFiles(fontVersion) {
+  const currentVersionedFileName = getVersionedFontFileName(fontVersion);
+  const entries = await readdir(fontsDir, { withFileTypes: true });
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (
+        !entry.isFile() ||
+        entry.name === currentVersionedFileName ||
+        !VERSIONED_MATERIAL_SYMBOLS_FONT_PATTERN.test(entry.name)
+      ) {
+        return;
+      }
+
+      await unlink(path.join(fontsDir, entry.name));
+    }),
+  );
+}
+
+async function writeVersionedFontFile(fontBuffer, fontVersion) {
+  await writeFile(getVersionedFontOutputPath(fontVersion), fontBuffer);
+  await pruneObsoleteVersionedFontFiles(fontVersion);
+}
+
+async function updateFontsCssFontVersion(fontVersion) {
+  const fontsCss = await readFontsCss();
+
+  if (!MATERIAL_SYMBOLS_FONT_SRC_PATTERN.test(fontsCss)) {
+    throw new Error("Material Symbols font source is missing from fonts.css.");
+  }
+
+  const nextFontsCss = fontsCss.replace(MATERIAL_SYMBOLS_FONT_SRC_PATTERN, buildMaterialSymbolsFontSource(fontVersion));
+
+  if (nextFontsCss === fontsCss) {
+    return false;
+  }
+
+  await writeFile(fontsCssPath, nextFontsCss);
+  return true;
+}
+
 async function verifyStoredSubset(iconNames) {
   const storedIconNames = await readStoredManifest();
 
@@ -352,12 +455,15 @@ async function verifyStoredSubset(iconNames) {
     );
   }
 
+  await verifyFontsCssFontVersion();
+
   console.log(
     JSON.stringify(
       {
         status: "ok",
         iconCount: iconNames.length,
         manifestPath: path.relative(frontendDir, manifestOutputPath),
+        fontsCssPath: path.relative(frontendDir, fontsCssPath),
       },
       null,
       2,
@@ -458,14 +564,20 @@ async function main() {
 
   if (storedSubsetComparison?.isEqual) {
     try {
-      await readFile(fontOutputPath);
+      const fontBuffer = await readStoredFontBuffer();
+      const fontVersion = createFontVersion(fontBuffer);
+      await writeVersionedFontFile(fontBuffer, fontVersion);
+      const updatedFontsCss = await updateFontsCssFontVersion(fontVersion);
       console.log(
         JSON.stringify(
           {
             iconCount: iconNames.length,
             outputPath: path.relative(frontendDir, fontOutputPath),
             manifestPath: path.relative(frontendDir, manifestOutputPath),
+            fontsCssPath: path.relative(frontendDir, fontsCssPath),
+            fontVersion,
             unchanged: true,
+            updatedFontsCss,
             iconNames,
           },
           null,
@@ -479,9 +591,11 @@ async function main() {
   }
 
   const { fontBuffer, fontUrl } = await fetchSubsetFont(iconNames);
+  const fontVersion = createFontVersion(fontBuffer);
 
-  await mkdir(path.dirname(fontOutputPath), { recursive: true });
+  await mkdir(fontsDir, { recursive: true });
   await writeFile(fontOutputPath, fontBuffer);
+  await writeVersionedFontFile(fontBuffer, fontVersion);
   await writeFile(
     manifestOutputPath,
     JSON.stringify(
@@ -492,6 +606,7 @@ async function main() {
       2,
     ),
   );
+  const updatedFontsCss = await updateFontsCssFontVersion(fontVersion);
 
   console.log(
     JSON.stringify(
@@ -499,8 +614,11 @@ async function main() {
         iconCount: iconNames.length,
         outputPath: path.relative(frontendDir, fontOutputPath),
         manifestPath: path.relative(frontendDir, manifestOutputPath),
+        fontsCssPath: path.relative(frontendDir, fontsCssPath),
+        fontVersion,
         fontBytes: fontBuffer.length,
         sourceUrl: fontUrl,
+        updatedFontsCss,
         iconNames,
       },
       null,
