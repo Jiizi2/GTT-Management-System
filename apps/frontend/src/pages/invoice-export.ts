@@ -364,6 +364,7 @@ export async function exportInvoicePdf(
   const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const statusLabel = resolvePaymentStatusLabel(payload);
   const isPaidInvoice = isPaidStatusLabel(statusLabel, payload.remainingBalanceIdr);
+  const printableStatusLabel = isPaidInvoice ? "Lunas" : statusLabel;
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
   const billToName = resolveBillToName(payload);
@@ -465,22 +466,32 @@ export async function exportInvoicePdf(
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid #059669;
-            background: #ecfdf5;
-            color: #047857;
-            border-radius: 999px;
-            padding: 6px 12px;
-            font-size: 10px;
-            font-weight: 900;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-        .invoice-paid-status {
-            border: 1px solid #059669;
-            background: #ecfdf5;
+            position: relative;
+            min-width: 36mm;
+            min-height: 14mm;
+            border: 2.5px solid #047857;
+            background: rgba(236, 253, 245, 0.5);
             color: #047857 !important;
-            border-radius: 999px;
-            padding: 3px 8px;
+            border-radius: 7px;
+            padding: 3mm 5mm;
+            font-size: 1.75rem;
+            font-weight: 900;
+            line-height: 1;
+            text-transform: uppercase;
+            transform: rotate(-6deg);
+            box-shadow: inset 0 0 0 3px rgba(4, 120, 87, 0.16), 0 4px 10px rgba(4, 120, 87, 0.12);
+        }
+        .invoice-paid-stamp::before {
+            content: "";
+            position: absolute;
+            inset: 3px;
+            border: 1px solid rgba(4, 120, 87, 0.7);
+            border-radius: 4px;
+        }
+        .invoice-paid-stamp span {
+            position: relative;
+            z-index: 1;
+            color: #047857 !important;
         }
         .invoice-paid-total {
             border-color: #059669 !important;
@@ -564,10 +575,15 @@ export async function exportInvoicePdf(
                 box-shadow: none !important;
             }
             .invoice-paid-stamp,
-            .invoice-paid-status,
             .invoice-paid-total {
                 border-color: #059669 !important;
                 background: #ecfdf5 !important;
+                color: #047857 !important;
+            }
+            .invoice-paid-stamp::before {
+                border-color: rgba(4, 120, 87, 0.7) !important;
+            }
+            .invoice-paid-stamp * {
                 color: #047857 !important;
             }
             .invoice-total-due-label {
@@ -787,7 +803,7 @@ export async function exportInvoicePdf(
 <section class="invoice-block invoice-overview-block px-10 py-6 grid grid-cols-12 gap-5 items-start">
 <div class="col-span-7">
 <h1 class="invoice-main-title font-headline text-5xl font-extrabold text-luxury-black tracking-tighter mb-4">INVOICE</h1>
-${isPaidInvoice ? '<div class="invoice-paid-stamp mb-3">Paid / Lunas</div>' : ""}
+${isPaidInvoice ? '<div class="invoice-paid-stamp mb-5"><span>LUNAS</span></div>' : ""}
 <div class="space-y-1">
 <h2 class="invoice-bill-to-name text-lg font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
 </div>
@@ -804,7 +820,7 @@ ${isPaidInvoice ? '<div class="invoice-paid-stamp mb-3">Paid / Lunas</div>' : ""
 <div class="pt-4 border-t border-stone-200">
 <div class="flex justify-between items-center">
 <span class="invoice-status-label font-bold text-[10px] uppercase tracking-widest">Status</span>
-<span class="invoice-status-value text-[10px] font-bold uppercase tracking-widest ${isPaidInvoice ? "invoice-paid-status" : ""}">${escapeHtml(statusLabel)}</span>
+<span class="invoice-status-value text-[10px] font-bold uppercase tracking-widest">${escapeHtml(printableStatusLabel)}</span>
 </div>
 </div>
 </div>

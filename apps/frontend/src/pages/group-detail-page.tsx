@@ -3,10 +3,11 @@ import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import * as Domain from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { buildGroupItineraryBuilderPath } from "../shared/app-route";
+import { buildGroupItineraryBuilderPath, buildVisaDetailPath } from "../shared/app-route";
 import type {
   EditScheduleFormState,
   GroupData,
+  GroupAgreementHotel,
   ItineraryItem,
   Musyrif,
   NoteItem,
@@ -21,15 +22,18 @@ const {
   createNoteItems,
   createScheduleMeta,
   expandTransferTrainItineraryItems,
+  formatVisaShortDate,
   formatScheduleTime,
   formatRouteSummary,
   formatScheduleDate,
+  getGroupAgreementHotelsByCity,
   getScheduleTypeOption,
   hasIncompleteTransferTrainFields,
   inferCategoryKey,
   inferCityTourCity,
   isCityTourActivityType,
   isFlightActivityType,
+  isIsoDateValue,
   isTransferActivityType,
   normalizeAgreementCityKey,
   parseTimeForInput,
@@ -273,6 +277,88 @@ function formatItinerarySupportMeta(item: ItineraryItem, categoryKey: string): s
   }
 
   return formatItineraryMetaForDisplay(item.meta);
+}
+
+type AgreementCityKey = "makkah" | "madinah";
+
+type CompactAgreementSummary = {
+  city: AgreementCityKey;
+  cityLabel: string;
+  hotelLabel: string;
+  paxLabel: string;
+  stayLabel: string;
+  primaryHotelLabel: string;
+  isMissing: boolean;
+};
+
+function formatAgreementHotelCount(count: number): string {
+  return count === 1 ? "1 hotel" : `${count} hotels`;
+}
+
+function formatCompactIsoDateRange(startIso: string, endIso: string): string {
+  const normalizedStartIso = startIso.trim();
+  const normalizedEndIso = endIso.trim();
+  const hasStart = isIsoDateValue(normalizedStartIso);
+  const hasEnd = isIsoDateValue(normalizedEndIso);
+
+  if (hasStart && hasEnd) {
+    if (normalizedStartIso === normalizedEndIso) {
+      return formatVisaShortDate(normalizedStartIso);
+    }
+
+    return `${formatVisaShortDate(normalizedStartIso)} - ${formatVisaShortDate(normalizedEndIso)}`;
+  }
+
+  if (hasStart) {
+    return `Start ${formatVisaShortDate(normalizedStartIso)}`;
+  }
+
+  if (hasEnd) {
+    return `End ${formatVisaShortDate(normalizedEndIso)}`;
+  }
+
+  return "Dates pending";
+}
+
+function formatGroupTripWindow(group: GroupData): string {
+  return formatCompactIsoDateRange(group.arrivalDate ?? "", group.returnDate ?? "");
+}
+
+function formatCompactAgreementStayRange(hotels: GroupAgreementHotel[]): string {
+  const sortedDates = hotels
+    .flatMap((hotel) => [hotel.stayStartIso.trim(), hotel.stayEndIso.trim()])
+    .filter(isIsoDateValue)
+    .sort();
+  const startIso = sortedDates[0] ?? "";
+  const endIso = sortedDates.at(-1) ?? "";
+
+  if (!startIso && !endIso) {
+    return "Tanggal pending";
+  }
+
+  if (startIso && endIso && startIso !== endIso) {
+    return `${formatVisaShortDate(startIso)} - ${formatVisaShortDate(endIso)}`;
+  }
+
+  return formatVisaShortDate(startIso || endIso);
+}
+
+function buildCompactAgreementSummary(group: GroupData, city: AgreementCityKey): CompactAgreementSummary {
+  const hotels = getGroupAgreementHotelsByCity(group, city);
+  const hotelCount = hotels.length;
+  const totalPax = hotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0);
+  const firstHotelName = hotels[0]?.hotelName.trim() ?? "";
+  const fallbackCityLabel = city === "makkah" ? "Makkah" : "Madinah";
+
+  return {
+    city,
+    cityLabel: fallbackCityLabel,
+    hotelLabel: hotelCount > 0 ? formatAgreementHotelCount(hotelCount) : "Belum linked",
+    paxLabel: hotelCount > 0 ? `${totalPax}/${group.pax} pax` : `0/${group.pax} pax`,
+    stayLabel: hotelCount > 0 ? formatCompactAgreementStayRange(hotels) : "Agreement pending",
+    primaryHotelLabel: firstHotelName || `${fallbackCityLabel} hotel pending`,
+    isMissing: hotelCount === 0,
+  };
 }
 
 export function GroupDetail({
@@ -577,6 +663,10 @@ export function GroupDetail({
   const completeness = useMemo(
     () => resolveGroupCompleteness({ ...group, itinerary: itineraryItems }),
     [group, itineraryItems],
+  );
+  const compactAgreementSummaries = useMemo(
+    () => (["makkah", "madinah"] as const).map((city) => buildCompactAgreementSummary(group, city)),
+    [group],
   );
   const shouldShowLinkAgreementAction = completeness.issues.some(
     (issue) =>
@@ -966,6 +1056,16 @@ export function GroupDetail({
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 self-stretch md:w-auto md:self-start">
+          <Link
+            to={buildVisaDetailPath(group.code)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-primary px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-primary-container sm:w-auto"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              fact_check
+            </span>
+            <span>Visa Detail</span>
+          </Link>
+
           <button
             type="button"
             className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3 py-2 text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/15 sm:w-auto"
@@ -993,7 +1093,7 @@ export function GroupDetail({
       </header>
 
       <div className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-[1.45fr_0.75fr]">
+        <div className="grid items-start gap-4 xl:grid-cols-[1.45fr_0.75fr]">
           <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="space-y-2 md:space-y-1">
@@ -1083,13 +1183,41 @@ export function GroupDetail({
                   </span>
                 </div>
               </div>
+
+              <div className="mt-4 grid gap-3 border-t border-outline-variant/25 pt-3 sm:grid-cols-2">
+                <div className="flex min-w-0 items-center gap-2 sm:pr-3">
+                  <span className="material-symbols-outlined text-lg text-on-surface-variant/70" aria-hidden="true">
+                    travel_explore
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/75">
+                      Package
+                    </span>
+                    <p className="mt-0.5 truncate text-sm font-bold text-on-surface" title={group.packageName}>
+                      {group.packageName}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex min-w-0 items-center gap-2 sm:border-l sm:border-outline-variant/35 sm:pl-3">
+                  <span className="material-symbols-outlined text-lg text-on-surface-variant/70" aria-hidden="true">
+                    event_available
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/75">
+                      Trip Window
+                    </span>
+                    <p className="mt-0.5 truncate text-sm font-bold text-on-surface">{formatGroupTripWindow(group)}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
-            <div className="flex items-start justify-between gap-3">
+          <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-4 shadow-ambient sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className={detailKickerClassName}>Assigned Musyrif</p>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
@@ -1121,9 +1249,9 @@ export function GroupDetail({
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-3 flex min-w-0 items-center gap-3">
               <div className="relative">
-                <div className="h-14 w-14 overflow-hidden rounded-2xl ring-2 ring-brand-primary/20">
+                <div className="h-12 w-12 overflow-hidden rounded-2xl ring-2 ring-brand-primary/20">
                   <img src={musyrifProfile.avatar} alt={musyrifProfile.name} className="h-full w-full object-cover" />
                 </div>
                 <span
@@ -1133,13 +1261,72 @@ export function GroupDetail({
               </div>
 
               <div className="min-w-0">
-                <h3 className="truncate text-lg font-semibold text-on-surface">{musyrifProfile.name}</h3>
+                <h3 className="truncate text-base font-semibold text-on-surface">{musyrifProfile.name}</h3>
                 <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-on-surface-variant">
                   <span className="material-symbols-outlined" aria-hidden="true">
                     call
                   </span>
                   <span>{musyrifProfile.phone}</span>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-3 border-t border-outline-variant/30 pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-on-surface-variant/75" aria-hidden="true">
+                    hotel
+                  </span>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/75">
+                    Agreement Hotel
+                  </p>
+                </div>
+                <Link
+                  to={buildVisaDetailPath(group.code)}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-primary transition hover:text-brand-primary/75"
+                >
+                  <span>Detail</span>
+                  <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
+                    fact_check
+                  </span>
+                </Link>
+              </div>
+
+              <div className="mt-2 divide-y divide-outline-variant/25">
+                {compactAgreementSummaries.map((summary) => (
+                  <div key={summary.city} className="py-2 first:pt-0 last:pb-0">
+                    <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className={`inline-flex h-6 min-w-[4.75rem] items-center justify-center rounded-lg px-2 font-extrabold uppercase tracking-[0.08em] ${
+                            summary.isMissing
+                              ? "bg-brand-tertiary/12 text-brand-tertiary"
+                              : "bg-brand-primary/10 text-brand-primary"
+                          }`}
+                        >
+                          {summary.cityLabel}
+                        </span>
+                        <p className="truncate font-bold text-on-surface" title={summary.primaryHotelLabel}>
+                          {summary.primaryHotelLabel}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 text-[11px] font-bold ${
+                          summary.isMissing ? "text-brand-tertiary" : "text-on-surface-variant"
+                        }`}
+                      >
+                        {summary.paxLabel}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-[5.25rem] text-[11px] font-medium text-on-surface-variant">
+                      <span className="truncate">{summary.hotelLabel}</span>
+                      <span className="text-on-surface-variant/40" aria-hidden="true">
+                        |
+                      </span>
+                      <span className="truncate">{summary.stayLabel}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
