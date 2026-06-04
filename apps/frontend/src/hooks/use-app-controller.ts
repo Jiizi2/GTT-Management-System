@@ -146,6 +146,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleBackToVisaTracking: routeState.handleBackToVisaTracking,
     handleOpenNewGroup: routeState.handleOpenNewGroup,
     handleSaveInputGroup: groupRecordsState.handleSaveInputGroup,
+    handleSaveGroupIdentity: groupRecordsState.handleSaveGroupIdentity,
     handleSaveGroupDetail: groupRecordsState.handleSaveGroupDetail,
     handleSaveVisaGroupDetail: groupRecordsState.handleSaveVisaGroupDetail,
     dismissSyncFeedback,

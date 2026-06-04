@@ -51,6 +51,7 @@ import {
   parseDisplayDateToIso,
   parseTimeForInput,
   resolveCurrentGroupTone,
+  resolveGroupCompleteness,
   resolveGroupToneByItinerary,
   resolveTotalBusCount,
   resolveValidRaudhahAppointments,
@@ -304,6 +305,122 @@ function testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses(): void {
   assert.equal(rows[0].raudhahTone, "warn");
 }
 
+function testGroupCompletenessFlagsMissingPartsAndMismatches(): void {
+  const partialGroup = createBaseGroup({
+    code: "UNIT-PARTIAL",
+    status: "Entry Only",
+    itinerary: [],
+    visaSetup: undefined,
+  });
+
+  const partialSummary = resolveGroupCompleteness(partialGroup);
+  assert.equal(partialSummary.state, "incomplete");
+  assert.equal(partialSummary.isReadyForOperations, false);
+  assert.equal(
+    partialSummary.issues.some((issue) => issue.key === "missing-agreement"),
+    true,
+  );
+  assert.equal(
+    partialSummary.issues.some((issue) => issue.key === "missing-itinerary"),
+    true,
+  );
+
+  const completeGroup = createBaseGroup({
+    code: "UNIT-COMPLETE",
+    pax: 45,
+    itinerary: [
+      {
+        date: "01 Jan",
+        year: "2099",
+        category: "Arrival",
+        categoryKey: "arrival",
+        title: "Arrival Trip",
+        meta: "08:00 | Airport",
+        icon: "flight_land",
+        isoDate: "2099-01-01",
+        time: "08:00",
+        from: "JED Airport",
+        to: "Makkah Hotel",
+        requiresBus: true,
+      },
+      {
+        date: "05 Jan",
+        year: "2099",
+        category: "Departure",
+        categoryKey: "departure",
+        title: "Departure Trip",
+        meta: "21:00 | Hotel to Airport",
+        icon: "flight_takeoff",
+        isoDate: "2099-01-05",
+        time: "21:00",
+        from: "Madinah Hotel",
+        to: "MED Airport",
+        requiresBus: true,
+      },
+    ],
+    visaSetup: {
+      visaStatus: "Issued",
+      issuedDate: "2098-12-31",
+      syarikah: "Provider Unit",
+      paymentStatus: "Paid",
+      makkahHotels: [
+        {
+          id: "m-1",
+          hotelName: "Makkah Hotel",
+          agreementNumber: "M-1",
+          pax: 45,
+          status: "Approved",
+          stayStartIso: "2099-01-01",
+          stayEndIso: "2099-01-03",
+        },
+      ],
+      madinahHotels: [
+        {
+          id: "d-1",
+          hotelName: "Madinah Hotel",
+          agreementNumber: "D-1",
+          pax: 45,
+          status: "Approved",
+          stayStartIso: "2099-01-04",
+          stayEndIso: "2099-01-05",
+        },
+      ],
+      raudhahAppointments: [],
+    },
+  });
+
+  const completeSummary = resolveGroupCompleteness(completeGroup);
+  assert.equal(completeSummary.state, "ready");
+  assert.equal(completeSummary.isReadyForOperations, true);
+  assert.equal(completeSummary.issues.length, 0);
+
+  const mismatchedSummary = resolveGroupCompleteness(
+    createBaseGroup({
+      code: "UNIT-MISMATCH",
+      pax: 45,
+      itinerary: completeGroup.itinerary,
+      visaSetup: {
+        ...completeGroup.visaSetup!,
+        makkahHotels: [
+          {
+            ...completeGroup.visaSetup!.makkahHotels[0],
+            pax: 30,
+            stayStartIso: "2099-01-02",
+          },
+        ],
+      },
+    }),
+  );
+  assert.equal(
+    mismatchedSummary.issues.some((issue) => issue.key === "pax-mismatch"),
+    true,
+  );
+  assert.equal(
+    mismatchedSummary.issues.some((issue) => issue.key === "date-mismatch"),
+    true,
+  );
+}
+
 function testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime(): void {
   const [todayIso, tomorrowIso] = getChecklistRangeDates();
   const outsideWindowIso = getLocalIsoDateWithOffset(6);
@@ -530,6 +647,17 @@ function testOverviewAndStatusNormalizationHelpers(): void {
   assert.equal(normalized.tone, "active");
   assert.equal(normalized.status, "Active");
   assert.equal(normalized.totalBuses, 3);
+
+  const identityOnly = normalizeGroupStatus(
+    createBaseGroup({
+      code: "UNIT-IDENTITY",
+      status: "Entry Only",
+      tone: "active",
+      itinerary: [],
+    }),
+  );
+  assert.equal(identityOnly.tone, "active");
+  assert.equal(identityOnly.status, "Entry Only");
 }
 
 function testFormFactoryAndCategoryHelpers(): void {
@@ -911,6 +1039,7 @@ describe("app-domain", () => {
   runCase("route helper behavior", testRouteHelpersForCategorySpecificBehavior);
   runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
   runCase("visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
+  runCase("group completeness helper", testGroupCompletenessFlagsMissingPartsAndMismatches);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
   runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);
   runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);

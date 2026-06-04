@@ -3,12 +3,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   buildVisaTrackingRowsFromGroups,
   formatLocalIsoDate,
+  formatScheduleDate,
   getItineraryIsoDate,
+  getMinimumBusCountForPax,
   groups,
+  musyrifAvatar,
   normalizeGroupStatus,
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
   resolveVisaProvider,
+  shiftIsoDate,
 } from "../../shared/app-domain";
 import type {
   AgreementApprovalStatus,
@@ -27,6 +31,7 @@ import { agreementDraftQueryKeys, groupQueryKeys } from "../../shared/query-keys
 import { useGroupsQuery, useGroupsSearchQuery } from "../use-groups-query";
 import {
   createGroupInBackend,
+  createGroupIdentityInBackend,
   deleteGroupInBackend,
   deleteVisaHotelAgreementInBackend,
   fetchGroupsFromBackend,
@@ -35,6 +40,7 @@ import {
   saveVisaHotelAgreementInBackend,
   sortHotelsByStayStart,
   type GroupFetchProjection,
+  type GroupIdentityDraftPayload,
 } from "../use-app-controller-backend";
 import type { OverviewMonthOption, OverviewStatCard, SyncFeedback } from "./types";
 
@@ -320,6 +326,83 @@ function resolveRequestedGroupProjection({
   return "summary";
 }
 
+function isIsoDateOnly(value: string | undefined): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+}
+
+function resolveIdentityDurationDays(
+  identity: GroupIdentityDraftPayload,
+  arrivalDate: string,
+  returnDate: string,
+): number {
+  if (identity.durationDays && identity.durationDays > 0) {
+    return identity.durationDays;
+  }
+
+  const startMs = Date.parse(`${arrivalDate}T00:00:00`);
+  const endMs = Date.parse(`${returnDate}T00:00:00`);
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+    return Math.max(1, Math.floor((endMs - startMs) / 86_400_000) + 1);
+  }
+
+  return 1;
+}
+
+function buildLocalIdentityGroup(identity: GroupIdentityDraftPayload): GroupData {
+  const normalizedCode = identity.groupCode.trim().toUpperCase();
+  const arrivalDate = isIsoDateOnly(identity.arrivalDate)
+    ? identity.arrivalDate.trim()
+    : formatLocalIsoDate(new Date());
+  const durationDays = Math.max(1, identity.durationDays ?? 1);
+  const rawReturnDate = isIsoDateOnly(identity.returnDate)
+    ? identity.returnDate.trim()
+    : shiftIsoDate(arrivalDate, durationDays - 1);
+  const returnDate = rawReturnDate >= arrivalDate ? rawReturnDate : arrivalDate;
+  const resolvedDurationDays = resolveIdentityDurationDays(identity, arrivalDate, returnDate);
+  const arrivalLabel = formatScheduleDate(arrivalDate);
+  const returnLabel = formatScheduleDate(returnDate);
+  const pax = Math.max(1, identity.pax ?? 1);
+
+  return {
+    code: normalizedCode,
+    name: identity.groupName?.trim() || `Group ${normalizedCode}`,
+    status: "Entry Only",
+    tone: "active",
+    pax,
+    totalBuses: identity.totalBuses ?? getMinimumBusCountForPax(pax),
+    packageName: identity.packageName?.trim() || "Pending Package",
+    durationDays: resolvedDurationDays,
+    arrivalDate,
+    returnDate,
+    timeline: [
+      {
+        date: arrivalLabel.date,
+        title: "Group identity created",
+      },
+      {
+        date: returnLabel.date,
+        title: "Agreement and itinerary pending",
+        isCurrent: true,
+        nextActivity: "Link agreement and create itinerary",
+      },
+    ],
+    nextActivity: {
+      title: "Complete group workspace",
+      date: arrivalLabel.date,
+      time: "09:00",
+      icon: "pending_actions",
+    },
+    itinerary: [],
+    notes: ["Group workspace created from identity entry. Agreement and itinerary can be linked later."],
+    musyrif: {
+      name: identity.musyrifName?.trim() || "Unassigned Musyrif",
+      phone: identity.musyrifPhone?.trim() || "-",
+      avatar: musyrifAvatar,
+    },
+    checklistAssignments: [],
+  };
+}
+
 export function useDashboardGroupRecords({
   activeNav,
   query,
@@ -373,6 +456,10 @@ export function useDashboardGroupRecords({
   );
   const createGroupMutation = useMutation({
     mutationFn: (group: GroupData) => createGroupInBackend(group),
+    retry: false,
+  });
+  const createGroupIdentityMutation = useMutation({
+    mutationFn: (identity: GroupIdentityDraftPayload) => createGroupIdentityInBackend(identity),
     retry: false,
   });
   const replaceGroupMutation = useMutation({
@@ -1248,6 +1335,54 @@ export function useDashboardGroupRecords({
     ],
   );
 
+  const handleSaveGroupIdentity = useCallback(
+    (identity: GroupIdentityDraftPayload) => {
+      const normalizedGroupCode = identity.groupCode.trim().toUpperCase();
+      if (!normalizedGroupCode) {
+        showSyncFeedback("error", "Group number tidak boleh kosong.");
+        return;
+      }
+
+      const hasDuplicateCode = groupRecordsRef.current.some(
+        (item) => item.code.trim().toUpperCase() === normalizedGroupCode,
+      );
+      if (hasDuplicateCode) {
+        showSyncFeedback("error", "Group number sudah dipakai. Gunakan nomor group yang berbeda.");
+        return;
+      }
+
+      const localIdentityGroup = normalizeGroupStatus(buildLocalIdentityGroup(identity));
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+      commitGroupRecords((current) => [localIdentityGroup, ...current]);
+      clearQuery();
+      navigateToOverview({ replace: true });
+
+      runBackendSync({
+        task: createGroupIdentityMutation.mutateAsync(identity).then((backendGroup) => {
+          const normalizedBackendGroup = normalizeGroupStatus(backendGroup);
+          commitGroupRecords((current) =>
+            current.map((group) =>
+              group.code.trim().toUpperCase() === normalizedGroupCode ? normalizedBackendGroup : group,
+            ),
+          );
+        }),
+        successMessage: "Workspace group berhasil dibuat dari identity entry.",
+        failureMessage: (error: unknown) =>
+          resolveDashboardSyncFailureMessage(error, "Workspace group belum berhasil disimpan ke backend."),
+        rollbackSnapshot,
+      });
+    },
+    [
+      captureGroupRecordsSnapshot,
+      clearQuery,
+      commitGroupRecords,
+      createGroupIdentityMutation,
+      navigateToOverview,
+      runBackendSync,
+      showSyncFeedback,
+    ],
+  );
+
   const handleSaveGroupDetail = useCallback(
     (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
       const normalizedGroup = normalizeGroupStatus(group);
@@ -1443,6 +1578,7 @@ export function useDashboardGroupRecords({
     handleSetRaudhahTasrehPrinted,
     handleClearRaudhahAppointment,
     handleSaveInputGroup,
+    handleSaveGroupIdentity,
     handleSaveGroupDetail,
     handleSaveVisaGroupDetail,
   };

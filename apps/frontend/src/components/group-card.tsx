@@ -8,6 +8,7 @@ const {
   formatScheduleTime,
   parseDisplayDateToIso,
   parseTimeForInput,
+  resolveGroupCompleteness,
   resolveTotalBusCount,
 } = Domain;
 
@@ -221,6 +222,18 @@ function getStatusLabel(tone: GroupData["tone"]): string {
   return tone === "active" ? "Active" : "Inactive";
 }
 
+function getCompletenessBadgeClasses(state: ReturnType<typeof resolveGroupCompleteness>["state"]): string {
+  if (state === "ready") {
+    return "border-primary/25 bg-primary/12 text-primary";
+  }
+
+  if (state === "action-required") {
+    return "border-error-container/70 bg-error-container text-on-error-container";
+  }
+
+  return "border-tertiary-fixed/70 bg-tertiary-fixed text-on-tertiary-fixed-variant";
+}
+
 function getServiceTypeBadgeLabel(group: GroupData): string {
   if (group.visaSetup?.busStatus === "Visa+") {
     return "Visa+";
@@ -244,6 +257,7 @@ function getRequiredBusBadgeLabel(group: GroupData): string | null {
 export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDetail: (groupCode: string) => void }) {
   const itineraryPreview = buildItineraryPreview(group);
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
+  const completeness = resolveGroupCompleteness(group);
   const metadataBadges = [
     `${group.pax} Pax`,
     ...(busBadgeLabel ? [busBadgeLabel] : []),
@@ -265,6 +279,13 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
           >
             {getStatusLabel(group.tone)}
           </span>
+          <span
+            className={`inline-flex shrink-0 whitespace-nowrap rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getCompletenessBadgeClasses(
+              completeness.state,
+            )}`}
+          >
+            {completeness.badgeLabel}
+          </span>
         </div>
         <h2 className="font-display text-lg font-bold text-on-surface-variant">{group.name}</h2>
       </div>
@@ -282,6 +303,32 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
           </span>
         ))}
       </div>
+
+      {!completeness.isReadyForOperations ? (
+        <section
+          className="mx-1 mb-6 rounded-xl border border-tertiary-fixed/70 bg-tertiary-fixed px-3 py-2 text-on-tertiary-fixed-variant"
+          aria-label="Group completion warning"
+        >
+          <div className="flex items-start gap-2">
+            <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
+              warning
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold leading-snug">{completeness.primaryMessage}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {completeness.issues.slice(0, 3).map((issue) => (
+                  <span
+                    key={issue.key}
+                    className="rounded-md bg-surface-container-lowest/75 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]"
+                  >
+                    {issue.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mx-1 mb-8 pt-1" aria-label="Itinerary preview">
         <div className="mb-3 flex items-center justify-between gap-3 px-1">

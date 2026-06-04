@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -17,6 +29,7 @@ import {
   getSchemaPath,
 } from "@nestjs/swagger";
 import { ApiErrorResponseDto } from "../../http/api-error-response.dto";
+import { CreateGroupIdentityDto } from "../dto/create-group-identity.dto";
 import { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
 import { UpdateGroupDto } from "../dto/update-group.dto";
@@ -37,8 +50,12 @@ import {
 } from "../dto/group-response.dto";
 import type { GroupResponseProjection } from "../groups.service-types";
 
-function normalizeGroupProjection(rawProjection?: string): GroupResponseProjection {
-  return rawProjection?.trim().toLowerCase() === "summary" ? "summary" : "detail";
+function normalizeGroupProjection(
+  rawProjection?: string,
+): GroupResponseProjection {
+  return rawProjection?.trim().toLowerCase() === "summary"
+    ? "summary"
+    : "detail";
 }
 
 function normalizeBooleanQuery(rawValue?: string): boolean {
@@ -58,12 +75,15 @@ function normalizeBooleanQuery(rawValue?: string): boolean {
 )
 @Controller("groups")
 export class GroupsController {
-  constructor(@Inject(GroupsService) private readonly groupsService: GroupsService) {}
+  constructor(
+    @Inject(GroupsService) private readonly groupsService: GroupsService,
+  ) {}
 
   @Get()
   @ApiOperation({
     summary: "List groups",
-    description: "Mengembalikan daftar grup dengan search, filter, pagination, dan projection summary/detail.",
+    description:
+      "Mengembalikan daftar grup dengan search, filter, pagination, dan projection summary/detail.",
   })
   @ApiQuery({ name: "q", required: false, example: "9017001001" })
   @ApiQuery({ name: "page", required: false, example: "1" })
@@ -109,9 +129,12 @@ export class GroupsController {
     const parsedPageSize = Number.parseInt(pageSize ?? "", 10);
 
     return this.groupsService.findAll(query, {
-      page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : undefined,
+      page:
+        Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : undefined,
       pageSize:
-        Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : undefined,
+        Number.isFinite(parsedPageSize) && parsedPageSize > 0
+          ? parsedPageSize
+          : undefined,
       filter,
       activeOnly: normalizeBooleanQuery(activeOnly),
       projection: normalizeGroupProjection(projection),
@@ -121,7 +144,8 @@ export class GroupsController {
   @Get("audit-logs")
   @ApiOperation({
     summary: "List group audit logs",
-    description: "Mengembalikan audit log group dari memory atau Prisma, tergantung data source.",
+    description:
+      "Mengembalikan audit log group dari memory atau Prisma, tergantung data source.",
   })
   @ApiQuery({ name: "groupCode", required: false, example: "9017001001" })
   @ApiQuery({ name: "limit", required: false, example: "25" })
@@ -160,7 +184,8 @@ export class GroupsController {
   @Post()
   @ApiOperation({
     summary: "Create group",
-    description: "Membuat group baru lengkap dengan itinerary, visa setup, notes, dan checklist bila disediakan.",
+    description:
+      "Membuat group baru lengkap dengan itinerary, visa setup, notes, dan checklist bila disediakan.",
   })
   @ApiCreatedResponse({
     description: "Group berhasil dibuat.",
@@ -172,10 +197,27 @@ export class GroupsController {
     return this.groupsService.create(payload);
   }
 
+  @Post("identity")
+  @ApiOperation({
+    summary: "Create group identity workspace",
+    description:
+      "Membuat workspace group dari data entry minimal. Agreement dan itinerary bisa dihubungkan setelahnya.",
+  })
+  @ApiCreatedResponse({
+    description: "Workspace group berhasil dibuat dari identity entry.",
+    type: GroupDetailResponseDto,
+  })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto })
+  @ApiConflictResponse({ type: ApiErrorResponseDto })
+  createIdentity(@Body() payload: CreateGroupIdentityDto) {
+    return this.groupsService.createIdentity(payload);
+  }
+
   @Put(":idOrCode")
   @ApiOperation({
     summary: "Replace group",
-    description: "Mengganti payload group secara penuh berdasarkan ID atau code.",
+    description:
+      "Mengganti payload group secara penuh berdasarkan ID atau code.",
   })
   @ApiParam({ name: "idOrCode", example: "9017001001" })
   @ApiOkResponse({
@@ -185,14 +227,18 @@ export class GroupsController {
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
   @ApiConflictResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
-  replace(@Param("idOrCode") idOrCode: string, @Body() payload: CreateGroupDto) {
+  replace(
+    @Param("idOrCode") idOrCode: string,
+    @Body() payload: CreateGroupDto,
+  ) {
     return this.groupsService.replace(idOrCode, payload);
   }
 
   @Patch(":idOrCode")
   @ApiOperation({
     summary: "Update group",
-    description: "Memperbarui field sederhana group tanpa mengganti payload penuh.",
+    description:
+      "Memperbarui field sederhana group tanpa mengganti payload penuh.",
   })
   @ApiParam({ name: "idOrCode", example: "9017001001" })
   @ApiOkResponse({
@@ -270,7 +316,8 @@ export class GroupsController {
   @Post(":idOrCode/checklist/confirm-driver")
   @ApiOperation({
     summary: "Confirm checklist driver",
-    description: "Menambahkan atau mengonfirmasi slot driver untuk checklist assignment.",
+    description:
+      "Menambahkan atau mengonfirmasi slot driver untuk checklist assignment.",
   })
   @ApiParam({ name: "idOrCode", example: "9017001001" })
   @ApiOkResponse({
@@ -288,7 +335,8 @@ export class GroupsController {
   @Post(":idOrCode/checklist/reset-driver")
   @ApiOperation({
     summary: "Reset checklist driver",
-    description: "Menghapus seluruh driver dari checklist assignment yang sesuai.",
+    description:
+      "Menghapus seluruh driver dari checklist assignment yang sesuai.",
   })
   @ApiParam({ name: "idOrCode", example: "9017001001" })
   @ApiOkResponse({
@@ -341,7 +389,11 @@ export class GroupsController {
     @Param("hotelId") hotelId: string,
     @Body() payload: UpsertGroupVisaHotelDto,
   ) {
-    return this.groupsService.updateVisaHotelAgreement(idOrCode, hotelId, payload);
+    return this.groupsService.updateVisaHotelAgreement(
+      idOrCode,
+      hotelId,
+      payload,
+    );
   }
 
   @Delete(":idOrCode/visa/hotels/:hotelId")
@@ -366,7 +418,8 @@ export class GroupsController {
   @Put(":idOrCode/visa/raudhah")
   @ApiOperation({
     summary: "Upsert primary Raudhah appointment",
-    description: "Membuat atau memperbarui appointment Raudhah utama pada visa setup group.",
+    description:
+      "Membuat atau memperbarui appointment Raudhah utama pada visa setup group.",
   })
   @ApiParam({ name: "idOrCode", example: "9017001001" })
   @ApiOkResponse({
@@ -379,7 +432,10 @@ export class GroupsController {
     @Param("idOrCode") idOrCode: string,
     @Body() payload: UpsertGroupRaudhahDto,
   ) {
-    return this.groupsService.upsertPrimaryRaudhahAppointment(idOrCode, payload);
+    return this.groupsService.upsertPrimaryRaudhahAppointment(
+      idOrCode,
+      payload,
+    );
   }
 
   @Delete(":idOrCode")

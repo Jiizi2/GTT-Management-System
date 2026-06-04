@@ -9,6 +9,7 @@ import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../
 import { SereneSelect } from "../components/serene-select";
 import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import {
+  assignAgreementDraftInBackend,
   deleteAgreementDraftInBackend,
   saveAgreementDraftInBackend,
   useAgreementDraftsQuery,
@@ -20,7 +21,7 @@ import {
   type HotelAgreementDraft,
   type HotelAgreementDraftFormState,
 } from "../shared/app-domain";
-import { agreementDraftQueryKeys } from "../shared/query-keys";
+import { agreementDraftQueryKeys, groupQueryKeys } from "../shared/query-keys";
 
 const draftSchema = z
   .object({
@@ -497,6 +498,7 @@ export function AgreementInboxScreen() {
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
   const [editingDraft, setEditingDraft] = useState<HotelAgreementDraft | null>(null);
   const [deleteDraftTarget, setDeleteDraftTarget] = useState<HotelAgreementDraft | null>(null);
+  const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
   const draftsQuery = useAgreementDraftsQuery(query, statusFilter);
@@ -508,6 +510,10 @@ export function AgreementInboxScreen() {
   });
   const deleteDraftMutation = useMutation({
     mutationFn: deleteAgreementDraftInBackend,
+    retry: false,
+  });
+  const assignDraftMutation = useMutation({
+    mutationFn: assignAgreementDraftInBackend,
     retry: false,
   });
 
@@ -578,6 +584,50 @@ export function AgreementInboxScreen() {
   const requestDeleteDraft = (draft: HotelAgreementDraft) => {
     setDeleteDraftTarget(draft);
     setFeedback(null);
+  };
+
+  const updateAssignmentGroupCode = (draftId: string, groupCode: string) => {
+    setAssignmentGroupCodes((current) => ({
+      ...current,
+      [draftId]: groupCode,
+    }));
+  };
+
+  const assignDraftToGroup = async (draft: HotelAgreementDraft) => {
+    const groupCode = assignmentGroupCodes[draft.id]?.trim().toUpperCase() ?? "";
+    if (!groupCode) {
+      setFeedback({
+        tone: "error",
+        message: "Isi group number sebelum menghubungkan agreement.",
+      });
+      return;
+    }
+
+    setFeedback(null);
+    try {
+      await assignDraftMutation.mutateAsync({
+        draftId: draft.id,
+        groupCode,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
+      setAssignmentGroupCodes((current) => {
+        const next = { ...current };
+        delete next[draft.id];
+        return next;
+      });
+      setFeedback({
+        tone: "success",
+        message: `Agreement berhasil dihubungkan ke group ${groupCode}.`,
+      });
+    } catch (error: unknown) {
+      setFeedback({
+        tone: "error",
+        message: formatMutationError(error, "Agreement belum berhasil dihubungkan ke group."),
+      });
+    }
   };
 
   const deleteDraft = async (draft: HotelAgreementDraft) => {
@@ -778,6 +828,33 @@ export function AgreementInboxScreen() {
                   </button>
                 </div>
               </div>
+
+              {!isAssigned ? (
+                <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                  <label className="sr-only" htmlFor={`assign-${draft.id}`}>
+                    Group number
+                  </label>
+                  <input
+                    id={`assign-${draft.id}`}
+                    type="text"
+                    className="h-10 min-w-0 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 sm:w-52"
+                    placeholder="Group number"
+                    value={assignmentGroupCodes[draft.id] ?? ""}
+                    onChange={(event) => updateAssignmentGroupCode(draft.id, event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void assignDraftToGroup(draft)}
+                    disabled={assignDraftMutation.isPending}
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      link
+                    </span>
+                    <span>{assignDraftMutation.isPending ? "Linking..." : "Link to Group"}</span>
+                  </button>
+                </div>
+              ) : null}
             </article>
           );
         })}

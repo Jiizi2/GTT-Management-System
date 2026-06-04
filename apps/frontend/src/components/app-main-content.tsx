@@ -131,6 +131,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
           element={
             <LazyAddGroupWorkspaceScreen
               onSaveGroup={controller.handleSaveInputGroup}
+              onSaveIdentity={controller.handleSaveGroupIdentity}
               onCancel={controller.handleBackToOverview}
             />
           }

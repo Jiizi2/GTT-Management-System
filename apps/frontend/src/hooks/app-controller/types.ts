@@ -9,6 +9,7 @@ import type {
   VisaStatus,
   VisaTrackingRow,
 } from "../../shared/app-domain";
+import type { GroupIdentityDraftPayload } from "../use-app-controller-backend";
 
 export type OverviewStatCard = {
   label: string;
@@ -70,6 +71,7 @@ export type AppController = {
   handleBackToVisaTracking: () => void;
   handleOpenNewGroup: () => void;
   handleSaveInputGroup: (group: GroupData) => void;
+  handleSaveGroupIdentity: (identity: GroupIdentityDraftPayload) => void;
   handleSaveGroupDetail: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   handleSaveVisaGroupDetail: (
     group: GroupData,

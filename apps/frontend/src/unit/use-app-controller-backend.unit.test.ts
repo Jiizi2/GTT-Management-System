@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe } from "vitest";
-import { fetchGroupsFromBackend } from "../hooks/use-app-controller-backend.js";
+import { createGroupIdentityInBackend, fetchGroupsFromBackend } from "../hooks/use-app-controller-backend.js";
 import { formatScheduleDate, getLocalIsoDateWithOffset } from "../shared/app-domain.js";
 import { runCase } from "../test/run-case.js";
 
@@ -115,6 +115,61 @@ async function testFetchGroupsMarksCompletedItineraryAsInactive(): Promise<void>
   });
 }
 
+async function testCreateGroupIdentityPostsMinimalWorkspace(): Promise<void> {
+  await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
+    await withMockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: "G-IDENTITY",
+            name: "Nusuk Identity",
+            status: "Entry Only",
+            tone: "ACTIVE",
+            pax: 25,
+            totalBuses: 1,
+            packageName: "Nusuk Package",
+            durationDays: 7,
+            arrivalDate: "2099-01-01",
+            returnDate: "2099-01-07",
+            itinerary: [],
+            timeline: [],
+            notes: [],
+          }),
+          { status: 201 },
+        ),
+      async (calls) => {
+        const group = await createGroupIdentityInBackend({
+          groupCode: " g-identity ",
+          groupName: " Nusuk Identity ",
+          packageName: " Nusuk Package ",
+          pax: 25,
+          totalBuses: 1,
+          arrivalDate: "2099-01-01",
+          returnDate: "2099-01-07",
+          musyrifName: " Ust Identity ",
+          musyrifPhone: " 081234 ",
+        });
+
+        assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/groups/identity");
+        assert.equal(calls[0].init?.method, "POST");
+        const body = JSON.parse(String(calls[0].init?.body)) as {
+          code?: string;
+          name?: string;
+          musyrif?: { name?: string; phone?: string };
+        };
+        assert.equal(body.code, "G-IDENTITY");
+        assert.equal(body.name, "Nusuk Identity");
+        assert.equal(body.musyrif?.name, "Ust Identity");
+        assert.equal(body.musyrif?.phone, "081234");
+        assert.equal(group.code, "G-IDENTITY");
+        assert.equal(group.status, "Entry Only");
+        assert.equal(group.itinerary.length, 0);
+      },
+    );
+  });
+}
+
 describe("use-app-controller-backend", () => {
   runCase("fetch groups marks completed itinerary as inactive", testFetchGroupsMarksCompletedItineraryAsInactive);
+  runCase("create group identity posts minimal workspace", testCreateGroupIdentityPostsMinimalWorkspace);
 });

@@ -31,6 +31,7 @@ const {
   isTransferActivityType,
   normalizeAgreementCityKey,
   parseTimeForInput,
+  resolveGroupCompleteness,
   resolveTotalBusCount,
   shouldShowFridayCityTourWarning,
 } = Domain;
@@ -568,6 +569,10 @@ export function GroupDetail({
   const requiredBusCount = useMemo(
     () => resolveTotalBusCount(group.pax, group.totalBuses),
     [group.pax, group.totalBuses],
+  );
+  const completeness = useMemo(
+    () => resolveGroupCompleteness({ ...group, itinerary: itineraryItems }),
+    [group, itineraryItems],
   );
 
   const persistGroupSnapshot = ({
@@ -1117,6 +1122,38 @@ export function GroupDetail({
             </div>
           </section>
         </div>
+
+        {!completeness.isReadyForOperations ? (
+          <section
+            className="rounded-3xl border border-tertiary-fixed/70 bg-tertiary-fixed p-5 text-on-tertiary-fixed-variant shadow-ambient"
+            aria-label="Group completion status"
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="material-symbols-outlined mt-0.5 text-2xl" aria-hidden="true">
+                  warning
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Workspace Status</p>
+                  <h2 className="mt-1 text-xl font-extrabold tracking-tight">{completeness.badgeLabel}</h2>
+                  <p className="mt-1 text-sm font-semibold">{completeness.primaryMessage}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {completeness.issues.map((issue) => (
+                  <span
+                    key={issue.key}
+                    className="inline-flex rounded-lg bg-surface-container-lowest/75 px-2.5 py-1 text-xs font-bold uppercase tracking-[0.08em]"
+                    title={issue.message}
+                  >
+                    {issue.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[1.45fr_0.75fr]">
           <div className="space-y-4">

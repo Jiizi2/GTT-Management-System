@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Prisma } from "@prisma/client";
+import { GroupTone, Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../../config/app-config";
 import { createStructuredLogger } from "../../logging/create-structured-logger";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
+import type { CreateGroupIdentityDto } from "../dto/create-group-identity.dto";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import type {
   UpsertGroupItineraryItemDto,
@@ -14,7 +15,11 @@ import type {
 } from "../dto/group-operations.dto";
 import type { ResetChecklistDriverDto } from "../dto/reset-checklist-driver.dto";
 import type { UpdateGroupDto } from "../dto/update-group.dto";
-import { extractGroupCode, extractGroupId, sanitizeAuditPayloadValue } from "../infrastructure/groups.audit";
+import {
+  extractGroupCode,
+  extractGroupId,
+  sanitizeAuditPayloadValue,
+} from "../infrastructure/groups.audit";
 import { createDefaultMemoryGroups } from "../infrastructure/groups.memory-store";
 import type {
   ChecklistAssignmentSyncResult,
@@ -29,7 +34,8 @@ import { GroupsQueryService } from "./groups-query.service";
 @Injectable()
 export class GroupsService {
   private readonly dataSource: "memory" | "prisma";
-  private readonly memoryGroups: MemoryGroupRecord[] = createDefaultMemoryGroups();
+  private readonly memoryGroups: MemoryGroupRecord[] =
+    createDefaultMemoryGroups();
   private readonly auditLogs: MemoryAuditLog[] = [];
   private readonly logger = createStructuredLogger(GroupsService.name);
   private readonly queryService: GroupsQueryService;
@@ -46,7 +52,11 @@ export class GroupsService {
       this.memoryGroups,
       this.auditLogs,
     );
-    this.commandService = new GroupsCommandService(this.prisma, this.dataSource, this.memoryGroups);
+    this.commandService = new GroupsCommandService(
+      this.prisma,
+      this.dataSource,
+      this.memoryGroups,
+    );
   }
 
   async findAll(
@@ -69,6 +79,20 @@ export class GroupsService {
     this.logMutation("group.created", created, {
       packageName: payload.packageName.trim(),
       pax: payload.pax,
+    });
+    return created;
+  }
+
+  async createIdentity(payload: CreateGroupIdentityDto): Promise<unknown> {
+    const createPayload = this.buildIdentityCreatePayload(payload);
+    const created = await this.commandService.create(createPayload);
+    await this.writeAuditLog("group.identity.created", "group", created, {
+      code: createPayload.code,
+      name: createPayload.name,
+    });
+    this.logMutation("group.identity.created", created, {
+      packageName: createPayload.packageName,
+      pax: createPayload.pax,
     });
     return created;
   }
@@ -113,12 +137,21 @@ export class GroupsService {
     });
   }
 
-  async listAuditLogs(groupCode?: string, limit?: number): Promise<MemoryAuditLog[]> {
+  async listAuditLogs(
+    groupCode?: string,
+    limit?: number,
+  ): Promise<MemoryAuditLog[]> {
     return this.queryService.listAuditLogs(groupCode, limit);
   }
 
-  async addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<unknown> {
-    const updated = await this.commandService.addItineraryItem(idOrCode, payload);
+  async addItineraryItem(
+    idOrCode: string,
+    payload: UpsertGroupItineraryItemDto,
+  ): Promise<unknown> {
+    const updated = await this.commandService.addItineraryItem(
+      idOrCode,
+      payload,
+    );
     await this.writeAuditLog("itinerary.added", "itinerary", updated, {
       idOrCode,
       title: payload.title?.trim() || undefined,
@@ -136,7 +169,11 @@ export class GroupsService {
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
   ): Promise<unknown> {
-    const updated = await this.commandService.updateItineraryItem(idOrCode, itemId, payload);
+    const updated = await this.commandService.updateItineraryItem(
+      idOrCode,
+      itemId,
+      payload,
+    );
     await this.writeAuditLog("itinerary.updated", "itinerary", updated, {
       idOrCode,
       itemId,
@@ -150,8 +187,14 @@ export class GroupsService {
     return updated;
   }
 
-  async removeItineraryItem(idOrCode: string, itemId: string): Promise<unknown> {
-    const updated = await this.commandService.removeItineraryItem(idOrCode, itemId);
+  async removeItineraryItem(
+    idOrCode: string,
+    itemId: string,
+  ): Promise<unknown> {
+    const updated = await this.commandService.removeItineraryItem(
+      idOrCode,
+      itemId,
+    );
     await this.writeAuditLog("itinerary.deleted", "itinerary", updated, {
       idOrCode,
       itemId,
@@ -163,13 +206,24 @@ export class GroupsService {
     return updated;
   }
 
-  async addVisaHotelAgreement(idOrCode: string, payload: UpsertGroupVisaHotelDto): Promise<unknown> {
-    const updated = await this.commandService.addVisaHotelAgreement(idOrCode, payload);
-    await this.writeAuditLog("visa.hotel.added", "visaHotelAgreement", updated, {
+  async addVisaHotelAgreement(
+    idOrCode: string,
+    payload: UpsertGroupVisaHotelDto,
+  ): Promise<unknown> {
+    const updated = await this.commandService.addVisaHotelAgreement(
       idOrCode,
-      city: payload.city,
-      agreementNumber: payload.agreementNumber.trim(),
-    });
+      payload,
+    );
+    await this.writeAuditLog(
+      "visa.hotel.added",
+      "visaHotelAgreement",
+      updated,
+      {
+        idOrCode,
+        city: payload.city,
+        agreementNumber: payload.agreementNumber.trim(),
+      },
+    );
     this.logMutation("visa.hotel.added", updated, {
       idOrCode,
       city: payload.city,
@@ -182,13 +236,22 @@ export class GroupsService {
     hotelId: string,
     payload: UpsertGroupVisaHotelDto,
   ): Promise<unknown> {
-    const updated = await this.commandService.updateVisaHotelAgreement(idOrCode, hotelId, payload);
-    await this.writeAuditLog("visa.hotel.updated", "visaHotelAgreement", updated, {
+    const updated = await this.commandService.updateVisaHotelAgreement(
       idOrCode,
       hotelId,
-      city: payload.city,
-      agreementNumber: payload.agreementNumber.trim(),
-    });
+      payload,
+    );
+    await this.writeAuditLog(
+      "visa.hotel.updated",
+      "visaHotelAgreement",
+      updated,
+      {
+        idOrCode,
+        hotelId,
+        city: payload.city,
+        agreementNumber: payload.agreementNumber.trim(),
+      },
+    );
     this.logMutation("visa.hotel.updated", updated, {
       idOrCode,
       hotelId,
@@ -197,12 +260,23 @@ export class GroupsService {
     return updated;
   }
 
-  async removeVisaHotelAgreement(idOrCode: string, hotelId: string): Promise<unknown> {
-    const updated = await this.commandService.removeVisaHotelAgreement(idOrCode, hotelId);
-    await this.writeAuditLog("visa.hotel.deleted", "visaHotelAgreement", updated, {
+  async removeVisaHotelAgreement(
+    idOrCode: string,
+    hotelId: string,
+  ): Promise<unknown> {
+    const updated = await this.commandService.removeVisaHotelAgreement(
       idOrCode,
       hotelId,
-    });
+    );
+    await this.writeAuditLog(
+      "visa.hotel.deleted",
+      "visaHotelAgreement",
+      updated,
+      {
+        idOrCode,
+        hotelId,
+      },
+    );
     this.logMutation("visa.hotel.deleted", updated, {
       idOrCode,
       hotelId,
@@ -214,13 +288,21 @@ export class GroupsService {
     idOrCode: string,
     payload: UpsertGroupRaudhahDto,
   ): Promise<unknown> {
-    const updated = await this.commandService.upsertPrimaryRaudhahAppointment(idOrCode, payload);
-    await this.writeAuditLog("visa.raudhah.upserted", "raudhahAppointment", updated, {
+    const updated = await this.commandService.upsertPrimaryRaudhahAppointment(
       idOrCode,
-      date: payload.date,
-      status: payload.status,
-      tasrehPrinted: payload.tasrehPrinted ?? false,
-    });
+      payload,
+    );
+    await this.writeAuditLog(
+      "visa.raudhah.upserted",
+      "raudhahAppointment",
+      updated,
+      {
+        idOrCode,
+        date: payload.date,
+        status: payload.status,
+        tasrehPrinted: payload.tasrehPrinted ?? false,
+      },
+    );
     this.logMutation("visa.raudhah.upserted", updated, {
       idOrCode,
       date: payload.date,
@@ -233,18 +315,26 @@ export class GroupsService {
     idOrCode: string,
     payload: ConfirmChecklistDriverDto,
   ): Promise<ChecklistAssignmentSyncResult> {
-    const confirmed = await this.commandService.confirmChecklistDriver(idOrCode, payload);
+    const confirmed = await this.commandService.confirmChecklistDriver(
+      idOrCode,
+      payload,
+    );
     const auditGroupIdentity = {
       groupCode: confirmed.groupCode,
     };
-    await this.writeAuditLog("checklist.driver.confirmed", "checklistAssignment", auditGroupIdentity, {
-      idOrCode,
-      assignmentId: confirmed.id,
-      tripDate: confirmed.tripDate,
-      activity: confirmed.activity,
-      scheduledTime: confirmed.scheduledTime,
-      slotCount: confirmed.drivers.length,
-    });
+    await this.writeAuditLog(
+      "checklist.driver.confirmed",
+      "checklistAssignment",
+      auditGroupIdentity,
+      {
+        idOrCode,
+        assignmentId: confirmed.id,
+        tripDate: confirmed.tripDate,
+        activity: confirmed.activity,
+        scheduledTime: confirmed.scheduledTime,
+        slotCount: confirmed.drivers.length,
+      },
+    );
     this.logMutation("checklist.driver.confirmed", auditGroupIdentity, {
       idOrCode,
       assignmentId: confirmed.id,
@@ -258,17 +348,25 @@ export class GroupsService {
     idOrCode: string,
     payload: ResetChecklistDriverDto,
   ): Promise<ChecklistAssignmentSyncResult> {
-    const resetResult = await this.commandService.resetChecklistDriver(idOrCode, payload);
+    const resetResult = await this.commandService.resetChecklistDriver(
+      idOrCode,
+      payload,
+    );
     const auditGroupIdentity = {
       groupCode: resetResult.groupCode,
     };
-    await this.writeAuditLog("checklist.driver.reset", "checklistAssignment", auditGroupIdentity, {
-      idOrCode,
-      assignmentId: resetResult.id,
-      tripDate: resetResult.tripDate,
-      activity: payload.activity?.trim(),
-      scheduledTime: resetResult.scheduledTime,
-    });
+    await this.writeAuditLog(
+      "checklist.driver.reset",
+      "checklistAssignment",
+      auditGroupIdentity,
+      {
+        idOrCode,
+        assignmentId: resetResult.id,
+        tripDate: resetResult.tripDate,
+        activity: payload.activity?.trim(),
+        scheduledTime: resetResult.scheduledTime,
+      },
+    );
     this.logMutation("checklist.driver.reset", auditGroupIdentity, {
       idOrCode,
       assignmentId: resetResult.id,
@@ -292,6 +390,94 @@ export class GroupsService {
       },
       "Groups mutation completed.",
     );
+  }
+
+  private buildIdentityCreatePayload(
+    payload: CreateGroupIdentityDto,
+  ): CreateGroupDto {
+    const normalizedCode = payload.code.trim().toUpperCase();
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const arrivalDate = payload.arrivalDate?.trim() || todayIso;
+    const durationDays = Math.max(1, payload.durationDays ?? 1);
+    const returnDate =
+      payload.returnDate?.trim() ||
+      this.addDaysToIsoDate(arrivalDate, durationDays - 1);
+    const groupName = payload.name?.trim() || `Group ${normalizedCode}`;
+    const packageName = payload.packageName?.trim() || "Pending Package";
+
+    return {
+      code: normalizedCode,
+      name: groupName,
+      status: "Entry Only",
+      arrivalDate,
+      returnDate,
+      tone: GroupTone.ACTIVE,
+      pax: payload.pax ?? 1,
+      totalBuses: payload.totalBuses,
+      packageName,
+      durationDays,
+      musyrif: payload.musyrif
+        ? {
+            name: payload.musyrif.name.trim(),
+            phone: payload.musyrif.phone.trim(),
+            avatar: payload.musyrif.avatar.trim(),
+          }
+        : {
+            name: "Unassigned Musyrif",
+            phone: "-",
+            avatar: "https://i.pravatar.cc/96?img=12",
+          },
+      nextActivity: {
+        title: "Complete group workspace",
+        dateLabel: this.formatDateLabel(arrivalDate),
+        timeLabel: "09:00",
+        icon: "pending_actions",
+      },
+      timeline: [
+        {
+          sortOrder: 0,
+          dateLabel: this.formatDateLabel(arrivalDate),
+          title: "Group identity created",
+        },
+        {
+          sortOrder: 1,
+          dateLabel: this.formatDateLabel(returnDate),
+          title: "Agreement and itinerary pending",
+          isCurrent: true,
+          nextActivity: "Link agreement and create itinerary",
+        },
+      ],
+      itinerary: [],
+      notes: [
+        {
+          sortOrder: 0,
+          text: "Group workspace created from identity entry. Agreement and itinerary can be linked later.",
+        },
+      ],
+      checklistAssignments: [],
+    };
+  }
+
+  private addDaysToIsoDate(isoDate: string, dayOffset: number): string {
+    const parsedDate = new Date(`${isoDate.slice(0, 10)}T12:00:00.000Z`);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    parsedDate.setUTCDate(parsedDate.getUTCDate() + dayOffset);
+    return parsedDate.toISOString().slice(0, 10);
+  }
+
+  private formatDateLabel(isoDate: string): string {
+    const parsedDate = new Date(`${isoDate.slice(0, 10)}T12:00:00.000Z`);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "-";
+    }
+
+    return parsedDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+    });
   }
 
   private async writeAuditLog(

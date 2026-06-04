@@ -8,6 +8,7 @@ import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useAgreementDraftsQuery } from "../hooks/use-agreement-drafts-query";
+import type { GroupIdentityDraftPayload } from "../hooks/use-app-controller-backend";
 import type {
   AgreementApprovalStatus,
   BusStatus,
@@ -44,6 +45,7 @@ const visaServiceOptionSchema = z.enum(["Visa Only", "Visa+"]);
 const paymentStatusSchema = z.enum(["Paid", "Unpaid"]);
 const agreementApprovalStatusSchema = z.enum(["Waiting for Approval", "Approved"]);
 const raudhahStatusSchema = z.enum(["Free", "After", "Before"]);
+const EMPTY_AGREEMENT_FORMS: NewGroupAgreementFormState[] = [];
 
 const newGroupAgreementFormSchema = z.object({
   id: z.string(),
@@ -394,8 +396,8 @@ export function NewGroupScreen({
       }),
     [makkahHotels, madinahHotels],
   );
-  const savedMakkahHotels = savedAgreementSnapshot?.makkahHotels ?? [];
-  const savedMadinahHotels = savedAgreementSnapshot?.madinahHotels ?? [];
+  const savedMakkahHotels = savedAgreementSnapshot?.makkahHotels ?? EMPTY_AGREEMENT_FORMS;
+  const savedMadinahHotels = savedAgreementSnapshot?.madinahHotels ?? EMPTY_AGREEMENT_FORMS;
   const savedAgreementDateConnection = useMemo(
     () => validateConnectedAgreementDates(savedMakkahHotels, savedMadinahHotels),
     [savedMadinahHotels, savedMakkahHotels],
@@ -1190,9 +1192,11 @@ export function NewGroupScreen({
 
 export function AddGroupWorkspaceScreen({
   onSaveGroup,
+  onSaveIdentity,
   onCancel,
 }: {
   onSaveGroup: (group: GroupData) => void;
+  onSaveIdentity: (identity: GroupIdentityDraftPayload) => void;
   onCancel: () => void;
 }) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -1271,6 +1275,24 @@ export function AddGroupWorkspaceScreen({
     );
   };
 
+  const handleSaveIdentityWorkspace = () => {
+    if (!identityDraft || !isIdentityStepComplete) {
+      return;
+    }
+
+    onSaveIdentity({
+      groupCode: identityDraft.groupCode?.trim().toUpperCase() ?? "",
+      groupName: identityDraft.groupName?.trim(),
+      packageName: identityDraft.packageName?.trim(),
+      pax: identityDraft.pax,
+      totalBuses: identityDraft.totalBuses,
+      arrivalDate: identityDraft.startDate,
+      returnDate: identityDraft.endDate,
+      musyrifName: identityDraft.musyrifName?.trim(),
+      musyrifPhone: identityDraft.musyrifPhone?.trim(),
+    });
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
       <div className="flex items-center gap-3">
@@ -1323,18 +1345,28 @@ export function AddGroupWorkspaceScreen({
           </Suspense>
 
           <section className="serene-section">
-            <div className="serene-form-actions serene-form-actions-fill">
+            <div className="serene-form-actions-split serene-form-actions-fill">
               <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="serene-btn-primary min-h-11 w-full sm:w-auto"
-                onClick={() => setCurrentStep(2)}
-                disabled={!canOpenSetupStep}
-              >
-                Next: Visa
-              </button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <button
+                  type="button"
+                  className="serene-btn-secondary min-h-11 w-full sm:w-auto"
+                  onClick={handleSaveIdentityWorkspace}
+                  disabled={!isIdentityStepComplete}
+                >
+                  Save Identity
+                </button>
+                <button
+                  type="button"
+                  className="serene-btn-primary min-h-11 w-full sm:w-auto"
+                  onClick={() => setCurrentStep(2)}
+                  disabled={!canOpenSetupStep}
+                >
+                  Next: Visa
+                </button>
+              </div>
             </div>
           </section>
         </div>
