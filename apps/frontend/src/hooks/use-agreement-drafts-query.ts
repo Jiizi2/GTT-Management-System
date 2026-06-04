@@ -222,6 +222,26 @@ export async function assignAgreementDraftInBackend({
   return mappedDraft;
 }
 
+export async function unassignAgreementDraftInBackend(draftId: string): Promise<HotelAgreementDraft> {
+  const { response, payload, responseText } = await fetchBackendParsed(
+    `/visa/agreement-drafts/${encodeURIComponent(draftId)}/unassign`,
+    {
+      method: "POST",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(formatBackendRequestError(response.status, payload, responseText, "Draft unassign failed"));
+  }
+
+  const mappedDraft = mapBackendDraft(payload as BackendHotelAgreementDraftRecord);
+  if (!mappedDraft) {
+    throw new Error("Draft unassign failed: response is not a draft record.");
+  }
+
+  return mappedDraft;
+}
+
 export function useAgreementDraftsQuery(query: string, status: AgreementDraftStatusFilter, enabled = true) {
   const normalizedQuery = query.trim();
   return useQuery({

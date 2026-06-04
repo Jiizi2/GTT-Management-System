@@ -437,8 +437,9 @@ export function useDashboardGroupRecords({
     selectedVisaGroupCode,
   });
   const requestedProjectionRef = useRef(requestedProjection);
-  const shouldUseRemoteOverviewActiveOnly =
-    activeNav === "overview" && requestedProjection === "summary" && isActiveOnly;
+  // Keep the combined overview controls independent: month selection is based on
+  // all overview rows, while Active only is applied as a local filter.
+  const shouldUseRemoteOverviewActiveOnly = false;
   const shouldUseRemoteOverviewActiveOnlyRef = useRef(shouldUseRemoteOverviewActiveOnly);
   const backendSyncRequestIdRef = useRef(0);
   const currentDashboardDate = useCurrentDashboardDate();

@@ -108,4 +108,20 @@ export class HotelAgreementDraftsController {
   assign(@Param("draftId") draftId: string, @Body() payload: AssignHotelAgreementDraftDto) {
     return this.hotelAgreementDraftsService.assign(draftId, payload);
   }
+
+  @Post(":draftId/unassign")
+  @ApiOperation({
+    summary: "Unassign hotel agreement draft from group",
+    description:
+      "Melepas draft agreement dari group, menghapus link hotel agreement di visa setup group, dan mengembalikan draft ke inbox unassigned.",
+  })
+  @ApiParam({ name: "draftId", example: "cldraftagreementid123" })
+  @ApiOkResponse({
+    description: "Draft agreement berhasil dilepas dari group.",
+    type: HotelAgreementDraftResponseDto,
+  })
+  @ApiNotFoundResponse({ type: ApiErrorResponseDto })
+  unassign(@Param("draftId") draftId: string) {
+    return this.hotelAgreementDraftsService.unassign(draftId);
+  }
 }

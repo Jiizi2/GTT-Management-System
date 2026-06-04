@@ -212,6 +212,56 @@ async function testAssignDraftToGroup(): Promise<void> {
   }
 }
 
+async function testUnassignDraftFromGroup(): Promise<void> {
+  const { groupsService, draftsService, restore } =
+    await createMemoryServices();
+
+  try {
+    await groupsService.create(createGroupPayload());
+    const created = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Al Maqam",
+      agreementNumber: "AG-UNASSIGN-001",
+      pax: 45,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
+    })) as {
+      id: string;
+    };
+
+    await draftsService.assign(created.id, {
+      groupCode: "DRAFT-G-001",
+    });
+
+    const unassigned = (await draftsService.unassign(created.id)) as {
+      assignmentStatus: string;
+      groupCode?: string;
+    };
+
+    assert.equal(unassigned.assignmentStatus, "UNASSIGNED");
+    assert.equal(unassigned.groupCode, undefined);
+
+    const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as {
+      visaSetup?: {
+        hotelAgreements?: Array<unknown>;
+      };
+    };
+    assert.equal(group.visaSetup?.hotelAgreements?.length, 0);
+
+    const unassignedDrafts = (await draftsService.findAll(
+      undefined,
+      "unassigned",
+    )) as Array<{ id: string }>;
+    assert.equal(
+      unassignedDrafts.some((draft) => draft.id === created.id),
+      true,
+    );
+  } finally {
+    restore();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft create update delete",
@@ -220,6 +270,10 @@ async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft assign to group",
     testAssignDraftToGroup,
+  );
+  await runCase(
+    "hotel agreement draft unassign from group",
+    testUnassignDraftFromGroup,
   );
 }
 

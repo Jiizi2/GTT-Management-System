@@ -65,6 +65,23 @@ type PrismaHotelAgreementDraftRecord = {
   updatedAt: Date;
 };
 
+type GroupHotelAgreementSnapshot = {
+  id?: unknown;
+  sourceDraftId?: unknown;
+  city?: unknown;
+  hotelName?: unknown;
+  agreementNumber?: unknown;
+  pax?: unknown;
+  stayStart?: unknown;
+  stayEnd?: unknown;
+};
+
+type GroupWithVisaHotelAgreements = {
+  visaSetup?: {
+    hotelAgreements?: GroupHotelAgreementSnapshot[];
+  };
+};
+
 function toIsoDateOnly(value: Date | string): string {
   if (value instanceof Date) {
     return value.toISOString().slice(0, 10);
@@ -98,6 +115,45 @@ function normalizeStatusFilter(
 
 function toUtcMidnightDate(isoDate: string): Date {
   return new Date(`${isoDate}T00:00:00.000Z`);
+}
+
+function readText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function doesHotelSnapshotMatchDraft(
+  hotel: GroupHotelAgreementSnapshot,
+  draft: Pick<
+    MemoryHotelAgreementDraft | PrismaHotelAgreementDraftRecord,
+    | "id"
+    | "city"
+    | "hotelName"
+    | "agreementNumber"
+    | "pax"
+    | "stayStart"
+    | "stayEnd"
+  >,
+): boolean {
+  if (readText(hotel.sourceDraftId) === draft.id) {
+    return true;
+  }
+
+  return (
+    readText(hotel.city).toUpperCase() === draft.city &&
+    readText(hotel.agreementNumber).toUpperCase() ===
+      draft.agreementNumber.trim().toUpperCase() &&
+    readText(hotel.hotelName).toUpperCase() ===
+      draft.hotelName.trim().toUpperCase() &&
+    readNumber(hotel.pax) === draft.pax &&
+    toIsoDateOnly(readText(hotel.stayStart)) === toIsoDateOnly(draft.stayStart) &&
+    toIsoDateOnly(readText(hotel.stayEnd)) === toIsoDateOnly(draft.stayEnd)
+  );
 }
 
 @Injectable()
@@ -282,7 +338,7 @@ export class HotelAgreementDraftsService {
 
       await this.groupsService.addVisaHotelAgreement(
         targetGroup.code,
-        this.toGroupHotelPayload(draft),
+        this.toGroupHotelPayload(draft, draft.id),
       );
 
       const assigned = await this.prisma.hotelAgreementDraft.update({
@@ -312,11 +368,85 @@ export class HotelAgreementDraftsService {
 
     await this.groupsService.addVisaHotelAgreement(
       normalizedGroupCode,
-      this.toGroupHotelPayload(draft),
+      this.toGroupHotelPayload(draft, draft.id),
     );
     draft.groupCode = normalizedGroupCode;
     draft.assignedAt = new Date().toISOString();
     draft.updatedAt = draft.assignedAt;
+    return this.mapMemoryDraft(draft);
+  }
+
+  async unassign(draftId: string): Promise<unknown> {
+    if (this.dataSource === "prisma") {
+      const draft = await this.prisma.hotelAgreementDraft.findUnique({
+        where: { id: draftId },
+        include: {
+          group: {
+            select: {
+              id: true,
+              code: true,
+            },
+          },
+        },
+      });
+      if (!draft) {
+        throw new NotFoundException(
+          `Hotel agreement draft '${draftId}' not found.`,
+        );
+      }
+
+      if (!draft.groupId || !draft.group) {
+        return this.mapPrismaDraft(draft);
+      }
+
+      const groupHotel = await this.findAssignedPrismaHotelForDraft(draft);
+      if (groupHotel) {
+        await this.groupsService.removeVisaHotelAgreement(
+          draft.group.code,
+          groupHotel.id,
+        );
+      }
+
+      const unassigned = await this.prisma.hotelAgreementDraft.update({
+        where: { id: draft.id },
+        data: {
+          groupId: null,
+          assignedAt: null,
+        },
+        include: {
+          group: {
+            select: {
+              code: true,
+            },
+          },
+        },
+      });
+
+      return this.mapPrismaDraft(unassigned);
+    }
+
+    const draft = this.resolveMemoryDraft(draftId);
+    if (!draft.groupCode) {
+      return this.mapMemoryDraft(draft);
+    }
+
+    const group = (await this.groupsService.findOneByIdOrCode(
+      draft.groupCode,
+    )) as GroupWithVisaHotelAgreements;
+    const groupHotel = group.visaSetup?.hotelAgreements?.find((hotel) =>
+      doesHotelSnapshotMatchDraft(hotel, draft),
+    );
+    const groupHotelId = readText(groupHotel?.id);
+    if (groupHotelId) {
+      await this.groupsService.removeVisaHotelAgreement(
+        draft.groupCode,
+        groupHotelId,
+      );
+    }
+
+    draft.groupCode = undefined;
+    draft.assignedAt = undefined;
+    draft.updatedAt = new Date().toISOString();
     return this.mapMemoryDraft(draft);
   }
 
@@ -466,6 +596,7 @@ export class HotelAgreementDraftsService {
   private toGroupHotelPayload(
     draft: Pick<
       MemoryHotelAgreementDraft | PrismaHotelAgreementDraftRecord,
+      | "id"
       | "city"
       | "hotelName"
       | "agreementNumber"
@@ -474,9 +605,11 @@ export class HotelAgreementDraftsService {
       | "stayStart"
       | "stayEnd"
     >,
+    sourceDraftId?: string,
   ): UpsertGroupVisaHotelDto {
     return {
       city: draft.city,
+      sourceDraftId: sourceDraftId?.trim() || undefined,
       hotelName: draft.hotelName,
       agreementNumber: draft.agreementNumber,
       pax: draft.pax,
@@ -484,6 +617,46 @@ export class HotelAgreementDraftsService {
       stayStart: toIsoDateOnly(draft.stayStart),
       stayEnd: toIsoDateOnly(draft.stayEnd),
     };
+  }
+
+  private async findAssignedPrismaHotelForDraft(
+    draft: PrismaHotelAgreementDraftRecord & {
+      groupId?: string | null;
+    },
+  ): Promise<{ id: string } | null> {
+    if (!draft.groupId) {
+      return null;
+    }
+
+    const hotels = await this.prisma.visaHotelAgreement.findMany({
+      where: {
+        visaSetup: {
+          groupId: draft.groupId,
+        },
+        city: draft.city,
+        agreementNumber: draft.agreementNumber,
+      },
+      select: {
+        id: true,
+        hotelName: true,
+        pax: true,
+        stayStart: true,
+        stayEnd: true,
+      },
+    });
+
+    return (
+      hotels.find(
+        (hotel) =>
+          hotel.hotelName.trim().toUpperCase() ===
+            draft.hotelName.trim().toUpperCase() &&
+          hotel.pax === draft.pax &&
+          toIsoDateOnly(hotel.stayStart) === toIsoDateOnly(draft.stayStart) &&
+          toIsoDateOnly(hotel.stayEnd) === toIsoDateOnly(draft.stayEnd),
+      ) ??
+      hotels[0] ??
+      null
+    );
   }
 
   private mapMemoryDraft(draft: MemoryHotelAgreementDraft) {

@@ -209,6 +209,7 @@ type BackendGroupRecord = {
     hotelAgreements?: Array<{
       id?: string;
       city?: string;
+      sourceDraftId?: string | null;
       hotelName?: string;
       agreementNumber?: string;
       pax?: number;
@@ -794,6 +795,7 @@ function mapBackendHotelsByCity({
 
     bucket.push({
       id: readString(item.id, `${groupCode}-${citySuffix}-${fallbackIndex}`),
+      sourceDraftId: readString(item.sourceDraftId ?? "", "") || undefined,
       hotelName: readString(item.hotelName, city === "MAKKAH" ? "Makkah Hotel" : "Madinah Hotel"),
       agreementNumber: readString(item.agreementNumber),
       pax: Math.max(0, readNumber(item.pax, defaultPax)),
