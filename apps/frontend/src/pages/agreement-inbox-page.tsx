@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
+import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import {
@@ -53,6 +54,7 @@ const inputClassName =
   "h-11 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
 const textareaClassName =
   "min-h-24 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
+const AGREEMENT_DRAFT_PAGE_SIZE = 8;
 
 function createDefaultDraftForm(): HotelAgreementDraftFormState {
   return {
@@ -499,6 +501,8 @@ export function AgreementInboxScreen() {
   const linkedGroupCode = searchParams.get("groupCode")?.trim().toUpperCase() ?? "";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isDraftComposerOpen, setIsDraftComposerOpen] = useState(false);
   const [editingDraft, setEditingDraft] = useState<HotelAgreementDraft | null>(null);
   const [deleteDraftTarget, setDeleteDraftTarget] = useState<HotelAgreementDraft | null>(null);
   const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
@@ -506,6 +510,11 @@ export function AgreementInboxScreen() {
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
   const draftsQuery = useAgreementDraftsQuery(query, statusFilter);
   const drafts = draftsQuery.data ?? [];
+  const totalPages = Math.max(1, Math.ceil(drafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
+  const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
+  const paginatedDrafts = drafts.slice(pageStartIndex, pageStartIndex + AGREEMENT_DRAFT_PAGE_SIZE);
+  const rangeStart = drafts.length === 0 ? 0 : pageStartIndex + 1;
+  const rangeEnd = drafts.length === 0 ? 0 : Math.min(drafts.length, pageStartIndex + paginatedDrafts.length);
 
   const saveDraftMutation = useMutation({
     mutationFn: saveAgreementDraftInBackend,
@@ -549,6 +558,7 @@ export function AgreementInboxScreen() {
         message: "Draft agreement berhasil disimpan.",
       });
       resetDraftForm();
+      setIsDraftComposerOpen(false);
     } catch (error: unknown) {
       setFeedback({
         tone: "error",
@@ -664,6 +674,14 @@ export function AgreementInboxScreen() {
     };
   }, [hasBlockingModal]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
+  }, [totalPages]);
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 py-5 sm:py-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -700,34 +718,63 @@ export function AgreementInboxScreen() {
       ) : null}
 
       {linkedGroupCode ? (
-        <section className="rounded-2xl border border-brand-primary/25 bg-brand-primary/12 px-4 py-3 text-sm font-semibold text-brand-primary">
-          Draft unassigned akan otomatis memakai group <strong>{linkedGroupCode}</strong> saat dihubungkan.
+        <section className="rounded-2xl border border-brand-primary/25 bg-brand-primary/12 px-4 py-3 text-brand-primary">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                link
+              </span>
+              <p className="text-sm font-bold">Target group: {linkedGroupCode}</p>
+            </div>
+            <span className="inline-flex w-fit rounded-lg bg-surface-container-lowest px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em]">
+              Prefilled
+            </span>
+          </div>
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">New Draft Agreement</h2>
+      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 shadow-sm sm:px-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-slate-900">New Draft Agreement</h2>
           </div>
+
+          <button
+            type="button"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/15"
+            onClick={() => setIsDraftComposerOpen((isOpen) => !isOpen)}
+            aria-expanded={isDraftComposerOpen}
+            aria-controls="agreement-draft-composer"
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              {isDraftComposerOpen ? "close" : "add"}
+            </span>
+            <span>{isDraftComposerOpen ? "Close" : "Create Draft"}</span>
+          </button>
         </div>
 
-        <form className="space-y-5" onSubmit={onSubmit}>
-          <AgreementDraftFields control={control} register={register} errors={errors} idPrefix="agreement-draft" />
+        {isDraftComposerOpen ? (
+          <form
+            id="agreement-draft-composer"
+            className="mt-4 space-y-4 border-t border-slate-200 pt-4"
+            onSubmit={onSubmit}
+          >
+            <AgreementDraftFields control={control} register={register} errors={errors} idPrefix="agreement-draft" />
 
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isSaving}
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                save
-              </span>
-              <span>{isSaving ? "Saving..." : "Save Draft"}</span>
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isSaving}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  save
+                </span>
+                <span>{isSaving ? "Saving..." : "Save Draft"}</span>
+              </button>
+            </div>
+          </form>
+        ) : null}
       </section>
 
       <section className="space-y-3">
@@ -767,7 +814,7 @@ export function AgreementInboxScreen() {
           </div>
         ) : null}
 
-        {drafts.map((draft) => {
+        {paginatedDrafts.map((draft) => {
           const isAssigned = draft.assignmentStatus === "Assigned";
 
           return (
@@ -868,6 +915,16 @@ export function AgreementInboxScreen() {
           );
         })}
       </section>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={drafts.length}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        itemLabel="agreement drafts"
+        onPageChange={(nextPage) => setCurrentPage(Math.max(1, Math.min(totalPages, nextPage)))}
+      />
 
       {editingDraft ? (
         <AgreementDraftEditModal

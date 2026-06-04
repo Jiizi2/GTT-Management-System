@@ -11,7 +11,6 @@ import {
   normalizeGroupStatus,
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
-  resolveVisaProvider,
   shiftIsoDate,
 } from "../../shared/app-domain";
 import type {
@@ -906,7 +905,7 @@ export function useDashboardGroupRecords({
     (group: GroupData, row: VisaTrackingRow): GroupVisaSetup => ({
       visaStatus: row.visaStatus,
       issuedDate: row.issuedDateIso,
-      syarikah: resolveVisaProvider(group.packageName),
+      syarikah: "Not assigned",
       busStatus: undefined,
       paymentStatus: row.paymentStatus,
       makkahHotels: [],
@@ -1079,9 +1078,9 @@ export function useDashboardGroupRecords({
 
   const handleUpdateSyarikah = useCallback(
     (groupCode: string, syarikah: string) => {
-      updateVisaSetupForGroupAndSync(groupCode, ({ group, visaSetup }) => ({
+      updateVisaSetupForGroupAndSync(groupCode, ({ visaSetup }) => ({
         ...visaSetup,
-        syarikah: syarikah.trim() || resolveVisaProvider(group.packageName),
+        syarikah: syarikah.trim() || "Not assigned",
       }));
     },
     [updateVisaSetupForGroupAndSync],

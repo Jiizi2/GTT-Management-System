@@ -28,6 +28,7 @@ export function DashboardWorkspaceShell({
     (controller.activeNav === "user-management" && controller.sessionAccessTier === "super-admin") ||
     (controller.activeNav === "master-data" && controller.sessionAccessTier === "super-admin")
   );
+  const shouldShowMobileNav = controller.activeNav !== "new-group" && controller.activeNav !== "input";
   const syncFeedback = controller.syncFeedback;
   const syncFeedbackToneClassMap = {
     success: "bg-primary text-on-primary",
@@ -79,30 +80,34 @@ export function DashboardWorkspaceShell({
       ) : null}
 
       <main
-        className={`relative px-4 pb-28 pt-0 transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-8 lg:pt-0 ${
+        className={`relative px-4 pt-0 transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-8 lg:pt-0 ${
           controller.isSidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[280px]"
-        }`}
+        } ${shouldShowMobileNav ? "pb-28" : "pb-10"}`}
       >
         <AppMainContent controller={controller} />
       </main>
 
-      <MobileNav
-        activeNav={controller.activeNav}
-        isActionsOpen={isMobileActionsOpen}
-        onNavigate={controller.handleNavigate}
-        onToggleActions={() => setIsMobileActionsOpen((current) => !current)}
-      />
+      {shouldShowMobileNav ? (
+        <>
+          <MobileNav
+            activeNav={controller.activeNav}
+            isActionsOpen={isMobileActionsOpen}
+            onNavigate={controller.handleNavigate}
+            onToggleActions={() => setIsMobileActionsOpen((current) => !current)}
+          />
 
-      <MobileQuickActionsSheet
-        activeNav={controller.activeNav}
-        sessionAccessTier={controller.sessionAccessTier}
-        open={isMobileActionsOpen}
-        onClose={() => setIsMobileActionsOpen(false)}
-        onSelectAction={(navId) => {
-          setIsMobileActionsOpen(false);
-          controller.handleNavigate(navId);
-        }}
-      />
+          <MobileQuickActionsSheet
+            activeNav={controller.activeNav}
+            sessionAccessTier={controller.sessionAccessTier}
+            open={isMobileActionsOpen}
+            onClose={() => setIsMobileActionsOpen(false)}
+            onSelectAction={(navId) => {
+              setIsMobileActionsOpen(false);
+              controller.handleNavigate(navId);
+            }}
+          />
+        </>
+      ) : null}
 
       {syncFeedback ? (
         <div className="fixed bottom-24 left-4 right-4 z-[90] lg:bottom-6 lg:left-auto lg:right-6 lg:w-full lg:max-w-sm">

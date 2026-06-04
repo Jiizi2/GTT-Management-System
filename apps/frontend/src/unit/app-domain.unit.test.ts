@@ -53,6 +53,7 @@ import {
   resolveCurrentGroupTone,
   resolveGroupCompleteness,
   resolveGroupToneByItinerary,
+  resolveVisaAgreementNumber,
   resolveTotalBusCount,
   resolveValidRaudhahAppointments,
   scrollToTop,
@@ -303,6 +304,19 @@ function testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses(): void {
   assert.equal(rows[0].makkahVerified, 30);
   assert.equal(rows[0].madinahVerified, 30);
   assert.equal(rows[0].raudhahTone, "warn");
+
+  const entryOnlyGroup = createBaseGroup({
+    code: "UNIT-ENTRY",
+    status: "Entry Only",
+    visaSetup: undefined,
+  });
+  const entryOnlyRow = buildVisaTrackingRowsFromGroups([entryOnlyGroup])[0];
+  assert.equal(entryOnlyRow.visaStatus, "Draft");
+  assert.equal(entryOnlyRow.paymentStatus, "Unpaid");
+  assert.equal(entryOnlyRow.makkahVerified, 0);
+  assert.equal(entryOnlyRow.madinahVerified, 0);
+  assert.equal(resolveVisaAgreementNumber(entryOnlyRow, entryOnlyGroup, "makkah"), "Agreement pending");
+  assert.equal(resolveVisaAgreementNumber(rows[0], group, "makkah"), "AG-M-1");
 }
 
 function testGroupCompletenessFlagsMissingPartsAndMismatches(): void {

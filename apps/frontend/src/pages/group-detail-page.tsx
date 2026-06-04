@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import * as Domain from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { buildGroupItineraryBuilderPath } from "../shared/app-route";
 import type {
   EditScheduleFormState,
   GroupData,
@@ -1146,13 +1147,16 @@ export function GroupDetail({
 
         {!completeness.isReadyForOperations ? (
           <section
-            className="rounded-3xl border border-tertiary-fixed/70 bg-tertiary-fixed p-5 text-on-tertiary-fixed-variant shadow-ambient"
+            className="rounded-3xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 p-5 text-on-tertiary-fixed-variant shadow-ambient"
             aria-label="Group completion status"
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 items-start gap-3">
-                <span className="material-symbols-outlined mt-0.5 text-2xl" aria-hidden="true">
-                  warning
+                <span
+                  className="material-symbols-outlined mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest text-xl"
+                  aria-hidden="true"
+                >
+                  pending_actions
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Workspace Status</p>
@@ -1189,16 +1193,15 @@ export function GroupDetail({
                 ) : null}
 
                 {shouldShowCreateItineraryAction ? (
-                  <button
-                    type="button"
+                  <Link
+                    to={buildGroupItineraryBuilderPath(group.code)}
                     className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-brand-primary px-3 text-sm font-bold text-on-primary transition hover:bg-primary-container"
-                    onClick={handleOpenScheduleModal}
                   >
                     <span className="material-symbols-outlined text-base" aria-hidden="true">
                       add_circle
                     </span>
-                    <span>Add Itinerary Item</span>
-                  </button>
+                    <span>Build Itinerary</span>
+                  </Link>
                 ) : null}
               </div>
             ) : null}

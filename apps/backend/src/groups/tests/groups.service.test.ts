@@ -629,7 +629,7 @@ async function testVisaAgreementRules(): Promise<void> {
     await service.create(
       createGroupPayload({
         code: "G-403",
-        name: "Mandatory Makkah on Delete",
+        name: "Incremental Agreement Delete",
       }),
     );
 
@@ -667,30 +667,58 @@ async function testVisaAgreementRules(): Promise<void> {
       stayEnd: "2026-05-06",
     });
 
-    await assert.rejects(
-      async () => service.removeVisaHotelAgreement("G-403", makkahHotelId!),
-      /Makkah agreement is required/i,
+    const afterRemoveMakkah = (await service.removeVisaHotelAgreement(
+      "G-403",
+      makkahHotelId!,
+    )) as {
+      visaSetup: {
+        hotelAgreements: Array<{
+          city: AgreementCity;
+          agreementNumber: string;
+        }>;
+      };
+    };
+    assert.equal(afterRemoveMakkah.visaSetup.hotelAgreements.length, 1);
+    assert.equal(
+      afterRemoveMakkah.visaSetup.hotelAgreements[0]?.city,
+      AgreementCity.MADINAH,
+    );
+    assert.equal(
+      afterRemoveMakkah.visaSetup.hotelAgreements[0]?.agreementNumber,
+      "MAD-403-A",
     );
 
     await service.create(
       createGroupPayload({
         code: "G-404",
-        name: "Madinah Add Requires Makkah",
+        name: "Madinah Add Before Makkah",
       }),
     );
 
-    await assert.rejects(
-      async () =>
-        service.addVisaHotelAgreement("G-404", {
-          city: AgreementCity.MADINAH,
-          hotelName: "Madinah Solo",
-          agreementNumber: "MAD-404",
-          pax: 25,
-          status: AgreementApprovalStatus.WAITING,
-          stayStart: "2026-06-01",
-          stayEnd: "2026-06-03",
-        }),
-      /Makkah agreement is required/i,
+    const afterMadinahOnly = (await service.addVisaHotelAgreement("G-404", {
+      city: AgreementCity.MADINAH,
+      hotelName: "Madinah Solo",
+      agreementNumber: "MAD-404",
+      pax: 25,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-06-01",
+      stayEnd: "2026-06-03",
+    })) as {
+      visaSetup: {
+        hotelAgreements: Array<{
+          city: AgreementCity;
+          agreementNumber: string;
+        }>;
+      };
+    };
+    assert.equal(afterMadinahOnly.visaSetup.hotelAgreements.length, 1);
+    assert.equal(
+      afterMadinahOnly.visaSetup.hotelAgreements[0]?.city,
+      AgreementCity.MADINAH,
+    );
+    assert.equal(
+      afterMadinahOnly.visaSetup.hotelAgreements[0]?.agreementNumber,
+      "MAD-404",
     );
 
     // Avoid unused variable linting in strict TS with assertion-only reads.

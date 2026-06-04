@@ -17,7 +17,6 @@ import {
   getMinimumBusCountForPax,
   isIsoDateValue,
   musyrifAvatar,
-  resolveVisaProvider,
   resolveVisaAgreementNumber,
   shiftIsoDate,
 } from "../shared/app-domain.js";
@@ -556,7 +555,7 @@ export function buildNewGroupPayload({
     );
 
   const draftPackageName = itineraryDraft?.packageName?.trim() || "";
-  const resolvedSyarikahName = syarikahName.trim() || resolveVisaProvider(draftPackageName);
+  const resolvedSyarikahName = syarikahName.trim() || "Not assigned";
   const defaultPrimaryNote = "Itinerary drafted by operator and ready for operations review.";
   const itineraryPrimaryNote = itineraryDraft?.notes?.map((note) => note.trim()).find(Boolean) ?? "";
   const notes = [

@@ -1278,13 +1278,23 @@ export function AddGroupWorkspaceScreen({
 
       <section className="serene-section">
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-tertiary-fixed/70 bg-tertiary-fixed px-4 py-3 text-on-tertiary-fixed-variant">
-            <p className="text-xs font-extrabold uppercase tracking-[0.14em]">Agreement</p>
-            <p className="mt-1 text-sm font-semibold">Pending link</p>
+          <div className="rounded-2xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 px-4 py-3 text-on-tertiary-fixed-variant">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                link
+              </span>
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em]">Agreement</p>
+            </div>
+            <p className="mt-2 text-sm font-semibold">Pending link</p>
           </div>
-          <div className="rounded-2xl border border-tertiary-fixed/70 bg-tertiary-fixed px-4 py-3 text-on-tertiary-fixed-variant">
-            <p className="text-xs font-extrabold uppercase tracking-[0.14em]">Itinerary</p>
-            <p className="mt-1 text-sm font-semibold">Pending schedule</p>
+          <div className="rounded-2xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 px-4 py-3 text-on-tertiary-fixed-variant">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                travel_explore
+              </span>
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em]">Itinerary</p>
+            </div>
+            <p className="mt-2 text-sm font-semibold">Pending builder</p>
           </div>
         </div>
 

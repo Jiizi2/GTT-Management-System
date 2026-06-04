@@ -2320,7 +2320,7 @@ function resolveItineraryBoundaryIsoDates(itinerary: ItineraryItem[]): {
 }
 
 function collectGroupAgreementHotels(group: GroupData): GroupAgreementHotel[] {
-  return [...(group.visaSetup?.makkahHotels ?? []), ...(group.visaSetup?.madinahHotels ?? [])];
+  return [...getGroupAgreementHotelsByCity(group, "makkah"), ...getGroupAgreementHotelsByCity(group, "madinah")];
 }
 
 function resolveAgreementDateBounds(group: GroupData): {
@@ -2347,8 +2347,10 @@ function hasAgreementPaxMismatch(group: GroupData): boolean {
 export function resolveGroupCompleteness(group: GroupData): GroupCompletenessSummary {
   const issues: GroupCompletenessIssue[] = [];
   const hasIdentity = Boolean(group.code.trim() && group.name.trim() && group.pax > 0);
-  const hasMakkahAgreement = (group.visaSetup?.makkahHotels.length ?? 0) > 0;
-  const hasMadinahAgreement = (group.visaSetup?.madinahHotels.length ?? 0) > 0;
+  const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
+  const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
+  const hasMakkahAgreement = makkahAgreements.length > 0;
+  const hasMadinahAgreement = madinahAgreements.length > 0;
   const hasAnyAgreement = hasMakkahAgreement || hasMadinahAgreement;
   const hasItinerary = group.itinerary.length > 0;
   const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary);
@@ -2461,38 +2463,30 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
     const departureIso = customAgreementDateRange.makkahStartIso;
     const returnIso = customAgreementDateRange.madinahEndIso;
 
-    const visaStatus: VisaStatus =
-      visaSetup?.visaStatus ?? (index % 6 === 0 ? "Draft" : index % 4 === 0 ? "Pending" : "Issued");
-    const paymentStatus: VisaPaymentStatus =
-      visaSetup?.paymentStatus ?? (index % 5 === 0 ? "Unpaid" : index % 3 === 0 ? "Partial" : "Paid");
+    const visaStatus: VisaStatus = visaSetup?.visaStatus ?? "Draft";
+    const paymentStatus: VisaPaymentStatus = visaSetup?.paymentStatus ?? "Unpaid";
     const configuredIssuedDate = visaSetup?.issuedDate?.trim() ?? "";
     const issuedDateIso =
       visaStatus === "Issued" ? (isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : departureIso) : "";
 
     const pax = Math.max(1, group.pax);
-    const visaDelayFactor = visaStatus === "Issued" ? 0 : 1;
-    const defaultMakkahGap = (index % 5 === 0 ? Math.max(1, Math.ceil(pax * 0.12)) : 0) + visaDelayFactor;
-    const defaultMadinahGap = (index % 4 === 0 ? Math.max(1, Math.ceil(pax * 0.18)) : 0) + visaDelayFactor;
-    const fallbackMakkahVerified = Math.max(0, pax - Math.min(pax, defaultMakkahGap));
-    const fallbackMadinahVerified = Math.max(0, pax - Math.min(pax, defaultMadinahGap));
-    const mappedMakkahVerified = visaSetup
-      ? Math.min(
-          pax,
-          Math.max(
-            0,
-            visaSetup.makkahHotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
-          ),
-        )
-      : fallbackMakkahVerified;
-    const mappedMadinahVerified = visaSetup
-      ? Math.min(
-          pax,
-          Math.max(
-            0,
-            visaSetup.madinahHotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
-          ),
-        )
-      : fallbackMadinahVerified;
+    const mappedMakkahVerified = Math.min(
+      pax,
+      Math.max(
+        0,
+        getGroupAgreementHotelsByCity(group, "makkah").reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
+      ),
+    );
+    const mappedMadinahVerified = Math.min(
+      pax,
+      Math.max(
+        0,
+        getGroupAgreementHotelsByCity(group, "madinah").reduce(
+          (total, hotel) => total + Math.max(0, hotel.pax || 0),
+          0,
+        ),
+      ),
+    );
     const makkahVerified = mappedMakkahVerified;
     const madinahVerified = mappedMadinahVerified;
 

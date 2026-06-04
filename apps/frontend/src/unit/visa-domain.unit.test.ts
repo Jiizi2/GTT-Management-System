@@ -155,12 +155,9 @@ function testAgreementNumberIsoValidationAndCityHotelSelection(): void {
       }),
       "makkah",
     ),
-    buildVisaAgreementNumber("9017001001", "makkah"),
+    "Agreement pending",
   );
-  assert.equal(
-    resolveVisaAgreementNumber(row, undefined, "madinah"),
-    buildVisaAgreementNumber("9017001001", "madinah"),
-  );
+  assert.equal(resolveVisaAgreementNumber(row, undefined, "madinah"), "Agreement pending");
 }
 
 function testResolveVisaAgreementDateRangeFallbackAndCustomNormalization(): void {

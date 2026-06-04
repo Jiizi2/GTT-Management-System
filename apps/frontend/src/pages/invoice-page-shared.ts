@@ -20,6 +20,7 @@ export type InvoiceStatusOption = {
 export type InvoiceWorkspaceInitialData = {
   id: string;
   invoiceNumber: string;
+  sourceInvoiceNumber?: string;
   clientName: string;
   clientLabel: string;
   clientId: string;
@@ -173,6 +174,10 @@ export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "pending
   return "overdue";
 }
 
+export function getInvoiceStatusDisplayLabel(status: InvoiceStatus): string {
+  return status === "Paid" ? "Paid / Lunas" : status;
+}
+
 export function resolveDateRangeLabel(rows: InvoiceRow[]): string {
   if (rows.length === 0) {
     return "-";
@@ -293,7 +298,11 @@ export function resolveInvoiceRemainingBalanceIdr(amount: number, downPaymentIdr
   return Math.max(0, Math.round(amount) - Math.max(0, Math.round(downPaymentIdr)));
 }
 
-export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number): string {
+export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number, remainingBalanceIdr?: number): string {
+  if (remainingBalanceIdr !== undefined && Math.max(0, Math.round(remainingBalanceIdr)) <= 0) {
+    return "Lunas";
+  }
+
   return Math.max(0, Math.round(downPaymentIdr)) > 0 ? "Sisa Tagihan" : "Tagihan";
 }
 
@@ -367,7 +376,7 @@ export async function viewInvoicePdfFromRow({
       invoiceNumber: row.invoiceNumber,
       issueDateIso: row.issuedDateIso,
       dueDateIso: row.dueDateIso,
-      statusLabel: row.status,
+      statusLabel: getInvoiceStatusDisplayLabel(row.status),
       issuingOffice: "Bekasi Office",
       clientName: row.clientName,
       clientCode: row.groupCode ?? row.clientLabel,

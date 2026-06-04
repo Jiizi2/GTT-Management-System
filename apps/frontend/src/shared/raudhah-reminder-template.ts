@@ -1,4 +1,4 @@
-import { isIsoDateValue, resolveVisaProvider, shiftIsoDate, type GroupRaudhahStatus } from "./app-domain.js";
+import { isIsoDateValue, shiftIsoDate, type GroupRaudhahStatus } from "./app-domain.js";
 
 type ReminderAppointment = {
   dateIso: string;
@@ -182,7 +182,7 @@ function resolveGroupDetailLine(args: BuildRaudhahReminderTemplateArgs): string 
 }
 
 export function buildRaudhahReminderTemplate(args: BuildRaudhahReminderTemplateArgs): string {
-  const providerName = args.providerName?.trim() || resolveVisaProvider(args.packageName);
+  const providerName = args.providerName?.trim() || "Provider pending";
   const coordinatorName = (args.coordinatorName?.trim() || "PIC").toUpperCase();
   const bookingDateSummary = formatBookingDateSummary(resolveBookingDateIsos(args));
 

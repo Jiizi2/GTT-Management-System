@@ -97,7 +97,7 @@ export function getGroupAgreementHotelsByCity(
 }
 
 export function resolveVisaAgreementNumber(
-  row: Pick<VisaTrackingRow, "groupCode">,
+  _row: Pick<VisaTrackingRow, "groupCode">,
   group: GroupData | undefined,
   city: "makkah" | "madinah",
 ): string {
@@ -108,7 +108,7 @@ export function resolveVisaAgreementNumber(
     return customAgreementNumber;
   }
 
-  return buildVisaAgreementNumber(row.groupCode, city);
+  return "Agreement pending";
 }
 
 export function resolveVisaAgreementDateRange(

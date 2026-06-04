@@ -1,10 +1,14 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
+import { assignAgreementDraftInBackend, useAgreementDraftsQuery } from "../hooks/use-agreement-drafts-query";
 import { buildRaudhahReminderTemplate } from "../shared/raudhah-reminder-template.js";
+import { agreementDraftQueryKeys, groupQueryKeys } from "../shared/query-keys";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
 import { SereneSelect } from "../components/serene-select";
@@ -12,6 +16,7 @@ import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import type {
   GroupAgreementHotel,
   GroupData,
+  HotelAgreementDraft,
   VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaRaudhahEditFormState,
@@ -22,10 +27,10 @@ import type {
 const {
   formatVisaDateWithYear,
   getGroupAgreementHotelsByCity,
+  resolveGroupCompleteness,
   resolveTotalBusCount,
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
-  resolveVisaProvider,
 } = Domain;
 
 const LazyDeleteGroupModal = lazy(async () => ({
@@ -145,6 +150,29 @@ function formatAgreementSummary(agreement: GroupAgreementHotel): string {
   const paxLabel = Number.isFinite(agreement.pax) ? agreement.pax.toString() : "0";
 
   return `${agreementNumber} - Pax ${paxLabel} - ${formatAgreementStayRange(agreement)}`;
+}
+
+function formatAgreementDraftStayRange(draft: HotelAgreementDraft): string {
+  const stayStart = draft.stayStartIso.trim();
+  const stayEnd = draft.stayEndIso.trim();
+
+  if (stayStart && stayEnd) {
+    return `${formatVisaDateWithYear(stayStart)} - ${formatVisaDateWithYear(stayEnd)}`;
+  }
+
+  if (stayStart) {
+    return `Start ${formatVisaDateWithYear(stayStart)}`;
+  }
+
+  if (stayEnd) {
+    return `End ${formatVisaDateWithYear(stayEnd)}`;
+  }
+
+  return "Stay dates pending";
+}
+
+function formatVisaMutationError(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? error.message.trim() : fallback;
 }
 
 function getRaudhahStatusBadgeClasses(status: RaudhahStatus): string {
@@ -381,6 +409,119 @@ function InlineHotelAgreementForm({
   );
 }
 
+function AgreementInboxDraftAssignmentList({
+  city,
+  drafts,
+  remainingPax,
+  isLoading,
+  isError,
+  assigningDraftId,
+  onAssignDraft,
+}: {
+  city: "makkah" | "madinah";
+  drafts: HotelAgreementDraft[];
+  remainingPax: number;
+  isLoading: boolean;
+  isError: boolean;
+  assigningDraftId: string | null;
+  onAssignDraft: (draft: HotelAgreementDraft) => void;
+}) {
+  const cityLabel = city === "makkah" ? "Makkah" : "Madinah";
+  const safeRemainingPax = Math.max(0, remainingPax);
+
+  return (
+    <section className="mt-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand-primary">Agreement Inbox</p>
+          <h3 className="mt-0.5 text-sm font-bold text-slate-900">Available {cityLabel} Agreements</h3>
+        </div>
+        <span className="inline-flex w-fit rounded-lg border border-slate-200 bg-surface-container-low px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
+          {safeRemainingPax} pax remaining
+        </span>
+      </div>
+
+      {isLoading ? (
+        <p className="mt-3 rounded-xl bg-surface-container-low px-3 py-2 text-xs font-semibold text-slate-600">
+          Loading agreement inbox...
+        </p>
+      ) : null}
+
+      {isError ? (
+        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+          Agreement inbox belum berhasil dimuat.
+        </p>
+      ) : null}
+
+      {!isLoading && drafts.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500">
+          Tidak ada draft {cityLabel} yang belum assigned.
+        </p>
+      ) : null}
+
+      {drafts.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {drafts.map((draft) => {
+            const isAssigning = assigningDraftId === draft.id;
+            const hasRemainingPax = safeRemainingPax > 0;
+            const fitsRemainingPax = draft.pax <= safeRemainingPax;
+            const isAssignable = hasRemainingPax && fitsRemainingPax && !assigningDraftId;
+
+            return (
+              <article
+                key={draft.id}
+                className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-surface-container-low p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="break-words text-sm font-bold text-slate-900">{draft.hotelName}</h4>
+                    <span className="inline-flex rounded-md border border-slate-200 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
+                      Pax {draft.pax}
+                    </span>
+                    <span
+                      className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getAgreementStatusClasses(
+                        draft.status === "Approved",
+                      )}`}
+                    >
+                      {getAgreementStatusLabel(draft.status)}
+                    </span>
+                  </div>
+                  {draft.agentName ? (
+                    <p className="mt-1 text-xs font-semibold text-brand-primary">Agent: {draft.agentName}</p>
+                  ) : null}
+                  <p className="mt-1 break-words text-xs font-semibold text-slate-700">{draft.agreementNumber}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                    {formatAgreementDraftStayRange(draft)}
+                  </p>
+                  {!hasRemainingPax ? (
+                    <p className="mt-1 text-[11px] font-semibold text-amber-700">Pax {cityLabel} sudah penuh.</p>
+                  ) : !fitsRemainingPax ? (
+                    <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                      Draft ini melebihi sisa {safeRemainingPax} pax.
+                    </p>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-xs font-bold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => onAssignDraft(draft)}
+                  disabled={!isAssignable}
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    {isAssigning ? "sync" : "link"}
+                  </span>
+                  <span>{isAssigning ? "Assigning..." : "Assign"}</span>
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function VisaTrackingDetailScreen({
   row,
   groups,
@@ -413,6 +554,8 @@ export function VisaTrackingDetailScreen({
   onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
 }) {
+  const queryClient = useQueryClient();
+  const agreementDraftsQuery = useAgreementDraftsQuery("", "unassigned");
   const [paymentStatus, setPaymentStatus] = useState<VisaPaymentStatus>(row.paymentStatus);
   const [activeModal, setActiveModal] = useState<
     "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | null
@@ -427,6 +570,11 @@ export function VisaTrackingDetailScreen({
   const [deleteAgreementDraft, setDeleteAgreementDraft] = useState<{
     city: "makkah" | "madinah";
     agreement: GroupAgreementHotel;
+  } | null>(null);
+  const [assigningAgreementDraftId, setAssigningAgreementDraftId] = useState<string | null>(null);
+  const [draftAssignFeedback, setDraftAssignFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
   } | null>(null);
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
@@ -447,34 +595,67 @@ export function VisaTrackingDetailScreen({
   });
 
   const group = groups.find((item) => item.code === row.groupCode) ?? null;
-  const groupIndex = Math.max(
-    0,
-    groups.findIndex((item) => item.code === row.groupCode),
+  const groupCompleteness = group ? resolveGroupCompleteness(group) : null;
+  const agreementIssues =
+    groupCompleteness?.issues.filter(
+      (issue) =>
+        issue.key === "missing-agreement" ||
+        issue.key === "missing-makkah-agreement" ||
+        issue.key === "missing-madinah-agreement" ||
+        issue.key === "pax-mismatch" ||
+        issue.key === "date-mismatch",
+    ) ?? [];
+  const shouldShowLinkAgreementAction = agreementIssues.some(
+    (issue) =>
+      issue.key === "missing-agreement" ||
+      issue.key === "missing-makkah-agreement" ||
+      issue.key === "missing-madinah-agreement",
   );
+  const primaryAgreementMessage = agreementIssues[0]?.message ?? "Agreement hotel sudah tersambung.";
 
   const totalPax = group?.pax ?? row.pax;
   const requiredBusCount = resolveTotalBusCount(totalPax, group?.totalBuses);
   const durationDays = group?.durationDays ?? 8;
   const agreementDateRange = resolveVisaAgreementDateRange(row, durationDays, group ?? undefined);
-  const departureIso = agreementDateRange.makkahStartIso;
-  const makkahEndIso = agreementDateRange.makkahEndIso;
-  const madinahStartIso = agreementDateRange.madinahStartIso;
-  const fallbackReturnIso = agreementDateRange.madinahEndIso;
 
-  const makkahHotels = ["Makkah Clock Tower", "Swissotel Al Maqam", "Hilton Suites Makkah", "Movenpick Hajar Tower"];
-  const madinahHotels = [
-    "Anwar Al Madinah Movenpick",
-    "Pullman Zamzam Madinah",
-    "Taiba Front Hotel",
-    "Shaza Regency Plaza",
-  ];
-  const primaryMakkahAgreement = getGroupAgreementHotelsByCity(group ?? undefined, "makkah")[0];
-  const primaryMadinahAgreement = getGroupAgreementHotelsByCity(group ?? undefined, "madinah")[0];
   const makkahAgreements = getGroupAgreementHotelsByCity(group ?? undefined, "makkah");
   const madinahAgreements = getGroupAgreementHotelsByCity(group ?? undefined, "madinah");
-  const makkahHotelName = primaryMakkahAgreement?.hotelName?.trim() || makkahHotels[groupIndex % makkahHotels.length];
-  const madinahHotelName =
-    primaryMadinahAgreement?.hotelName?.trim() || madinahHotels[groupIndex % madinahHotels.length];
+  const connectedAgreementKeys = useMemo(
+    () =>
+      new Set([
+        ...makkahAgreements.map((agreement) => `makkah:${agreement.agreementNumber.trim().toUpperCase()}`),
+        ...madinahAgreements.map((agreement) => `madinah:${agreement.agreementNumber.trim().toUpperCase()}`),
+      ]),
+    [madinahAgreements, makkahAgreements],
+  );
+  const availableAgreementDraftsByCity = useMemo(() => {
+    const availableDrafts: Record<"makkah" | "madinah", HotelAgreementDraft[]> = {
+      makkah: [],
+      madinah: [],
+    };
+
+    for (const draft of agreementDraftsQuery.data ?? []) {
+      if (draft.assignmentStatus !== "Unassigned") {
+        continue;
+      }
+
+      const draftKey = `${draft.city}:${draft.agreementNumber.trim().toUpperCase()}`;
+      if (connectedAgreementKeys.has(draftKey)) {
+        continue;
+      }
+
+      availableDrafts[draft.city].push(draft);
+    }
+
+    return {
+      makkah: availableDrafts.makkah.sort((left, right) =>
+        `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
+      ),
+      madinah: availableDrafts.madinah.sort((left, right) =>
+        `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
+      ),
+    };
+  }, [agreementDraftsQuery.data, connectedAgreementKeys]);
 
   const makkahAssigned = Math.min(totalPax, row.makkahVerified);
   const madinahAssigned = Math.min(totalPax, row.madinahVerified);
@@ -508,7 +689,9 @@ export function VisaTrackingDetailScreen({
   const raudhahSecondaryTextMobile = hasRaudhahDates
     ? `${raudhahAppointments.length} date${raudhahAppointments.length > 1 ? "s" : ""} set`
     : "Pending";
-  const providerName = group?.visaSetup?.syarikah?.trim() || resolveVisaProvider(row.packageName);
+  const rawSyarikahValue = group?.visaSetup?.syarikah?.trim() ?? "";
+  const syarikahValue = rawSyarikahValue.toLowerCase() === "not assigned" ? "" : rawSyarikahValue;
+  const providerName = syarikahValue || "Provider pending";
   const raudhahReminderTemplate = buildRaudhahReminderTemplate({
     groupCode: row.groupCode,
     groupName: row.groupName,
@@ -519,31 +702,6 @@ export function VisaTrackingDetailScreen({
     coordinatorName: group?.musyrif?.name,
     appointments: raudhahAppointments,
   });
-  const makkahAgreementNumber = resolveVisaAgreementNumber(row, group ?? undefined, "makkah");
-  const madinahAgreementNumber = resolveVisaAgreementNumber(row, group ?? undefined, "madinah");
-
-  const fallbackMakkahAgreement: GroupAgreementHotel = {
-    id: `${row.groupCode}-makkah-fallback`,
-    hotelName: makkahHotelName,
-    agreementNumber: makkahAgreementNumber,
-    pax: totalPax,
-    status: makkahMissing === 0 ? "Approved" : "Waiting for Approval",
-    stayStartIso: departureIso,
-    stayEndIso: makkahEndIso,
-  };
-
-  const fallbackMadinahAgreement: GroupAgreementHotel = {
-    id: `${row.groupCode}-madinah-fallback`,
-    hotelName: madinahHotelName,
-    agreementNumber: madinahAgreementNumber,
-    pax: totalPax,
-    status: madinahMissing === 0 ? "Approved" : "Waiting for Approval",
-    stayStartIso: madinahStartIso,
-    stayEndIso: fallbackReturnIso,
-  };
-
-  const visibleMakkahAgreements = makkahAgreements.length > 0 ? makkahAgreements : [fallbackMakkahAgreement];
-  const visibleMadinahAgreements = madinahAgreements.length > 0 ? madinahAgreements : [fallbackMadinahAgreement];
   const makkahAgreementIdSet = new Set(makkahAgreements.map((agreement) => agreement.id));
   const madinahAgreementIdSet = new Set(madinahAgreements.map((agreement) => agreement.id));
 
@@ -559,7 +717,7 @@ export function VisaTrackingDetailScreen({
     if (mode === "add") {
       return {
         hotelName: "",
-        agreementNumber: resolveVisaAgreementNumber(row, group ?? undefined, city),
+        agreementNumber: "",
         pax: totalPax.toString(),
         status: "Waiting for Approval",
         stayStartIso: city === "makkah" ? cityRange.makkahStartIso : cityRange.madinahStartIso,
@@ -568,9 +726,8 @@ export function VisaTrackingDetailScreen({
     }
 
     return {
-      hotelName: currentHotel?.hotelName?.trim() || (city === "makkah" ? makkahHotelName : madinahHotelName),
-      agreementNumber:
-        currentHotel?.agreementNumber?.trim() || resolveVisaAgreementNumber(row, group ?? undefined, city),
+      hotelName: currentHotel?.hotelName?.trim() || "",
+      agreementNumber: currentHotel?.agreementNumber?.trim() || "",
       pax: currentHotel?.pax?.toString() || totalPax.toString(),
       status: currentHotel?.status ?? "Waiting for Approval",
       stayStartIso:
@@ -768,6 +925,50 @@ export function VisaTrackingDetailScreen({
     setAddingHotelCity(null);
   };
 
+  const assignAgreementDraft = async (draft: HotelAgreementDraft) => {
+    const remainingPax = draft.city === "makkah" ? makkahMissing : madinahMissing;
+    if (remainingPax <= 0) {
+      setDraftAssignFeedback({
+        tone: "error",
+        message: `Pax ${draft.city === "makkah" ? "Makkah" : "Madinah"} sudah penuh.`,
+      });
+      return;
+    }
+
+    if (draft.pax > remainingPax) {
+      setDraftAssignFeedback({
+        tone: "error",
+        message: `Draft ${draft.agreementNumber} melebihi sisa ${remainingPax} pax.`,
+      });
+      return;
+    }
+
+    setAssigningAgreementDraftId(draft.id);
+    setDraftAssignFeedback(null);
+    try {
+      await assignAgreementDraftInBackend({
+        draftId: draft.id,
+        groupCode: row.groupCode,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+      ]);
+      setAddingHotelCity(null);
+      setDraftAssignFeedback({
+        tone: "success",
+        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${row.groupCode}.`,
+      });
+    } catch (error: unknown) {
+      setDraftAssignFeedback({
+        tone: "error",
+        message: formatVisaMutationError(error, "Agreement belum berhasil di-assign."),
+      });
+    } finally {
+      setAssigningAgreementDraftId(null);
+    }
+  };
+
   const clearRaudhah = () => {
     onClearRaudhahAppointment(row.groupCode);
     setIsClearRaudhahConfirmOpen(false);
@@ -913,6 +1114,54 @@ export function VisaTrackingDetailScreen({
         </div>
       </section>
 
+      {agreementIssues.length > 0 ? (
+        <section
+          className="rounded-3xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 p-4 text-on-tertiary-fixed-variant shadow-sm"
+          aria-label="Agreement setup status"
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                className="material-symbols-outlined mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest"
+                aria-hidden="true"
+              >
+                link
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Agreement Status</p>
+                <h2 className="mt-1 text-lg font-extrabold">Agreement Needs Attention</h2>
+                <p className="mt-1 text-sm font-semibold">{primaryAgreementMessage}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {agreementIssues.slice(0, 4).map((issue) => (
+                    <span
+                      key={issue.key}
+                      className="rounded-md bg-surface-container-lowest/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.08em]"
+                      title={issue.message}
+                    >
+                      {issue.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {shouldShowLinkAgreementAction ? (
+              <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+                <Link
+                  to={`/agreement-inbox?groupCode=${encodeURIComponent(row.groupCode)}`}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-on-tertiary-fixed-variant/20 bg-surface-container-lowest px-3 text-sm font-bold text-brand-primary transition hover:bg-surface-container-low"
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    link
+                  </span>
+                  <span>Link Agreement</span>
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-3 md:grid-cols-3" aria-label="Quick status">
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
@@ -984,6 +1233,23 @@ export function VisaTrackingDetailScreen({
         </article>
       </section>
 
+      {draftAssignFeedback ? (
+        <section
+          className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+            draftAssignFeedback.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-rose-200 bg-rose-50 text-rose-700"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
+            {draftAssignFeedback.tone === "success" ? "check_circle" : "warning"}
+          </span>
+          <p className="font-semibold">{draftAssignFeedback.message}</p>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 xl:grid-cols-2">
         <article className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1007,7 +1273,22 @@ export function VisaTrackingDetailScreen({
           </div>
 
           <div className="mt-4 space-y-3">
-            {visibleMakkahAgreements.map((agreement, index) => {
+            {makkahAgreements.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-brand-tertiary/45 bg-brand-tertiary/10 px-4 py-4 text-sm text-brand-tertiary">
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    warning
+                  </span>
+                  <div>
+                    <p className="font-bold">Agreement Makkah belum tersambung.</p>
+                    <p className="mt-1 text-xs font-semibold opacity-85">
+                      Tambahkan hotel agreement dari data Nusuk sebelum pax dianggap assigned.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {makkahAgreements.map((agreement, index) => {
               const canDeleteAgreement = makkahAgreementIdSet.has(agreement.id);
               const statusLabel = getAgreementStatusLabel(agreement.status);
 
@@ -1094,14 +1375,25 @@ export function VisaTrackingDetailScreen({
           </div>
 
           {addingHotelCity === "makkah" ? (
-            <InlineHotelAgreementForm
-              key="makkah-add-agreement"
-              title="New Makkah Agreement"
-              hotelPlaceholder="e.g. Swissotel Al Maqam"
-              initialValue={buildHotelDraft("makkah", "add")}
-              onCancel={cancelAddHotelInline}
-              onSave={(hotel) => saveAddHotelInline("makkah", hotel)}
-            />
+            <>
+              <AgreementInboxDraftAssignmentList
+                city="makkah"
+                drafts={availableAgreementDraftsByCity.makkah}
+                remainingPax={makkahMissing}
+                isLoading={agreementDraftsQuery.isLoading}
+                isError={agreementDraftsQuery.isError}
+                assigningDraftId={assigningAgreementDraftId}
+                onAssignDraft={(draft) => void assignAgreementDraft(draft)}
+              />
+              <InlineHotelAgreementForm
+                key="makkah-add-agreement"
+                title="New Makkah Agreement"
+                hotelPlaceholder="e.g. Swissotel Al Maqam"
+                initialValue={buildHotelDraft("makkah", "add")}
+                onCancel={cancelAddHotelInline}
+                onSave={(hotel) => saveAddHotelInline("makkah", hotel)}
+              />
+            </>
           ) : null}
 
           <div
@@ -1144,7 +1436,22 @@ export function VisaTrackingDetailScreen({
           </div>
 
           <div className="mt-4 space-y-3">
-            {visibleMadinahAgreements.map((agreement, index) => {
+            {madinahAgreements.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-brand-tertiary/45 bg-brand-tertiary/10 px-4 py-4 text-sm text-brand-tertiary">
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    warning
+                  </span>
+                  <div>
+                    <p className="font-bold">Agreement Madinah belum tersambung.</p>
+                    <p className="mt-1 text-xs font-semibold opacity-85">
+                      Tambahkan hotel agreement dari data Nusuk sebelum pax dianggap assigned.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {madinahAgreements.map((agreement, index) => {
               const canDeleteAgreement = madinahAgreementIdSet.has(agreement.id);
               const statusLabel = getAgreementStatusLabel(agreement.status);
 
@@ -1231,14 +1538,25 @@ export function VisaTrackingDetailScreen({
           </div>
 
           {addingHotelCity === "madinah" ? (
-            <InlineHotelAgreementForm
-              key="madinah-add-agreement"
-              title="New Madinah Agreement"
-              hotelPlaceholder="e.g. Pullman Zamzam Madinah"
-              initialValue={buildHotelDraft("madinah", "add")}
-              onCancel={cancelAddHotelInline}
-              onSave={(hotel) => saveAddHotelInline("madinah", hotel)}
-            />
+            <>
+              <AgreementInboxDraftAssignmentList
+                city="madinah"
+                drafts={availableAgreementDraftsByCity.madinah}
+                remainingPax={madinahMissing}
+                isLoading={agreementDraftsQuery.isLoading}
+                isError={agreementDraftsQuery.isError}
+                assigningDraftId={assigningAgreementDraftId}
+                onAssignDraft={(draft) => void assignAgreementDraft(draft)}
+              />
+              <InlineHotelAgreementForm
+                key="madinah-add-agreement"
+                title="New Madinah Agreement"
+                hotelPlaceholder="e.g. Pullman Zamzam Madinah"
+                initialValue={buildHotelDraft("madinah", "add")}
+                onCancel={cancelAddHotelInline}
+                onSave={(hotel) => saveAddHotelInline("madinah", hotel)}
+              />
+            </>
           ) : null}
 
           <div
@@ -1437,7 +1755,7 @@ export function VisaTrackingDetailScreen({
           ) : null}
 
           {activeModal === "syarikah" ? (
-            <LazySyarikahModal initialValue={providerName} onClose={closeModal} onSave={saveSyarikah} />
+            <LazySyarikahModal initialValue={syarikahValue} onClose={closeModal} onSave={saveSyarikah} />
           ) : null}
 
           {activeModal === "hotel" ? (

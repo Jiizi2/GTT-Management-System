@@ -421,6 +421,49 @@ async function pickTodayDate(page: Page, label: string): Promise<void> {
   await dateDialog.getByRole("button", { name: "Today" }).click();
 }
 
+async function pickNowTime(page: Page, label: string): Promise<void> {
+  await page.getByLabel(label).first().click();
+  const timeDialog = page.getByRole("dialog", { name: "Select time" });
+  await expect(timeDialog).toBeVisible();
+  await timeDialog.getByRole("button", { name: "Now" }).click();
+  await timeDialog.getByRole("button", { name: "Apply" }).click();
+}
+
+async function saveBaseTripsFromItineraryBuilder(page: Page, groupCode: string): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Itinerary Builder" })).toBeVisible();
+
+  const saveBaseTripsButton = page.getByRole("button", { name: "Save 5 Base Trips" });
+  const addBaseTripsButton = page.getByRole("button", { name: "Add 5 Base Trips" });
+  if ((await addBaseTripsButton.count()) > 0 && (await addBaseTripsButton.first().isVisible())) {
+    await expect(addBaseTripsButton).toBeEnabled();
+    await addBaseTripsButton.click();
+  }
+
+  await page.getByRole("button", { name: "Go to step 5" }).click();
+  await pickNowTime(page, "Flight Return Time");
+  await pickNowTime(page, "Hotel Pickup Request Time");
+
+  await expect(saveBaseTripsButton).toBeEnabled();
+  await saveBaseTripsButton.click();
+
+  const saveItineraryButton = page.getByRole("button", { name: "Save Itinerary" });
+  await expect(saveItineraryButton).toBeEnabled();
+  const saveItineraryResponsePromise = page.waitForResponse(
+    (response) => response.url().includes(`/api/groups/${groupCode}`) && response.request().method() === "PUT",
+  );
+  await saveItineraryButton.click();
+  const saveItineraryResponse = await saveItineraryResponsePromise;
+  if (!saveItineraryResponse.ok()) {
+    throw new Error(
+      `Save itinerary failed with ${saveItineraryResponse.status()}: ${await saveItineraryResponse.text()}`,
+    );
+  }
+
+  await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
+  await expect(page.getByText(groupCode)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Build Itinerary" })).toHaveCount(0);
+}
+
 async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string; groupName: string }> {
   const suffix = buildUniqueSuffix();
   const groupCode = `E2E${suffix}`;
@@ -455,14 +498,14 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
   await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
   await expect(page.getByText(groupCode)).toBeVisible();
   await expect(page.getByRole("link", { name: "Link Agreement" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add Itinerary Item" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Build Itinerary" })).toBeVisible();
 
   await page.getByRole("button", { name: "Back to Groups" }).click();
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
   const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
   await expect(createdCard).toBeVisible();
   await expect(createdCard.getByRole("link", { name: "Link Agreement" })).toBeVisible();
-  await expect(createdCard.getByRole("link", { name: "Add Itinerary" })).toBeVisible();
+  await expect(createdCard.getByRole("link", { name: "Build Itinerary" })).toBeVisible();
 
   return { groupCode, groupName };
 }
@@ -528,10 +571,8 @@ test("creates a new group from workspace flow", async ({ page }) => {
   const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
   await expect(createdCard).toBeVisible();
   await expect(createdCard.getByText(groupName)).toBeVisible();
-  await createdCard.getByRole("link", { name: "Add Itinerary" }).click();
-  await expect(page.getByRole("dialog", { name: "Add New Schedule" })).toBeVisible();
-  await page.getByRole("button", { name: "Close add schedule popup" }).click();
-  await expect(page.getByRole("dialog", { name: "Add New Schedule" })).toBeHidden();
+  await createdCard.getByRole("link", { name: "Build Itinerary" }).click();
+  await saveBaseTripsFromItineraryBuilder(page, groupCode);
   await page.getByRole("button", { name: "Back to Groups" }).click();
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
 });

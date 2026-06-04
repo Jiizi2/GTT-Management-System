@@ -8,7 +8,6 @@ import {
   musyrifAvatar,
   parseTimeForInput,
   resolveTotalBusCount,
-  resolveVisaProvider,
 } from "../shared/app-domain";
 import type {
   AgreementApprovalStatus,
@@ -425,7 +424,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
 
   if (group.visaSetup) {
     const normalizedIssuedDate = group.visaSetup.issuedDate?.trim() ?? "";
-    const resolvedSyarikah = group.visaSetup.syarikah.trim() || resolveVisaProvider(group.packageName);
+    const resolvedSyarikah = group.visaSetup.syarikah.trim() || "Not assigned";
     payload.visaSetup = {
       visaStatus: mapVisaStatusToBackend(group.visaSetup.visaStatus),
       issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate) ? normalizedIssuedDate : undefined,
@@ -966,7 +965,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     ? {
         visaStatus: mapBackendVisaStatus(group.visaSetup.visaStatus),
         issuedDate: toIsoDate(group.visaSetup.issuedDate) ?? "",
-        syarikah: readString(group.visaSetup.syarikah, resolveVisaProvider(readString(group.packageName))),
+        syarikah: readString(group.visaSetup.syarikah, "Not assigned"),
         busStatus: resolvedBusStatus,
         paymentStatus: mapBackendPaymentStatus(group.visaSetup.paymentStatus),
         makkahHotels: mappedHotelsByCity.makkahHotels,

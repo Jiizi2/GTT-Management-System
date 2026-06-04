@@ -44,7 +44,9 @@ function validateCityHotelAgreementContinuity(
     const currentStartMs = parseIsoDateToUtcMiddayMs(current.stayStart);
     const currentEndMs = parseIsoDateToUtcMiddayMs(current.stayEnd);
     if (currentStartMs === null || currentEndMs === null) {
-      throw new BadRequestException(`${cityLabel} agreement dates must use YYYY-MM-DD format.`);
+      throw new BadRequestException(
+        `${cityLabel} agreement dates must use YYYY-MM-DD format.`,
+      );
     }
 
     if (currentEndMs < currentStartMs) {
@@ -60,7 +62,9 @@ function validateCityHotelAgreementContinuity(
     const previous = sortedAgreements[index - 1];
     const expectedNextStart = addDaysToIsoDate(previous.stayEnd, 1);
     if (!expectedNextStart) {
-      throw new BadRequestException(`${cityLabel} agreement dates must use YYYY-MM-DD format.`);
+      throw new BadRequestException(
+        `${cityLabel} agreement dates must use YYYY-MM-DD format.`,
+      );
     }
 
     if (current.stayStart !== expectedNextStart) {
@@ -78,27 +82,39 @@ export function validateHotelAgreementRules(
     stayStart: string;
     stayEnd: string;
   }>,
+  options: { requireMakkah?: boolean } = {},
 ): void {
   if (hotelAgreements.length === 0) {
     return;
   }
 
-  const makkahHotels = hotelAgreements.filter((agreement) => agreement.city === AgreementCity.MAKKAH);
-  if (makkahHotels.length === 0) {
-    throw new BadRequestException("Makkah agreement is required when hotel agreements are provided.");
+  const shouldRequireMakkah = options.requireMakkah ?? true;
+  const makkahHotels = hotelAgreements.filter(
+    (agreement) => agreement.city === AgreementCity.MAKKAH,
+  );
+  if (shouldRequireMakkah && makkahHotels.length === 0) {
+    throw new BadRequestException(
+      "Makkah agreement is required when hotel agreements are provided.",
+    );
   }
 
   validateCityHotelAgreementContinuity(
     AgreementCity.MAKKAH,
-    hotelAgreements.filter((agreement) => agreement.city === AgreementCity.MAKKAH),
+    hotelAgreements.filter(
+      (agreement) => agreement.city === AgreementCity.MAKKAH,
+    ),
   );
   validateCityHotelAgreementContinuity(
     AgreementCity.MADINAH,
-    hotelAgreements.filter((agreement) => agreement.city === AgreementCity.MADINAH),
+    hotelAgreements.filter(
+      (agreement) => agreement.city === AgreementCity.MADINAH,
+    ),
   );
 }
 
-export function validateCreateOrReplaceHotelAgreementRules(payload: CreateGroupDto): void {
+export function validateCreateOrReplaceHotelAgreementRules(
+  payload: CreateGroupDto,
+): void {
   const agreements = payload.visaSetup?.hotelAgreements ?? [];
   validateHotelAgreementRules(
     agreements.map((agreement, index) => ({
