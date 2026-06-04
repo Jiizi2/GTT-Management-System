@@ -11,7 +11,6 @@ const {
   formatVisaDateWithYear,
   isIsoDateValue,
   resolveValidRaudhahAppointments,
-  resolveVisaProvider,
   shiftIsoDate,
 } = Domain;
 
@@ -736,7 +735,10 @@ export function RaudhahReminderScreen({
                 totalPax: group.pax ?? row.pax,
                 packageName: row.packageName,
                 departureIso: row.departureIso,
-                providerName: group.visaSetup?.syarikah?.trim() || resolveVisaProvider(row.packageName),
+                providerName:
+                  group.visaSetup?.syarikah?.trim().toLowerCase() === "not assigned"
+                    ? undefined
+                    : group.visaSetup?.syarikah?.trim(),
                 coordinatorName: group.musyrif?.name,
                 appointments: scheduleAppointments,
                 bookingDateIsos: slotAppointments.map((appointment) => appointment.bookingDateIso),

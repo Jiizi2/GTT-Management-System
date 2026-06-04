@@ -45,9 +45,14 @@ function addUtcDays(baseDate: Date, dayOffset: number): Date {
   return nextDate;
 }
 
-function resolveMemoryGroupIndex(memoryGroups: MemoryGroupRecord[], idOrCode: string): number {
+function resolveMemoryGroupIndex(
+  memoryGroups: MemoryGroupRecord[],
+  idOrCode: string,
+): number {
   const normalizedCode = idOrCode.trim().toUpperCase();
-  return memoryGroups.findIndex((item) => item.id === idOrCode || item.code === normalizedCode);
+  return memoryGroups.findIndex(
+    (item) => item.id === idOrCode || item.code === normalizedCode,
+  );
 }
 
 function resolveNextSortOrder(entries: Array<{ sortOrder: number }>): number {
@@ -361,9 +366,14 @@ export function createDefaultMemoryGroups(): MemoryGroupRecord[] {
   ];
 }
 
-export function findOneFromMemory(memoryGroups: MemoryGroupRecord[], idOrCode: string): MemoryGroupRecord {
+export function findOneFromMemory(
+  memoryGroups: MemoryGroupRecord[],
+  idOrCode: string,
+): MemoryGroupRecord {
   const normalizedCode = idOrCode.trim().toUpperCase();
-  const group = memoryGroups.find((item) => item.id === idOrCode || item.code === normalizedCode);
+  const group = memoryGroups.find(
+    (item) => item.id === idOrCode || item.code === normalizedCode,
+  );
 
   if (!group) {
     throw new NotFoundException(`Group '${idOrCode}' not found.`);
@@ -380,7 +390,9 @@ export function createInMemory(
   const existing = memoryGroups.find((item) => item.code === normalizedCode);
 
   if (existing) {
-    throw new ConflictException(`Group code '${normalizedCode}' already exists.`);
+    throw new ConflictException(
+      `Group code '${normalizedCode}' already exists.`,
+    );
   }
 
   const now = new Date().toISOString();
@@ -409,9 +421,13 @@ export function replaceInMemory(
 
   const current = memoryGroups[targetIndex];
   const normalizedCode = payload.code.trim().toUpperCase();
-  const hasDuplicate = memoryGroups.some((item, index) => index !== targetIndex && item.code === normalizedCode);
+  const hasDuplicate = memoryGroups.some(
+    (item, index) => index !== targetIndex && item.code === normalizedCode,
+  );
   if (hasDuplicate) {
-    throw new ConflictException(`Group code '${normalizedCode}' already exists.`);
+    throw new ConflictException(
+      `Group code '${normalizedCode}' already exists.`,
+    );
   }
 
   const updatedAt = new Date().toISOString();
@@ -440,14 +456,20 @@ export function updateInMemory(
   const current = memoryGroups[targetIndex];
   const nextCode = payload.code?.trim().toUpperCase();
   if (nextCode && nextCode !== current.code) {
-    const hasDuplicate = memoryGroups.some((item, index) => index !== targetIndex && item.code === nextCode);
+    const hasDuplicate = memoryGroups.some(
+      (item, index) => index !== targetIndex && item.code === nextCode,
+    );
     if (hasDuplicate) {
       throw new ConflictException(`Group code '${nextCode}' already exists.`);
     }
   }
 
-  const nextArrivalDate = payload.arrivalDate ? parseIsoDateOnly(payload.arrivalDate) : current.arrivalDate;
-  const nextReturnDate = payload.returnDate ? parseIsoDateOnly(payload.returnDate) : current.returnDate;
+  const nextArrivalDate = payload.arrivalDate
+    ? parseIsoDateOnly(payload.arrivalDate)
+    : current.arrivalDate;
+  const nextReturnDate = payload.returnDate
+    ? parseIsoDateOnly(payload.returnDate)
+    : current.returnDate;
   validateTravelDateRangeOrThrow(nextArrivalDate, nextReturnDate);
 
   const updated: MemoryGroupRecord = {
@@ -469,7 +491,10 @@ export function updateInMemory(
   return updated;
 }
 
-export function removeFromMemory(memoryGroups: MemoryGroupRecord[], idOrCode: string): void {
+export function removeFromMemory(
+  memoryGroups: MemoryGroupRecord[],
+  idOrCode: string,
+): void {
   const targetIndex = resolveMemoryGroupIndex(memoryGroups, idOrCode);
   if (targetIndex === -1) {
     throw new NotFoundException(`Group '${idOrCode}' not found.`);
@@ -492,7 +517,9 @@ export function addItineraryItemInMemory(
   const sortOrder = payload.sortOrder ?? resolveNextSortOrder(group.itinerary);
   const conflict = group.itinerary.some((item) => item.sortOrder === sortOrder);
   if (conflict) {
-    throw new ConflictException(`Sort order '${sortOrder}' already exists for this group itinerary.`);
+    throw new ConflictException(
+      `Sort order '${sortOrder}' already exists for this group itinerary.`,
+    );
   }
 
   group.itinerary.push(buildMemoryItineraryItem(payload, sortOrder));
@@ -510,17 +537,27 @@ export function updateItineraryItemInMemory(
   const group = findOneFromMemory(memoryGroups, idOrCode);
   const itemIndex = group.itinerary.findIndex((item) => item.id === itemId);
   if (itemIndex === -1) {
-    throw new NotFoundException(`Itinerary item '${itemId}' not found in group '${idOrCode}'.`);
+    throw new NotFoundException(
+      `Itinerary item '${itemId}' not found in group '${idOrCode}'.`,
+    );
   }
 
   const current = group.itinerary[itemIndex];
   const sortOrder = payload.sortOrder ?? current.sortOrder;
-  const conflict = group.itinerary.some((item, index) => index !== itemIndex && item.sortOrder === sortOrder);
+  const conflict = group.itinerary.some(
+    (item, index) => index !== itemIndex && item.sortOrder === sortOrder,
+  );
   if (conflict) {
-    throw new ConflictException(`Sort order '${sortOrder}' already exists for this group itinerary.`);
+    throw new ConflictException(
+      `Sort order '${sortOrder}' already exists for this group itinerary.`,
+    );
   }
 
-  group.itinerary[itemIndex] = buildMemoryItineraryItem(payload, sortOrder, current.id);
+  group.itinerary[itemIndex] = buildMemoryItineraryItem(
+    payload,
+    sortOrder,
+    current.id,
+  );
   group.itinerary.sort((left, right) => left.sortOrder - right.sortOrder);
   group.updatedAt = new Date().toISOString();
   return group;
@@ -534,7 +571,9 @@ export function removeItineraryItemInMemory(
   const group = findOneFromMemory(memoryGroups, idOrCode);
   const itemIndex = group.itinerary.findIndex((item) => item.id === itemId);
   if (itemIndex === -1) {
-    throw new NotFoundException(`Itinerary item '${itemId}' not found in group '${idOrCode}'.`);
+    throw new NotFoundException(
+      `Itinerary item '${itemId}' not found in group '${idOrCode}'.`,
+    );
   }
 
   group.itinerary.splice(itemIndex, 1);
@@ -557,8 +596,13 @@ export function addVisaHotelAgreementInMemory(
 ): MemoryGroupRecord {
   const group = findOneFromMemory(memoryGroups, idOrCode);
   const visaSetup = ensureMemoryVisaSetup(group);
-  const nextHotelAgreements = [...visaSetup.hotelAgreements, buildMemoryVisaHotelAgreement(payload)];
-  validateHotelAgreementRules(nextHotelAgreements);
+  const nextHotelAgreements = [
+    ...visaSetup.hotelAgreements,
+    buildMemoryVisaHotelAgreement(payload),
+  ];
+  validateHotelAgreementRules(nextHotelAgreements, {
+    requireMakkah: false,
+  });
 
   visaSetup.hotelAgreements = nextHotelAgreements.sort((left, right) => {
     const cityDiff = left.city.localeCompare(right.city);
@@ -580,15 +624,27 @@ export function updateVisaHotelAgreementInMemory(
 ): MemoryGroupRecord {
   const group = findOneFromMemory(memoryGroups, idOrCode);
   const visaSetup = ensureMemoryVisaSetup(group);
-  const hotelIndex = visaSetup.hotelAgreements.findIndex((item) => item.id === hotelId);
+  const hotelIndex = visaSetup.hotelAgreements.findIndex(
+    (item) => item.id === hotelId,
+  );
   if (hotelIndex === -1) {
-    throw new NotFoundException(`Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`);
+    throw new NotFoundException(
+      `Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`,
+    );
   }
 
-  const nextHotelAgreements = visaSetup.hotelAgreements.map((agreement, index) =>
-    index === hotelIndex ? buildMemoryVisaHotelAgreement(payload, visaSetup.hotelAgreements[hotelIndex].id) : agreement,
+  const nextHotelAgreements = visaSetup.hotelAgreements.map(
+    (agreement, index) =>
+      index === hotelIndex
+        ? buildMemoryVisaHotelAgreement(
+            payload,
+            visaSetup.hotelAgreements[hotelIndex].id,
+          )
+        : agreement,
   );
-  validateHotelAgreementRules(nextHotelAgreements);
+  validateHotelAgreementRules(nextHotelAgreements, {
+    requireMakkah: false,
+  });
 
   visaSetup.hotelAgreements = nextHotelAgreements.sort((left, right) => {
     const cityDiff = left.city.localeCompare(right.city);
@@ -609,13 +665,21 @@ export function removeVisaHotelAgreementInMemory(
 ): MemoryGroupRecord {
   const group = findOneFromMemory(memoryGroups, idOrCode);
   const visaSetup = ensureMemoryVisaSetup(group);
-  const hotelIndex = visaSetup.hotelAgreements.findIndex((item) => item.id === hotelId);
+  const hotelIndex = visaSetup.hotelAgreements.findIndex(
+    (item) => item.id === hotelId,
+  );
   if (hotelIndex === -1) {
-    throw new NotFoundException(`Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`);
+    throw new NotFoundException(
+      `Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`,
+    );
   }
 
-  const nextHotelAgreements = visaSetup.hotelAgreements.filter((agreement) => agreement.id !== hotelId);
-  validateHotelAgreementRules(nextHotelAgreements);
+  const nextHotelAgreements = visaSetup.hotelAgreements.filter(
+    (agreement) => agreement.id !== hotelId,
+  );
+  validateHotelAgreementRules(nextHotelAgreements, {
+    requireMakkah: false,
+  });
   visaSetup.hotelAgreements = nextHotelAgreements;
   group.updatedAt = new Date().toISOString();
   return group;
@@ -628,17 +692,26 @@ export function upsertPrimaryRaudhahAppointmentInMemory(
 ): MemoryGroupRecord {
   const group = findOneFromMemory(memoryGroups, idOrCode);
   const visaSetup = ensureMemoryVisaSetup(group);
-  const sorted = [...visaSetup.raudhahAppointments].sort((left, right) => left.date.localeCompare(right.date));
+  const sorted = [...visaSetup.raudhahAppointments].sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
   const primary = sorted[0];
 
   if (!primary) {
     visaSetup.raudhahAppointments.push(buildMemoryRaudhahAppointment(payload));
   } else {
-    const primaryIndex = visaSetup.raudhahAppointments.findIndex((item) => item.id === primary.id);
-    visaSetup.raudhahAppointments[primaryIndex] = buildMemoryRaudhahAppointment(payload, primary.id);
+    const primaryIndex = visaSetup.raudhahAppointments.findIndex(
+      (item) => item.id === primary.id,
+    );
+    visaSetup.raudhahAppointments[primaryIndex] = buildMemoryRaudhahAppointment(
+      payload,
+      primary.id,
+    );
   }
 
-  visaSetup.raudhahAppointments.sort((left, right) => left.date.localeCompare(right.date));
+  visaSetup.raudhahAppointments.sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
   group.updatedAt = new Date().toISOString();
   return group;
 }
@@ -701,7 +774,9 @@ export function confirmChecklistDriverInMemory(
   assignment.trainDepartureTime = trainDepartureTime;
   assignment.stationPickupTime = stationPickupTime;
 
-  const nextDrivers = [...(assignment.drivers ?? [])].sort((left, right) => left.slotNumber - right.slotNumber);
+  const nextDrivers = [...(assignment.drivers ?? [])].sort(
+    (left, right) => left.slotNumber - right.slotNumber,
+  );
   if (nextDrivers.length < requiredBusCount) {
     nextDrivers.push({
       slotNumber: nextDrivers.length + 1,
@@ -736,7 +811,8 @@ export function resetChecklistDriverInMemory(
     (item) =>
       item.tripDate === normalizedTripDate &&
       item.scheduledTime === normalizedScheduledTime &&
-      (!normalizedActivity || item.activity.trim().toLowerCase() === normalizedActivity),
+      (!normalizedActivity ||
+        item.activity.trim().toLowerCase() === normalizedActivity),
   );
 
   if (!assignment) {

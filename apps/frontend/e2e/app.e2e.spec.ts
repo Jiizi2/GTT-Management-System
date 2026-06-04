@@ -429,6 +429,41 @@ async function pickNowTime(page: Page, label: string): Promise<void> {
   await timeDialog.getByRole("button", { name: "Apply" }).click();
 }
 
+async function saveBaseTripsFromItineraryBuilder(page: Page, groupCode: string): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Itinerary Builder" })).toBeVisible();
+
+  const saveBaseTripsButton = page.getByRole("button", { name: "Save 5 Base Trips" });
+  const addBaseTripsButton = page.getByRole("button", { name: "Add 5 Base Trips" });
+  if ((await addBaseTripsButton.count()) > 0 && (await addBaseTripsButton.first().isVisible())) {
+    await expect(addBaseTripsButton).toBeEnabled();
+    await addBaseTripsButton.click();
+  }
+
+  await page.getByRole("button", { name: "Go to step 5" }).click();
+  await pickNowTime(page, "Flight Return Time");
+  await pickNowTime(page, "Hotel Pickup Request Time");
+
+  await expect(saveBaseTripsButton).toBeEnabled();
+  await saveBaseTripsButton.click();
+
+  const saveItineraryButton = page.getByRole("button", { name: "Save Itinerary" });
+  await expect(saveItineraryButton).toBeEnabled();
+  const saveItineraryResponsePromise = page.waitForResponse(
+    (response) => response.url().includes(`/api/groups/${groupCode}`) && response.request().method() === "PUT",
+  );
+  await saveItineraryButton.click();
+  const saveItineraryResponse = await saveItineraryResponsePromise;
+  if (!saveItineraryResponse.ok()) {
+    throw new Error(
+      `Save itinerary failed with ${saveItineraryResponse.status()}: ${await saveItineraryResponse.text()}`,
+    );
+  }
+
+  await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
+  await expect(page.getByText(groupCode)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Build Itinerary" })).toHaveCount(0);
+}
+
 async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string; groupName: string }> {
   const suffix = buildUniqueSuffix();
   const groupCode = `E2E${suffix}`;
@@ -446,48 +481,31 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
   await pickTodayDate(page, "End Date");
   await page.getByLabel("Musyrif Name").fill("Ustadz E2E");
   await page.getByLabel("Phone Number").fill("+6281234567890");
-  await page.getByRole("button", { name: "Next: Visa" }).click();
-  await page.getByRole("button", { name: "Next: Itinerary" }).click();
 
-  const openScheduleDetailButton = page.getByRole("button", { name: "Add Schedule Detail" });
-  if ((await openScheduleDetailButton.count()) > 0) {
-    await openScheduleDetailButton.first().click();
-  }
-
-  const saveBaseTripsButton = page.getByRole("button", { name: "Save 5 Base Trips" });
-  const isSaveBaseTripsVisible =
-    (await saveBaseTripsButton.count()) > 0 && (await saveBaseTripsButton.first().isVisible());
-
-  if (!isSaveBaseTripsVisible) {
-    const addBaseTripsButton = page.getByRole("button", { name: "Add 5 Base Trips" });
-    if ((await addBaseTripsButton.count()) > 0 && (await addBaseTripsButton.first().isVisible())) {
-      await expect(addBaseTripsButton).toBeEnabled();
-      await addBaseTripsButton.click();
-    }
-  }
-
-  await page.getByRole("button", { name: "Go to step 5" }).click();
-  await pickNowTime(page, "Flight Return Time");
-  await pickNowTime(page, "Hotel Pickup Request Time");
-
-  if ((await saveBaseTripsButton.count()) > 0 && (await saveBaseTripsButton.first().isVisible())) {
-    await expect(saveBaseTripsButton).toBeEnabled();
-    await saveBaseTripsButton.click();
-  }
-
-  const saveGroupButton = page.getByRole("button", { name: "Save Group" });
-  await expect(saveGroupButton).toBeEnabled();
+  const createWorkspaceButton = page.getByRole("button", { name: "Create Group Workspace" });
+  await expect(createWorkspaceButton).toBeEnabled();
   const createGroupResponsePromise = page.waitForResponse(
-    (response) => response.url().includes("/api/groups") && response.request().method() === "POST",
+    (response) => response.url().includes("/api/groups/identity") && response.request().method() === "POST",
   );
-  await saveGroupButton.click();
+  await createWorkspaceButton.click();
   const createGroupResponse = await createGroupResponsePromise;
   if (!createGroupResponse.ok()) {
-    throw new Error(`Create group failed with ${createGroupResponse.status()}: ${await createGroupResponse.text()}`);
+    throw new Error(
+      `Create group workspace failed with ${createGroupResponse.status()}: ${await createGroupResponse.text()}`,
+    );
   }
 
-  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
   await expect(page.getByText(groupCode)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Link Agreement" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Build Itinerary" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Back to Groups" }).click();
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
+  const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
+  await expect(createdCard).toBeVisible();
+  await expect(createdCard.getByRole("link", { name: "Link Agreement" })).toBeVisible();
+  await expect(createdCard.getByRole("link", { name: "Build Itinerary" })).toBeVisible();
 
   return { groupCode, groupName };
 }
@@ -553,6 +571,10 @@ test("creates a new group from workspace flow", async ({ page }) => {
   const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
   await expect(createdCard).toBeVisible();
   await expect(createdCard.getByText(groupName)).toBeVisible();
+  await createdCard.getByRole("link", { name: "Build Itinerary" }).click();
+  await saveBaseTripsFromItineraryBuilder(page, groupCode);
+  await page.getByRole("button", { name: "Back to Groups" }).click();
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
 });
 
 test("edits group name from group detail modal", async ({ page }) => {

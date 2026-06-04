@@ -108,7 +108,16 @@ function resolveTaxPercentage(payload: InvoiceExportPayload): number {
 }
 
 function resolveOutstandingBalanceLabel(payload: InvoiceExportPayload): string {
+  if (payload.remainingBalanceIdr <= 0) {
+    return "Lunas";
+  }
+
   return payload.downPaymentIdr > 0 ? "Sisa Tagihan" : "Tagihan";
+}
+
+function isPaidStatusLabel(statusLabel: string, remainingBalanceIdr: number): boolean {
+  const normalizedStatus = statusLabel.trim().toLowerCase();
+  return remainingBalanceIdr <= 0 || normalizedStatus.includes("paid") || normalizedStatus.includes("lunas");
 }
 
 function resolveBankMeta(bankAccountLabel: string): {
@@ -180,7 +189,8 @@ function resolvePrintableWindow(options: InvoiceExportWindowOptions): Window | n
     return reusableWindow;
   }
 
-  return window.open("", "_blank", "width=1180,height=860");
+  const isCompactViewport = window.innerWidth < 768;
+  return isCompactViewport ? window.open("", "_blank") : window.open("", "_blank", "width=1180,height=860");
 }
 
 function waitForTimeout(timeoutMs: number): Promise<void> {
@@ -353,6 +363,8 @@ export async function exportInvoicePdf(
   const appCssUrl = new URL("/index.css", window.location.origin).toString();
   const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const statusLabel = resolvePaymentStatusLabel(payload);
+  const isPaidInvoice = isPaidStatusLabel(statusLabel, payload.remainingBalanceIdr);
+  const printableStatusLabel = isPaidInvoice ? "Lunas" : statusLabel;
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
   const billToName = resolveBillToName(payload);
@@ -417,7 +429,7 @@ export async function exportInvoicePdf(
             height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden;
+            overflow: visible;
             background: #ffffff;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -450,6 +462,41 @@ export async function exportInvoicePdf(
             page-break-after: avoid;
             break-after: avoid;
         }
+        .invoice-paid-stamp {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-width: 36mm;
+            min-height: 14mm;
+            border: 2.5px solid #047857;
+            background: rgba(236, 253, 245, 0.5);
+            color: #047857 !important;
+            border-radius: 7px;
+            padding: 3mm 5mm;
+            font-size: 1.75rem;
+            font-weight: 900;
+            line-height: 1;
+            text-transform: uppercase;
+            transform: rotate(-6deg);
+            box-shadow: inset 0 0 0 3px rgba(4, 120, 87, 0.16), 0 4px 10px rgba(4, 120, 87, 0.12);
+        }
+        .invoice-paid-stamp::before {
+            content: "";
+            position: absolute;
+            inset: 3px;
+            border: 1px solid rgba(4, 120, 87, 0.7);
+            border-radius: 4px;
+        }
+        .invoice-paid-stamp span {
+            position: relative;
+            z-index: 1;
+            color: #047857 !important;
+        }
+        .invoice-paid-total {
+            border-color: #059669 !important;
+            background: #ecfdf5 !important;
+        }
         @media screen {
             html,
             body {
@@ -466,6 +513,10 @@ export async function exportInvoicePdf(
             }
             .print-container {
                 margin: 0 auto;
+                height: auto;
+                min-height: 297mm;
+                max-height: none;
+                overflow: visible;
                 box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
             }
         }
@@ -473,6 +524,7 @@ export async function exportInvoicePdf(
             body {
                 padding: 8px;
                 justify-content: flex-start;
+                overflow-x: auto;
             }
             .print-container {
                 margin: 0;
@@ -481,23 +533,25 @@ export async function exportInvoicePdf(
         @media print {
             html,
             body {
-                width: 100%;
-                height: 100%;
+                width: 210mm;
+                min-width: 210mm;
+                height: auto;
+                min-height: 297mm;
                 margin: 0;
                 padding: 0;
-                overflow: hidden;
+                overflow: visible;
                 background: white;
             }
             .print-container {
                 width: 210mm !important;
                 min-width: 210mm !important;
                 max-width: 210mm !important;
-                height: 297mm !important;
+                height: auto !important;
                 min-height: 297mm !important;
-                max-height: 297mm !important;
+                max-height: none !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                overflow: hidden !important;
+                overflow: visible !important;
                 box-shadow: none !important;
             }
             header {
@@ -519,6 +573,18 @@ export async function exportInvoicePdf(
                 color: var(--invoice-ink) !important;
                 border-top: 2px solid var(--invoice-gold) !important;
                 box-shadow: none !important;
+            }
+            .invoice-paid-stamp,
+            .invoice-paid-total {
+                border-color: #059669 !important;
+                background: #ecfdf5 !important;
+                color: #047857 !important;
+            }
+            .invoice-paid-stamp::before {
+                border-color: rgba(4, 120, 87, 0.7) !important;
+            }
+            .invoice-paid-stamp * {
+                color: #047857 !important;
             }
             .invoice-total-due-label {
                 color: var(--invoice-gold) !important;
@@ -737,6 +803,7 @@ export async function exportInvoicePdf(
 <section class="invoice-block invoice-overview-block px-10 py-6 grid grid-cols-12 gap-5 items-start">
 <div class="col-span-7">
 <h1 class="invoice-main-title font-headline text-5xl font-extrabold text-luxury-black tracking-tighter mb-4">INVOICE</h1>
+${isPaidInvoice ? '<div class="invoice-paid-stamp mb-5"><span>LUNAS</span></div>' : ""}
 <div class="space-y-1">
 <h2 class="invoice-bill-to-name text-lg font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
 </div>
@@ -753,7 +820,7 @@ export async function exportInvoicePdf(
 <div class="pt-4 border-t border-stone-200">
 <div class="flex justify-between items-center">
 <span class="invoice-status-label font-bold text-[10px] uppercase tracking-widest">Status</span>
-<span class="invoice-status-value text-[10px] font-bold uppercase tracking-widest">${escapeHtml(statusLabel)}</span>
+<span class="invoice-status-value text-[10px] font-bold uppercase tracking-widest">${escapeHtml(printableStatusLabel)}</span>
 </div>
 </div>
 </div>
@@ -825,7 +892,7 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
 <span class="font-manrope font-semibold text-red-700">${escapeHtml(formatIdr(payload.downPaymentIdr))}</span>
 </div>
 </div>
-<div class="invoice-total-due-row mt-2 flex justify-between items-center py-2.5">
+<div class="invoice-total-due-row mt-2 flex justify-between items-center py-2.5 ${isPaidInvoice ? "invoice-paid-total px-3 rounded-xl" : ""}">
 <span class="invoice-total-due-label font-bold uppercase tracking-[0.2em] text-[9px]">${escapeHtml(resolveOutstandingBalanceLabel(payload))}</span>
 <span class="invoice-total-due-value font-manrope text-lg font-extrabold tracking-tight">${escapeHtml(formatIdr(payload.remainingBalanceIdr))}</span>
 </div>

@@ -75,6 +75,10 @@ export function buildGroupDetailPath(groupCode: string): string {
   return buildDetailPath("/groups", groupCode);
 }
 
+export function buildGroupItineraryBuilderPath(groupCode: string): string {
+  return buildDetailPath("/itinerary-builder", groupCode);
+}
+
 export function buildVisaDetailPath(groupCode: string): string {
   return buildDetailPath("/visa", groupCode);
 }
@@ -82,6 +86,18 @@ export function buildVisaDetailPath(groupCode: string): string {
 export function resolveDashboardRouteFromPathname(pathname: string): DashboardRouteState {
   const normalizedPathname = normalizePathname(pathname);
   const normalizedLowerPathname = normalizedPathname.toLowerCase();
+
+  if (normalizedLowerPathname.startsWith("/itinerary-builder/")) {
+    const groupCode = normalizeRouteCode(normalizedPathname.slice("/itinerary-builder/".length).split("/")[0] ?? "");
+    if (groupCode) {
+      return {
+        activeNav: "overview",
+        selectedGroupCode: groupCode,
+        selectedVisaGroupCode: null,
+        canonicalPath: buildGroupItineraryBuilderPath(groupCode),
+      };
+    }
+  }
 
   if (normalizedLowerPathname.startsWith("/groups/")) {
     const groupCode = normalizeRouteCode(normalizedPathname.slice("/groups/".length).split("/")[0] ?? "");

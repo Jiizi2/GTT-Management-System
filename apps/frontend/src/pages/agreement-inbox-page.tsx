@@ -1,14 +1,17 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import { Controller, type Control, type FieldErrors, type UseFormRegister, useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import { DatePickerInput } from "../components/date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../components/form-accessibility";
+import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import {
+  assignAgreementDraftInBackend,
   deleteAgreementDraftInBackend,
   saveAgreementDraftInBackend,
   useAgreementDraftsQuery,
@@ -20,7 +23,7 @@ import {
   type HotelAgreementDraft,
   type HotelAgreementDraftFormState,
 } from "../shared/app-domain";
-import { agreementDraftQueryKeys } from "../shared/query-keys";
+import { agreementDraftQueryKeys, groupQueryKeys } from "../shared/query-keys";
 
 const draftSchema = z
   .object({
@@ -51,6 +54,7 @@ const inputClassName =
   "h-11 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
 const textareaClassName =
   "min-h-24 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
+const AGREEMENT_DRAFT_PAGE_SIZE = 8;
 
 function createDefaultDraftForm(): HotelAgreementDraftFormState {
   return {
@@ -97,8 +101,16 @@ function getAssignmentBadgeClasses(draft: HotelAgreementDraft): string {
 
 function getApprovalBadgeClasses(draft: HotelAgreementDraft): string {
   return draft.status === "Approved"
-    ? "border-brand-primary/25 bg-brand-primary/12 text-brand-primary"
-    : "border-slate-200 bg-slate-50 text-slate-700";
+    ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
+    : "border-amber-300 bg-amber-100 text-amber-900";
+}
+
+function getApprovalStatusIconName(draft: HotelAgreementDraft): "check_circle" | "pending_actions" {
+  return draft.status === "Approved" ? "check_circle" : "pending_actions";
+}
+
+function getApprovalStatusLabel(draft: HotelAgreementDraft): "Approved" | "Waiting for Approval" {
+  return draft.status === "Approved" ? "Approved" : "Waiting for Approval";
 }
 
 function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormState {
@@ -493,14 +505,24 @@ function DeleteAgreementDraftModal({
 
 export function AgreementInboxScreen() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const linkedGroupCode = searchParams.get("groupCode")?.trim().toUpperCase() ?? "";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isDraftComposerOpen, setIsDraftComposerOpen] = useState(false);
   const [editingDraft, setEditingDraft] = useState<HotelAgreementDraft | null>(null);
   const [deleteDraftTarget, setDeleteDraftTarget] = useState<HotelAgreementDraft | null>(null);
+  const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
   const draftsQuery = useAgreementDraftsQuery(query, statusFilter);
   const drafts = draftsQuery.data ?? [];
+  const totalPages = Math.max(1, Math.ceil(drafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
+  const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
+  const paginatedDrafts = drafts.slice(pageStartIndex, pageStartIndex + AGREEMENT_DRAFT_PAGE_SIZE);
+  const rangeStart = drafts.length === 0 ? 0 : pageStartIndex + 1;
+  const rangeEnd = drafts.length === 0 ? 0 : Math.min(drafts.length, pageStartIndex + paginatedDrafts.length);
 
   const saveDraftMutation = useMutation({
     mutationFn: saveAgreementDraftInBackend,
@@ -508,6 +530,10 @@ export function AgreementInboxScreen() {
   });
   const deleteDraftMutation = useMutation({
     mutationFn: deleteAgreementDraftInBackend,
+    retry: false,
+  });
+  const assignDraftMutation = useMutation({
+    mutationFn: assignAgreementDraftInBackend,
     retry: false,
   });
 
@@ -540,6 +566,7 @@ export function AgreementInboxScreen() {
         message: "Draft agreement berhasil disimpan.",
       });
       resetDraftForm();
+      setIsDraftComposerOpen(false);
     } catch (error: unknown) {
       setFeedback({
         tone: "error",
@@ -580,6 +607,50 @@ export function AgreementInboxScreen() {
     setFeedback(null);
   };
 
+  const updateAssignmentGroupCode = (draftId: string, groupCode: string) => {
+    setAssignmentGroupCodes((current) => ({
+      ...current,
+      [draftId]: groupCode,
+    }));
+  };
+
+  const assignDraftToGroup = async (draft: HotelAgreementDraft) => {
+    const groupCode = (assignmentGroupCodes[draft.id] ?? linkedGroupCode).trim().toUpperCase();
+    if (!groupCode) {
+      setFeedback({
+        tone: "error",
+        message: "Isi group number sebelum menghubungkan agreement.",
+      });
+      return;
+    }
+
+    setFeedback(null);
+    try {
+      await assignDraftMutation.mutateAsync({
+        draftId: draft.id,
+        groupCode,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
+      setAssignmentGroupCodes((current) => {
+        const next = { ...current };
+        delete next[draft.id];
+        return next;
+      });
+      setFeedback({
+        tone: "success",
+        message: `Agreement berhasil dihubungkan ke group ${groupCode}.`,
+      });
+    } catch (error: unknown) {
+      setFeedback({
+        tone: "error",
+        message: formatMutationError(error, "Agreement belum berhasil dihubungkan ke group."),
+      });
+    }
+  };
+
   const deleteDraft = async (draft: HotelAgreementDraft) => {
     setFeedback(null);
     try {
@@ -610,6 +681,14 @@ export function AgreementInboxScreen() {
       document.body.style.overflow = previousOverflow;
     };
   }, [hasBlockingModal]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
+  }, [totalPages]);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-5 py-5 sm:py-6">
@@ -646,32 +725,67 @@ export function AgreementInboxScreen() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">New Draft Agreement</h2>
+      {linkedGroupCode ? (
+        <section className="rounded-2xl border border-brand-primary/25 bg-brand-primary/12 px-4 py-3 text-brand-primary">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                link
+              </span>
+              <p className="text-sm font-bold">Target group: {linkedGroupCode}</p>
+            </div>
+            <span className="inline-flex w-fit rounded-lg bg-surface-container-lowest px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em]">
+              Prefilled
+            </span>
           </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 shadow-sm sm:px-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-slate-900">New Draft Agreement</h2>
+          </div>
+
+          <button
+            type="button"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/15"
+            onClick={() => setIsDraftComposerOpen((isOpen) => !isOpen)}
+            aria-expanded={isDraftComposerOpen}
+            aria-controls="agreement-draft-composer"
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              {isDraftComposerOpen ? "close" : "add"}
+            </span>
+            <span>{isDraftComposerOpen ? "Close" : "Create Draft"}</span>
+          </button>
         </div>
 
-        <form className="space-y-5" onSubmit={onSubmit}>
-          <AgreementDraftFields control={control} register={register} errors={errors} idPrefix="agreement-draft" />
+        {isDraftComposerOpen ? (
+          <form
+            id="agreement-draft-composer"
+            className="mt-4 space-y-4 border-t border-slate-200 pt-4"
+            onSubmit={onSubmit}
+          >
+            <AgreementDraftFields control={control} register={register} errors={errors} idPrefix="agreement-draft" />
 
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isSaving}
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                save
-              </span>
-              <span>{isSaving ? "Saving..." : "Save Draft"}</span>
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isSaving}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  save
+                </span>
+                <span>{isSaving ? "Saving..." : "Save Draft"}</span>
+              </button>
+            </div>
+          </form>
+        ) : null}
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-2" aria-label="Agreement draft filters">
           {(["unassigned", "assigned", "all"] as AgreementDraftStatusFilter[]).map((filter) => {
             const isActive = statusFilter === filter;
@@ -708,80 +822,181 @@ export function AgreementInboxScreen() {
           </div>
         ) : null}
 
-        {drafts.map((draft) => {
+        {paginatedDrafts.map((draft) => {
           const isAssigned = draft.assignmentStatus === "Assigned";
 
           return (
             <article
               key={draft.id}
-              className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5"
+              className="overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-surface-container-lowest shadow-sm"
             >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="break-words text-lg font-bold text-slate-900">{draft.hotelName}</h3>
-                    <span
-                      className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getAssignmentBadgeClasses(
-                        draft,
-                      )}`}
+              <div className="grid gap-0 lg:grid-cols-[0.82fr_1.18fr]">
+                <div className="border-b border-dashed border-black/45 bg-surface-container-lowest p-5 lg:border-b-0 lg:border-r">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Agreement No</p>
+                      <p className="mt-2 break-words text-2xl font-extrabold leading-none tracking-tight text-slate-900 sm:text-[2rem]">
+                        {draft.agreementNumber}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest/90 text-slate-900 transition hover:bg-surface-container-high"
+                      aria-label={`Edit agreement draft ${draft.agreementNumber}`}
+                      onClick={() => startEditDraft(draft)}
                     >
-                      {draft.assignmentStatus}
-                    </span>
-                    <span
-                      className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getApprovalBadgeClasses(
-                        draft,
-                      )}`}
-                    >
-                      {draft.status}
-                    </span>
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        edit
+                      </span>
+                    </button>
                   </div>
 
-                  {draft.agentName ? (
-                    <p className="mt-1 break-words text-sm font-semibold text-brand-primary">
-                      Agent: {draft.agentName}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 break-words text-sm font-semibold text-slate-700">{draft.agreementNumber}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    {draft.city === "makkah" ? "Makkah" : "Madinah"} - Pax {draft.pax} -{" "}
-                    {formatVisaDateWithYear(draft.stayStartIso)} to {formatVisaDateWithYear(draft.stayEndIso)}
-                  </p>
-                  {draft.notes ? <p className="mt-2 text-sm leading-relaxed text-slate-600">{draft.notes}</p> : null}
-                  <p className="mt-2 text-xs text-slate-500">
-                    {isAssigned && draft.groupCode
-                      ? `Assigned to ${draft.groupCode}${draft.assignedAtIso ? ` on ${formatDraftDateTime(draft.assignedAtIso)}` : ""}`
-                      : `Created ${formatDraftDateTime(draft.createdAtIso)}`}
-                  </p>
+                  <div className="mt-5 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Hotel</p>
+                    <h3 className="break-words text-lg font-bold leading-snug text-slate-900">{draft.hotelName}</h3>
+                    {draft.agentName ? (
+                      <p className="truncate text-sm font-semibold text-brand-primary">Agent: {draft.agentName}</p>
+                    ) : (
+                      <p className="text-sm font-semibold text-slate-500">Agent belum diisi</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="inline-flex rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-800">
+                        {draft.city === "makkah" ? "Makkah" : "Madinah"}
+                      </span>
+                      <span className="inline-flex rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-800">
+                        {draft.pax} Pax
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Check In</p>
+                      <strong className="mt-1 block text-sm font-extrabold text-slate-900 sm:text-base">
+                        {formatVisaDateWithYear(draft.stayStartIso)}
+                      </strong>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Check Out</p>
+                      <strong className="mt-1 block text-sm font-extrabold text-slate-900 sm:text-base">
+                        {formatVisaDateWithYear(draft.stayEndIso)}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-surface-container-lowest text-slate-600 transition hover:border-brand-primary hover:text-brand-primary"
-                    aria-label={`Edit agreement draft ${draft.agreementNumber}`}
-                    onClick={() => startEditDraft(draft)}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      edit
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-brand-tertiary/35 bg-brand-tertiary/12 text-brand-tertiary transition hover:bg-brand-tertiary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label={`Delete agreement draft ${draft.agreementNumber}`}
-                    onClick={() => requestDeleteDraft(draft)}
-                    disabled={deleteDraftMutation.isPending}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      delete
-                    </span>
-                  </button>
+                <div className="space-y-4 bg-surface-container-low p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-on-surface-variant/90">
+                        Agreement Status
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.08em] leading-none ${getApprovalBadgeClasses(
+                            draft,
+                          )}`}
+                        >
+                          <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
+                            {getApprovalStatusIconName(draft)}
+                          </span>
+                          <span>{getApprovalStatusLabel(draft)}</span>
+                        </span>
+                        <span
+                          className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase leading-none tracking-[0.08em] ${getAssignmentBadgeClasses(
+                            draft,
+                          )}`}
+                        >
+                          {draft.assignmentStatus}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-tertiary/35 bg-brand-tertiary/12 text-brand-tertiary transition hover:bg-brand-tertiary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`Delete agreement draft ${draft.agreementNumber}`}
+                      onClick={() => requestDeleteDraft(draft)}
+                      disabled={deleteDraftMutation.isPending}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        delete
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-dashed border-black/20 pt-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                          Group Link
+                        </p>
+                        {isAssigned && draft.groupCode ? (
+                          <p className="mt-1 text-lg font-extrabold leading-tight text-slate-900">{draft.groupCode}</p>
+                        ) : (
+                          <p className="mt-1 text-sm font-bold text-slate-900">Belum terhubung ke group</p>
+                        )}
+                        <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
+                          {isAssigned && draft.groupCode
+                            ? draft.assignedAtIso
+                              ? `Assigned ${formatDraftDateTime(draft.assignedAtIso)}`
+                              : "Agreement sudah assigned"
+                            : `Created ${formatDraftDateTime(draft.createdAtIso)}`}
+                        </p>
+                      </div>
+
+                      {!isAssigned ? (
+                        <div className="flex min-w-0 flex-col gap-2 sm:w-64">
+                          <label className="sr-only" htmlFor={`assign-${draft.id}`}>
+                            Group number
+                          </label>
+                          <input
+                            id={`assign-${draft.id}`}
+                            type="text"
+                            className="h-10 min-w-0 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                            placeholder="Group number"
+                            value={assignmentGroupCodes[draft.id] ?? linkedGroupCode}
+                            onChange={(event) => updateAssignmentGroupCode(draft.id, event.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => void assignDraftToGroup(draft)}
+                            disabled={assignDraftMutation.isPending}
+                          >
+                            <span className="material-symbols-outlined text-base" aria-hidden="true">
+                              link
+                            </span>
+                            <span>{assignDraftMutation.isPending ? "Linking..." : "Link to Group"}</span>
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {draft.notes ? (
+                    <div className="border-t border-dashed border-black/20 pt-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                        Notes
+                      </p>
+                      <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-600">{draft.notes}</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </article>
           );
         })}
       </section>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={drafts.length}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        itemLabel="agreement drafts"
+        onPageChange={(nextPage) => setCurrentPage(Math.max(1, Math.min(totalPages, nextPage)))}
+      />
 
       {editingDraft ? (
         <AgreementDraftEditModal

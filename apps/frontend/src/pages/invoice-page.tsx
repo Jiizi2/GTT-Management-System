@@ -64,6 +64,7 @@ type InvoiceDraftItem = BackendInvoiceItem & {
 type InvoiceWorkspaceInitialData = {
   id: string;
   invoiceNumber: string;
+  sourceInvoiceNumber?: string;
   clientName: string;
   clientLabel: string;
   clientId: string;
@@ -209,6 +210,10 @@ function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): string {
   }
 
   return isDarkMode ? "border-tertiary/35 bg-tertiary/16 text-tertiary" : "border-rose-200 bg-rose-100 text-rose-700";
+}
+
+function getInvoiceStatusDisplayLabel(status: InvoiceStatus): string {
+  return status === "Paid" ? "Paid / Lunas" : status;
 }
 
 function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean): string {
@@ -460,6 +465,20 @@ function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceIni
   };
 }
 
+function createFollowUpInvoiceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
+  const initialData = createInvoiceWorkspaceInitialData(row);
+
+  return {
+    ...initialData,
+    id: `follow-up-${row.id}`,
+    sourceInvoiceNumber: row.invoiceNumber,
+    issuedDateIso: Domain.getLocalIsoDateWithOffset(0),
+    dueDateIso: Domain.getLocalIsoDateWithOffset(7),
+    downPaymentIdr: 0,
+    status: "Pending",
+  };
+}
+
 function resolveInvoiceWorkspaceValidationMessage(errors: FieldErrors<InvoiceWorkspaceFormValues>): string | null {
   const candidateMessages = [
     errors.issueDateIso?.message,
@@ -539,7 +558,7 @@ async function viewInvoicePdfFromRow({
       invoiceNumber: row.invoiceNumber,
       issueDateIso: row.issuedDateIso,
       dueDateIso: row.dueDateIso,
-      statusLabel: row.status,
+      statusLabel: getInvoiceStatusDisplayLabel(row.status),
       issuingOffice: "Bekasi Office",
       clientName: row.clientName,
       clientCode: row.groupCode ?? row.clientLabel,
@@ -646,7 +665,8 @@ export function CreateInvoiceWorkspace({
   const createInvoiceMutation = useCreateInvoiceMutation();
   const updateInvoiceMutation = useUpdateInvoiceMutation();
   const isEditMode = mode === "edit";
-  const resolvedInitialInvoice = isEditMode ? (initialInvoice ?? null) : null;
+  const resolvedInitialInvoice = initialInvoice ?? null;
+  const sourceInvoiceNumber = !isEditMode ? resolvedInitialInvoice?.sourceInvoiceNumber : undefined;
   const initialClientId = resolvedInitialInvoice?.clientId ?? "";
   const resolvedInitialClientName = resolvedInitialInvoice?.clientName.trim() ?? "";
   const hasResolvedInitialClient = initialClientId ? clients.some((client) => client.id === initialClientId) : false;
@@ -681,7 +701,7 @@ export function CreateInvoiceWorkspace({
       address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
       bankAccount: isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "",
       downPaymentIdr: resolvedInitialInvoice?.downPaymentIdr ?? 0,
-      notes: "",
+      notes: sourceInvoiceNumber ? `Invoice lanjutan dari ${sourceInvoiceNumber}.` : "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
     },
   });
@@ -1076,7 +1096,7 @@ export function CreateInvoiceWorkspace({
           invoiceNumber: savedInvoice.invoiceNumber,
           issueDateIso: values.issueDateIso,
           dueDateIso: values.dueDateIso,
-          statusLabel: values.invoiceStatus as InvoiceStatus,
+          statusLabel: getInvoiceStatusDisplayLabel(values.invoiceStatus as InvoiceStatus),
           issuingOffice: values.issuingOffice,
           clientName: savedInvoice.clientName,
           clientCode: linkedGroupCode || savedInvoice.groupCode || savedInvoice.clientLabel,
@@ -1169,6 +1189,21 @@ export function CreateInvoiceWorkspace({
               Backend invoice/database belum terhubung.{" "}
               {isEditMode ? "Save Changes" : "Save Draft dan Generate Invoice"} dinonaktifkan sampai koneksi backend
               kembali normal.
+            </p>
+          </section>
+        ) : null}
+
+        {sourceInvoiceNumber ? (
+          <section
+            className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
+              task_alt
+            </span>
+            <p className="text-xs font-semibold leading-relaxed">
+              Invoice lanjutan dari <strong>{sourceInvoiceNumber}</strong>. Client, group, dan item sudah diprefill.
             </p>
           </section>
         ) : null}
@@ -1823,11 +1858,21 @@ export function CreateInvoiceWorkspace({
                     : "DP belum diisi, jadi total pembayaran masih utuh."}
                 </p>
               </div>
-              <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 px-3 py-2">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3 py-2 ${
+                  remainingBalanceIdr <= 0
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-primary/10 bg-primary/5"
+                }`}
+              >
                 <span className="text-xs font-medium text-on-surface-variant">
-                  {resolveInvoiceOutstandingBalanceLabel(normalizedDownPaymentIdr)}
+                  {resolveInvoiceOutstandingBalanceLabel(normalizedDownPaymentIdr, remainingBalanceIdr)}
                 </span>
-                <strong className="text-xs font-bold text-primary">{formatNumberInput(remainingBalanceIdr)}</strong>
+                <strong
+                  className={`text-xs font-bold ${remainingBalanceIdr <= 0 ? "text-emerald-700" : "text-primary"}`}
+                >
+                  {formatNumberInput(remainingBalanceIdr)}
+                </strong>
               </div>
             </div>
           </article>
@@ -1954,6 +1999,7 @@ export function InvoiceScreen({
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
+  const [draftSourceInvoice, setDraftSourceInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const invoiceDashboardQuery = useInvoiceDashboardQuery();
   const issuingOfficeOptionsQuery = useMasterDataOptionsQuery({
@@ -2092,7 +2138,7 @@ export function InvoiceScreen({
     : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
 
   const handleViewPdf = (row: InvoiceRow) => {
-    const printableWindow = window.open("", "_blank", "width=1180,height=860");
+    const printableWindow = openInvoiceExportWindow();
     if (!printableWindow) {
       setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
       return;
@@ -2121,8 +2167,24 @@ export function InvoiceScreen({
       return;
     }
 
+    setDraftSourceInvoice(null);
     setEditingInvoice(createInvoiceWorkspaceInitialData(row));
     setWorkspaceMode("edit");
+  };
+
+  const handleCreateFollowUpInvoice = (row: InvoiceRow) => {
+    if (!isInvoiceBackendAvailable) {
+      setActionFeedback("Backend invoice/database belum terhubung. Invoice lanjutan dinonaktifkan.");
+      return;
+    }
+
+    if (row.status !== "Paid") {
+      return;
+    }
+
+    setEditingInvoice(null);
+    setDraftSourceInvoice(createFollowUpInvoiceInitialData(row));
+    setWorkspaceMode("create");
   };
 
   useEffect(() => {
@@ -2161,8 +2223,9 @@ export function InvoiceScreen({
   if (workspaceMode === "create") {
     return (
       <CreateInvoiceWorkspace
+        key={draftSourceInvoice ? `create-${draftSourceInvoice.id}` : "create-new"}
         mode="create"
-        initialInvoice={null}
+        initialInvoice={draftSourceInvoice}
         clients={invoiceClients}
         issuingOfficeOptions={issuingOfficeOptions}
         invoiceStatusOptions={invoiceStatusOptions}
@@ -2171,13 +2234,19 @@ export function InvoiceScreen({
         groups={groups}
         isBackendAvailable={isInvoiceBackendAvailable}
         existingInvoiceNumbers={invoiceRows.map((row) => row.invoiceNumber)}
-        onBack={() => setWorkspaceMode("list")}
+        onBack={() => {
+          setWorkspaceMode("list");
+          setDraftSourceInvoice(null);
+        }}
         onCreate={(invoice, action) => {
           setWorkspaceMode("list");
+          setDraftSourceInvoice(null);
           setActionFeedback(
             action === "draft"
               ? `Draft invoice ${invoice.invoiceNumber} saved to database.`
-              : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
+              : draftSourceInvoice?.sourceInvoiceNumber
+                ? `Invoice lanjutan ${invoice.invoiceNumber} dibuat dari ${draftSourceInvoice.sourceInvoiceNumber}.`
+                : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
           );
           setQuery("");
           setStatusFilter("all");
@@ -2208,6 +2277,7 @@ export function InvoiceScreen({
         onBack={() => {
           setWorkspaceMode("list");
           setEditingInvoice(null);
+          setDraftSourceInvoice(null);
         }}
         onCreate={() => {
           // no-op on edit mode
@@ -2289,6 +2359,7 @@ export function InvoiceScreen({
             disabled={!isInvoiceBackendAvailable}
             onClick={() => {
               setEditingInvoice(null);
+              setDraftSourceInvoice(null);
               setWorkspaceMode("create");
             }}
             title={
@@ -2427,7 +2498,13 @@ export function InvoiceScreen({
             {paginatedRows.map((row) => (
               <article
                 key={row.id}
-                className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm"
+                className={`rounded-2xl border p-4 shadow-sm ${
+                  row.status === "Paid"
+                    ? isDarkMode
+                      ? "border-primary/45 bg-primary/10 shadow-ambient"
+                      : "border-emerald-300 bg-emerald-50/80 shadow-[0_16px_34px_rgba(5,150,105,0.14)]"
+                    : "border-slate-200 bg-surface-container-lowest"
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -2442,7 +2519,7 @@ export function InvoiceScreen({
                       isDarkMode,
                     )}`}
                   >
-                    {row.status}
+                    {getInvoiceStatusDisplayLabel(row.status)}
                   </span>
                 </div>
 
@@ -2508,6 +2585,24 @@ export function InvoiceScreen({
                       picture_as_pdf
                     </span>
                   </button>
+                  {row.status === "Paid" ? (
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`Create follow-up invoice for ${row.invoiceNumber}`}
+                      onClick={() => handleCreateFollowUpInvoice(row)}
+                      disabled={!isInvoiceBackendAvailable}
+                      title={
+                        isInvoiceBackendAvailable
+                          ? "Invoice Lanjutan"
+                          : "Backend invoice/database belum terhubung, invoice lanjutan dinonaktifkan."
+                      }
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        add_circle
+                      </span>
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
@@ -2555,7 +2650,13 @@ export function InvoiceScreen({
                   {paginatedRows.map((row) => (
                     <article
                       key={row.id}
-                      className="grid items-center gap-2 px-5 py-4 text-sm transition hover:bg-surface-container-low"
+                      className={`grid items-center gap-2 px-5 py-4 text-sm transition ${
+                        row.status === "Paid"
+                          ? isDarkMode
+                            ? "bg-primary/8 hover:bg-primary/12"
+                            : "bg-emerald-50/70 hover:bg-emerald-50"
+                          : "hover:bg-surface-container-low"
+                      }`}
                       style={{ gridTemplateColumns: "1.2fr 1.05fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
                     >
                       <div>
@@ -2597,11 +2698,29 @@ export function InvoiceScreen({
                             isDarkMode,
                           )}`}
                         >
-                          {row.status}
+                          {getInvoiceStatusDisplayLabel(row.status)}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-end gap-1">
+                        {row.status === "Paid" ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            title={
+                              isInvoiceBackendAvailable
+                                ? "Invoice Lanjutan"
+                                : "Backend invoice/database belum terhubung, invoice lanjutan dinonaktifkan."
+                            }
+                            aria-label={`Create follow-up invoice for ${row.invoiceNumber}`}
+                            onClick={() => handleCreateFollowUpInvoice(row)}
+                            disabled={!isInvoiceBackendAvailable}
+                          >
+                            <span className="material-symbols-outlined text-base" aria-hidden="true">
+                              add_circle
+                            </span>
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"

@@ -48,8 +48,14 @@ import {
   upsertPrimaryRaudhahAppointmentInMemory,
 } from "../infrastructure/groups.memory-store";
 import { groupDetailSelection } from "../infrastructure/groups.prisma-include";
-import { buildGroupCreateData, buildGroupReplaceData } from "../infrastructure/groups.prisma-write-builders";
-import type { ChecklistAssignmentSyncResult, MemoryGroupRecord } from "../groups.service-types";
+import {
+  buildGroupCreateData,
+  buildGroupReplaceData,
+} from "../infrastructure/groups.prisma-write-builders";
+import type {
+  ChecklistAssignmentSyncResult,
+  MemoryGroupRecord,
+} from "../groups.service-types";
 
 function collectSourceDraftIds(payload: CreateGroupDto): string[] {
   return [
@@ -107,7 +113,10 @@ export class GroupsCommandService {
     removeFromMemory(this.memoryGroups, idOrCode);
   }
 
-  async addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<unknown> {
+  async addItineraryItem(
+    idOrCode: string,
+    payload: UpsertGroupItineraryItemDto,
+  ): Promise<unknown> {
     if (this.dataSource === "prisma") {
       return this.addItineraryItemWithPrisma(idOrCode, payload);
     }
@@ -124,10 +133,18 @@ export class GroupsCommandService {
       return this.updateItineraryItemWithPrisma(idOrCode, itemId, payload);
     }
 
-    return updateItineraryItemInMemory(this.memoryGroups, idOrCode, itemId, payload);
+    return updateItineraryItemInMemory(
+      this.memoryGroups,
+      idOrCode,
+      itemId,
+      payload,
+    );
   }
 
-  async removeItineraryItem(idOrCode: string, itemId: string): Promise<unknown> {
+  async removeItineraryItem(
+    idOrCode: string,
+    itemId: string,
+  ): Promise<unknown> {
     if (this.dataSource === "prisma") {
       return this.removeItineraryItemWithPrisma(idOrCode, itemId);
     }
@@ -135,7 +152,10 @@ export class GroupsCommandService {
     return removeItineraryItemInMemory(this.memoryGroups, idOrCode, itemId);
   }
 
-  async addVisaHotelAgreement(idOrCode: string, payload: UpsertGroupVisaHotelDto): Promise<unknown> {
+  async addVisaHotelAgreement(
+    idOrCode: string,
+    payload: UpsertGroupVisaHotelDto,
+  ): Promise<unknown> {
     if (this.dataSource === "prisma") {
       return this.addVisaHotelAgreementWithPrisma(idOrCode, payload);
     }
@@ -149,18 +169,34 @@ export class GroupsCommandService {
     payload: UpsertGroupVisaHotelDto,
   ): Promise<unknown> {
     if (this.dataSource === "prisma") {
-      return this.updateVisaHotelAgreementWithPrisma(idOrCode, hotelId, payload);
+      return this.updateVisaHotelAgreementWithPrisma(
+        idOrCode,
+        hotelId,
+        payload,
+      );
     }
 
-    return updateVisaHotelAgreementInMemory(this.memoryGroups, idOrCode, hotelId, payload);
+    return updateVisaHotelAgreementInMemory(
+      this.memoryGroups,
+      idOrCode,
+      hotelId,
+      payload,
+    );
   }
 
-  async removeVisaHotelAgreement(idOrCode: string, hotelId: string): Promise<unknown> {
+  async removeVisaHotelAgreement(
+    idOrCode: string,
+    hotelId: string,
+  ): Promise<unknown> {
     if (this.dataSource === "prisma") {
       return this.removeVisaHotelAgreementWithPrisma(idOrCode, hotelId);
     }
 
-    return removeVisaHotelAgreementInMemory(this.memoryGroups, idOrCode, hotelId);
+    return removeVisaHotelAgreementInMemory(
+      this.memoryGroups,
+      idOrCode,
+      hotelId,
+    );
   }
 
   async upsertPrimaryRaudhahAppointment(
@@ -171,7 +207,11 @@ export class GroupsCommandService {
       return this.upsertPrimaryRaudhahAppointmentWithPrisma(idOrCode, payload);
     }
 
-    return upsertPrimaryRaudhahAppointmentInMemory(this.memoryGroups, idOrCode, payload);
+    return upsertPrimaryRaudhahAppointmentInMemory(
+      this.memoryGroups,
+      idOrCode,
+      payload,
+    );
   }
 
   async confirmChecklistDriver(
@@ -476,7 +516,9 @@ export class GroupsCommandService {
     });
   }
 
-  private async resolvePrismaGroupIdentity(idOrCode: string): Promise<{ id: string; code: string }> {
+  private async resolvePrismaGroupIdentity(
+    idOrCode: string,
+  ): Promise<{ id: string; code: string }> {
     const group = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -494,7 +536,9 @@ export class GroupsCommandService {
     return group;
   }
 
-  private async resolveOrCreatePrismaVisaSetup(groupId: string): Promise<{ id: string; groupId: string }> {
+  private async resolveOrCreatePrismaVisaSetup(
+    groupId: string,
+  ): Promise<{ id: string; groupId: string }> {
     return this.prisma.visaSetup.upsert({
       where: {
         groupId,
@@ -514,7 +558,9 @@ export class GroupsCommandService {
     });
   }
 
-  private async resolveNextPrismaItinerarySortOrder(groupId: string): Promise<number> {
+  private async resolveNextPrismaItinerarySortOrder(
+    groupId: string,
+  ): Promise<number> {
     const latest = await this.prisma.itineraryItem.findFirst({
       where: {
         groupId,
@@ -549,7 +595,9 @@ export class GroupsCommandService {
     const maxAttempts = requestedSortOrder === undefined ? 3 : 1;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const sortOrder = requestedSortOrder ?? (await this.resolveNextPrismaItinerarySortOrder(group.id));
+      const sortOrder =
+        requestedSortOrder ??
+        (await this.resolveNextPrismaItinerarySortOrder(group.id));
       if (requestedSortOrder !== undefined) {
         const duplicateSortOrder = await this.prisma.itineraryItem.findFirst({
           where: {
@@ -559,7 +607,9 @@ export class GroupsCommandService {
           select: { id: true },
         });
         if (duplicateSortOrder) {
-          throw new ConflictException(`Sort order '${sortOrder}' already exists for this group itinerary.`);
+          throw new ConflictException(
+            `Sort order '${sortOrder}' already exists for this group itinerary.`,
+          );
         }
       }
 
@@ -576,7 +626,9 @@ export class GroupsCommandService {
             meta: payload.meta.trim(),
             icon: payload.icon.trim(),
             highlighted: payload.highlighted ?? false,
-            isoDate: payload.isoDate ? new Date(`${payload.isoDate}T00:00:00.000Z`) : null,
+            isoDate: payload.isoDate
+              ? new Date(`${payload.isoDate}T00:00:00.000Z`)
+              : null,
             time: payload.time?.trim() || null,
             flightNumber: payload.flightNumber?.trim() || null,
             hotelName: payload.hotelName?.trim() || null,
@@ -588,8 +640,10 @@ export class GroupsCommandService {
             notes: payload.notes?.trim() || null,
             transferByTrain: payload.transferByTrain ?? false,
             trainDepartureTime: payload.trainDepartureTime?.trim() || null,
-            destinationPickupTime: payload.destinationPickupTime?.trim() || null,
-            hotelPickupRequestTime: payload.hotelPickupRequestTime?.trim() || null,
+            destinationPickupTime:
+              payload.destinationPickupTime?.trim() || null,
+            hotelPickupRequestTime:
+              payload.hotelPickupRequestTime?.trim() || null,
           },
         });
 
@@ -600,7 +654,9 @@ export class GroupsCommandService {
           error.code === "P2002"
         ) {
           if (requestedSortOrder !== undefined) {
-            throw new ConflictException(`Sort order '${sortOrder}' already exists for this group itinerary.`);
+            throw new ConflictException(
+              `Sort order '${sortOrder}' already exists for this group itinerary.`,
+            );
           }
 
           if (attempt < maxAttempts - 1) {
@@ -616,7 +672,9 @@ export class GroupsCommandService {
       }
     }
 
-    throw new ConflictException("Unable to create itinerary item. Please retry.");
+    throw new ConflictException(
+      "Unable to create itinerary item. Please retry.",
+    );
   }
 
   private async updateItineraryItemWithPrisma(
@@ -637,7 +695,9 @@ export class GroupsCommandService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Itinerary item '${itemId}' not found in group '${idOrCode}'.`);
+      throw new NotFoundException(
+        `Itinerary item '${itemId}' not found in group '${idOrCode}'.`,
+      );
     }
 
     const sortOrder = payload.sortOrder ?? existing.sortOrder;
@@ -653,7 +713,9 @@ export class GroupsCommandService {
         select: { id: true },
       });
       if (duplicateSortOrder) {
-        throw new ConflictException(`Sort order '${sortOrder}' already exists for this group itinerary.`);
+        throw new ConflictException(
+          `Sort order '${sortOrder}' already exists for this group itinerary.`,
+        );
       }
     }
 
@@ -670,7 +732,9 @@ export class GroupsCommandService {
           meta: payload.meta.trim(),
           icon: payload.icon.trim(),
           highlighted: payload.highlighted ?? false,
-          isoDate: payload.isoDate ? new Date(`${payload.isoDate}T00:00:00.000Z`) : null,
+          isoDate: payload.isoDate
+            ? new Date(`${payload.isoDate}T00:00:00.000Z`)
+            : null,
           time: payload.time?.trim() || null,
           flightNumber: payload.flightNumber?.trim() || null,
           hotelName: payload.hotelName?.trim() || null,
@@ -683,7 +747,8 @@ export class GroupsCommandService {
           transferByTrain: payload.transferByTrain ?? false,
           trainDepartureTime: payload.trainDepartureTime?.trim() || null,
           destinationPickupTime: payload.destinationPickupTime?.trim() || null,
-          hotelPickupRequestTime: payload.hotelPickupRequestTime?.trim() || null,
+          hotelPickupRequestTime:
+            payload.hotelPickupRequestTime?.trim() || null,
         },
       });
     } catch (error: unknown) {
@@ -691,7 +756,9 @@ export class GroupsCommandService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        throw new ConflictException(`Sort order '${sortOrder}' already exists for this group itinerary.`);
+        throw new ConflictException(
+          `Sort order '${sortOrder}' already exists for this group itinerary.`,
+        );
       }
 
       throw error;
@@ -700,7 +767,10 @@ export class GroupsCommandService {
     return this.findOneWithPrisma(group.id);
   }
 
-  private async removeItineraryItemWithPrisma(idOrCode: string, itemId: string): Promise<unknown> {
+  private async removeItineraryItemWithPrisma(
+    idOrCode: string,
+    itemId: string,
+  ): Promise<unknown> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const removed = await this.prisma.itineraryItem.deleteMany({
       where: {
@@ -710,7 +780,9 @@ export class GroupsCommandService {
     });
 
     if (removed.count === 0) {
-      throw new NotFoundException(`Itinerary item '${itemId}' not found in group '${idOrCode}'.`);
+      throw new NotFoundException(
+        `Itinerary item '${itemId}' not found in group '${idOrCode}'.`,
+      );
     }
 
     return this.findOneWithPrisma(group.id);
@@ -747,7 +819,9 @@ export class GroupsCommandService {
         stayEnd: payload.stayEnd,
       },
     ];
-    validateHotelAgreementRules(nextHotelAgreements);
+    validateHotelAgreementRules(nextHotelAgreements, {
+      requireMakkah: false,
+    });
 
     await this.prisma.visaHotelAgreement.create({
       data: {
@@ -787,7 +861,9 @@ export class GroupsCommandService {
     const existing = existingHotels.find((hotel) => hotel.id === hotelId);
 
     if (!existing) {
-      throw new NotFoundException(`Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`);
+      throw new NotFoundException(
+        `Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`,
+      );
     }
 
     const nextHotelAgreements = existingHotels.map((hotel) =>
@@ -805,7 +881,9 @@ export class GroupsCommandService {
             stayEnd: hotel.stayEnd.toISOString().slice(0, 10),
           },
     );
-    validateHotelAgreementRules(nextHotelAgreements);
+    validateHotelAgreementRules(nextHotelAgreements, {
+      requireMakkah: false,
+    });
 
     await this.prisma.visaHotelAgreement.update({
       where: { id: hotelId },
@@ -843,7 +921,9 @@ export class GroupsCommandService {
     });
     const target = existingHotels.find((hotel) => hotel.id === hotelId);
     if (!target) {
-      throw new NotFoundException(`Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`);
+      throw new NotFoundException(
+        `Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`,
+      );
     }
 
     const nextHotelAgreements = existingHotels
@@ -854,7 +934,9 @@ export class GroupsCommandService {
         stayStart: hotel.stayStart.toISOString().slice(0, 10),
         stayEnd: hotel.stayEnd.toISOString().slice(0, 10),
       }));
-    validateHotelAgreementRules(nextHotelAgreements);
+    validateHotelAgreementRules(nextHotelAgreements, {
+      requireMakkah: false,
+    });
 
     const removed = await this.prisma.visaHotelAgreement.deleteMany({
       where: {
@@ -866,7 +948,9 @@ export class GroupsCommandService {
     });
 
     if (removed.count === 0) {
-      throw new NotFoundException(`Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`);
+      throw new NotFoundException(
+        `Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`,
+      );
     }
 
     return this.findOneWithPrisma(group.id);
@@ -959,8 +1043,13 @@ export class GroupsCommandService {
         return created;
       });
     } catch (error: unknown) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw new ConflictException(`Group code '${normalizedCode}' already exists.`);
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          `Group code '${normalizedCode}' already exists.`,
+        );
       }
 
       throw error;
@@ -995,7 +1084,9 @@ export class GroupsCommandService {
         select: { id: true },
       });
       if (duplicate && duplicate.id !== current.id) {
-        throw new ConflictException(`Group code '${normalizedCode}' already exists.`);
+        throw new ConflictException(
+          `Group code '${normalizedCode}' already exists.`,
+        );
       }
     }
 
@@ -1009,7 +1100,8 @@ export class GroupsCommandService {
         return;
       }
 
-      const legacySortOrder = legacyItinerarySortOrderById.get(legacyItineraryId);
+      const legacySortOrder =
+        legacyItinerarySortOrderById.get(legacyItineraryId);
       if (legacySortOrder === undefined) {
         return;
       }
@@ -1087,8 +1179,12 @@ export class GroupsCommandService {
           return;
         }
 
-        const mappedItineraryId = newItineraryIdBySortOrder.get(mappedSortOrder);
-        if (!mappedItineraryId || assignment.itineraryItemId === mappedItineraryId) {
+        const mappedItineraryId =
+          newItineraryIdBySortOrder.get(mappedSortOrder);
+        if (
+          !mappedItineraryId ||
+          assignment.itineraryItemId === mappedItineraryId
+        ) {
           return;
         }
 
@@ -1169,8 +1265,12 @@ export class GroupsCommandService {
           status: payload.status?.trim() ?? current.status,
           packageName: payload.packageName?.trim() ?? current.packageName,
         }),
-        arrivalDate: payload.arrivalDate ? toUtcMidnightDate(nextArrivalDateIso) : undefined,
-        returnDate: payload.returnDate ? toUtcMidnightDate(nextReturnDateIso) : undefined,
+        arrivalDate: payload.arrivalDate
+          ? toUtcMidnightDate(nextArrivalDateIso)
+          : undefined,
+        returnDate: payload.returnDate
+          ? toUtcMidnightDate(nextReturnDateIso)
+          : undefined,
         tone: payload.tone,
         pax: payload.pax,
         totalBuses: payload.totalBuses,

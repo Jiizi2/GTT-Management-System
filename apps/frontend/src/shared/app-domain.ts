@@ -156,6 +156,32 @@ export type GroupData = {
   checklistAssignments?: GroupChecklistAssignment[];
 };
 
+export type GroupCompletenessIssueKey =
+  | "missing-identity"
+  | "missing-agreement"
+  | "missing-makkah-agreement"
+  | "missing-madinah-agreement"
+  | "missing-itinerary"
+  | "pax-mismatch"
+  | "date-mismatch";
+
+export type GroupCompletenessIssue = {
+  key: GroupCompletenessIssueKey;
+  severity: "warning" | "error";
+  label: string;
+  message: string;
+};
+
+export type GroupCompletenessState = "ready" | "incomplete" | "action-required";
+
+export type GroupCompletenessSummary = {
+  state: GroupCompletenessState;
+  isReadyForOperations: boolean;
+  issues: GroupCompletenessIssue[];
+  primaryMessage: string;
+  badgeLabel: string;
+};
+
 export type ScheduleFormState = {
   category: string;
   date: string;
@@ -1233,7 +1259,10 @@ export function normalizeGroupStatus(group: GroupData): GroupData {
   const normalizedReturnDateCandidate = isIsoDateValue(currentReturnDate) ? currentReturnDate : fallbackReturnDate;
   const normalizedReturnDate =
     normalizedReturnDateCandidate >= normalizedArrivalDate ? normalizedReturnDateCandidate : normalizedArrivalDate;
-  const tone = resolveCurrentGroupTone(resolveGroupToneByItinerary(normalizedItinerary), normalizedItinerary);
+  const tone =
+    normalizedItinerary.length === 0
+      ? group.tone
+      : resolveCurrentGroupTone(resolveGroupToneByItinerary(normalizedItinerary), normalizedItinerary);
   const overviewSnapshot = buildOverviewSnapshotFromItinerary(normalizedItinerary, group);
   return {
     ...group,
@@ -1243,7 +1272,7 @@ export function normalizeGroupStatus(group: GroupData): GroupData {
     timeline: overviewSnapshot.timeline,
     nextActivity: overviewSnapshot.nextActivity,
     tone,
-    status: getStatusByTone(tone),
+    status: normalizedItinerary.length === 0 && group.status.trim() ? group.status : getStatusByTone(tone),
     totalBuses: resolveTotalBusCount(group.pax, group.totalBuses),
   };
 }
@@ -2290,6 +2319,127 @@ function resolveItineraryBoundaryIsoDates(itinerary: ItineraryItem[]): {
   };
 }
 
+function collectGroupAgreementHotels(group: GroupData): GroupAgreementHotel[] {
+  return [...getGroupAgreementHotelsByCity(group, "makkah"), ...getGroupAgreementHotelsByCity(group, "madinah")];
+}
+
+function resolveAgreementDateBounds(group: GroupData): {
+  earliestAgreementIsoDate: string | null;
+  latestAgreementIsoDate: string | null;
+} {
+  const dates = collectGroupAgreementHotels(group)
+    .flatMap((hotel) => [hotel.stayStartIso, hotel.stayEndIso])
+    .map((value) => value.trim())
+    .filter(isIsoDateValue)
+    .sort();
+
+  return {
+    earliestAgreementIsoDate: dates[0] ?? null,
+    latestAgreementIsoDate: dates.at(-1) ?? null,
+  };
+}
+
+function hasAgreementPaxMismatch(group: GroupData): boolean {
+  const groupPax = Math.max(1, group.pax);
+  return collectGroupAgreementHotels(group).some((hotel) => hotel.pax > 0 && hotel.pax !== groupPax);
+}
+
+export function resolveGroupCompleteness(group: GroupData): GroupCompletenessSummary {
+  const issues: GroupCompletenessIssue[] = [];
+  const hasIdentity = Boolean(group.code.trim() && group.name.trim() && group.pax > 0);
+  const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
+  const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
+  const hasMakkahAgreement = makkahAgreements.length > 0;
+  const hasMadinahAgreement = madinahAgreements.length > 0;
+  const hasAnyAgreement = hasMakkahAgreement || hasMadinahAgreement;
+  const hasItinerary = group.itinerary.length > 0;
+  const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary);
+  const { earliestAgreementIsoDate, latestAgreementIsoDate } = resolveAgreementDateBounds(group);
+
+  if (!hasIdentity) {
+    issues.push({
+      key: "missing-identity",
+      severity: "error",
+      label: "Identity",
+      message: "Group identity belum lengkap.",
+    });
+  }
+
+  if (!hasAnyAgreement) {
+    issues.push({
+      key: "missing-agreement",
+      severity: "warning",
+      label: "Agreement",
+      message: "Agreement hotel belum tersambung.",
+    });
+  } else {
+    if (!hasMakkahAgreement) {
+      issues.push({
+        key: "missing-makkah-agreement",
+        severity: "warning",
+        label: "Makkah",
+        message: "Agreement Makkah belum tersambung.",
+      });
+    }
+
+    if (!hasMadinahAgreement) {
+      issues.push({
+        key: "missing-madinah-agreement",
+        severity: "warning",
+        label: "Madinah",
+        message: "Agreement Madinah belum tersambung.",
+      });
+    }
+  }
+
+  if (!hasItinerary) {
+    issues.push({
+      key: "missing-itinerary",
+      severity: "warning",
+      label: "Itinerary",
+      message: "Itinerary belum dibuat atau belum dihubungkan.",
+    });
+  }
+
+  if (hasAgreementPaxMismatch(group)) {
+    issues.push({
+      key: "pax-mismatch",
+      severity: "warning",
+      label: "Pax",
+      message: "Pax agreement berbeda dengan pax group.",
+    });
+  }
+
+  if (
+    hasAnyAgreement &&
+    hasItinerary &&
+    earliestAgreementIsoDate &&
+    latestAgreementIsoDate &&
+    earliestIsoDate &&
+    latestIsoDate &&
+    (earliestAgreementIsoDate !== earliestIsoDate || latestAgreementIsoDate !== latestIsoDate)
+  ) {
+    issues.push({
+      key: "date-mismatch",
+      severity: "warning",
+      label: "Dates",
+      message: "Tanggal agreement belum selaras dengan batas itinerary.",
+    });
+  }
+
+  const hasError = issues.some((issue) => issue.severity === "error");
+  const state: GroupCompletenessState = issues.length === 0 ? "ready" : hasError ? "action-required" : "incomplete";
+  const primaryMessage = issues[0]?.message ?? "Group sudah punya identity, agreement, dan itinerary yang tersambung.";
+
+  return {
+    state,
+    isReadyForOperations: state === "ready",
+    issues,
+    primaryMessage,
+    badgeLabel: state === "ready" ? "Ready" : state === "action-required" ? "Action Required" : "Incomplete",
+  };
+}
+
 export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTrackingRow[] {
   return groups.map((group, index) => {
     const visaSetup = group.visaSetup;
@@ -2313,38 +2463,30 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
     const departureIso = customAgreementDateRange.makkahStartIso;
     const returnIso = customAgreementDateRange.madinahEndIso;
 
-    const visaStatus: VisaStatus =
-      visaSetup?.visaStatus ?? (index % 6 === 0 ? "Draft" : index % 4 === 0 ? "Pending" : "Issued");
-    const paymentStatus: VisaPaymentStatus =
-      visaSetup?.paymentStatus ?? (index % 5 === 0 ? "Unpaid" : index % 3 === 0 ? "Partial" : "Paid");
+    const visaStatus: VisaStatus = visaSetup?.visaStatus ?? "Draft";
+    const paymentStatus: VisaPaymentStatus = visaSetup?.paymentStatus ?? "Unpaid";
     const configuredIssuedDate = visaSetup?.issuedDate?.trim() ?? "";
     const issuedDateIso =
       visaStatus === "Issued" ? (isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : departureIso) : "";
 
     const pax = Math.max(1, group.pax);
-    const visaDelayFactor = visaStatus === "Issued" ? 0 : 1;
-    const defaultMakkahGap = (index % 5 === 0 ? Math.max(1, Math.ceil(pax * 0.12)) : 0) + visaDelayFactor;
-    const defaultMadinahGap = (index % 4 === 0 ? Math.max(1, Math.ceil(pax * 0.18)) : 0) + visaDelayFactor;
-    const fallbackMakkahVerified = Math.max(0, pax - Math.min(pax, defaultMakkahGap));
-    const fallbackMadinahVerified = Math.max(0, pax - Math.min(pax, defaultMadinahGap));
-    const mappedMakkahVerified = visaSetup
-      ? Math.min(
-          pax,
-          Math.max(
-            0,
-            visaSetup.makkahHotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
-          ),
-        )
-      : fallbackMakkahVerified;
-    const mappedMadinahVerified = visaSetup
-      ? Math.min(
-          pax,
-          Math.max(
-            0,
-            visaSetup.madinahHotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
-          ),
-        )
-      : fallbackMadinahVerified;
+    const mappedMakkahVerified = Math.min(
+      pax,
+      Math.max(
+        0,
+        getGroupAgreementHotelsByCity(group, "makkah").reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
+      ),
+    );
+    const mappedMadinahVerified = Math.min(
+      pax,
+      Math.max(
+        0,
+        getGroupAgreementHotelsByCity(group, "madinah").reduce(
+          (total, hotel) => total + Math.max(0, hotel.pax || 0),
+          0,
+        ),
+      ),
+    );
     const makkahVerified = mappedMakkahVerified;
     const madinahVerified = mappedMadinahVerified;
 

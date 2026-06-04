@@ -8,7 +8,6 @@ import {
   musyrifAvatar,
   parseTimeForInput,
   resolveTotalBusCount,
-  resolveVisaProvider,
 } from "../shared/app-domain";
 import type {
   AgreementApprovalStatus,
@@ -26,6 +25,19 @@ import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
 
 export type GroupFetchProjection = "summary" | "detail";
+
+export type GroupIdentityDraftPayload = {
+  groupCode: string;
+  groupName?: string;
+  packageName?: string;
+  pax?: number;
+  totalBuses?: number;
+  arrivalDate?: string;
+  returnDate?: string;
+  durationDays?: number;
+  musyrifName?: string;
+  musyrifPhone?: string;
+};
 
 type BackendCreateGroupPayload = {
   code: string;
@@ -412,7 +424,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
 
   if (group.visaSetup) {
     const normalizedIssuedDate = group.visaSetup.issuedDate?.trim() ?? "";
-    const resolvedSyarikah = group.visaSetup.syarikah.trim() || resolveVisaProvider(group.packageName);
+    const resolvedSyarikah = group.visaSetup.syarikah.trim() || "Not assigned";
     payload.visaSetup = {
       visaStatus: mapVisaStatusToBackend(group.visaSetup.visaStatus),
       issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate) ? normalizedIssuedDate : undefined,
@@ -953,7 +965,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     ? {
         visaStatus: mapBackendVisaStatus(group.visaSetup.visaStatus),
         issuedDate: toIsoDate(group.visaSetup.issuedDate) ?? "",
-        syarikah: readString(group.visaSetup.syarikah, resolveVisaProvider(readString(group.packageName))),
+        syarikah: readString(group.visaSetup.syarikah, "Not assigned"),
         busStatus: resolvedBusStatus,
         paymentStatus: mapBackendPaymentStatus(group.visaSetup.paymentStatus),
         makkahHotels: mappedHotelsByCity.makkahHotels,
@@ -1116,6 +1128,51 @@ export async function createGroupInBackend(group: GroupData): Promise<void> {
   if (!response.ok) {
     throw new Error(formatBackendRequestError(response.status, responsePayload, responseText, "Backend sync failed"));
   }
+}
+
+export async function createGroupIdentityInBackend(identity: GroupIdentityDraftPayload): Promise<GroupData> {
+  const body = {
+    code: identity.groupCode.trim().toUpperCase(),
+    name: identity.groupName?.trim() || undefined,
+    packageName: identity.packageName?.trim() || undefined,
+    pax: identity.pax,
+    totalBuses: identity.totalBuses,
+    arrivalDate: identity.arrivalDate?.trim() || undefined,
+    returnDate: identity.returnDate?.trim() || undefined,
+    durationDays: identity.durationDays,
+    musyrif:
+      identity.musyrifName?.trim() || identity.musyrifPhone?.trim()
+        ? {
+            name: identity.musyrifName?.trim() || "Unassigned Musyrif",
+            phone: identity.musyrifPhone?.trim() || "-",
+            avatar: musyrifAvatar,
+          }
+        : undefined,
+  };
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed("/groups/identity", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Identity create failed"),
+    );
+  }
+
+  const mappedGroup = mapBackendGroupToFrontend(responsePayload as BackendGroupRecord);
+  if (!mappedGroup) {
+    throw new Error("Identity create failed: response is not a group record.");
+  }
+
+  return mappedGroup;
 }
 
 export async function updateGroupInBackend(groupCode: string, group: GroupData): Promise<void> {

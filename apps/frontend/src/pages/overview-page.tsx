@@ -222,43 +222,48 @@ export function OverviewScreen({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[11rem]">
-            <SereneSelect
-              className="serene-select-pill h-9 w-full pr-9"
-              value={overviewMonthFilter}
-              onChange={(event) => onOverviewMonthFilterChange(event.target.value)}
-              showCaret={false}
-              aria-label="Filter overview month"
-            >
-              {overviewMonthOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </SereneSelect>
-            <span
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-base text-on-surface-variant"
-              aria-hidden="true"
-            >
-              calendar_month
-            </span>
-          </div>
-
-          <button
-            type="button"
-            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-bold leading-none transition ${
-              isActiveOnly
-                ? "bg-primary text-on-primary shadow-cta-soft"
-                : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
-            }`}
-            onClick={() => onToggleActiveOnly(!isActiveOnly)}
-            aria-pressed={isActiveOnly}
+          <div
+            className="inline-flex min-h-9 max-w-full overflow-hidden rounded-xl border border-outline-variant/45 bg-surface-container-lowest shadow-sm"
+            aria-label="Overview filters"
           >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              filter_alt
-            </span>
-            <span>Active only</span>
-          </button>
+            <div className="relative min-w-[10.5rem]">
+              <SereneSelect
+                className="h-9 w-full border-none bg-transparent pl-3 pr-8 text-sm font-bold text-on-surface-variant outline-none"
+                value={overviewMonthFilter}
+                onChange={(event) => onOverviewMonthFilterChange(event.target.value)}
+                showCaret={false}
+                aria-label="Filter overview month"
+              >
+                {overviewMonthOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SereneSelect>
+              <span
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-base text-on-surface-variant"
+                aria-hidden="true"
+              >
+                calendar_month
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className={`inline-flex min-h-9 items-center gap-1.5 border-l border-outline-variant/45 px-2.5 text-sm font-bold leading-none transition ${
+                isActiveOnly
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
+              }`}
+              onClick={() => onToggleActiveOnly(!isActiveOnly)}
+              aria-pressed={isActiveOnly}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                filter_alt
+              </span>
+              <span>Active only</span>
+            </button>
+          </div>
 
           {hasQuery ? (
             <button

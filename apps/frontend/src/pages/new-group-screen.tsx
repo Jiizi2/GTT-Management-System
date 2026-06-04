@@ -8,6 +8,7 @@ import { DatePickerInput } from "../components/date-time-pickers";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useAgreementDraftsQuery } from "../hooks/use-agreement-drafts-query";
+import type { GroupIdentityDraftPayload } from "../hooks/use-app-controller-backend";
 import type {
   AgreementApprovalStatus,
   BusStatus,
@@ -44,6 +45,7 @@ const visaServiceOptionSchema = z.enum(["Visa Only", "Visa+"]);
 const paymentStatusSchema = z.enum(["Paid", "Unpaid"]);
 const agreementApprovalStatusSchema = z.enum(["Waiting for Approval", "Approved"]);
 const raudhahStatusSchema = z.enum(["Free", "After", "Before"]);
+const EMPTY_AGREEMENT_FORMS: NewGroupAgreementFormState[] = [];
 
 const newGroupAgreementFormSchema = z.object({
   id: z.string(),
@@ -394,8 +396,8 @@ export function NewGroupScreen({
       }),
     [makkahHotels, madinahHotels],
   );
-  const savedMakkahHotels = savedAgreementSnapshot?.makkahHotels ?? [];
-  const savedMadinahHotels = savedAgreementSnapshot?.madinahHotels ?? [];
+  const savedMakkahHotels = savedAgreementSnapshot?.makkahHotels ?? EMPTY_AGREEMENT_FORMS;
+  const savedMadinahHotels = savedAgreementSnapshot?.madinahHotels ?? EMPTY_AGREEMENT_FORMS;
   const savedAgreementDateConnection = useMemo(
     () => validateConnectedAgreementDates(savedMakkahHotels, savedMadinahHotels),
     [savedMadinahHotels, savedMakkahHotels],
@@ -1190,29 +1192,14 @@ export function NewGroupScreen({
 
 export function AddGroupWorkspaceScreen({
   onSaveGroup,
+  onSaveIdentity,
   onCancel,
 }: {
   onSaveGroup: (group: GroupData) => void;
+  onSaveIdentity: (identity: GroupIdentityDraftPayload) => void;
   onCancel: () => void;
 }) {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-  const [visitedSteps, setVisitedSteps] = useState<Record<1 | 2 | 3, boolean>>({
-    1: true,
-    2: false,
-    3: false,
-  });
   const [identityDraft, setIdentityDraft] = useState<NewGroupItineraryDraft | null>(null);
-  const [setupDraft, setSetupDraft] = useState<NewGroupSetupDraft | null>(null);
-  const [itineraryDetailDraft, setItineraryDetailDraft] = useState<NewGroupItineraryDraft | null>(null);
-  const [itineraryPrefill, setItineraryPrefill] = useState<ItineraryPrefill | null>(null);
-
-  const itineraryDraft =
-    identityDraft || itineraryDetailDraft
-      ? {
-          ...(identityDraft ?? {}),
-          ...(itineraryDetailDraft ?? {}),
-        }
-      : null;
 
   const isIdentityStepComplete = Boolean(
     identityDraft?.groupCode?.trim() &&
@@ -1227,48 +1214,23 @@ export function AddGroupWorkspaceScreen({
     identityDraft?.musyrifName?.trim() &&
     identityDraft?.musyrifPhone?.trim(),
   );
-  const canOpenSetupStep = isIdentityStepComplete;
-  const canOpenItineraryStep = isIdentityStepComplete && Boolean(setupDraft?.canProceed);
-  const isItineraryStepComplete = Boolean(itineraryDetailDraft?.itinerary?.length);
-  const canSaveGroup = canOpenItineraryStep && isItineraryStepComplete && Boolean(setupDraft);
 
-  useEffect(() => {
-    setVisitedSteps((currentVisitedSteps) =>
-      currentVisitedSteps[currentStep] ? currentVisitedSteps : { ...currentVisitedSteps, [currentStep]: true },
-    );
-  }, [currentStep]);
-
-  useEffect(() => {
-    if (currentStep === 3 && !canOpenItineraryStep) {
-      setCurrentStep(2);
+  const handleSaveIdentityWorkspace = () => {
+    if (!identityDraft || !isIdentityStepComplete) {
       return;
     }
 
-    if (currentStep === 2 && !canOpenSetupStep) {
-      setCurrentStep(1);
-    }
-  }, [canOpenItineraryStep, canOpenSetupStep, currentStep]);
-
-  const handleSaveWorkspaceGroup = () => {
-    if (!identityDraft || !setupDraft || !canSaveGroup) {
-      return;
-    }
-
-    onSaveGroup(
-      buildNewGroupPayload({
-        resolvedGroupCode: identityDraft.groupCode?.trim().toUpperCase() ?? "",
-        resolvedGroupName: identityDraft.groupName?.trim() ?? "",
-        safePax: setupDraft.safePax,
-        visaStatus: setupDraft.visaStatus,
-        syarikahName: setupDraft.syarikahName,
-        busStatus: setupDraft.busStatus === "Visa+" ? "Visa+" : undefined,
-        paymentStatus: setupDraft.paymentStatus,
-        makkahHotels: setupDraft.makkahHotels,
-        madinahHotels: setupDraft.madinahHotels,
-        raudhahDates: setupDraft.raudhahDates,
-        itineraryDraft,
-      }),
-    );
+    onSaveIdentity({
+      groupCode: identityDraft.groupCode?.trim().toUpperCase() ?? "",
+      groupName: identityDraft.groupName?.trim(),
+      packageName: identityDraft.packageName?.trim(),
+      pax: identityDraft.pax,
+      totalBuses: identityDraft.totalBuses,
+      arrivalDate: identityDraft.startDate,
+      returnDate: identityDraft.endDate,
+      musyrifName: identityDraft.musyrifName?.trim(),
+      musyrifPhone: identityDraft.musyrifPhone?.trim(),
+    });
   };
 
   return (
@@ -1296,142 +1258,60 @@ export function AddGroupWorkspaceScreen({
             Add New Group
           </h1>
           <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-            <span className="sm:hidden">Semua kebutuhan group dalam satu alur.</span>
-            <span className="hidden sm:inline">Semua kebutuhan pembuatan group dan itinerary ada dalam satu alur.</span>
+            <span className="sm:hidden">Buat workspace group dari data entry.</span>
+            <span className="hidden sm:inline">
+              Buat workspace group dari nomor entry, lalu sambungkan agreement dan itinerary secara terpisah.
+            </span>
           </p>
         </div>
       </section>
 
-      {visitedSteps[1] || currentStep === 1 ? (
-        <div className={currentStep === 1 ? "space-y-6" : "hidden"} aria-hidden={currentStep !== 1}>
-          <section className="serene-section p-5 sm:p-6">
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Step 1 of 3</p>
-            <h2 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface">Group Identity</h2>
-            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-              Isi identitas group, rentang tanggal, kebutuhan bus, dan PIC musyrif sebelum masuk ke setup visa.
-            </p>
-          </section>
+      <Suspense fallback={<ItinerarySectionFallback label="Loading group identity form..." />}>
+        <LazyInputItineraryScreen
+          onSaveGroup={onSaveGroup}
+          hideHeader
+          hideSaveAction
+          sectionMode="identity-only"
+          onItineraryDraftChange={setIdentityDraft}
+        />
+      </Suspense>
 
-          <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary identity form..." />}>
-            <LazyInputItineraryScreen
-              onSaveGroup={onSaveGroup}
-              hideHeader
-              hideSaveAction
-              sectionMode="identity-only"
-              onItineraryDraftChange={setIdentityDraft}
-            />
-          </Suspense>
-
-          <section className="serene-section">
-            <div className="serene-form-actions serene-form-actions-fill">
-              <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="serene-btn-primary min-h-11 w-full sm:w-auto"
-                onClick={() => setCurrentStep(2)}
-                disabled={!canOpenSetupStep}
-              >
-                Next: Visa
-              </button>
+      <section className="serene-section">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 px-4 py-3 text-on-tertiary-fixed-variant">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                link
+              </span>
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em]">Agreement</p>
             </div>
-          </section>
-        </div>
-      ) : null}
-
-      {visitedSteps[2] || currentStep === 2 ? (
-        <div className={currentStep === 2 ? "space-y-6" : "hidden"} aria-hidden={currentStep !== 2}>
-          <section className="serene-section p-5 sm:p-6">
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Step 2 of 3</p>
-            <h2 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface">
-              Visa & Booking Setup
-            </h2>
-            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-              Lengkapi visa, hotel agreement, raudhah, dan payment. Jika hotel agreement sudah siap, klik save untuk
-              validasi lalu sync ke itinerary.
-            </p>
-          </section>
-
-          <NewGroupScreen
-            onSaveGroup={onSaveGroup}
-            onCancel={onCancel}
-            hideHeader
-            hideGroupInformation
-            hideFooterActions
-            itineraryDraft={itineraryDraft}
-            onItineraryPrefillChange={setItineraryPrefill}
-            onSetupDraftChange={setSetupDraft}
-          />
-
-          <section className="serene-section">
-            <div className="serene-form-actions-split serene-form-actions-fill">
-              <button
-                type="button"
-                className="serene-btn-secondary min-h-11 w-full sm:w-auto"
-                onClick={() => setCurrentStep(1)}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="serene-btn-primary min-h-11 w-full sm:w-auto"
-                onClick={() => setCurrentStep(3)}
-                disabled={!canOpenItineraryStep}
-              >
-                Next: Itinerary
-              </button>
+            <p className="mt-2 text-sm font-semibold">Pending link</p>
+          </div>
+          <div className="rounded-2xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 px-4 py-3 text-on-tertiary-fixed-variant">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                travel_explore
+              </span>
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em]">Itinerary</p>
             </div>
-          </section>
+            <p className="mt-2 text-sm font-semibold">Pending builder</p>
+          </div>
         </div>
-      ) : null}
 
-      {visitedSteps[3] || currentStep === 3 ? (
-        <div className={currentStep === 3 ? "space-y-6" : "hidden"} aria-hidden={currentStep !== 3}>
-          <section className="serene-section p-5 sm:p-6">
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Step 3 of 3</p>
-            <h2 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface">
-              Itinerary / Add Schedule
-            </h2>
-            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-              Susun itinerary group. Setelah minimal satu itinerary terisi, group siap disimpan.
-            </p>
-          </section>
-
-          <Suspense fallback={<ItinerarySectionFallback label="Loading itinerary schedule form..." />}>
-            <LazyInputItineraryScreen
-              onSaveGroup={onSaveGroup}
-              hideHeader
-              hideSaveAction
-              sectionMode="schedule-only"
-              identityDraft={identityDraft}
-              itineraryPrefill={itineraryPrefill}
-              emitIdentityInDraft={false}
-              onItineraryDraftChange={setItineraryDetailDraft}
-            />
-          </Suspense>
-
-          <section className="serene-section">
-            <div className="serene-form-actions-split serene-form-actions-fill">
-              <button
-                type="button"
-                className="serene-btn-secondary min-h-11 w-full sm:w-auto"
-                onClick={() => setCurrentStep(2)}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="serene-btn-primary min-h-11 w-full sm:w-auto"
-                onClick={handleSaveWorkspaceGroup}
-                disabled={!canSaveGroup}
-              >
-                Save Group
-              </button>
-            </div>
-          </section>
+        <div className="serene-form-actions-split serene-form-actions-fill mt-5">
+          <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="serene-btn-primary min-h-11 w-full sm:w-auto"
+            onClick={handleSaveIdentityWorkspace}
+            disabled={!isIdentityStepComplete}
+          >
+            Create Group Workspace
+          </button>
         </div>
-      ) : null}
+      </section>
     </div>
   );
 }

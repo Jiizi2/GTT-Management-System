@@ -8,6 +8,7 @@ const {
   formatScheduleTime,
   parseDisplayDateToIso,
   parseTimeForInput,
+  resolveGroupCompleteness,
   resolveTotalBusCount,
 } = Domain;
 
@@ -221,6 +222,18 @@ function getStatusLabel(tone: GroupData["tone"]): string {
   return tone === "active" ? "Active" : "Inactive";
 }
 
+function getCompletenessBadgeClasses(state: ReturnType<typeof resolveGroupCompleteness>["state"]): string {
+  if (state === "ready") {
+    return "border-primary/25 bg-primary/12 text-primary";
+  }
+
+  if (state === "action-required") {
+    return "border-error-container/70 bg-error-container text-on-error-container";
+  }
+
+  return "border-tertiary-fixed/70 bg-tertiary-fixed text-on-tertiary-fixed-variant";
+}
+
 function getServiceTypeBadgeLabel(group: GroupData): string {
   if (group.visaSetup?.busStatus === "Visa+") {
     return "Visa+";
@@ -244,32 +257,44 @@ function getRequiredBusBadgeLabel(group: GroupData): string | null {
 export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDetail: (groupCode: string) => void }) {
   const itineraryPreview = buildItineraryPreview(group);
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
+  const completeness = resolveGroupCompleteness(group);
   const metadataBadges = [
     `${group.pax} Pax`,
     ...(busBadgeLabel ? [busBadgeLabel] : []),
     group.packageName,
     getServiceTypeBadgeLabel(group),
   ];
+  const visibleIssues = completeness.issues.slice(0, 2);
+  const hiddenIssueCount = Math.max(0, completeness.issues.length - visibleIssues.length);
 
   return (
     <article className="serene-card flex h-full w-full flex-col px-5 py-6">
-      <div className="mx-1 mb-7 py-1">
-        <div className="flex flex-wrap items-start gap-x-2 gap-y-2">
-          <span className="min-w-0 font-display text-2xl font-extrabold tracking-tighter text-primary sm:text-3xl xl:text-4xl">
-            {group.code}
-          </span>
+      <div className="mx-1 mb-4 py-1">
+        <span className="block break-words font-display text-2xl font-extrabold leading-none tracking-tighter text-primary sm:text-3xl xl:text-4xl">
+          {group.code}
+        </span>
+        <h2 className="mt-2 truncate font-display text-lg font-bold leading-tight text-on-surface-variant">
+          {group.name}
+        </h2>
+        <div className="mt-2 flex min-h-4 flex-wrap items-center gap-1.5" aria-label="Group status">
           <span
-            className={`ml-auto inline-flex shrink-0 whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getStatusBadgeClasses(
+            className={`inline-flex whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.08em] ${getStatusBadgeClasses(
               group.tone,
             )}`}
           >
             {getStatusLabel(group.tone)}
           </span>
+          <span
+            className={`inline-flex whitespace-nowrap rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.08em] ${getCompletenessBadgeClasses(
+              completeness.state,
+            )}`}
+          >
+            {completeness.badgeLabel}
+          </span>
         </div>
-        <h2 className="font-display text-lg font-bold text-on-surface-variant">{group.name}</h2>
       </div>
 
-      <div className="mx-1 mb-7 flex min-h-[3.5rem] flex-wrap content-start gap-2 py-1">
+      <div className="mx-1 mb-4 flex min-h-[3rem] flex-wrap content-start gap-2 py-1">
         {metadataBadges.map((label, index) => (
           <span
             key={`${group.code}-${index}-${label}`}
@@ -282,6 +307,42 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
           </span>
         ))}
       </div>
+
+      {!completeness.isReadyForOperations ? (
+        <section
+          className="mx-1 mb-4 rounded-lg border border-tertiary-fixed/60 bg-tertiary-fixed/55 px-2.5 py-2 text-on-tertiary-fixed-variant"
+          aria-label="Group completion warning"
+        >
+          <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-2">
+            <span
+              className="material-symbols-outlined inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-container-lowest text-[15px]"
+              aria-hidden="true"
+            >
+              pending_actions
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-bold leading-snug" title={completeness.primaryMessage}>
+                {completeness.primaryMessage}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {visibleIssues.map((issue) => (
+                  <span
+                    key={issue.key}
+                    className="rounded-md bg-surface-container-lowest/75 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em]"
+                  >
+                    {issue.label}
+                  </span>
+                ))}
+                {hiddenIssueCount > 0 ? (
+                  <span className="rounded-md bg-surface-container-lowest/75 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em]">
+                    +{hiddenIssueCount}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mx-1 mb-8 pt-1" aria-label="Itinerary preview">
         <div className="mb-3 flex items-center justify-between gap-3 px-1">

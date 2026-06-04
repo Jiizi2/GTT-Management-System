@@ -19,6 +19,9 @@ const LazyInvoiceScreen = lazy(async () => ({
 const LazyGroupDetail = lazy(async () => ({
   default: (await import("../pages/group-detail-page")).GroupDetail,
 }));
+const LazyGroupItineraryBuilderPage = lazy(async () => ({
+  default: (await import("../pages/group-itinerary-builder-page")).GroupItineraryBuilderPage,
+}));
 const LazyOverviewScreen = lazy(async () => ({
   default: (await import("../pages/overview-page")).OverviewScreen,
 }));
@@ -127,10 +130,30 @@ export function AppMainContent({ controller }: { controller: AppController }) {
           }
         />
         <Route
+          path="/itinerary-builder/:groupCode"
+          element={
+            controller.selectedGroup ? (
+              <LazyGroupItineraryBuilderPage
+                group={controller.selectedGroup}
+                onBack={controller.handleOpenDetail}
+                onSaveGroup={controller.handleSaveGroupDetail}
+              />
+            ) : (
+              <LazyPlaceholderScreen
+                eyebrow="Itinerary Builder"
+                title="Group belum ditemukan"
+                description="Endpoint itinerary builder sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
+                icon="edit_note"
+              />
+            )
+          }
+        />
+        <Route
           path="/new-group"
           element={
             <LazyAddGroupWorkspaceScreen
               onSaveGroup={controller.handleSaveInputGroup}
+              onSaveIdentity={controller.handleSaveGroupIdentity}
               onCancel={controller.handleBackToOverview}
             />
           }

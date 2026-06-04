@@ -578,6 +578,10 @@ export function VisaTrackingScreen({
           <section className="space-y-3 md:hidden" aria-label="Visa tracking cards">
             {paginatedRows.map((row) => {
               const group = groupByCode.get(row.groupCode);
+              const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
+              const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
+              const hasMakkahAgreement = makkahAgreements.length > 0;
+              const hasMadinahAgreement = madinahAgreements.length > 0;
               const makkahAgreementNumber = resolveVisaAgreementNumber(row, group, "makkah");
               const madinahAgreementNumber = resolveVisaAgreementNumber(row, group, "madinah");
               const visaTypeLabel = resolveVisaTypeLabel(group);
@@ -617,27 +621,36 @@ export function VisaTrackingScreen({
                         {makkahAgreementNumber}
                       </strong>
                       <small className={`block text-xs ${agreementDateTextClassName}`}>
-                        {formatVisaShortDate(agreementDateRange.makkahStartIso)} -{" "}
-                        {formatVisaShortDate(agreementDateRange.makkahEndIso)}
+                        {hasMakkahAgreement
+                          ? `${formatVisaShortDate(agreementDateRange.makkahStartIso)} - ${formatVisaShortDate(
+                              agreementDateRange.makkahEndIso,
+                            )}`
+                          : "Stay dates pending"}
                       </small>
-                      <SereneSelect
-                        value={toAgreementStatusSelectValue(makkahAgreementStatus)}
-                        className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
-                          makkahAgreementStatus,
-                          isDarkMode,
-                        )}`}
-                        onChange={(event) =>
-                          onUpdateAgreementStatus(
-                            row.groupCode,
-                            "makkah",
-                            fromAgreementStatusSelectValue(event.target.value),
-                          )
-                        }
-                        aria-label={`Update Makkah agreement status for ${row.groupCode}`}
-                      >
-                        <option value="approved">Approved</option>
-                        <option value="waiting">Waiting</option>
-                      </SereneSelect>
+                      {hasMakkahAgreement ? (
+                        <SereneSelect
+                          value={toAgreementStatusSelectValue(makkahAgreementStatus)}
+                          className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
+                            makkahAgreementStatus,
+                            isDarkMode,
+                          )}`}
+                          onChange={(event) =>
+                            onUpdateAgreementStatus(
+                              row.groupCode,
+                              "makkah",
+                              fromAgreementStatusSelectValue(event.target.value),
+                            )
+                          }
+                          aria-label={`Update Makkah agreement status for ${row.groupCode}`}
+                        >
+                          <option value="approved">Approved</option>
+                          <option value="waiting">Waiting</option>
+                        </SereneSelect>
+                      ) : (
+                        <span className="mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[10px] font-bold leading-none text-on-tertiary-fixed-variant">
+                          Not linked
+                        </span>
+                      )}
                     </div>
 
                     <div className="rounded-xl bg-slate-50 p-3">
@@ -648,27 +661,36 @@ export function VisaTrackingScreen({
                         {madinahAgreementNumber}
                       </strong>
                       <small className={`block text-xs ${agreementDateTextClassName}`}>
-                        {formatVisaShortDate(agreementDateRange.madinahStartIso)} -{" "}
-                        {formatVisaShortDate(agreementDateRange.madinahEndIso)}
+                        {hasMadinahAgreement
+                          ? `${formatVisaShortDate(agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
+                              agreementDateRange.madinahEndIso,
+                            )}`
+                          : "Stay dates pending"}
                       </small>
-                      <SereneSelect
-                        value={toAgreementStatusSelectValue(madinahAgreementStatus)}
-                        className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
-                          madinahAgreementStatus,
-                          isDarkMode,
-                        )}`}
-                        onChange={(event) =>
-                          onUpdateAgreementStatus(
-                            row.groupCode,
-                            "madinah",
-                            fromAgreementStatusSelectValue(event.target.value),
-                          )
-                        }
-                        aria-label={`Update Madinah agreement status for ${row.groupCode}`}
-                      >
-                        <option value="approved">Approved</option>
-                        <option value="waiting">Waiting</option>
-                      </SereneSelect>
+                      {hasMadinahAgreement ? (
+                        <SereneSelect
+                          value={toAgreementStatusSelectValue(madinahAgreementStatus)}
+                          className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
+                            madinahAgreementStatus,
+                            isDarkMode,
+                          )}`}
+                          onChange={(event) =>
+                            onUpdateAgreementStatus(
+                              row.groupCode,
+                              "madinah",
+                              fromAgreementStatusSelectValue(event.target.value),
+                            )
+                          }
+                          aria-label={`Update Madinah agreement status for ${row.groupCode}`}
+                        >
+                          <option value="approved">Approved</option>
+                          <option value="waiting">Waiting</option>
+                        </SereneSelect>
+                      ) : (
+                        <span className="mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[10px] font-bold leading-none text-on-tertiary-fixed-variant">
+                          Not linked
+                        </span>
+                      )}
                     </div>
 
                     <div className="rounded-xl bg-slate-50 p-3">
@@ -761,6 +783,10 @@ export function VisaTrackingScreen({
                 <div className="divide-y divide-slate-100">
                   {paginatedRows.map((row) => {
                     const group = groupByCode.get(row.groupCode);
+                    const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
+                    const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
+                    const hasMakkahAgreement = makkahAgreements.length > 0;
+                    const hasMadinahAgreement = madinahAgreements.length > 0;
                     const makkahAgreementNumber = resolveVisaAgreementNumber(row, group, "makkah");
                     const madinahAgreementNumber = resolveVisaAgreementNumber(row, group, "madinah");
                     const visaTypeLabel = resolveVisaTypeLabel(group);
@@ -783,7 +809,9 @@ export function VisaTrackingScreen({
                       >
                         <div className="font-semibold text-slate-800">{row.groupCode}</div>
 
-                        <div className="font-medium text-slate-700">{row.groupName}</div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-700">{row.groupName}</p>
+                        </div>
 
                         <div>
                           <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
@@ -796,27 +824,36 @@ export function VisaTrackingScreen({
                             {makkahAgreementNumber}
                           </strong>
                           <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
-                            {formatVisaShortDate(agreementDateRange.makkahStartIso)} -{" "}
-                            {formatVisaShortDate(agreementDateRange.makkahEndIso)}
+                            {hasMakkahAgreement
+                              ? `${formatVisaShortDate(agreementDateRange.makkahStartIso)} - ${formatVisaShortDate(
+                                  agreementDateRange.makkahEndIso,
+                                )}`
+                              : "Stay dates pending"}
                           </small>
-                          <SereneSelect
-                            value={toAgreementStatusSelectValue(makkahAgreementStatus)}
-                            className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
-                              makkahAgreementStatus,
-                              isDarkMode,
-                            )}`}
-                            onChange={(event) =>
-                              onUpdateAgreementStatus(
-                                row.groupCode,
-                                "makkah",
-                                fromAgreementStatusSelectValue(event.target.value),
-                              )
-                            }
-                            aria-label={`Update Makkah agreement status for ${row.groupCode}`}
-                          >
-                            <option value="approved">Approved</option>
-                            <option value="waiting">Waiting</option>
-                          </SereneSelect>
+                          {hasMakkahAgreement ? (
+                            <SereneSelect
+                              value={toAgreementStatusSelectValue(makkahAgreementStatus)}
+                              className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
+                                makkahAgreementStatus,
+                                isDarkMode,
+                              )}`}
+                              onChange={(event) =>
+                                onUpdateAgreementStatus(
+                                  row.groupCode,
+                                  "makkah",
+                                  fromAgreementStatusSelectValue(event.target.value),
+                                )
+                              }
+                              aria-label={`Update Makkah agreement status for ${row.groupCode}`}
+                            >
+                              <option value="approved">Approved</option>
+                              <option value="waiting">Waiting</option>
+                            </SereneSelect>
+                          ) : (
+                            <span className="inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[11px] font-bold leading-none text-on-tertiary-fixed-variant">
+                              Not linked
+                            </span>
+                          )}
                         </div>
 
                         <div className="space-y-0.5">
@@ -824,27 +861,36 @@ export function VisaTrackingScreen({
                             {madinahAgreementNumber}
                           </strong>
                           <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
-                            {formatVisaShortDate(agreementDateRange.madinahStartIso)} -{" "}
-                            {formatVisaShortDate(agreementDateRange.madinahEndIso)}
+                            {hasMadinahAgreement
+                              ? `${formatVisaShortDate(agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
+                                  agreementDateRange.madinahEndIso,
+                                )}`
+                              : "Stay dates pending"}
                           </small>
-                          <SereneSelect
-                            value={toAgreementStatusSelectValue(madinahAgreementStatus)}
-                            className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
-                              madinahAgreementStatus,
-                              isDarkMode,
-                            )}`}
-                            onChange={(event) =>
-                              onUpdateAgreementStatus(
-                                row.groupCode,
-                                "madinah",
-                                fromAgreementStatusSelectValue(event.target.value),
-                              )
-                            }
-                            aria-label={`Update Madinah agreement status for ${row.groupCode}`}
-                          >
-                            <option value="approved">Approved</option>
-                            <option value="waiting">Waiting</option>
-                          </SereneSelect>
+                          {hasMadinahAgreement ? (
+                            <SereneSelect
+                              value={toAgreementStatusSelectValue(madinahAgreementStatus)}
+                              className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
+                                madinahAgreementStatus,
+                                isDarkMode,
+                              )}`}
+                              onChange={(event) =>
+                                onUpdateAgreementStatus(
+                                  row.groupCode,
+                                  "madinah",
+                                  fromAgreementStatusSelectValue(event.target.value),
+                                )
+                              }
+                              aria-label={`Update Madinah agreement status for ${row.groupCode}`}
+                            >
+                              <option value="approved">Approved</option>
+                              <option value="waiting">Waiting</option>
+                            </SereneSelect>
+                          ) : (
+                            <span className="inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[11px] font-bold leading-none text-on-tertiary-fixed-variant">
+                              Not linked
+                            </span>
+                          )}
                         </div>
 
                         <div className="space-y-0.5 justify-self-center text-center">

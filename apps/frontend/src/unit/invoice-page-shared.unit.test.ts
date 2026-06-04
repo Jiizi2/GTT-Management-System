@@ -78,5 +78,6 @@ describe("invoice-page-shared", () => {
   runCase("resolves outstanding balance label from down payment presence", () => {
     assert.equal(resolveInvoiceOutstandingBalanceLabel(0), "Tagihan");
     assert.equal(resolveInvoiceOutstandingBalanceLabel(1), "Sisa Tagihan");
+    assert.equal(resolveInvoiceOutstandingBalanceLabel(1_000_000, 0), "Lunas");
   });
 });

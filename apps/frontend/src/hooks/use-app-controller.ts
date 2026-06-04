@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { formatLocalIsoDate } from "../shared/app-domain";
 import type { GroupData, SessionAccessTier, VisaTrackingRow } from "../shared/app-domain";
 import type { AppController } from "./app-controller/types";
 import { useDashboardGroupRecords } from "./app-controller/use-dashboard-group-records";
@@ -7,10 +6,6 @@ import { useDashboardRouteState } from "./app-controller/use-dashboard-route-sta
 import { useDashboardSyncFeedback } from "./app-controller/use-dashboard-sync-feedback";
 
 export type { AppController, OverviewStatCard, SyncFeedback } from "./app-controller/types";
-
-function getCurrentMonthKey(referenceDate = new Date()): string {
-  return formatLocalIsoDate(referenceDate).slice(0, 7);
-}
 
 function resolveDocumentTitle({
   activeNav,
@@ -80,7 +75,7 @@ function isLocalDevelopmentHost(): boolean {
 export function useAppController(sessionAccessTier: SessionAccessTier): AppController {
   const [query, setQuery] = useState("");
   const [isActiveOnly, setIsActiveOnly] = useState(true);
-  const [overviewMonthFilter, setOverviewMonthFilter] = useState(() => getCurrentMonthKey());
+  const [overviewMonthFilter, setOverviewMonthFilter] = useState("all");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const allowLocalFallback = isLocalDevelopmentHost();
 
@@ -146,6 +141,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleBackToVisaTracking: routeState.handleBackToVisaTracking,
     handleOpenNewGroup: routeState.handleOpenNewGroup,
     handleSaveInputGroup: groupRecordsState.handleSaveInputGroup,
+    handleSaveGroupIdentity: groupRecordsState.handleSaveGroupIdentity,
     handleSaveGroupDetail: groupRecordsState.handleSaveGroupDetail,
     handleSaveVisaGroupDetail: groupRecordsState.handleSaveVisaGroupDetail,
     dismissSyncFeedback,
