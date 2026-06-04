@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import * as Domain from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import type {
@@ -574,6 +575,13 @@ export function GroupDetail({
     () => resolveGroupCompleteness({ ...group, itinerary: itineraryItems }),
     [group, itineraryItems],
   );
+  const shouldShowLinkAgreementAction = completeness.issues.some(
+    (issue) =>
+      issue.key === "missing-agreement" ||
+      issue.key === "missing-makkah-agreement" ||
+      issue.key === "missing-madinah-agreement",
+  );
+  const shouldShowCreateItineraryAction = completeness.issues.some((issue) => issue.key === "missing-itinerary");
 
   const persistGroupSnapshot = ({
     nextItinerary = itineraryItems,
@@ -1152,6 +1160,35 @@ export function GroupDetail({
                 ))}
               </div>
             </div>
+
+            {shouldShowLinkAgreementAction || shouldShowCreateItineraryAction ? (
+              <div className="mt-4 flex flex-col gap-2 border-t border-on-tertiary-fixed-variant/15 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                {shouldShowLinkAgreementAction ? (
+                  <Link
+                    to={`/agreement-inbox?groupCode=${encodeURIComponent(group.code)}`}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-on-tertiary-fixed-variant/20 bg-surface-container-lowest px-3 text-sm font-bold text-brand-primary transition hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      link
+                    </span>
+                    <span>Link Agreement</span>
+                  </Link>
+                ) : null}
+
+                {shouldShowCreateItineraryAction ? (
+                  <button
+                    type="button"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-brand-primary px-3 text-sm font-bold text-on-primary transition hover:bg-primary-container"
+                    onClick={handleOpenScheduleModal}
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      add_circle
+                    </span>
+                    <span>Create Itinerary</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         ) : null}
 

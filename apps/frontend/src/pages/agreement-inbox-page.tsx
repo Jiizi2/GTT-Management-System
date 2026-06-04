@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import { Controller, type Control, type FieldErrors, type UseFormRegister, useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -494,6 +495,8 @@ function DeleteAgreementDraftModal({
 
 export function AgreementInboxScreen() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const linkedGroupCode = searchParams.get("groupCode")?.trim().toUpperCase() ?? "";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
   const [editingDraft, setEditingDraft] = useState<HotelAgreementDraft | null>(null);
@@ -594,7 +597,7 @@ export function AgreementInboxScreen() {
   };
 
   const assignDraftToGroup = async (draft: HotelAgreementDraft) => {
-    const groupCode = assignmentGroupCodes[draft.id]?.trim().toUpperCase() ?? "";
+    const groupCode = (assignmentGroupCodes[draft.id] ?? linkedGroupCode).trim().toUpperCase();
     if (!groupCode) {
       setFeedback({
         tone: "error",
@@ -694,6 +697,12 @@ export function AgreementInboxScreen() {
         >
           {feedback.message}
         </div>
+      ) : null}
+
+      {linkedGroupCode ? (
+        <section className="rounded-2xl border border-brand-primary/25 bg-brand-primary/12 px-4 py-3 text-sm font-semibold text-brand-primary">
+          Draft unassigned akan otomatis memakai group <strong>{linkedGroupCode}</strong> saat dihubungkan.
+        </section>
       ) : null}
 
       <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
@@ -839,7 +848,7 @@ export function AgreementInboxScreen() {
                     type="text"
                     className="h-10 min-w-0 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 sm:w-52"
                     placeholder="Group number"
-                    value={assignmentGroupCodes[draft.id] ?? ""}
+                    value={assignmentGroupCodes[draft.id] ?? linkedGroupCode}
                     onChange={(event) => updateAssignmentGroupCode(draft.id, event.target.value)}
                   />
                   <button
