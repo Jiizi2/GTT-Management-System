@@ -66,6 +66,7 @@ export function buildMemoryVisaHotelAgreement(
   return {
     id,
     city: payload.city,
+    sourceDraftId: payload.sourceDraftId?.trim() || undefined,
     hotelName: payload.hotelName.trim(),
     agreementNumber: payload.agreementNumber.trim(),
     pax: payload.pax,

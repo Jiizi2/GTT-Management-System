@@ -14,6 +14,7 @@ import {
   assignAgreementDraftInBackend,
   deleteAgreementDraftInBackend,
   saveAgreementDraftInBackend,
+  unassignAgreementDraftInBackend,
   useAgreementDraftsQuery,
   type AgreementDraftStatusFilter,
 } from "../hooks/use-agreement-drafts-query";
@@ -516,7 +517,10 @@ export function AgreementInboxScreen() {
   const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
-  const draftsQuery = useAgreementDraftsQuery(query, statusFilter);
+  const normalizedSearchQuery = query.trim();
+  const isSearchingAcrossStatuses = normalizedSearchQuery.length > 0;
+  const effectiveStatusFilter: AgreementDraftStatusFilter = isSearchingAcrossStatuses ? "all" : statusFilter;
+  const draftsQuery = useAgreementDraftsQuery(query, effectiveStatusFilter);
   const drafts = draftsQuery.data ?? [];
   const totalPages = Math.max(1, Math.ceil(drafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
@@ -534,6 +538,10 @@ export function AgreementInboxScreen() {
   });
   const assignDraftMutation = useMutation({
     mutationFn: assignAgreementDraftInBackend,
+    retry: false,
+  });
+  const unassignDraftMutation = useMutation({
+    mutationFn: unassignAgreementDraftInBackend,
     retry: false,
   });
 
@@ -669,6 +677,26 @@ export function AgreementInboxScreen() {
     }
   };
 
+  const unassignDraftFromGroup = async (draft: HotelAgreementDraft) => {
+    setFeedback(null);
+    try {
+      await unassignDraftMutation.mutateAsync(draft.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
+      setFeedback({
+        tone: "success",
+        message: `Agreement ${draft.agreementNumber} berhasil dikembalikan ke Unassigned.`,
+      });
+    } catch (error: unknown) {
+      setFeedback({
+        tone: "error",
+        message: formatMutationError(error, "Agreement belum berhasil di-unassign dari group."),
+      });
+    }
+  };
+
   useEffect(() => {
     if (!hasBlockingModal) {
       return undefined;
@@ -698,12 +726,16 @@ export function AgreementInboxScreen() {
           <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Agreement Inbox</h1>
         </div>
 
-        <label className="serene-page-search w-full sm:max-w-sm" aria-label="Search agreement drafts">
+        <label
+          className="serene-page-search w-full cursor-text border border-transparent transition focus-within:border-brand-primary/25 focus-within:ring-2 focus-within:ring-brand-primary/15 sm:max-w-sm"
+          aria-label="Search agreement drafts"
+        >
           <span className="material-symbols-outlined text-slate-400" aria-hidden="true">
             search
           </span>
           <input
             type="search"
+            className="serene-page-search-input h-full"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search agreement..."
@@ -788,7 +820,7 @@ export function AgreementInboxScreen() {
       <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-2" aria-label="Agreement draft filters">
           {(["unassigned", "assigned", "all"] as AgreementDraftStatusFilter[]).map((filter) => {
-            const isActive = statusFilter === filter;
+            const isActive = effectiveStatusFilter === filter;
             const label = filter === "all" ? "All" : filter === "assigned" ? "Assigned" : "Unassigned";
             return (
               <button
@@ -915,8 +947,9 @@ export function AgreementInboxScreen() {
                       type="button"
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-tertiary/35 bg-brand-tertiary/12 text-brand-tertiary transition hover:bg-brand-tertiary/20 disabled:cursor-not-allowed disabled:opacity-50"
                       aria-label={`Delete agreement draft ${draft.agreementNumber}`}
+                      title={isAssigned ? "Unassign agreement before deleting it." : undefined}
                       onClick={() => requestDeleteDraft(draft)}
-                      disabled={deleteDraftMutation.isPending}
+                      disabled={deleteDraftMutation.isPending || isAssigned}
                     >
                       <span className="material-symbols-outlined text-base" aria-hidden="true">
                         delete
@@ -944,7 +977,19 @@ export function AgreementInboxScreen() {
                         </p>
                       </div>
 
-                      {!isAssigned ? (
+                      {isAssigned ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-100 px-3 text-sm font-bold text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => void unassignDraftFromGroup(draft)}
+                          disabled={unassignDraftMutation.isPending}
+                        >
+                          <span className="material-symbols-outlined text-base" aria-hidden="true">
+                            link_off
+                          </span>
+                          <span>{unassignDraftMutation.isPending ? "Unassigning..." : "Unassign"}</span>
+                        </button>
+                      ) : (
                         <div className="flex min-w-0 flex-col gap-2 sm:w-64">
                           <label className="sr-only" htmlFor={`assign-${draft.id}`}>
                             Group number
@@ -969,7 +1014,7 @@ export function AgreementInboxScreen() {
                             <span>{assignDraftMutation.isPending ? "Linking..." : "Link to Group"}</span>
                           </button>
                         </div>
-                      ) : null}
+                      )}
                     </div>
                   </div>
 

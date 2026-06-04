@@ -6,7 +6,11 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
-import { assignAgreementDraftInBackend, useAgreementDraftsQuery } from "../hooks/use-agreement-drafts-query";
+import {
+  assignAgreementDraftInBackend,
+  unassignAgreementDraftInBackend,
+  useAgreementDraftsQuery,
+} from "../hooks/use-agreement-drafts-query";
 import { buildRaudhahReminderTemplate } from "../shared/raudhah-reminder-template.js";
 import { agreementDraftQueryKeys, groupQueryKeys } from "../shared/query-keys";
 import { DatePickerInput } from "../components/date-time-pickers";
@@ -145,11 +149,71 @@ function formatAgreementStayRange(agreement: GroupAgreementHotel): string {
   return `End ${formatVisaDateWithYear(stayEndIso)}`;
 }
 
-function formatAgreementSummary(agreement: GroupAgreementHotel): string {
-  const agreementNumber = agreement.agreementNumber?.trim() || "Agreement number pending";
-  const paxLabel = Number.isFinite(agreement.pax) ? agreement.pax.toString() : "0";
+function formatAgreementStayDate(value: string | undefined): string {
+  const isoDate = value?.trim() ?? "";
+  return isoDate ? formatVisaDateWithYear(isoDate) : "Pending";
+}
 
-  return `${agreementNumber} - Pax ${paxLabel} - ${formatAgreementStayRange(agreement)}`;
+function AgreementSummaryFields({ agreement }: { agreement: GroupAgreementHotel }) {
+  const agreementNumber = agreement.agreementNumber?.trim() || "Agreement number pending";
+  const paxLabel = Number.isFinite(agreement.pax) ? agreement.pax.toString() : "-";
+
+  return (
+    <div className="flex w-full flex-wrap gap-2">
+      <div className="min-w-[13rem] flex-1 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            confirmation_number
+          </span>
+          Agreement No
+        </span>
+        <strong className="mt-1 block break-all text-sm font-extrabold leading-snug text-slate-900">
+          {agreementNumber}
+        </strong>
+      </div>
+
+      <div className="min-w-[5.5rem] rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            group
+          </span>
+          Pax
+        </span>
+        <strong className="mt-1 block text-lg font-black leading-none text-slate-900">{paxLabel}</strong>
+      </div>
+
+      <div className="min-w-[12rem] flex-1 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            event
+          </span>
+          Stay
+        </span>
+        <strong className="mt-1 block text-sm font-extrabold leading-snug text-slate-900">
+          {formatAgreementStayRange(agreement)}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+function AgreementExpandedFields({ agreement }: { agreement: GroupAgreementHotel }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      <div className="rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Check In</span>
+        <strong className="mt-1 block text-sm font-extrabold text-slate-900">
+          {formatAgreementStayDate(agreement.stayStartIso)}
+        </strong>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Check Out</span>
+        <strong className="mt-1 block text-sm font-extrabold text-slate-900">
+          {formatAgreementStayDate(agreement.stayEndIso)}
+        </strong>
+      </div>
+    </div>
+  );
 }
 
 function formatAgreementDraftStayRange(draft: HotelAgreementDraft): string {
@@ -169,6 +233,33 @@ function formatAgreementDraftStayRange(draft: HotelAgreementDraft): string {
   }
 
   return "Stay dates pending";
+}
+
+function normalizeAgreementMatchValue(value: string | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function doesAgreementMatchAssignedDraft({
+  draft,
+  agreement,
+  city,
+  groupCode,
+}: {
+  draft: HotelAgreementDraft;
+  agreement: GroupAgreementHotel;
+  city: "makkah" | "madinah";
+  groupCode: string;
+}): boolean {
+  if (agreement.sourceDraftId && agreement.sourceDraftId === draft.id) {
+    return true;
+  }
+
+  return (
+    draft.assignmentStatus === "Assigned" &&
+    draft.city === city &&
+    normalizeAgreementMatchValue(draft.groupCode) === normalizeAgreementMatchValue(groupCode) &&
+    normalizeAgreementMatchValue(draft.agreementNumber) === normalizeAgreementMatchValue(agreement.agreementNumber)
+  );
 }
 
 function formatVisaMutationError(error: unknown, fallback: string): string {
@@ -555,7 +646,7 @@ export function VisaTrackingDetailScreen({
   onClearRaudhahAppointment: (groupCode: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const agreementDraftsQuery = useAgreementDraftsQuery("", "unassigned");
+  const agreementDraftsQuery = useAgreementDraftsQuery("", "all");
   const [paymentStatus, setPaymentStatus] = useState<VisaPaymentStatus>(row.paymentStatus);
   const [activeModal, setActiveModal] = useState<
     "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | null
@@ -570,8 +661,10 @@ export function VisaTrackingDetailScreen({
   const [deleteAgreementDraft, setDeleteAgreementDraft] = useState<{
     city: "makkah" | "madinah";
     agreement: GroupAgreementHotel;
+    draft?: HotelAgreementDraft;
   } | null>(null);
   const [assigningAgreementDraftId, setAssigningAgreementDraftId] = useState<string | null>(null);
+  const [unassigningAgreementDraftId, setUnassigningAgreementDraftId] = useState<string | null>(null);
   const [draftAssignFeedback, setDraftAssignFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -656,6 +749,40 @@ export function VisaTrackingDetailScreen({
       ),
     };
   }, [agreementDraftsQuery.data, connectedAgreementKeys]);
+  const assignedDraftByAgreementId = useMemo(() => {
+    const drafts = agreementDraftsQuery.data ?? [];
+    const draftByAgreementId = new Map<string, HotelAgreementDraft>();
+
+    for (const agreement of makkahAgreements) {
+      const assignedDraft = drafts.find((draft) =>
+        doesAgreementMatchAssignedDraft({
+          draft,
+          agreement,
+          city: "makkah",
+          groupCode: row.groupCode,
+        }),
+      );
+      if (assignedDraft) {
+        draftByAgreementId.set(agreement.id, assignedDraft);
+      }
+    }
+
+    for (const agreement of madinahAgreements) {
+      const assignedDraft = drafts.find((draft) =>
+        doesAgreementMatchAssignedDraft({
+          draft,
+          agreement,
+          city: "madinah",
+          groupCode: row.groupCode,
+        }),
+      );
+      if (assignedDraft) {
+        draftByAgreementId.set(agreement.id, assignedDraft);
+      }
+    }
+
+    return draftByAgreementId;
+  }, [agreementDraftsQuery.data, madinahAgreements, makkahAgreements, row.groupCode]);
 
   const makkahAssigned = Math.min(totalPax, row.makkahVerified);
   const madinahAssigned = Math.min(totalPax, row.madinahVerified);
@@ -798,12 +925,13 @@ export function VisaTrackingDetailScreen({
     city: "makkah" | "madinah",
     agreement: GroupAgreementHotel,
     isStoredAgreement: boolean,
+    draft?: HotelAgreementDraft,
   ) => {
     if (!isStoredAgreement) {
       return;
     }
 
-    setDeleteAgreementDraft({ city, agreement });
+    setDeleteAgreementDraft({ city, agreement, draft });
   };
 
   const openAddHotelInline = (city: "makkah" | "madinah") => {
@@ -975,13 +1103,38 @@ export function VisaTrackingDetailScreen({
     closeModal();
   };
 
-  const deleteAgreement = () => {
+  const deleteAgreement = async () => {
     if (!deleteAgreementDraft) {
       return;
     }
 
-    onDeleteVisaHotel(row.groupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
-    setDeleteAgreementDraft(null);
+    if (!deleteAgreementDraft.draft) {
+      onDeleteVisaHotel(row.groupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
+      setDeleteAgreementDraft(null);
+      return;
+    }
+
+    setUnassigningAgreementDraftId(deleteAgreementDraft.draft.id);
+    setDraftAssignFeedback(null);
+    try {
+      await unassignAgreementDraftInBackend(deleteAgreementDraft.draft.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+      ]);
+      setDraftAssignFeedback({
+        tone: "success",
+        message: `Agreement ${deleteAgreementDraft.agreement.agreementNumber} berhasil dikembalikan ke Unassigned.`,
+      });
+    } catch (error: unknown) {
+      setDraftAssignFeedback({
+        tone: "error",
+        message: formatVisaMutationError(error, "Agreement belum berhasil di-unassign dari group."),
+      });
+    } finally {
+      setUnassigningAgreementDraftId(null);
+      setDeleteAgreementDraft(null);
+    }
   };
 
   const handleCopyRaudhahReminder = async () => {
@@ -1042,6 +1195,9 @@ export function VisaTrackingDetailScreen({
   );
 
   const deleteAgreementCityLabel = deleteAgreementDraft?.city === "makkah" ? "Makkah" : "Madinah";
+  const isUnassigningAgreement =
+    deleteAgreementDraft?.draft !== undefined && unassigningAgreementDraftId === deleteAgreementDraft.draft.id;
+  const deleteAgreementActionLabel = deleteAgreementDraft?.draft ? "Unassign Agreement" : "Delete Agreement";
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
@@ -1290,12 +1446,14 @@ export function VisaTrackingDetailScreen({
             ) : null}
             {makkahAgreements.map((agreement, index) => {
               const canDeleteAgreement = makkahAgreementIdSet.has(agreement.id);
+              const assignedDraft = assignedDraftByAgreementId.get(agreement.id);
               const statusLabel = getAgreementStatusLabel(agreement.status);
 
               return (
                 <details key={agreement.id} className="serene-accordion">
-                  <summary className="serene-accordion-summary">
-                    <div className="min-w-0 flex-1">
+                  <summary className="serene-accordion-summary flex-col">
+                    <div className="flex w-full items-start gap-3">
+                      <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-slate-900">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
@@ -1308,66 +1466,52 @@ export function VisaTrackingDetailScreen({
                           {statusLabel}
                         </span>
                       </div>
-                      <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                        {formatAgreementSummary(agreement)}
-                      </p>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className={getIconButtonClasses()}
+                          aria-label={`Edit Makkah agreement ${index + 1}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openAgreementEditor("makkah", agreement, canDeleteAgreement);
+                          }}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            edit
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
+                          aria-label={`${assignedDraft ? "Unassign" : "Delete"} Makkah agreement ${index + 1}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openDeleteAgreementConfirm("makkah", agreement, canDeleteAgreement, assignedDraft);
+                          }}
+                          disabled={!canDeleteAgreement}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            {assignedDraft ? "link_off" : "delete"}
+                          </span>
+                        </button>
+                        <span
+                          className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
+                          aria-hidden="true"
+                        >
+                          expand_more
+                        </span>
+                      </div>
                     </div>
 
-                    <div
-                      className="flex shrink-0 items-center gap-1"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={getIconButtonClasses()}
-                        aria-label={`Edit Makkah agreement ${index + 1}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          openAgreementEditor("makkah", agreement, canDeleteAgreement);
-                        }}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          edit
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
-                        aria-label={`Delete Makkah agreement ${index + 1}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          openDeleteAgreementConfirm("makkah", agreement, canDeleteAgreement);
-                        }}
-                        disabled={!canDeleteAgreement}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          delete
-                        </span>
-                      </button>
-                    </div>
-
-                    <span
-                      className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
-                      aria-hidden="true"
-                    >
-                      expand_more
-                    </span>
+                    <AgreementSummaryFields agreement={agreement} />
                   </summary>
 
                   <div className="serene-accordion-content">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">
-                          group
-                        </span>
-                        <span>{agreement.pax} Pax</span>
-                      </div>
-                    </div>
+                    <AgreementExpandedFields agreement={agreement} />
                   </div>
                 </details>
               );
@@ -1453,12 +1597,14 @@ export function VisaTrackingDetailScreen({
             ) : null}
             {madinahAgreements.map((agreement, index) => {
               const canDeleteAgreement = madinahAgreementIdSet.has(agreement.id);
+              const assignedDraft = assignedDraftByAgreementId.get(agreement.id);
               const statusLabel = getAgreementStatusLabel(agreement.status);
 
               return (
                 <details key={agreement.id} className="serene-accordion">
-                  <summary className="serene-accordion-summary">
-                    <div className="min-w-0 flex-1">
+                  <summary className="serene-accordion-summary flex-col">
+                    <div className="flex w-full items-start gap-3">
+                      <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-slate-900">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
@@ -1471,66 +1617,52 @@ export function VisaTrackingDetailScreen({
                           {statusLabel}
                         </span>
                       </div>
-                      <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                        {formatAgreementSummary(agreement)}
-                      </p>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className={getIconButtonClasses()}
+                          aria-label={`Edit Madinah agreement ${index + 1}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openAgreementEditor("madinah", agreement, canDeleteAgreement);
+                          }}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            edit
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
+                          aria-label={`${assignedDraft ? "Unassign" : "Delete"} Madinah agreement ${index + 1}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openDeleteAgreementConfirm("madinah", agreement, canDeleteAgreement, assignedDraft);
+                          }}
+                          disabled={!canDeleteAgreement}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            {assignedDraft ? "link_off" : "delete"}
+                          </span>
+                        </button>
+                        <span
+                          className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
+                          aria-hidden="true"
+                        >
+                          expand_more
+                        </span>
+                      </div>
                     </div>
 
-                    <div
-                      className="flex shrink-0 items-center gap-1"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={getIconButtonClasses()}
-                        aria-label={`Edit Madinah agreement ${index + 1}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          openAgreementEditor("madinah", agreement, canDeleteAgreement);
-                        }}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          edit
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${getIconButtonClasses(true)} disabled:cursor-not-allowed disabled:opacity-45`}
-                        aria-label={`Delete Madinah agreement ${index + 1}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          openDeleteAgreementConfirm("madinah", agreement, canDeleteAgreement);
-                        }}
-                        disabled={!canDeleteAgreement}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          delete
-                        </span>
-                      </button>
-                    </div>
-
-                    <span
-                      className="serene-accordion-chevron material-symbols-outlined text-on-surface-variant"
-                      aria-hidden="true"
-                    >
-                      expand_more
-                    </span>
+                    <AgreementSummaryFields agreement={agreement} />
                   </summary>
 
                   <div className="serene-accordion-content">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-slate-700">
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">
-                          group
-                        </span>
-                        <span>{agreement.pax} Pax</span>
-                      </div>
-                    </div>
+                    <AgreementExpandedFields agreement={agreement} />
                   </div>
                 </details>
               );
@@ -1803,12 +1935,21 @@ export function VisaTrackingDetailScreen({
               </span>
               <div className="min-w-0">
                 <h3 id="delete-agreement-title" className="text-lg font-extrabold text-slate-900">
-                  Delete {deleteAgreementCityLabel} Agreement?
+                  {deleteAgreementDraft.draft ? "Unassign" : "Delete"} {deleteAgreementCityLabel} Agreement?
                 </h3>
                 <p id="delete-agreement-description" className="mt-1 text-sm leading-relaxed text-slate-600">
                   Agreement <strong>{deleteAgreementDraft.agreement.agreementNumber}</strong> untuk hotel{" "}
-                  <strong>{deleteAgreementDraft.agreement.hotelName}</strong> akan dihapus dari group{" "}
-                  <strong>{row.groupCode}</strong>.
+                  <strong>{deleteAgreementDraft.agreement.hotelName}</strong>{" "}
+                  {deleteAgreementDraft.draft ? (
+                    <>
+                      akan dilepas dari group <strong>{row.groupCode}</strong> dan dikembalikan ke Agreement Inbox
+                      Unassigned.
+                    </>
+                  ) : (
+                    <>
+                      akan dihapus dari group <strong>{row.groupCode}</strong>.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -1824,12 +1965,13 @@ export function VisaTrackingDetailScreen({
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700"
-                onClick={deleteAgreement}
+                onClick={() => void deleteAgreement()}
+                disabled={isUnassigningAgreement}
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  delete
+                  {isUnassigningAgreement ? "sync" : deleteAgreementDraft.draft ? "link_off" : "delete"}
                 </span>
-                <span>Delete Agreement</span>
+                <span>{isUnassigningAgreement ? "Unassigning..." : deleteAgreementActionLabel}</span>
               </button>
             </div>
           </section>

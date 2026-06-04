@@ -125,6 +125,11 @@ export class UpsertGroupVisaHotelDto {
   @IsEnum(AgreementCity)
   city!: AgreementCity;
 
+  @ApiPropertyOptional({ example: "cldraftagreementid123" })
+  @IsOptional()
+  @IsString()
+  sourceDraftId?: string;
+
   @ApiProperty({ example: "Pullman Zamzam Madinah" })
   @IsString()
   @IsNotEmpty()
