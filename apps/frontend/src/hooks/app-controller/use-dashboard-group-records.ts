@@ -1355,7 +1355,7 @@ export function useDashboardGroupRecords({
       const rollbackSnapshot = captureGroupRecordsSnapshot();
       commitGroupRecords((current) => [localIdentityGroup, ...current]);
       clearQuery();
-      navigateToOverview({ replace: true });
+      navigateToGroupDetail(normalizedGroupCode, { replace: true });
 
       runBackendSync({
         task: createGroupIdentityMutation.mutateAsync(identity).then((backendGroup) => {
@@ -1377,7 +1377,7 @@ export function useDashboardGroupRecords({
       clearQuery,
       commitGroupRecords,
       createGroupIdentityMutation,
-      navigateToOverview,
+      navigateToGroupDetail,
       runBackendSync,
       showSyncFeedback,
     ],
