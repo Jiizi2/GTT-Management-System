@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import * as Domain from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import type {
@@ -285,6 +285,7 @@ export function GroupDetail({
   onDeleteGroup: (groupCode: string) => void;
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
 }) {
+  const [searchParams] = useSearchParams();
   const [itineraryItems, setItineraryItems] = useState(() => sortItineraryByNearestDate(group.itinerary));
   const [noteItems, setNoteItems] = useState<NoteItem[]>(() => createNoteItems(group.notes, group.code));
   const [musyrifProfile, setMusyrifProfile] = useState<Musyrif>(group.musyrif);
@@ -299,6 +300,7 @@ export function GroupDetail({
   const scheduleSuggestedFromHotelNameRef = useRef("");
   const editSuggestedHotelNameRef = useRef("");
   const editSuggestedFromHotelNameRef = useRef("");
+  const handledSetupActionRef = useRef<string | null>(null);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
@@ -629,12 +631,23 @@ export function GroupDetail({
     setEditScheduleForm((current) => (current ? applyEditHotelAutofill({ ...current, [field]: value }) : current));
   };
 
-  const handleOpenScheduleModal = () => {
+  const handleOpenScheduleModal = useCallback(() => {
     scheduleSuggestedHotelNameRef.current = "";
     scheduleSuggestedFromHotelNameRef.current = "";
     setScheduleForm(applyScheduleHotelAutofill(createInitialScheduleForm()));
     setIsScheduleModalOpen(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const setupAction = searchParams.get("action")?.trim().toLowerCase() ?? "";
+    const setupActionKey = `${group.code}:${setupAction}`;
+    if (setupAction !== "schedule" || handledSetupActionRef.current === setupActionKey) {
+      return;
+    }
+
+    handledSetupActionRef.current = setupActionKey;
+    handleOpenScheduleModal();
+  }, [group.code, handleOpenScheduleModal, searchParams]);
 
   const handleCloseScheduleModal = () => {
     setIsScheduleModalOpen(false);
@@ -1184,7 +1197,7 @@ export function GroupDetail({
                     <span className="material-symbols-outlined text-base" aria-hidden="true">
                       add_circle
                     </span>
-                    <span>Create Itinerary</span>
+                    <span>Add Itinerary Item</span>
                   </button>
                 ) : null}
               </div>

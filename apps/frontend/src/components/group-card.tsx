@@ -1,5 +1,7 @@
+import { Link } from "react-router-dom";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
+import { buildGroupDetailPath } from "../shared/app-route";
 
 const {
   inferCategoryKey,
@@ -258,6 +260,15 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
   const itineraryPreview = buildItineraryPreview(group);
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
   const completeness = resolveGroupCompleteness(group);
+  const shouldShowLinkAgreementAction = completeness.issues.some(
+    (issue) =>
+      issue.key === "missing-agreement" ||
+      issue.key === "missing-makkah-agreement" ||
+      issue.key === "missing-madinah-agreement",
+  );
+  const shouldShowAddItineraryAction = completeness.issues.some((issue) => issue.key === "missing-itinerary");
+  const agreementInboxPath = `/agreement-inbox?groupCode=${encodeURIComponent(group.code)}`;
+  const itinerarySetupPath = `${buildGroupDetailPath(group.code)}?action=schedule`;
   const metadataBadges = [
     `${group.pax} Pax`,
     ...(busBadgeLabel ? [busBadgeLabel] : []),
@@ -325,6 +336,33 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
                   </span>
                 ))}
               </div>
+              {shouldShowLinkAgreementAction || shouldShowAddItineraryAction ? (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  {shouldShowLinkAgreementAction ? (
+                    <Link
+                      to={agreementInboxPath}
+                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-on-tertiary-fixed-variant/15 bg-surface-container-lowest px-2.5 text-[11px] font-extrabold text-brand-primary transition hover:bg-surface-container-low"
+                    >
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                        link
+                      </span>
+                      <span>Link Agreement</span>
+                    </Link>
+                  ) : null}
+
+                  {shouldShowAddItineraryAction ? (
+                    <Link
+                      to={itinerarySetupPath}
+                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-2.5 text-[11px] font-extrabold text-on-primary transition hover:bg-primary-container"
+                    >
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                        add_circle
+                      </span>
+                      <span>Add Itinerary</span>
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </section>

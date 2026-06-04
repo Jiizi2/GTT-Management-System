@@ -455,11 +455,14 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
   await expect(page.getByRole("heading", { name: "Group Detail" })).toBeVisible();
   await expect(page.getByText(groupCode)).toBeVisible();
   await expect(page.getByRole("link", { name: "Link Agreement" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create Itinerary" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add Itinerary Item" })).toBeVisible();
 
   await page.getByRole("button", { name: "Back to Groups" }).click();
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
-  await expect(page.getByText(groupCode)).toBeVisible();
+  const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
+  await expect(createdCard).toBeVisible();
+  await expect(createdCard.getByRole("link", { name: "Link Agreement" })).toBeVisible();
+  await expect(createdCard.getByRole("link", { name: "Add Itinerary" })).toBeVisible();
 
   return { groupCode, groupName };
 }
@@ -525,6 +528,12 @@ test("creates a new group from workspace flow", async ({ page }) => {
   const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
   await expect(createdCard).toBeVisible();
   await expect(createdCard.getByText(groupName)).toBeVisible();
+  await createdCard.getByRole("link", { name: "Add Itinerary" }).click();
+  await expect(page.getByRole("dialog", { name: "Add New Schedule" })).toBeVisible();
+  await page.getByRole("button", { name: "Close add schedule popup" }).click();
+  await expect(page.getByRole("dialog", { name: "Add New Schedule" })).toBeHidden();
+  await page.getByRole("button", { name: "Back to Groups" }).click();
+  await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
 });
 
 test("edits group name from group detail modal", async ({ page }) => {
