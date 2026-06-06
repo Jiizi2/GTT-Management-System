@@ -315,6 +315,28 @@ export class HotelAgreementDraftsService {
           `Hotel agreement draft '${draftId}' not found.`,
         );
       }
+
+      // Check auto-reject before assignment
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      if (
+        draft.status === AgreementApprovalStatus.WAITING &&
+        draft.updatedAt < cutoff
+      ) {
+        await this.prisma.hotelAgreementDraft.update({
+          where: { id: draft.id },
+          data: { status: AgreementApprovalStatus.REJECTED },
+        });
+        throw new BadRequestException(
+          "Hotel agreement ini berstatus ditolak (Rejected) karena telah melewati batas waktu 24 jam. Silakan edit nomor agreement untuk mengajukan kembali.",
+        );
+      }
+
+      if (draft.status === AgreementApprovalStatus.REJECTED) {
+        throw new BadRequestException(
+          "Hotel agreement ini berstatus ditolak (Rejected). Silakan edit nomor agreement untuk mengajukan kembali.",
+        );
+      }
+
       if (draft.groupId) {
         throw new ConflictException(
           `Hotel agreement draft '${draftId}' is already assigned.`,
@@ -360,6 +382,22 @@ export class HotelAgreementDraftsService {
     }
 
     const draft = this.resolveMemoryDraft(draftId);
+
+    // Check auto-reject before assignment
+    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
+    if (
+      draft.status === AgreementApprovalStatus.WAITING &&
+      new Date(draft.updatedAt).getTime() < cutoffMs
+    ) {
+      draft.status = AgreementApprovalStatus.REJECTED;
+    }
+
+    if (draft.status === AgreementApprovalStatus.REJECTED) {
+      throw new BadRequestException(
+        "Hotel agreement ini berstatus ditolak (Rejected). Silakan edit nomor agreement untuk mengajukan kembali.",
+      );
+    }
+
     if (draft.groupCode) {
       throw new ConflictException(
         `Hotel agreement draft '${draftId}' is already assigned.`,
@@ -454,6 +492,16 @@ export class HotelAgreementDraftsService {
     query?: string,
     status?: DraftStatusFilter,
   ): unknown[] {
+    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
+    for (const draft of this.memoryDrafts) {
+      if (
+        draft.status === AgreementApprovalStatus.WAITING &&
+        new Date(draft.updatedAt).getTime() < cutoffMs
+      ) {
+        draft.status = AgreementApprovalStatus.REJECTED;
+      }
+    }
+
     const normalizedQuery = query?.trim().toLowerCase() ?? "";
     return this.memoryDrafts
       .filter((draft) => {
@@ -482,6 +530,17 @@ export class HotelAgreementDraftsService {
     query?: string,
     status?: DraftStatusFilter,
   ): Promise<unknown[]> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await this.prisma.hotelAgreementDraft.updateMany({
+      where: {
+        status: AgreementApprovalStatus.WAITING,
+        updatedAt: { lt: cutoff },
+      },
+      data: {
+        status: AgreementApprovalStatus.REJECTED,
+      },
+    });
+
     const normalizedQuery = query?.trim() ?? "";
     const where: Prisma.HotelAgreementDraftWhereInput = {};
 

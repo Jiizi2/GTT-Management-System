@@ -59,11 +59,24 @@ function toIsoDateTime(value: unknown): string {
 }
 
 function mapBackendAgreementStatus(value: string | undefined): AgreementApprovalStatus {
-  return value?.trim().toUpperCase() === "APPROVED" ? "Approved" : "Waiting for Approval";
+  const upper = value?.trim().toUpperCase();
+  if (upper === "APPROVED") {
+    return "Approved";
+  }
+  if (upper === "REJECTED") {
+    return "Rejected";
+  }
+  return "Waiting for Approval";
 }
 
-function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" {
-  return status === "Approved" ? "APPROVED" : "WAITING";
+function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" | "REJECTED" {
+  if (status === "Approved") {
+    return "APPROVED";
+  }
+  if (status === "Rejected") {
+    return "REJECTED";
+  }
+  return "WAITING";
 }
 
 function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreementDraft | null {

@@ -27,7 +27,9 @@ enum VisaPaymentStatus {
 enum AgreementApprovalStatus {
   WAITING
   APPROVED
+  REJECTED
 }
+
 
 enum AgreementCity {
   MAKKAH

@@ -1,7 +1,18 @@
 import { BadRequestException } from "@nestjs/common";
 import { AgreementCity } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
-import { DAY_IN_MS } from "../groups.service-types";
+
+type HotelAgreementDateSegment = {
+  id?: string;
+  city: AgreementCity;
+  stayStart: string;
+  stayEnd: string;
+};
+
+type ValidatedHotelAgreementDateSegment = HotelAgreementDateSegment & {
+  stayStartMs: number;
+  stayEndMs: number;
+};
 
 function parseIsoDateToUtcMiddayMs(isoDate: string): number | null {
   const trimmed = isoDate.trim();
@@ -17,59 +28,111 @@ function parseIsoDateToUtcMiddayMs(isoDate: string): number | null {
   return parsedDate.getTime();
 }
 
-function addDaysToIsoDate(isoDate: string, days: number): string | null {
-  const baseMs = parseIsoDateToUtcMiddayMs(isoDate);
-  if (baseMs === null) {
-    return null;
-  }
-
-  return new Date(baseMs + days * DAY_IN_MS).toISOString().slice(0, 10);
+function toAgreementCityLabel(city: AgreementCity): "Makkah" | "Madinah" {
+  return city === AgreementCity.MAKKAH ? "Makkah" : "Madinah";
 }
 
-function validateCityHotelAgreementContinuity(
-  city: AgreementCity,
-  hotelAgreements: Array<{ id?: string; stayStart: string; stayEnd: string }>,
-): void {
-  if (hotelAgreements.length < 2) {
-    return;
+function validateAndSortHotelAgreementDateSegments(
+  hotelAgreements: HotelAgreementDateSegment[],
+): ValidatedHotelAgreementDateSegment[] {
+  return hotelAgreements
+    .map((agreement) => {
+      const stayStart = agreement.stayStart.trim();
+      const stayEnd = agreement.stayEnd.trim();
+      const stayStartMs = parseIsoDateToUtcMiddayMs(stayStart);
+      const stayEndMs = parseIsoDateToUtcMiddayMs(stayEnd);
+      const cityLabel = toAgreementCityLabel(agreement.city);
+
+      if (stayStartMs === null || stayEndMs === null) {
+        throw new BadRequestException(
+          `${cityLabel} agreement dates must use YYYY-MM-DD format.`,
+        );
+      }
+
+      if (stayEndMs < stayStartMs) {
+        throw new BadRequestException(
+          `${cityLabel} agreement end date must be on or after the start date.`,
+        );
+      }
+
+      return {
+        ...agreement,
+        stayStart,
+        stayEnd,
+        stayStartMs,
+        stayEndMs,
+      };
+    })
+    .sort((left, right) => {
+      if (left.stayStartMs !== right.stayStartMs) {
+        return left.stayStartMs - right.stayStartMs;
+      }
+
+      if (left.stayEndMs !== right.stayEndMs) {
+        return left.stayEndMs - right.stayEndMs;
+      }
+
+      return left.city.localeCompare(right.city);
+    });
+}
+
+function mergeHotelAgreementSegments(
+  segments: ValidatedHotelAgreementDateSegment[],
+): ValidatedHotelAgreementDateSegment[] {
+  if (segments.length === 0) {
+    return [];
   }
 
-  const sortedAgreements = [...hotelAgreements].sort((left, right) =>
-    left.stayStart.localeCompare(right.stayStart),
-  );
-  const cityLabel = city === AgreementCity.MAKKAH ? "Makkah" : "Madinah";
+  const merged: ValidatedHotelAgreementDateSegment[] = [];
+  let current = { ...segments[0] };
 
-  for (let index = 0; index < sortedAgreements.length; index += 1) {
-    const current = sortedAgreements[index];
-    const currentStartMs = parseIsoDateToUtcMiddayMs(current.stayStart);
-    const currentEndMs = parseIsoDateToUtcMiddayMs(current.stayEnd);
-    if (currentStartMs === null || currentEndMs === null) {
-      throw new BadRequestException(
-        `${cityLabel} agreement dates must use YYYY-MM-DD format.`,
-      );
-    }
-
-    if (currentEndMs < currentStartMs) {
-      throw new BadRequestException(
-        `${cityLabel} agreement end date must be on or after the start date.`,
-      );
-    }
-
-    if (index === 0) {
+  for (let index = 1; index < segments.length; index += 1) {
+    const next = segments[index];
+    if (next.stayStartMs <= current.stayEndMs) {
+      if (next.stayEndMs > current.stayEndMs) {
+        current.stayEnd = next.stayEnd;
+        current.stayEndMs = next.stayEndMs;
+      }
       continue;
     }
 
-    const previous = sortedAgreements[index - 1];
-    const expectedNextStart = addDaysToIsoDate(previous.stayEnd, 1);
-    if (!expectedNextStart) {
-      throw new BadRequestException(
-        `${cityLabel} agreement dates must use YYYY-MM-DD format.`,
-      );
-    }
+    merged.push(current);
+    current = { ...next };
+  }
 
-    if (current.stayStart !== expectedNextStart) {
+  merged.push(current);
+  return merged;
+}
+
+function validateHotelAgreementContinuity(
+  hotelAgreements: HotelAgreementDateSegment[],
+): void {
+  const validatedAndSorted = validateAndSortHotelAgreementDateSegments(
+    hotelAgreements,
+  );
+
+  const makkahSegments = validatedAndSorted.filter(
+    (agreement) => agreement.city === AgreementCity.MAKKAH,
+  );
+  const madinahSegments = validatedAndSorted.filter(
+    (agreement) => agreement.city === AgreementCity.MADINAH,
+  );
+
+  const mergedMakkah = mergeHotelAgreementSegments(makkahSegments);
+  const mergedMadinah = mergeHotelAgreementSegments(madinahSegments);
+
+  const combinedAndSorted = [...mergedMakkah, ...mergedMadinah].sort(
+    (left, right) => left.stayStartMs - right.stayStartMs,
+  );
+
+  for (let index = 1; index < combinedAndSorted.length; index += 1) {
+    const previous = combinedAndSorted[index - 1];
+    const current = combinedAndSorted[index];
+    if (current.stayStart !== previous.stayEnd) {
+      const previousLabel = toAgreementCityLabel(previous.city);
+      const currentLabel = toAgreementCityLabel(current.city);
       throw new BadRequestException(
-        `${cityLabel} agreement dates must be consecutive. Expected ${expectedNextStart} after ${previous.stayEnd}.`,
+        `Hotel agreement dates must be connected. ${previousLabel} Stay End ${previous.stayEnd} must match ${currentLabel} Stay Start ${current.stayStart}.`,
       );
     }
   }
@@ -98,18 +161,7 @@ export function validateHotelAgreementRules(
     );
   }
 
-  validateCityHotelAgreementContinuity(
-    AgreementCity.MAKKAH,
-    hotelAgreements.filter(
-      (agreement) => agreement.city === AgreementCity.MAKKAH,
-    ),
-  );
-  validateCityHotelAgreementContinuity(
-    AgreementCity.MADINAH,
-    hotelAgreements.filter(
-      (agreement) => agreement.city === AgreementCity.MADINAH,
-    ),
-  );
+  validateHotelAgreementContinuity(hotelAgreements);
 }
 
 export function validateCreateOrReplaceHotelAgreementRules(

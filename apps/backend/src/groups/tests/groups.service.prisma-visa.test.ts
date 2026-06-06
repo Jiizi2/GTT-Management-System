@@ -132,7 +132,7 @@ async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
         {
           id: "mad-1",
           city: AgreementCity.MADINAH,
-          stayStart: new Date("2026-04-13T00:00:00.000Z"),
+          stayStart: new Date("2026-04-12T00:00:00.000Z"),
           stayEnd: new Date("2026-04-15T00:00:00.000Z"),
         },
       ],
@@ -154,7 +154,7 @@ async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
         agreementNumber: " AG-PR-2 ",
         pax: 45,
         status: AgreementApprovalStatus.APPROVED,
-        stayStart: "2026-04-13",
+        stayStart: "2026-04-12",
         stayEnd: "2026-04-15",
       },
     )) as { code?: string };
@@ -186,7 +186,7 @@ async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
           hotelName: "Pullman",
           agreementNumber: "AG-X",
           pax: 45,
-          stayStart: "2026-04-13",
+          stayStart: "2026-04-12",
           stayEnd: "2026-04-15",
         }),
       (error: unknown) => {

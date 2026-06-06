@@ -21,6 +21,7 @@ import {
 import {
   formatVisaDateWithYear,
   getLocalIsoDateWithOffset,
+  type AgreementApprovalStatus,
   type HotelAgreementDraft,
   type HotelAgreementDraftFormState,
 } from "../shared/app-domain";
@@ -40,7 +41,7 @@ const draftSchema = z
         const parsed = Number.parseInt(value, 10);
         return Number.isInteger(parsed) && parsed > 0;
       }, "Pax harus lebih dari 0."),
-    status: z.enum(["Waiting for Approval", "Approved"]),
+    status: z.enum(["Waiting for Approval", "Approved", "Rejected"]),
     stayStartIso: z.string().trim().min(1, "Stay start wajib diisi."),
     stayEndIso: z.string().trim().min(1, "Stay end wajib diisi."),
     notes: z.string(),
@@ -101,17 +102,27 @@ function getAssignmentBadgeClasses(draft: HotelAgreementDraft): string {
 }
 
 function getApprovalBadgeClasses(draft: HotelAgreementDraft): string {
-  return draft.status === "Approved"
-    ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
-    : "border-amber-300 bg-amber-100 text-amber-900";
+  if (draft.status === "Approved") {
+    return "border-emerald-500 bg-emerald-600 text-white shadow-sm";
+  }
+  if (draft.status === "Rejected") {
+    return "border-rose-500 bg-rose-600 text-white shadow-sm";
+  }
+  return "border-amber-300 bg-amber-100 text-amber-900";
 }
 
-function getApprovalStatusIconName(draft: HotelAgreementDraft): "check_circle" | "pending_actions" {
-  return draft.status === "Approved" ? "check_circle" : "pending_actions";
+function getApprovalStatusIconName(draft: HotelAgreementDraft): "check_circle" | "pending_actions" | "cancel" {
+  if (draft.status === "Approved") {
+    return "check_circle";
+  }
+  if (draft.status === "Rejected") {
+    return "cancel";
+  }
+  return "pending_actions";
 }
 
-function getApprovalStatusLabel(draft: HotelAgreementDraft): "Approved" | "Waiting for Approval" {
-  return draft.status === "Approved" ? "Approved" : "Waiting for Approval";
+function getApprovalStatusLabel(draft: HotelAgreementDraft): AgreementApprovalStatus {
+  return draft.status;
 }
 
 function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormState {
@@ -275,6 +286,7 @@ function AgreementDraftFields({
               >
                 <option value="Waiting for Approval">Waiting for Approval</option>
                 <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
               </SereneSelect>
             )}
           />
@@ -856,14 +868,28 @@ export function AgreementInboxScreen() {
 
         {paginatedDrafts.map((draft) => {
           const isAssigned = draft.assignmentStatus === "Assigned";
+          const isRejected = draft.status === "Rejected";
+          const isApproved = draft.status === "Approved";
+
+          let cardBorderClass = "border-l-[6px] border-l-amber-500";
+          let cardBgClass = "bg-surface-container-lowest";
+          let opacityClass = "";
+
+          if (isApproved) {
+            cardBorderClass = "border-l-[6px] border-l-emerald-500";
+          } else if (isRejected) {
+            cardBorderClass = "border-l-[6px] border-l-rose-500";
+            cardBgClass = "bg-slate-50/75";
+            opacityClass = "opacity-90";
+          }
 
           return (
             <article
               key={draft.id}
-              className="overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-surface-container-lowest shadow-sm"
+              className={`overflow-hidden rounded-3xl border-[0.5px] border-black/20 ${cardBgClass} ${cardBorderClass} ${opacityClass} shadow-sm`}
             >
               <div className="grid gap-0 lg:grid-cols-[0.82fr_1.18fr]">
-                <div className="border-b border-dashed border-black/45 bg-surface-container-lowest p-5 lg:border-b-0 lg:border-r">
+                <div className="border-b border-dashed border-black/45 bg-transparent p-5 lg:border-b-0 lg:border-r">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Agreement No</p>
@@ -989,6 +1015,15 @@ export function AgreementInboxScreen() {
                           </span>
                           <span>{unassignDraftMutation.isPending ? "Unassigning..." : "Unassign"}</span>
                         </button>
+                      ) : isRejected ? (
+                        <div className="flex min-w-0 flex-col gap-1 sm:w-64">
+                          <p className="text-xs font-semibold text-rose-600 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                              error
+                            </span>
+                            <span>Draft ditolak. Harap edit nomor agreement dengan nomor baru untuk menghubungkan.</span>
+                          </p>
+                        </div>
                       ) : (
                         <div className="flex min-w-0 flex-col gap-2 sm:w-64">
                           <label className="sr-only" htmlFor={`assign-${draft.id}`}>

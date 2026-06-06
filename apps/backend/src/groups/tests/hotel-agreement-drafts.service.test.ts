@@ -262,6 +262,47 @@ async function testUnassignDraftFromGroup(): Promise<void> {
   }
 }
 
+async function testAutoRejectionDraft(): Promise<void> {
+  const { draftsService, restore } = await createMemoryServices();
+
+  try {
+    const created = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Al Maqam",
+      agreementNumber: "AG-AUTO-REJECT",
+      pax: 45,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
+    })) as { id: string; status: string };
+
+    assert.equal(created.status, AgreementApprovalStatus.WAITING);
+
+    // Manipulate createdAt to be 25 hours ago
+    const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const memoryDrafts = draftsService["memoryDrafts"];
+    const draftInMemory = memoryDrafts.find((d) => d.id === created.id);
+    if (draftInMemory) {
+      draftInMemory.createdAt = twentyFiveHoursAgo;
+      draftInMemory.updatedAt = twentyFiveHoursAgo;
+    }
+
+    // Call findAll to trigger auto-rejection
+    const allDrafts = (await draftsService.findAll()) as Array<{ id: string; status: string }>;
+    const found = allDrafts.find((d) => d.id === created.id);
+    assert.ok(found);
+    assert.equal(found.status, AgreementApprovalStatus.REJECTED);
+
+    // Verify assign throws error
+    await assert.rejects(
+      draftsService.assign(created.id, { groupCode: "ANY-GROUP" }),
+      /ditolak/i
+    );
+  } finally {
+    restore();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft create update delete",
@@ -274,6 +315,10 @@ async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft unassign from group",
     testUnassignDraftFromGroup,
+  );
+  await runCase(
+    "hotel agreement draft auto-rejection after 24h",
+    testAutoRejectionDraft,
   );
 }
 

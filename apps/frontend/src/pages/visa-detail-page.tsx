@@ -295,7 +295,7 @@ const inlineHotelSchema = z
         const parsedValue = Number.parseInt(value, 10);
         return Number.isInteger(parsedValue) && parsedValue > 0;
       }, "Total pax harus lebih dari 0."),
-    status: z.enum(["Waiting for Approval", "Approved"]),
+    status: z.enum(["Waiting for Approval", "Approved", "Rejected"]),
     stayStartIso: z.string().trim().min(1, "Stay start date wajib diisi."),
     stayEndIso: z.string().trim().min(1, "Stay end date wajib diisi."),
   })
@@ -419,6 +419,7 @@ function InlineHotelAgreementForm({
                     >
                       <option value="Waiting for Approval">Waiting for Approval</option>
                       <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
                     </SereneSelect>
                   )}
                 />
@@ -1278,10 +1279,12 @@ export function VisaTrackingDetailScreen({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span
-                className="material-symbols-outlined mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest"
+                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest"
                 aria-hidden="true"
               >
-                link
+                <span className="material-symbols-outlined text-lg">
+                  link
+                </span>
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Agreement Status</p>

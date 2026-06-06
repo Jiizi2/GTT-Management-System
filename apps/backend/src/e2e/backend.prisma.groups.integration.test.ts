@@ -685,19 +685,19 @@ async function testPrismaGroupsErrorFlow(): Promise<void> {
       server.baseUrl,
       `/api/groups/${encodeURIComponent(baseCode)}/visa/hotels`,
       {
-        city: "MADINAH",
-        hotelName: "Madinah Without Makkah",
-        agreementNumber: `${baseCode}-BAD-MAD`,
+        city: "MAKKAH",
+        hotelName: "Invalid Date Sequence",
+        agreementNumber: `${baseCode}-BAD-DATES`,
         pax: 10,
         status: "WAITING",
-        stayStart: "2026-04-10",
-        stayEnd: "2026-04-12",
+        stayStart: "2026-04-12",
+        stayEnd: "2026-04-10",
       },
     );
     assert.equal(
       invalidHotelSequenceResponse.status,
       400,
-      "First visa hotel cannot be MADINAH without MAKKAH agreement.",
+      "Hotel stayEnd before stayStart should be blocked.",
     );
 
     const missingChecklistResetResponse = await postJson(

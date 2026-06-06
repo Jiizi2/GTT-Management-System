@@ -346,7 +346,27 @@ function formatCompactAgreementStayRange(hotels: GroupAgreementHotel[]): string 
 function buildCompactAgreementSummary(group: GroupData, city: AgreementCityKey): CompactAgreementSummary {
   const hotels = getGroupAgreementHotelsByCity(group, city);
   const hotelCount = hotels.length;
-  const totalPax = hotels.reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0);
+  const calculateTotalPax = (hotelsList: GroupAgreementHotel[]): number => {
+    if (hotelsList.length === 0) {
+      return 0;
+    }
+    const dateRangePaxSums = new Map<string, number>();
+    for (const hotel of hotelsList) {
+      const start = hotel.stayStartIso.trim();
+      const end = hotel.stayEndIso.trim();
+      if (!isIsoDateValue(start) || !isIsoDateValue(end)) {
+        continue;
+      }
+      const key = `${start}_${end}`;
+      dateRangePaxSums.set(key, (dateRangePaxSums.get(key) ?? 0) + Math.max(0, hotel.pax || 0));
+    }
+    const sums = Array.from(dateRangePaxSums.values());
+    if (sums.length === 0) {
+      return 0;
+    }
+    return Math.min(group.pax, ...sums);
+  };
+  const totalPax = calculateTotalPax(hotels);
   const firstHotelName = hotels[0]?.hotelName.trim() ?? "";
   const fallbackCityLabel = city === "makkah" ? "Makkah" : "Madinah";
 
@@ -378,7 +398,7 @@ export function GroupDetail({
   const [musyrifProfile, setMusyrifProfile] = useState<Musyrif>(group.musyrif);
   const [isMusyrifModalOpen, setIsMusyrifModalOpen] = useState(false);
   const [isMusyrifCopied, setIsMusyrifCopied] = useState(false);
-  const musyrifCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const musyrifCopyTimerRef = useRef<any | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(createInitialScheduleForm);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -1340,10 +1360,12 @@ export function GroupDetail({
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <span
-                  className="material-symbols-outlined mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest text-xl"
+                  className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest"
                   aria-hidden="true"
                 >
-                  pending_actions
+                  <span className="material-symbols-outlined text-xl">
+                    pending_actions
+                  </span>
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Workspace Status</p>
