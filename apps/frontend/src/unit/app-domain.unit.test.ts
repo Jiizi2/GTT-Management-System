@@ -1048,12 +1048,75 @@ function testDisplayChecklistAndScrollHelpers(): void {
   });
 }
 
+function testAgreementPaxExceedsGroupPaxDoesNotMismatch(): void {
+  const completeGroup = createBaseGroup({
+    code: "UNIT-COMPLETE",
+    pax: 45,
+    itinerary: [
+      {
+        date: "01 Jan",
+        year: "2099",
+        category: "Arrival",
+        categoryKey: "arrival",
+        title: "Arrival Trip",
+        meta: "08:00 | Airport",
+        icon: "flight_land",
+        isoDate: "2099-01-01",
+        time: "08:00",
+        from: "JED Airport",
+        to: "Makkah Hotel",
+        requiresBus: true,
+      },
+    ],
+    visaSetup: {
+      visaStatus: "Issued",
+      issuedDate: "2098-12-31",
+      syarikah: "Provider Unit",
+      paymentStatus: "Paid",
+      makkahHotels: [
+        {
+          id: "m-1",
+          hotelName: "Makkah Hotel",
+          agreementNumber: "M-1",
+          pax: 50,
+          status: "Approved",
+          stayStartIso: "2099-01-01",
+          stayEndIso: "2099-01-03",
+        },
+      ],
+      madinahHotels: [],
+      raudhahAppointments: [],
+    },
+  });
+
+  const summary = resolveGroupCompleteness(completeGroup);
+  const hasPaxMismatch = summary.issues.some((issue) => issue.key === "pax-mismatch");
+  assert.equal(hasPaxMismatch, false);
+
+  const incompleteGroup = {
+    ...completeGroup,
+    visaSetup: {
+      ...completeGroup.visaSetup!,
+      makkahHotels: [
+        {
+          ...completeGroup.visaSetup!.makkahHotels[0],
+          pax: 40,
+        },
+      ],
+    },
+  };
+  const summaryIncomplete = resolveGroupCompleteness(incompleteGroup);
+  const hasPaxMismatchIncomplete = summaryIncomplete.issues.some((issue) => issue.key === "pax-mismatch");
+  assert.equal(hasPaxMismatchIncomplete, true);
+}
+
 describe("app-domain", () => {
   runCase("raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
   runCase("route helper behavior", testRouteHelpersForCategorySpecificBehavior);
   runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
   runCase("visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
   runCase("group completeness helper", testGroupCompletenessFlagsMissingPartsAndMismatches);
+  runCase("agreement pax exceeding group pax does not mismatch", testAgreementPaxExceedsGroupPaxDoesNotMismatch);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
   runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);
   runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);
