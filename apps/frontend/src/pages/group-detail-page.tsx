@@ -26,6 +26,7 @@ const {
   formatScheduleTime,
   formatRouteSummary,
   formatScheduleDate,
+  generateWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   getStayPeriods,
   getScheduleTypeOption,
@@ -409,6 +410,8 @@ export function GroupDetail({
   const [isMusyrifModalOpen, setIsMusyrifModalOpen] = useState(false);
   const [isMusyrifCopied, setIsMusyrifCopied] = useState(false);
   const musyrifCopyTimerRef = useRef<any | null>(null);
+  const [isWhatsappCopied, setIsWhatsappCopied] = useState(false);
+  const whatsappCopyTimerRef = useRef<any | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(createInitialScheduleForm);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -467,6 +470,10 @@ export function GroupDetail({
       if (musyrifCopyTimerRef.current !== null) {
         window.clearTimeout(musyrifCopyTimerRef.current);
         musyrifCopyTimerRef.current = null;
+      }
+      if (whatsappCopyTimerRef.current !== null) {
+        window.clearTimeout(whatsappCopyTimerRef.current);
+        whatsappCopyTimerRef.current = null;
       }
     },
     [],
@@ -665,6 +672,7 @@ export function GroupDetail({
     setNoteItems(createNoteItems(group.notes, group.code));
     setMusyrifProfile(group.musyrif);
     setIsMusyrifCopied(false);
+    setIsWhatsappCopied(false);
     setIsMusyrifModalOpen(false);
     setIsScheduleModalOpen(false);
     setScheduleForm(applyScheduleHotelAutofill(createInitialScheduleForm()));
@@ -1027,6 +1035,29 @@ export function GroupDetail({
     }, 1600);
   };
 
+  const handleCopyWhatsapp = async () => {
+    const text = generateWhatsappCopyText({
+      ...group,
+      itinerary: itineraryItems,
+    });
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+    } catch {
+      // fallback
+    }
+
+    setIsWhatsappCopied(true);
+    if (whatsappCopyTimerRef.current !== null) {
+      window.clearTimeout(whatsappCopyTimerRef.current);
+    }
+    whatsappCopyTimerRef.current = window.setTimeout(() => {
+      setIsWhatsappCopied(false);
+      whatsappCopyTimerRef.current = null;
+    }, 1600);
+  };
+
   const handleExportPdf = () => {
     const printableWindow = window.open("", "_blank", "width=1120,height=760");
     if (!printableWindow) {
@@ -1095,6 +1126,23 @@ export function GroupDetail({
             </span>
             <span>Visa Detail</span>
           </Link>
+
+          <button
+            type="button"
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition sm:w-auto ${
+              isWhatsappCopied
+                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
+                : "border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:border-primary/45 hover:text-primary"
+            }`}
+            onClick={handleCopyWhatsapp}
+            aria-label={`Copy WhatsApp formatted details for ${group.name}`}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {isWhatsappCopied ? "check" : "content_copy"}
+            </span>
+            <span className="sm:hidden">{isWhatsappCopied ? "Copied" : "Copy WA"}</span>
+            <span className="hidden sm:inline">{isWhatsappCopied ? "Copied" : "Copy WhatsApp"}</span>
+          </button>
 
           <button
             type="button"

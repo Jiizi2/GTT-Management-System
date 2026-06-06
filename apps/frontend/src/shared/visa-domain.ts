@@ -206,3 +206,103 @@ export function hasMissingHotelAllocation(row: VisaTrackingRow): boolean {
 export function isVisaRowActionRequired(row: VisaTrackingRow): boolean {
   return row.visaStatus !== "Issued";
 }
+
+export function generateWhatsappCopyText(group: GroupData | undefined): string {
+  if (!group) return "";
+
+  const visaType = group.visaSetup?.busStatus === "Visa+" ? "VISA+" : "VISA ONLY";
+  const paxCount = String(group.pax || 0).padStart(2, "0");
+  const groupCode = group.code || "[GROUP_CODE]";
+
+  const lines: string[] = [];
+  lines.push(`NEED MOFA ${visaType} GROUP CODE`);
+  lines.push(`${groupCode} ( ${paxCount} ) PAX`);
+  lines.push("");
+
+  lines.push("ARRIVAL");
+  const flightItems = (group.itinerary || []).filter(
+    (item) => item.category?.toLowerCase() === "arrival" || item.category?.toLowerCase() === "departure"
+  );
+
+  const formatFlightDate = (isoDateStr?: string, dateStr?: string, yearStr?: string) => {
+    if (isoDateStr) {
+      const d = new Date(`${isoDateStr.trim()}T12:00:00`);
+      if (!isNaN(d.getTime())) {
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        return `${day} ${month} ${year}`;
+      }
+    }
+    if (dateStr && yearStr) {
+      return `${dateStr.trim()} ${yearStr.trim()}`.toUpperCase();
+    }
+    return "[FLIGHT_DATE]";
+  };
+
+  const formatFlightLine = (item: any) => {
+    const from = item.from?.trim() || "[DEP]";
+    const to = item.to?.trim() || "[ARR]";
+    const flightNo = item.flightNumber?.trim() || "[FLIGHT_NO]";
+    const time = item.time?.trim() ? item.time.trim().replace(/:/g, ".") : "[FLIGHT_TIME]";
+    const dateFormatted = formatFlightDate(item.isoDate, item.date, item.year);
+    return `${from} - ${to} / ${flightNo} / ${time} / ${dateFormatted}`;
+  };
+
+  if (flightItems.length > 0) {
+    flightItems.forEach((item) => {
+      lines.push(formatFlightLine(item));
+    });
+  } else {
+    lines.push("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
+    lines.push("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
+  }
+  lines.push("");
+
+  const formatBrnDate = (isoDateStr?: string) => {
+    if (!isoDateStr) return "[DATE]";
+    const trimmed = isoDateStr.trim();
+    const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+    return trimmed || "[DATE]";
+  };
+
+  const makkahHotels = group.visaSetup?.makkahHotels || [];
+  lines.push("BRN MAKKAH");
+  if (makkahHotels.length > 0) {
+    makkahHotels.forEach((hotel) => {
+      lines.push(hotel.hotelName?.trim() || "[HOTEL MAKKAH NAME]");
+      const start = formatBrnDate(hotel.stayStartIso);
+      const end = formatBrnDate(hotel.stayEndIso);
+      lines.push(`${start} - ${end}`);
+      lines.push(hotel.agreementNumber?.trim() || "[BRN_CODE]");
+    });
+  } else {
+    lines.push("[HOTEL MAKKAH NAME]");
+    lines.push("[START_DATE] - [END_DATE]");
+    lines.push("[BRN_CODE]");
+  }
+  lines.push("");
+
+  const madinahHotels = group.visaSetup?.madinahHotels || [];
+  lines.push("BRN MADINAH");
+  if (madinahHotels.length > 0) {
+    madinahHotels.forEach((hotel) => {
+      lines.push(hotel.hotelName?.trim() || "[HOTEL MADINAH NAME]");
+      const start = formatBrnDate(hotel.stayStartIso);
+      const end = formatBrnDate(hotel.stayEndIso);
+      lines.push(`${start} - ${end}`);
+      lines.push(hotel.agreementNumber?.trim() || "[BRN_CODE]");
+    });
+  } else {
+    lines.push("[HOTEL MADINAH NAME]");
+    lines.push("[START_DATE] - [END_DATE]");
+    lines.push("[BRN_CODE]");
+  }
+
+  return lines.join("\n");
+}
+

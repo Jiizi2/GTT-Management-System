@@ -6,6 +6,7 @@ import {
   formatVisaDateWithYear,
   formatVisaLongDate,
   formatVisaShortDate,
+  generateWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   hasMissingHotelAllocation,
   isIsoDateValue,
@@ -253,6 +254,97 @@ function testProviderAndActionRequirementHelpers(): void {
   assert.equal(isVisaRowActionRequired(draftRow), true);
 }
 
+function testGenerateWhatsappCopyText(): void {
+  const group = createGroupWithVisaHotels({
+    makkahHotels: [
+      {
+        id: "mak-1",
+        hotelName: "Swissotel",
+        agreementNumber: "18014399405337794",
+        pax: 40,
+        status: "Approved",
+        stayStartIso: "2026-03-28",
+        stayEndIso: "2026-03-31",
+      },
+    ],
+    madinahHotels: [
+      {
+        id: "mad-1",
+        hotelName: "Burj Almarjan",
+        agreementNumber: "15762599591351269",
+        pax: 40,
+        status: "Approved",
+        stayStartIso: "2026-03-23",
+        stayEndIso: "2026-03-28",
+      },
+    ],
+  });
+
+  group.code = "902133273";
+  group.pax = 5;
+  group.visaSetup!.busStatus = undefined; // default to VISA ONLY
+  group.itinerary = [
+    {
+      date: "22 Mar",
+      year: "2026",
+      category: "Arrival",
+      title: "Landing JED",
+      meta: "07:30 | QR1190",
+      icon: "flight_land",
+      flightNumber: "QR1190",
+      isoDate: "2026-03-22",
+      time: "07:30",
+      from: "DOH",
+      to: "JED",
+    },
+    {
+      date: "14 Apr",
+      year: "2026",
+      category: "Departure",
+      title: "Departure JED",
+      meta: "12:55 | SV822",
+      icon: "flight_takeoff",
+      flightNumber: "SV822",
+      isoDate: "2026-04-14",
+      time: "12:55",
+      from: "JED",
+      to: "CGK",
+    },
+  ];
+
+  const copiedText = generateWhatsappCopyText(group);
+  
+  assert.equal(copiedText.includes("NEED MOFA VISA ONLY GROUP CODE"), true);
+  assert.equal(copiedText.includes("902133273 ( 05 ) PAX"), true);
+  assert.equal(copiedText.includes("DOH - JED / QR1190 / 07.30 / 22 MAR 2026"), true);
+  assert.equal(copiedText.includes("JED - CGK / SV822 / 12.55 / 14 APR 2026"), true);
+  assert.equal(copiedText.includes("BRN MAKKAH\nSwissotel\n28/03/2026 - 31/03/2026\n18014399405337794"), true);
+  assert.equal(copiedText.includes("BRN MADINAH\nBurj Almarjan\n23/03/2026 - 28/03/2026\n15762599591351269"), true);
+
+  // Test with completely empty data (should yield placeholders)
+  const emptyGroup: GroupData = {
+    code: "",
+    name: "",
+    status: "",
+    tone: "active",
+    pax: 0,
+    packageName: "",
+    durationDays: 0,
+    timeline: [{ date: "", title: "" }, { date: "", title: "" }],
+    nextActivity: { title: "", date: "", time: "", icon: "" },
+    itinerary: [],
+    notes: [],
+    musyrif: { name: "", phone: "", avatar: "" },
+  };
+
+  const emptyText = generateWhatsappCopyText(emptyGroup);
+  assert.equal(emptyText.includes("NEED MOFA VISA ONLY GROUP CODE"), true);
+  assert.equal(emptyText.includes("[GROUP_CODE] ( 00 ) PAX"), true);
+  assert.equal(emptyText.includes("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]"), true);
+  assert.equal(emptyText.includes("BRN MAKKAH\n[HOTEL MAKKAH NAME]\n[START_DATE] - [END_DATE]\n[BRN_CODE]"), true);
+  assert.equal(emptyText.includes("BRN MADINAH\n[HOTEL MADINAH NAME]\n[START_DATE] - [END_DATE]\n[BRN_CODE]"), true);
+}
+
 describe("visa-domain", () => {
   runCase("shift and formatter behavior", testShiftAndDateFormatters);
   runCase("agreement number and city helpers", testAgreementNumberIsoValidationAndCityHotelSelection);
@@ -261,4 +353,5 @@ describe("visa-domain", () => {
     testResolveVisaAgreementDateRangeFallbackAndCustomNormalization,
   );
   runCase("provider and action requirement helpers", testProviderAndActionRequirementHelpers);
+  runCase("generate whatsapp copy text template", testGenerateWhatsappCopyText);
 });

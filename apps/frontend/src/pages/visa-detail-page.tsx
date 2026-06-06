@@ -30,6 +30,7 @@ import type {
 
 const {
   formatVisaDateWithYear,
+  generateWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   isIsoDateValue,
   resolveGroupCompleteness,
@@ -704,7 +705,9 @@ export function VisaTrackingDetailScreen({
   } | null>(null);
   const [isRaudhahTemplateCopied, setIsRaudhahTemplateCopied] = useState(false);
   const [isClearRaudhahConfirmOpen, setIsClearRaudhahConfirmOpen] = useState(false);
-  const raudhahCopyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const raudhahCopyTimerRef = useRef<any | null>(null);
+  const [isWhatsappCopied, setIsWhatsappCopied] = useState(false);
+  const whatsappCopyTimerRef = useRef<any | null>(null);
   const hasBlockingModal =
     activeModal !== null ||
     isGroupEditModalOpen ||
@@ -1182,6 +1185,26 @@ export function VisaTrackingDetailScreen({
     }, 1600);
   };
 
+  const handleCopyWhatsapp = async () => {
+    const text = generateWhatsappCopyText(group ?? undefined);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+    } catch {
+      // fallback
+    }
+
+    setIsWhatsappCopied(true);
+    if (whatsappCopyTimerRef.current !== null) {
+      window.clearTimeout(whatsappCopyTimerRef.current);
+    }
+    whatsappCopyTimerRef.current = window.setTimeout(() => {
+      setIsWhatsappCopied(false);
+      whatsappCopyTimerRef.current = null;
+    }, 1600);
+  };
+
   useEffect(() => {
     setPaymentStatus(row.paymentStatus);
   }, [row.id, row.paymentStatus]);
@@ -1206,6 +1229,7 @@ export function VisaTrackingDetailScreen({
     setIsDeleteGroupModalOpen(false);
     setDeleteAgreementDraft(null);
     setIsRaudhahTemplateCopied(false);
+    setIsWhatsappCopied(false);
     setIsClearRaudhahConfirmOpen(false);
   }, [row.id]);
 
@@ -1214,6 +1238,10 @@ export function VisaTrackingDetailScreen({
       if (raudhahCopyTimerRef.current !== null) {
         window.clearTimeout(raudhahCopyTimerRef.current);
         raudhahCopyTimerRef.current = null;
+      }
+      if (whatsappCopyTimerRef.current !== null) {
+        window.clearTimeout(whatsappCopyTimerRef.current);
+        whatsappCopyTimerRef.current = null;
       }
     },
     [],
@@ -1282,15 +1310,19 @@ export function VisaTrackingDetailScreen({
           </button>
           <button
             type="button"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
-            disabled
-            title="Export PDF is coming soon."
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition sm:flex-none ${
+              isWhatsappCopied
+                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
+                : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-brand-primary hover:text-brand-primary"
+            }`}
+            onClick={handleCopyWhatsapp}
+            aria-label={`Copy WhatsApp formatted details for ${row.groupCode}`}
           >
             <span className="material-symbols-outlined text-base" aria-hidden="true">
-              picture_as_pdf
+              {isWhatsappCopied ? "check" : "content_copy"}
             </span>
-            <span className="sm:hidden">Export (Soon)</span>
-            <span className="hidden sm:inline">Export PDF (Soon)</span>
+            <span className="sm:hidden">{isWhatsappCopied ? "Copied" : "Copy WA"}</span>
+            <span className="hidden sm:inline">{isWhatsappCopied ? "Copied" : "Copy WhatsApp"}</span>
           </button>
         </div>
       </section>
