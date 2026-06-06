@@ -27,6 +27,7 @@ const {
   formatRouteSummary,
   formatScheduleDate,
   getGroupAgreementHotelsByCity,
+  getStayPeriods,
   getScheduleTypeOption,
   hasIncompleteTransferTrainFields,
   inferCategoryKey,
@@ -350,21 +351,30 @@ function buildCompactAgreementSummary(group: GroupData, city: AgreementCityKey):
     if (hotelsList.length === 0) {
       return 0;
     }
-    const dateRangePaxSums = new Map<string, number>();
-    for (const hotel of hotelsList) {
-      const start = hotel.stayStartIso.trim();
-      const end = hotel.stayEndIso.trim();
-      if (!isIsoDateValue(start) || !isIsoDateValue(end)) {
-        continue;
-      }
-      const key = `${start}_${end}`;
-      dateRangePaxSums.set(key, (dateRangePaxSums.get(key) ?? 0) + Math.max(0, hotel.pax || 0));
-    }
-    const sums = Array.from(dateRangePaxSums.values());
-    if (sums.length === 0) {
+    const periods = getStayPeriods(hotelsList);
+    if (periods.length === 0) {
       return 0;
     }
-    return Math.min(group.pax, ...sums);
+    let minSum = Infinity;
+    for (const period of periods) {
+      const startMs = Date.parse(period.startIso);
+      const endMs = Date.parse(period.endIso);
+      
+      const periodHotels = hotelsList.filter((h) => {
+        const hStart = h.stayStartIso.trim();
+        const hEnd = h.stayEndIso.trim();
+        if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
+          return false;
+        }
+        return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
+      });
+      
+      const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
+      if (sum < minSum) {
+        minSum = sum;
+      }
+    }
+    return Math.min(group.pax, minSum);
   };
   const totalPax = calculateTotalPax(hotels);
   const firstHotelName = hotels[0]?.hotelName.trim() ?? "";

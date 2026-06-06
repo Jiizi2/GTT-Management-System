@@ -31,6 +31,7 @@ import type {
 const {
   formatVisaDateWithYear,
   getGroupAgreementHotelsByCity,
+  isIsoDateValue,
   resolveGroupCompleteness,
   resolveTotalBusCount,
   resolveVisaAgreementDateRange,
@@ -501,9 +502,38 @@ function InlineHotelAgreementForm({
   );
 }
 
+function getRemainingPaxForDraft(draft: HotelAgreementDraft, group: GroupData | null): number {
+  if (!group) {
+    return 0;
+  }
+  const city = draft.city;
+  const hotels = getGroupAgreementHotelsByCity(group, city);
+  
+  const draftStart = draft.stayStartIso.trim();
+  const draftEnd = draft.stayEndIso.trim();
+  if (!isIsoDateValue(draftStart) || !isIsoDateValue(draftEnd)) {
+    return Math.max(0, group.pax);
+  }
+  const draftStartMs = Date.parse(draftStart);
+  const draftEndMs = Date.parse(draftEnd);
+  
+  const overlappingHotels = hotels.filter((h) => {
+    const hStart = h.stayStartIso.trim();
+    const hEnd = h.stayEndIso.trim();
+    if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
+      return false;
+    }
+    return Math.max(draftStartMs, Date.parse(hStart)) < Math.min(draftEndMs, Date.parse(hEnd));
+  });
+  
+  const assignedSum = overlappingHotels.reduce((sum, h) => sum + Math.max(0, h.pax || 0), 0);
+  return Math.max(0, group.pax - assignedSum);
+}
+
 function AgreementInboxDraftAssignmentList({
   city,
   drafts,
+  group,
   remainingPax,
   isLoading,
   isError,
@@ -512,6 +542,7 @@ function AgreementInboxDraftAssignmentList({
 }: {
   city: "makkah" | "madinah";
   drafts: HotelAgreementDraft[];
+  group: GroupData | null;
   remainingPax: number;
   isLoading: boolean;
   isError: boolean;
@@ -555,9 +586,10 @@ function AgreementInboxDraftAssignmentList({
         <div className="mt-3 space-y-2">
           {drafts.map((draft) => {
             const isAssigning = assigningDraftId === draft.id;
-            const hasRemainingPax = safeRemainingPax > 0;
-            const fitsRemainingPax = draft.pax <= safeRemainingPax;
-            const isAssignable = hasRemainingPax && fitsRemainingPax && !assigningDraftId;
+            const draftRemainingPax = getRemainingPaxForDraft(draft, group);
+            const hasRemainingPax = draftRemainingPax > 0;
+            const fitsRemainingPax = draft.pax <= draftRemainingPax;
+            const isAssignable = hasRemainingPax && !assigningDraftId;
 
             return (
               <article
@@ -589,7 +621,7 @@ function AgreementInboxDraftAssignmentList({
                     <p className="mt-1 text-[11px] font-semibold text-amber-700">Pax {cityLabel} sudah penuh.</p>
                   ) : !fitsRemainingPax ? (
                     <p className="mt-1 text-[11px] font-semibold text-amber-700">
-                      Draft ini melebihi sisa {safeRemainingPax} pax.
+                      Draft ini melebihi sisa {draftRemainingPax} pax.
                     </p>
                   ) : null}
                 </div>
@@ -1055,19 +1087,11 @@ export function VisaTrackingDetailScreen({
   };
 
   const assignAgreementDraft = async (draft: HotelAgreementDraft) => {
-    const remainingPax = draft.city === "makkah" ? makkahMissing : madinahMissing;
+    const remainingPax = getRemainingPaxForDraft(draft, group);
     if (remainingPax <= 0) {
       setDraftAssignFeedback({
         tone: "error",
-        message: `Pax ${draft.city === "makkah" ? "Makkah" : "Madinah"} sudah penuh.`,
-      });
-      return;
-    }
-
-    if (draft.pax > remainingPax) {
-      setDraftAssignFeedback({
-        tone: "error",
-        message: `Draft ${draft.agreementNumber} melebihi sisa ${remainingPax} pax.`,
+        message: `Pax ${draft.city === "makkah" ? "Makkah" : "Madinah"} sudah penuh untuk periode stay ini.`,
       });
       return;
     }
@@ -1526,6 +1550,7 @@ export function VisaTrackingDetailScreen({
               <AgreementInboxDraftAssignmentList
                 city="makkah"
                 drafts={availableAgreementDraftsByCity.makkah}
+                group={group}
                 remainingPax={makkahMissing}
                 isLoading={agreementDraftsQuery.isLoading}
                 isError={agreementDraftsQuery.isError}
@@ -1677,6 +1702,7 @@ export function VisaTrackingDetailScreen({
               <AgreementInboxDraftAssignmentList
                 city="madinah"
                 drafts={availableAgreementDraftsByCity.madinah}
+                group={group}
                 remainingPax={madinahMissing}
                 isLoading={agreementDraftsQuery.isLoading}
                 isError={agreementDraftsQuery.isError}

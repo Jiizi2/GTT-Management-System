@@ -2339,6 +2339,43 @@ function resolveAgreementDateBounds(group: GroupData): {
   };
 }
 
+export function getStayPeriods(hotels: GroupAgreementHotel[]): Array<{ startIso: string; endIso: string }> {
+  const parsed = hotels
+    .map((h) => {
+      const startIso = h.stayStartIso.trim();
+      const endIso = h.stayEndIso.trim();
+      if (!isIsoDateValue(startIso) || !isIsoDateValue(endIso)) {
+        return null;
+      }
+      return { startIso, endIso, startMs: Date.parse(startIso), endMs: Date.parse(endIso) };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => a.startMs - b.startMs);
+
+  if (parsed.length === 0) {
+    return [];
+  }
+
+  const merged: Array<{ startIso: string; endIso: string; startMs: number; endMs: number }> = [];
+  let current = { ...parsed[0] };
+
+  for (let i = 1; i < parsed.length; i++) {
+    const next = parsed[i];
+    if (next.startMs < current.endMs) {
+      if (next.endMs > current.endMs) {
+        current.endIso = next.endIso;
+        current.endMs = next.endMs;
+      }
+    } else {
+      merged.push(current);
+      current = { ...next };
+    }
+  }
+  merged.push(current);
+
+  return merged.map((m) => ({ startIso: m.startIso, endIso: m.endIso }));
+}
+
 function hasAgreementPaxMismatch(group: GroupData): boolean {
   const groupPax = Math.max(1, group.pax);
   const makkahHotels = getGroupAgreementHotelsByCity(group, "makkah");
@@ -2348,21 +2385,31 @@ function hasAgreementPaxMismatch(group: GroupData): boolean {
     if (hotels.length === 0) {
       return false;
     }
-    const dateRangePaxSums = new Map<string, number>();
-    for (const hotel of hotels) {
-      const start = hotel.stayStartIso.trim();
-      const end = hotel.stayEndIso.trim();
-      if (!isIsoDateValue(start) || !isIsoDateValue(end)) {
-        continue;
+    const periods = getStayPeriods(hotels);
+    for (const period of periods) {
+      const startMs = Date.parse(period.startIso);
+      const endMs = Date.parse(period.endIso);
+      
+      const periodHotels = hotels.filter((h) => {
+        const hStart = h.stayStartIso.trim();
+        const hEnd = h.stayEndIso.trim();
+        if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
+          return false;
+        }
+        return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
+      });
+      
+      const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
+      if (sum < groupPax) {
+        return true;
       }
-      const key = `${start}_${end}`;
-      dateRangePaxSums.set(key, (dateRangePaxSums.get(key) ?? 0) + Math.max(0, hotel.pax || 0));
     }
-    return Array.from(dateRangePaxSums.values()).some((sum) => sum > 0 && sum < groupPax);
+    return false;
   };
 
   return checkCityMismatch(makkahHotels) || checkCityMismatch(madinahHotels);
 }
+
 
 export function resolveGroupCompleteness(group: GroupData): GroupCompletenessSummary {
   const issues: GroupCompletenessIssue[] = [];
@@ -2494,21 +2541,30 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
       if (hotels.length === 0) {
         return 0;
       }
-      const dateRangePaxSums = new Map<string, number>();
-      for (const hotel of hotels) {
-        const start = hotel.stayStartIso.trim();
-        const end = hotel.stayEndIso.trim();
-        if (!isIsoDateValue(start) || !isIsoDateValue(end)) {
-          continue;
-        }
-        const key = `${start}_${end}`;
-        dateRangePaxSums.set(key, (dateRangePaxSums.get(key) ?? 0) + Math.max(0, hotel.pax || 0));
-      }
-      const sums = Array.from(dateRangePaxSums.values());
-      if (sums.length === 0) {
+      const periods = getStayPeriods(hotels);
+      if (periods.length === 0) {
         return 0;
       }
-      return Math.min(pax, ...sums);
+      let minSum = Infinity;
+      for (const period of periods) {
+        const startMs = Date.parse(period.startIso);
+        const endMs = Date.parse(period.endIso);
+        
+        const periodHotels = hotels.filter((h) => {
+          const hStart = h.stayStartIso.trim();
+          const hEnd = h.stayEndIso.trim();
+          if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
+            return false;
+          }
+          return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
+        });
+        
+        const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
+        if (sum < minSum) {
+          minSum = sum;
+        }
+      }
+      return Math.min(pax, minSum);
     };
 
     const mappedMakkahVerified = calculateVerifiedPax(getGroupAgreementHotelsByCity(group, "makkah"));
