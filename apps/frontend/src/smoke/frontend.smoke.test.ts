@@ -608,8 +608,8 @@ async function testVisaAgreementHelpers(): Promise<void> {
 
   const fallbackMakkahAgreement = resolveVisaAgreementNumber({ groupCode: "SMK-X9" }, undefined, "makkah");
   const fallbackMadinahAgreement = resolveVisaAgreementNumber({ groupCode: "SMK-X9" }, undefined, "madinah");
-  assertEqual(fallbackMakkahAgreement, "202600000965865716");
-  assertEqual(fallbackMadinahAgreement, "202600000977824519");
+  assertEqual(fallbackMakkahAgreement, "Agreement pending");
+  assertEqual(fallbackMadinahAgreement, "Agreement pending");
 }
 
 async function testItinerarySummaryHelpers(): Promise<void> {

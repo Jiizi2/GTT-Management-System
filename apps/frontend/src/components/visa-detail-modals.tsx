@@ -54,7 +54,7 @@ const hotelModalSchema = z
         const parsedValue = Number.parseInt(value, 10);
         return Number.isInteger(parsedValue) && parsedValue > 0;
       }, "Total pax harus lebih dari 0."),
-    status: z.enum(["Waiting for Approval", "Approved"]),
+    status: z.enum(["Waiting for Approval", "Approved", "Rejected"]),
     stayStartIso: z.string().trim().min(1, "Stay start date wajib diisi."),
     stayEndIso: z.string().trim().min(1, "Stay end date wajib diisi."),
   })
@@ -488,6 +488,7 @@ export function VisaHotelModal({
                 >
                   <option value="Waiting for Approval">Waiting for Approval</option>
                   <option value="Approved">Approved</option>
+                  <option value="Rejected">Rejected</option>
                 </SereneSelect>
               )}
             />

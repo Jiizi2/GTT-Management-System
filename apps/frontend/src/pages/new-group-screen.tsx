@@ -43,7 +43,7 @@ type AgreementSaveTone = "success" | "warning" | "error";
 const visaStatusSchema = z.enum(["Draft", "Pending", "Issued"]);
 const visaServiceOptionSchema = z.enum(["Visa Only", "Visa+"]);
 const paymentStatusSchema = z.enum(["Paid", "Unpaid"]);
-const agreementApprovalStatusSchema = z.enum(["Waiting for Approval", "Approved"]);
+const agreementApprovalStatusSchema = z.enum(["Waiting for Approval", "Approved", "Rejected"]);
 const raudhahStatusSchema = z.enum(["Free", "After", "Before"]);
 const EMPTY_AGREEMENT_FORMS: NewGroupAgreementFormState[] = [];
 

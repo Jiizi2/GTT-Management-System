@@ -574,7 +574,7 @@ async function testVisaAgreementRules(): Promise<void> {
       agreementNumber: "MAK-402-B",
       pax: 40,
       status: AgreementApprovalStatus.WAITING,
-      stayStart: "2026-04-13",
+      stayStart: "2026-04-12",
       stayEnd: "2026-04-15",
     });
 
@@ -589,7 +589,7 @@ async function testVisaAgreementRules(): Promise<void> {
           stayStart: "2026-04-17",
           stayEnd: "2026-04-18",
         }),
-      /consecutive/i,
+      /connected/i,
     );
 
     const secondMakkahId = (
@@ -606,7 +606,7 @@ async function testVisaAgreementRules(): Promise<void> {
     ).visaSetup.hotelAgreements.find(
       (agreement) =>
         agreement.city === AgreementCity.MAKKAH &&
-        agreement.stayStart === "2026-04-13" &&
+        agreement.stayStart === "2026-04-12" &&
         agreement.stayEnd === "2026-04-15",
     )?.id;
 
@@ -623,7 +623,7 @@ async function testVisaAgreementRules(): Promise<void> {
           stayStart: "2026-04-14",
           stayEnd: "2026-04-16",
         }),
-      /consecutive/i,
+      /connected/i,
     );
 
     await service.create(
@@ -663,7 +663,7 @@ async function testVisaAgreementRules(): Promise<void> {
       agreementNumber: "MAD-403-A",
       pax: 35,
       status: AgreementApprovalStatus.WAITING,
-      stayStart: "2026-05-04",
+      stayStart: "2026-05-03",
       stayEnd: "2026-05-06",
     });
 

@@ -315,10 +315,12 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
         >
           <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-2">
             <span
-              className="material-symbols-outlined inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-container-lowest text-[15px]"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-container-lowest"
               aria-hidden="true"
             >
-              pending_actions
+              <span className="material-symbols-outlined text-[15px]">
+                pending_actions
+              </span>
             </span>
             <div className="min-w-0">
               <p className="truncate text-[11px] font-bold leading-snug" title={completeness.primaryMessage}>

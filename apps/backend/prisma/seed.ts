@@ -15,7 +15,7 @@ import {
   requireDefaultAuthUserPasswordOverrides,
 } from "../src/auth/auth-default-users";
 import { resolveConfiguredNodeEnv, resolveConfiguredString } from "../src/config/app-config";
-import { buildGroupSearchDocument } from "../src/groups/groups.search-document";
+import { buildGroupSearchDocument } from "../src/groups/domain/groups.search-document";
 import { DEFAULT_MASTER_DATA_OPTIONS } from "../src/master-data/master-data.defaults";
 
 const prisma = new PrismaClient();
@@ -70,7 +70,7 @@ async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): 
         description: option.description ?? null,
         sortOrder: option.sortOrder,
         isActive: option.isActive ?? true,
-        metadata: option.metadata ?? Prisma.JsonNull,
+        metadata: (option.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
       },
       create: {
         categoryKey: option.categoryKey,
@@ -79,7 +79,7 @@ async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): 
         description: option.description ?? null,
         sortOrder: option.sortOrder,
         isActive: option.isActive ?? true,
-        metadata: option.metadata ?? Prisma.JsonNull,
+        metadata: (option.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
       },
     });
   }
@@ -1143,7 +1143,7 @@ async function seedInvoiceClients({ resetDataFirst }: { resetDataFirst: boolean 
 
   const groupCodes = defaultClients
     .map((entry) => entry.groupCode)
-    .filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+    .filter((entry): entry is Exclude<typeof entry, null> => entry !== null && entry.length > 0);
   const matchedGroups = groupCodes.length
     ? await prisma.group.findMany({
         where: {
@@ -1255,7 +1255,7 @@ async function seedInvoices({ resetDataFirst }: { resetDataFirst: boolean }): Pr
 
   const groupCodes = invoiceSeeds
     .map((entry) => entry.groupCode)
-    .filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+    .filter((entry): entry is Exclude<typeof entry, null> => entry !== null && entry.length > 0);
   const matchedGroups = groupCodes.length
     ? await prisma.group.findMany({
         where: {

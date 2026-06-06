@@ -102,7 +102,7 @@ export type Musyrif = {
   avatar: string;
 };
 
-export type AgreementApprovalStatus = "Waiting for Approval" | "Approved";
+export type AgreementApprovalStatus = "Waiting for Approval" | "Approved" | "Rejected";
 
 export type GroupRaudhahStatus = "Free" | "After" | "Before";
 export type BusStatus = "Visa+";
@@ -2341,7 +2341,27 @@ function resolveAgreementDateBounds(group: GroupData): {
 
 function hasAgreementPaxMismatch(group: GroupData): boolean {
   const groupPax = Math.max(1, group.pax);
-  return collectGroupAgreementHotels(group).some((hotel) => hotel.pax > 0 && hotel.pax !== groupPax);
+  const makkahHotels = getGroupAgreementHotelsByCity(group, "makkah");
+  const madinahHotels = getGroupAgreementHotelsByCity(group, "madinah");
+
+  const checkCityMismatch = (hotels: GroupAgreementHotel[]): boolean => {
+    if (hotels.length === 0) {
+      return false;
+    }
+    const dateRangePaxSums = new Map<string, number>();
+    for (const hotel of hotels) {
+      const start = hotel.stayStartIso.trim();
+      const end = hotel.stayEndIso.trim();
+      if (!isIsoDateValue(start) || !isIsoDateValue(end)) {
+        continue;
+      }
+      const key = `${start}_${end}`;
+      dateRangePaxSums.set(key, (dateRangePaxSums.get(key) ?? 0) + Math.max(0, hotel.pax || 0));
+    }
+    return Array.from(dateRangePaxSums.values()).some((sum) => sum > 0 && sum < groupPax);
+  };
+
+  return checkCityMismatch(makkahHotels) || checkCityMismatch(madinahHotels);
 }
 
 export function resolveGroupCompleteness(group: GroupData): GroupCompletenessSummary {
@@ -2470,23 +2490,29 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
       visaStatus === "Issued" ? (isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : departureIso) : "";
 
     const pax = Math.max(1, group.pax);
-    const mappedMakkahVerified = Math.min(
-      pax,
-      Math.max(
-        0,
-        getGroupAgreementHotelsByCity(group, "makkah").reduce((total, hotel) => total + Math.max(0, hotel.pax || 0), 0),
-      ),
-    );
-    const mappedMadinahVerified = Math.min(
-      pax,
-      Math.max(
-        0,
-        getGroupAgreementHotelsByCity(group, "madinah").reduce(
-          (total, hotel) => total + Math.max(0, hotel.pax || 0),
-          0,
-        ),
-      ),
-    );
+    const calculateVerifiedPax = (hotels: GroupAgreementHotel[]): number => {
+      if (hotels.length === 0) {
+        return 0;
+      }
+      const dateRangePaxSums = new Map<string, number>();
+      for (const hotel of hotels) {
+        const start = hotel.stayStartIso.trim();
+        const end = hotel.stayEndIso.trim();
+        if (!isIsoDateValue(start) || !isIsoDateValue(end)) {
+          continue;
+        }
+        const key = `${start}_${end}`;
+        dateRangePaxSums.set(key, (dateRangePaxSums.get(key) ?? 0) + Math.max(0, hotel.pax || 0));
+      }
+      const sums = Array.from(dateRangePaxSums.values());
+      if (sums.length === 0) {
+        return 0;
+      }
+      return Math.min(pax, ...sums);
+    };
+
+    const mappedMakkahVerified = calculateVerifiedPax(getGroupAgreementHotelsByCity(group, "makkah"));
+    const mappedMadinahVerified = calculateVerifiedPax(getGroupAgreementHotelsByCity(group, "madinah"));
     const makkahVerified = mappedMakkahVerified;
     const madinahVerified = mappedMadinahVerified;
 
