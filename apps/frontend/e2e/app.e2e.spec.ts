@@ -236,7 +236,7 @@ async function startBackendApiServer(frontendOrigin: string): Promise<StartedBac
   require("reflect-metadata");
   const { NestFactory } = require("@nestjs/core") as typeof import("@nestjs/core");
   const { ValidationPipe } = require("@nestjs/common") as typeof import("@nestjs/common");
-  const { AppModule } = require(backendDistEntry) as { AppModule: unknown };
+  const { AppModule } = require(backendDistEntry) as { AppModule: any };
 
   let app: NestLikeApplication | null = null;
 
