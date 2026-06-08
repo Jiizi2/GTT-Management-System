@@ -91,11 +91,20 @@ function computeDropdownStyle(triggerElement: HTMLElement, optionCount: number):
   const availableAbove = Math.max(0, rect.top - viewportPadding - gap);
   const openBelow = availableBelow >= estimatedHeight || availableBelow >= availableAbove;
   const maxHeight = Math.max(128, Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove));
-  const top = openBelow ? rect.bottom + gap : Math.max(viewportPadding, rect.top - gap - maxHeight);
+
+  if (openBelow) {
+    return {
+      position: "fixed",
+      top: rect.bottom + gap,
+      left,
+      width,
+      maxHeight,
+    };
+  }
 
   return {
     position: "fixed",
-    top,
+    bottom: viewportHeight - rect.top + gap,
     left,
     width,
     maxHeight,
