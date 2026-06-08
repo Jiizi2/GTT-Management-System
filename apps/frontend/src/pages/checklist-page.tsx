@@ -258,7 +258,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   const [driverDrafts, setDriverDrafts] = useState<Record<string, ChecklistDriverDraft>>({});
   const [confirmedDrivers, setConfirmedDrivers] = useState<Record<string, ChecklistDriverAssignment>>({});
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
-  const copiedItemTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const copiedItemTimerRef = useRef<any | null>(null);
   const [cancelTargetItemId, setCancelTargetItemId] = useState<string | null>(null);
   const [groupCodeQuery, setGroupCodeQuery] = useState("");
   const [pendingPage, setPendingPage] = useState(1);
@@ -272,9 +272,11 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     return assignedCount >= getRequiredDriverCount(item);
   };
   const isTwoDaysAwayChecklistItem = (item: ChecklistItem): boolean => item.tripDate === dayAfterTomorrowIso;
-  const searchedChecklistItems = checklistItems.filter((item) =>
-    normalizedGroupCodeQuery ? item.groupCode.toLowerCase().includes(normalizedGroupCodeQuery) : true,
-  );
+  const searchedChecklistItems = checklistItems.filter((item) => {
+    if (!normalizedGroupCodeQuery) return true;
+    const codes = item.groupCodes ?? [item.groupCode];
+    return codes.some((code) => code.toLowerCase().includes(normalizedGroupCodeQuery));
+  });
   const pendingItems = searchedChecklistItems.filter((item) => !isChecklistItemCompleted(item));
   const completedItems = searchedChecklistItems.filter((item) => isChecklistItemCompleted(item));
   const pendingGroups = useMemo(() => groupChecklistItemsByGroup(pendingItems), [pendingItems]);
@@ -528,7 +530,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     const payload = [
       "*GROUP DETAILS*",
       "```",
-      `GROUP NUMBER : ${checklistItem.groupCode}`,
+      `GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
       `GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
       `TOTAL BUS    : ${checklistItem.requiredBusCount}`,
       `TRIP         : ${tripLabel}`,
@@ -577,7 +579,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     const payload = [
       "*GROUP DETAILS*",
       "```",
-      `GROUP NUMBER : ${checklistItem.groupCode}`,
+      `GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
       `GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
       `TOTAL BUS    : ${checklistItem.requiredBusCount}`,
       `TRIP         : ${tripLabel}`,
@@ -671,6 +673,11 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         ? `Pickup ${formatScheduleTime(item.hotelPickupRequestTime)}`
         : formatScheduleTime(item.scheduledTime || "");
 
+    const codes = item.groupCodes && item.groupCodes.length > 0 ? item.groupCodes : [item.groupCode];
+    const displayCodes = codes.length > 2 ? codes.slice(0, 2) : codes;
+    const codesText = displayCodes.join(" - ");
+    const codesFontSizeClass = codes.length > 1 ? "text-[1.35rem] leading-snug" : "text-[2rem] leading-none";
+
     return (
       <article
         key={item.id}
@@ -681,8 +688,8 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Group No</p>
-                <p className="mt-2 text-[2rem] font-extrabold leading-none tracking-tight text-slate-900">
-                  {item.groupCode}
+                <p className={`mt-2 font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
+                  {codesText}
                 </p>
               </div>
               <button
@@ -967,12 +974,19 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                     ? `Flight ${formatScheduleTime(item.departureFlightTime || item.scheduledTime)}`
                     : "";
 
+                const codes = item.groupCodes && item.groupCodes.length > 0 ? item.groupCodes : [item.groupCode];
+                const displayCodes = codes.length > 2 ? codes.slice(0, 2) : codes;
+                const codesText = displayCodes.join(" - ");
+                const codesFontSizeClass = codes.length > 1
+                  ? "text-[1.35rem] sm:text-[1.5rem] leading-snug"
+                  : "text-2xl sm:text-3xl leading-none";
+
                 return (
                   <article key={item.id} className="checklist-complete-card rounded-2xl px-4 py-3">
                     <div className="grid items-center gap-3 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.9fr_1.3fr_auto_auto]">
                       <div className="min-w-0">
-                        <p className="truncate text-2xl font-extrabold leading-none tracking-tight text-on-surface sm:text-3xl">
-                          {item.groupCode}
+                        <p className={`truncate font-extrabold tracking-tight text-on-surface ${codesFontSizeClass}`}>
+                          {codesText}
                         </p>
                         <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{item.groupName}</p>
                         <p className="mt-0.5 inline-flex items-center gap-1 truncate text-sm font-semibold text-on-surface-variant">
@@ -1120,7 +1134,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
                     Cancel Driver Assignment?
                   </h4>
                   <p id="cancel-assignment-description" className="mt-1 text-sm text-on-surface-variant">
-                    Assignment untuk <strong>{cancelTargetItem.groupCode}</strong> akan dikembalikan ke
+                    Assignment untuk <strong>{(cancelTargetItem.groupCodes ?? [cancelTargetItem.groupCode]).join(" - ")}</strong> akan dikembalikan ke
                     <strong> Need Attention</strong> dan data supir akan dihapus.
                   </p>
                 </div>

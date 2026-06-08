@@ -803,6 +803,81 @@ async function testChecklistIdentityAvoidsSameTimeCollision(): Promise<void> {
   }
 }
 
+async function testParentChildGroupInheritanceAndValidation(): Promise<void> {
+  const { service, restore } = await createMemoryService();
+
+  try {
+    const parent = (await service.create(
+      createGroupPayload({
+        code: "G-PARENT",
+        name: "Parent Group",
+      }),
+    )) as { id: string };
+
+    const child = (await service.create(
+      createGroupPayload({
+        code: "G-CHILD",
+        name: "Child Group",
+        parentGroupId: parent.id,
+      }),
+    )) as { id: string; parentGroupId?: string | null };
+
+    assert.equal(child.parentGroupId, parent.id);
+
+    // 1. Add itinerary to parent
+    await service.addItineraryItem("G-PARENT", {
+      dateLabel: "2 Apr",
+      yearLabel: "2026",
+      category: "Arrival",
+      title: "Jeddah Arrival",
+      meta: "SV-827",
+      icon: "flight_land",
+      isoDate: "2026-04-02",
+      time: "04:20",
+    });
+
+    // 2. Fetch child group, verify itinerary is inherited
+    const fetchedChild = (await service.findOneByIdOrCode("G-CHILD")) as {
+      itinerary: Array<{ title: string }>;
+    };
+    assert.equal(fetchedChild.itinerary.length, 1);
+    assert.equal(fetchedChild.itinerary[0].title, "Jeddah Arrival");
+
+    // 3. Verify edits are blocked on child group
+    await assert.rejects(
+      async () =>
+        service.addItineraryItem("G-CHILD", {
+          dateLabel: "3 Apr",
+          yearLabel: "2026",
+          category: "Arrival",
+          title: "Direct to child",
+          meta: "SV-827",
+          icon: "flight_land",
+        }),
+      /adalah child group. Silakan edit itinerary pada parent group/i,
+    );
+
+    await assert.rejects(
+      async () =>
+        service.confirmChecklistDriver("G-CHILD", {
+          tripDate: "2026-04-02",
+          activity: "Arrival",
+          tripLabel: "Jeddah Arrival",
+          requiredBusCount: 1,
+          scheduledTime: "04:20",
+          driver: {
+            name: "Driver Yusuf",
+            phone: "+966 50 111 2222",
+            plateNumber: "B 1234 ABC",
+          },
+        }),
+      /adalah child group. Silakan edit checklist pada parent group/i,
+    );
+  } finally {
+    restore();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase("groups search/filter/pagination", testSearchFilterPagination);
   await runCase("group travel date validation", testTravelDateValidation);
@@ -820,6 +895,10 @@ async function main(): Promise<void> {
   await runCase(
     "checklist identity avoids same-time collision",
     testChecklistIdentityAvoidsSameTimeCollision,
+  );
+  await runCase(
+    "parent-child group inheritance and validation",
+    testParentChildGroupInheritanceAndValidation,
   );
 }
 

@@ -143,6 +143,9 @@ model Group {
   invoiceClients     InvoiceClient[]
   invoices           Invoice[]
   agreementDrafts    HotelAgreementDraft[]
+  parentGroupId      String?
+  parentGroup        Group?                @relation("GroupToGroup", fields: [parentGroupId], references: [id], onDelete: SetNull)
+  childGroups        Group[]               @relation("GroupToGroup")
 
   @@index([createdAt])
 }

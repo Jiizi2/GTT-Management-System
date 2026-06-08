@@ -379,6 +379,21 @@ export function findOneFromMemory(
     throw new NotFoundException(`Group '${idOrCode}' not found.`);
   }
 
+  if (group.parentGroupId) {
+    const parent = memoryGroups.find((item) => item.id === group.parentGroupId);
+    if (parent) {
+      return {
+        ...group,
+        musyrif: parent.musyrif,
+        nextActivity: parent.nextActivity,
+        timeline: parent.timeline,
+        itinerary: parent.itinerary,
+        notes: parent.notes,
+        checklistAssignments: parent.checklistAssignments,
+      };
+    }
+  }
+
   return group;
 }
 
@@ -484,6 +499,7 @@ export function updateInMemory(
     totalBuses: payload.totalBuses ?? current.totalBuses,
     packageName: payload.packageName?.trim() ?? current.packageName,
     durationDays: payload.durationDays ?? current.durationDays,
+    parentGroupId: payload.parentGroupId !== undefined ? (payload.parentGroupId?.trim() || null) : current.parentGroupId,
     updatedAt: new Date().toISOString(),
   };
 

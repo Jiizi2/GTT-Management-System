@@ -524,7 +524,7 @@ function getRemainingPaxForDraft(draft: HotelAgreementDraft, group: GroupData | 
     if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
       return false;
     }
-    return Math.max(draftStartMs, Date.parse(hStart)) < Math.min(draftEndMs, Date.parse(hEnd));
+    return Math.max(draftStartMs, Date.parse(hStart)) <= Math.min(draftEndMs, Date.parse(hEnd));
   });
   
   const assignedSum = overlappingHotels.reduce((sum, h) => sum + Math.max(0, h.pax || 0), 0);
@@ -588,9 +588,10 @@ function AgreementInboxDraftAssignmentList({
           {drafts.map((draft) => {
             const isAssigning = assigningDraftId === draft.id;
             const draftRemainingPax = getRemainingPaxForDraft(draft, group);
+            const draftAvailablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
             const hasRemainingPax = draftRemainingPax > 0;
-            const fitsRemainingPax = draft.pax <= draftRemainingPax;
-            const isAssignable = hasRemainingPax && !assigningDraftId;
+            const fitsRemainingPax = draftAvailablePax > 0;
+            const isAssignable = hasRemainingPax && fitsRemainingPax && !assigningDraftId;
 
             return (
               <article
@@ -601,7 +602,7 @@ function AgreementInboxDraftAssignmentList({
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="break-words text-sm font-bold text-slate-900">{draft.hotelName}</h4>
                     <span className="inline-flex rounded-md border border-slate-200 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
-                      Pax {draft.pax}
+                      Pax {draft.remainingPax !== undefined && draft.remainingPax < draft.pax ? `${draft.remainingPax}/${draft.pax}` : draft.pax}
                     </span>
                     <span
                       className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getAgreementStatusClasses(
@@ -622,7 +623,7 @@ function AgreementInboxDraftAssignmentList({
                     <p className="mt-1 text-[11px] font-semibold text-amber-700">Pax {cityLabel} sudah penuh.</p>
                   ) : !fitsRemainingPax ? (
                     <p className="mt-1 text-[11px] font-semibold text-amber-700">
-                      Draft ini melebihi sisa {draftRemainingPax} pax.
+                      Draft ini sudah terpakai sepenuhnya.
                     </p>
                   ) : null}
                 </div>
@@ -648,7 +649,7 @@ function AgreementInboxDraftAssignmentList({
 }
 
 export function VisaTrackingDetailScreen({
-  row,
+  row: initialRow,
   groups,
   onBack,
   onDeleteGroup,
@@ -679,9 +680,39 @@ export function VisaTrackingDetailScreen({
   onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
 }) {
+  const [activeGroupCode, setActiveGroupCode] = useState(initialRow.groupCode);
+  const allVisaRows = useMemo(() => Domain.buildVisaTrackingRowsFromGroups(groups), [groups]);
+  const activeRow = useMemo(() => {
+    return allVisaRows.find((r) => r.groupCode === activeGroupCode) ?? initialRow;
+  }, [allVisaRows, activeGroupCode, initialRow]);
+
+  // Shadow row prop with activeRow
+  const row = activeRow;
+
+  // Find family groups for tabs
+  const familyGroups = useMemo(() => {
+    const currentGroup = groups.find((item) => item.code === row.groupCode) ?? null;
+    if (!currentGroup) return [];
+    const parent = currentGroup.parentGroupId
+      ? (groups.find((g) => g.id === currentGroup.parentGroupId || g.code === currentGroup.parentGroupId) ?? null)
+      : currentGroup;
+    if (!parent) return [currentGroup];
+    const parentKey = parent.id || parent.code;
+    if (!parentKey) return [currentGroup];
+    const children = groups.filter(
+      (g) => g.parentGroupId && (g.parentGroupId === parent.id || g.parentGroupId === parent.code) && g.code !== parent.code
+    );
+    return [parent, ...children];
+  }, [groups, row.groupCode]);
+
   const queryClient = useQueryClient();
   const agreementDraftsQuery = useAgreementDraftsQuery("", "all");
   const [paymentStatus, setPaymentStatus] = useState<VisaPaymentStatus>(row.paymentStatus);
+
+  useEffect(() => {
+    setPaymentStatus(activeRow.paymentStatus);
+  }, [activeRow.groupCode, activeRow.paymentStatus]);
+
   const [activeModal, setActiveModal] = useState<
     "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | null
   >(null);
@@ -1023,11 +1054,17 @@ export function VisaTrackingDetailScreen({
     name,
     pax,
     totalBuses,
+    arrivalDate,
+    returnDate,
+    parentGroupId,
   }: {
     code: string;
     name: string;
     pax: number;
     totalBuses: number;
+    arrivalDate: string;
+    returnDate: string;
+    parentGroupId?: string | null;
   }): { ok: true } | { ok: false; message: string } => {
     if (!group) {
       return { ok: false, message: "Group belum tersedia." };
@@ -1035,6 +1072,11 @@ export function VisaTrackingDetailScreen({
 
     const normalizedPax = Math.max(1, Math.floor(pax));
     const normalizedTotalBuses = resolveTotalBusCount(normalizedPax, totalBuses);
+    const nextDurationDays = Math.max(
+      1,
+      Math.floor((Date.parse(returnDate) - Date.parse(arrivalDate)) / 86_400_000) + 1
+    );
+
     const result = onSaveGroup(
       {
         ...group,
@@ -1042,6 +1084,10 @@ export function VisaTrackingDetailScreen({
         name,
         pax: normalizedPax,
         totalBuses: normalizedTotalBuses,
+        arrivalDate,
+        returnDate,
+        durationDays: nextDurationDays,
+        parentGroupId,
       },
       group.code,
     );
@@ -1145,7 +1191,10 @@ export function VisaTrackingDetailScreen({
     setUnassigningAgreementDraftId(deleteAgreementDraft.draft.id);
     setDraftAssignFeedback(null);
     try {
-      await unassignAgreementDraftInBackend(deleteAgreementDraft.draft.id);
+      await unassignAgreementDraftInBackend({
+        draftId: deleteAgreementDraft.draft.id,
+        groupCode: row.groupCode,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
@@ -1186,7 +1235,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const handleCopyWhatsapp = async () => {
-    const text = generateWhatsappCopyText(group ?? undefined);
+    const text = generateWhatsappCopyText(group ?? undefined, familyGroups);
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -1268,12 +1317,44 @@ export function VisaTrackingDetailScreen({
         </button>
       </header>
 
+      {group?.parentGroupId && (
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-xs">
+          <span className="material-symbols-outlined text-base text-sky-700" aria-hidden="true">info</span>
+          <div>
+            <strong>Grup Operasional Terhubung</strong>
+            <p className="mt-0.5 text-[11px] text-sky-600 font-medium">
+              Grup ini mengikuti data operasional dari Group ({groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}). Itinerary dan Musyrif diwarisi secara otomatis.
+            </p>
+          </div>
+        </div>
+      )}
+
       <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-brand-neutral p-4 shadow-sm sm:p-5 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-primary">Visa Detail</p>
-          <h1 className="mt-2 break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            {row.groupCode}
-          </h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              {familyGroups.length > 1 ? familyGroups.map(g => g.code).join(" - ") : row.groupCode}
+            </h1>
+            {familyGroups.length > 1 && (
+              <span className={`inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600 ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
+                <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
+                <span>Terhubung:</span>
+                {familyGroups.filter(g => g.code !== activeGroupCode).map((g, index) => (
+                  <span key={g.code}>
+                    {index > 0 && ", "}
+                    <button
+                      type="button"
+                      onClick={() => setActiveGroupCode(g.code)}
+                      className="font-bold text-slate-900 hover:underline"
+                    >
+                      {g.code}
+                    </button>
+                  </span>
+                ))}
+              </span>
+            )}
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <p className="min-w-0 break-words">{group?.name ?? row.groupName}</p>
             <span className="inline-flex rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary">
@@ -1920,6 +2001,10 @@ export function VisaTrackingDetailScreen({
             groupName={group.name}
             groupPax={group.pax}
             requiredBusCount={requiredBusCount}
+            arrivalDate={group.arrivalDate ?? ""}
+            returnDate={group.returnDate ?? ""}
+            parentGroupId={group.parentGroupId}
+            groups={groups}
             onClose={closeGroupEditModal}
             onSave={saveGroupEdit}
           />

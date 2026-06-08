@@ -205,6 +205,7 @@ function buildGroupWriteData(
     totalBuses: options.nullifyMissingTotalBuses ? payload.totalBuses ?? null : payload.totalBuses,
     packageName: payload.packageName.trim(),
     durationDays: payload.durationDays,
+    parentGroupId: payload.parentGroupId?.trim() || null,
     musyrif: payload.musyrif
       ? {
           create: {

@@ -208,6 +208,12 @@ function resolveCityAgreementApprovalStatus(
   return verifiedCount >= row.pax ? "Approved" : "Waiting for Approval";
 }
 
+
+type VisaRowGroup = {
+  mainRow: VisaTrackingRow;
+  followerRows: VisaTrackingRow[];
+};
+
 const desktopTableGridTemplate = "0.76fr 1.2fr 0.64fr 1.1fr 1.1fr 0.72fr 0.72fr 0.62fr 0.66fr";
 
 export function VisaTrackingScreen({
@@ -228,13 +234,61 @@ export function VisaTrackingScreen({
   const [currentPage, setCurrentPage] = useState(1);
 
   const visaRows = useMemo(() => buildVisaTrackingRowsFromGroups(groups), [groups]);
+  const visaRowsByCode = useMemo(() => new Map(visaRows.map((row) => [row.groupCode, row] as const)), [visaRows]);
   const groupByCode = useMemo(() => new Map(groups.map((group) => [group.code, group] as const)), [groups]);
   const durationByGroupCode = useMemo(
     () => new Map(groups.map((group) => [group.code, group.durationDays] as const)),
     [groups],
   );
   const normalizedQuery = query.trim().toLowerCase();
-  const queriedRows = visaRows.filter((row) => {
+
+  // Group all visa rows into row groups
+  const allGroupedRows = useMemo<VisaRowGroup[]>(() => {
+    const followersMap = new Map<string, VisaTrackingRow[]>();
+    const rowByGroupId = new Map<string, VisaTrackingRow>();
+    const rowByGroupCode = new Map<string, VisaTrackingRow>();
+
+    visaRows.forEach(row => {
+      const group = groupByCode.get(row.groupCode);
+      if (group) {
+        if (group.id) rowByGroupId.set(group.id, row);
+        rowByGroupCode.set(group.code, row);
+      }
+    });
+
+    const followerRowIds = new Set<string>();
+
+    visaRows.forEach(row => {
+      const group = groupByCode.get(row.groupCode);
+      if (group && group.parentGroupId) {
+        const parentRow = rowByGroupId.get(group.parentGroupId) || rowByGroupCode.get(group.parentGroupId);
+        if (parentRow) {
+          followerRowIds.add(row.id);
+          const parentKey = parentRow.id || parentRow.groupCode;
+          if (!followersMap.has(parentKey)) {
+            followersMap.set(parentKey, []);
+          }
+          followersMap.get(parentKey)!.push(row);
+        }
+      }
+    });
+
+    const result: VisaRowGroup[] = [];
+    visaRows.forEach(row => {
+      if (!followerRowIds.has(row.id)) {
+        const parentKey = row.id;
+        const followers = followersMap.get(parentKey) || [];
+        result.push({
+          mainRow: row,
+          followerRows: followers,
+        });
+      }
+    });
+
+    return result;
+  }, [visaRows, groupByCode]);
+
+  const doesRowMatchQuery = (row: VisaTrackingRow): boolean => {
     if (!normalizedQuery) {
       return true;
     }
@@ -256,7 +310,41 @@ export function VisaTrackingScreen({
       row.visaStatus,
       row.paymentStatus,
     ].some((value) => value.toLowerCase().includes(normalizedQuery));
-  });
+  };
+
+  const doesRowMatchActiveFilter = (row: VisaTrackingRow): boolean => {
+    if (activeFilter === "all") {
+      return true;
+    }
+
+    if (activeFilter === "not-issued") {
+      return row.visaStatus !== "Issued";
+    }
+
+    if (activeFilter === "missing-hotel") {
+      return hasMissingHotelAllocation(row);
+    }
+
+    return row.paymentStatus !== "Paid";
+  };
+
+  const filteredGroupedRows = useMemo(() => {
+    return allGroupedRows
+      .filter(rowGroup => {
+        if (!normalizedQuery) return true;
+        return doesRowMatchQuery(rowGroup.mainRow) || rowGroup.followerRows.some(f => doesRowMatchQuery(f));
+      })
+      .filter(rowGroup => {
+        if (activeFilter === "all") return true;
+        return doesRowMatchActiveFilter(rowGroup.mainRow) || rowGroup.followerRows.some(f => doesRowMatchActiveFilter(f));
+      })
+      .filter(rowGroup => {
+        if (issuedMonthFilter === "all") return true;
+        const mainMonth = resolveIssuedMonthKey(rowGroup.mainRow.departureIso);
+        if (mainMonth === issuedMonthFilter) return true;
+        return rowGroup.followerRows.some(f => resolveIssuedMonthKey(f.departureIso) === issuedMonthFilter);
+      });
+  }, [allGroupedRows, normalizedQuery, activeFilter, issuedMonthFilter, groupByCode]);
 
   const issuedMonthOptions = useMemo<IssuedMonthOption[]>(() => {
     const monthCounter = new Map<string, number>();
@@ -279,46 +367,23 @@ export function VisaTrackingScreen({
       }));
   }, [currentIssuedMonthKey, visaRows]);
 
-  const filteredRows = queriedRows
-    .filter((row) => {
-      if (activeFilter === "all") {
-        return true;
-      }
-
-      if (activeFilter === "not-issued") {
-        return row.visaStatus !== "Issued";
-      }
-
-      if (activeFilter === "missing-hotel") {
-        return hasMissingHotelAllocation(row);
-      }
-
-      return row.paymentStatus !== "Paid";
-    })
-    .filter((row) => {
-      if (issuedMonthFilter === "all") {
-        return true;
-      }
-
-      return resolveIssuedMonthKey(row.departureIso) === issuedMonthFilter;
-    });
-
   const notIssuedCount = visaRows.filter((row) => row.visaStatus !== "Issued").length;
   const missingHotelCount = visaRows.filter((row) => hasMissingHotelAllocation(row)).length;
   const unpaidCount = visaRows.filter((row) => row.paymentStatus !== "Paid").length;
   const issuedCount = visaRows.filter((row) => row.visaStatus === "Issued").length;
-  const hasRowsForExport = filteredRows.length > 0;
+  const hasRowsForExport = filteredGroupedRows.length > 0;
   const selectedIssuedMonthLabel =
     issuedMonthFilter === "all"
       ? "All Months"
       : (issuedMonthOptions.find((option) => option.value === issuedMonthFilter)?.label ?? issuedMonthFilter);
   const actionRequiredCount = visaRows.filter((row) => isVisaRowActionRequired(row)).length;
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / VISA_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredGroupedRows.length / VISA_PAGE_SIZE));
   const startIndex = (currentPage - 1) * VISA_PAGE_SIZE;
-  const paginatedRows = filteredRows.slice(startIndex, startIndex + VISA_PAGE_SIZE);
-  const rangeStart = filteredRows.length === 0 ? 0 : startIndex + 1;
-  const rangeEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, startIndex + paginatedRows.length);
+  const paginatedRows = filteredGroupedRows.slice(startIndex, startIndex + VISA_PAGE_SIZE);
+  const rangeStart = filteredGroupedRows.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = filteredGroupedRows.length === 0 ? 0 : Math.min(filteredGroupedRows.length, startIndex + paginatedRows.length);
+  
   const heroLabelClassName = isDarkMode
     ? "text-xs font-semibold uppercase tracking-[0.2em] text-primary/85"
     : "text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700";
@@ -365,11 +430,13 @@ export function VisaTrackingScreen({
       return;
     }
 
+    const exportedRows = filteredGroupedRows.flatMap(rg => [rg.mainRow, ...rg.followerRows]);
+
     void import("./visa-tracking-export")
       .then(({ exportVisaTrackingReportPdf }) => {
         const exported = exportVisaTrackingReportPdf(
           {
-            rows: filteredRows,
+            rows: exportedRows,
             groups,
             query,
             activeFilter,
@@ -393,6 +460,305 @@ export function VisaTrackingScreen({
         }
         window.alert("Gagal menyiapkan export PDF. Coba lagi.");
       });
+  };
+
+  const renderAgreementCell = (row: VisaTrackingRow, city: "makkah" | "madinah", isFollower = false, view: "mobile" | "desktop" = "desktop") => {
+    const group = groupByCode.get(row.groupCode);
+    const agreements = getGroupAgreementHotelsByCity(group, city);
+    const hasAgreement = agreements.length > 0;
+    const agreementNumber = resolveVisaAgreementNumber(row, group, city);
+    const agreementStatus = resolveCityAgreementApprovalStatus(row, group, city);
+    const agreementDateRange = resolveVisaAgreementDateRange(
+      row,
+      durationByGroupCode.get(row.groupCode) ?? 8,
+      group,
+    );
+
+    const isMobile = view === "mobile";
+    const selectWidth = isMobile ? "w-[110px]" : "w-[96px]";
+    const selectTextSize = isMobile ? "text-[10px]" : "text-[11px]";
+    const agreementNumberTextSize = isMobile ? "text-xs" : "text-[13px]";
+    const badgeTextSize = isMobile ? "text-[10px]" : "text-[11px]";
+
+    return (
+      <div key={row.groupCode} className={`space-y-0.5 ${isFollower ? "mt-2 pt-2 border-t border-slate-200/50" : ""}`}>
+        <div className="flex items-center gap-1.5">
+          {isFollower && <span className="text-slate-400 text-xs font-bold">↳</span>}
+          <strong className={`break-all ${agreementNumberTextSize} font-semibold leading-tight text-slate-800`}>
+            {agreementNumber}
+          </strong>
+        </div>
+        <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
+          {hasAgreement
+            ? `${formatVisaShortDate(agreementDateRange.makkahStartIso || agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
+                agreementDateRange.makkahEndIso || agreementDateRange.madinahEndIso,
+              )}`
+            : "Stay dates pending"}
+        </small>
+        {hasAgreement ? (
+          <SereneSelect
+            value={toAgreementStatusSelectValue(agreementStatus)}
+            className={`serene-select-pill mt-1 ${selectWidth} ${selectTextSize} font-bold ${getAgreementApprovalClasses(
+              agreementStatus,
+              isDarkMode,
+            )}`}
+            onChange={(event) =>
+              onUpdateAgreementStatus(
+                row.groupCode,
+                city,
+                fromAgreementStatusSelectValue(event.target.value),
+              )
+            }
+            aria-label={`Update ${city} agreement status for ${row.groupCode}`}
+          >
+            <option value="approved">Approved</option>
+            <option value="waiting">Waiting</option>
+          </SereneSelect>
+        ) : (
+          <span className={`mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 ${badgeTextSize} font-bold leading-none text-on-tertiary-fixed-variant`}>
+            Not linked
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderMobileCardSingle = (row: VisaTrackingRow, isFollower = false) => {
+    const group = groupByCode.get(row.groupCode);
+    const visaTypeLabel = resolveVisaTypeLabel(group);
+    
+    const raudhahEntries = resolveRaudhahEntries(row, group);
+    const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
+    const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
+
+    return (
+      <article
+        key={row.id}
+        className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-surface-container-lowest transition-all"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold text-slate-900">
+                {row.groupCode}
+              </p>
+            </div>
+            <p className="mt-1 text-sm font-medium text-slate-700">{row.groupName}</p>
+          </div>
+
+          <div className="flex flex-col gap-1 items-end shrink-0">
+            <span className="inline-flex min-h-[24px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-700">
+              {row.pax} Pax
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+              Makkah Agreement
+            </p>
+            {renderAgreementCell(row, "makkah", false, "mobile")}
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+              Madinah Agreement
+            </p>
+            {renderAgreementCell(row, "madinah", false, "mobile")}
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Raudhah Entry Date
+            </p>
+            {raudhahEntries.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {visibleRaudhahEntries.map((entry) => (
+                  <span
+                    key={`${row.id}-mobile-raudhah-${entry.key}`}
+                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getRaudhahStatusClasses(
+                      entry.status,
+                      isDarkMode,
+                    )}`}
+                  >
+                    <span>{entry.dateLabel}</span>
+                    <span aria-hidden="true">|</span>
+                    <span>{entry.status}</span>
+                  </span>
+                ))}
+                {hiddenRaudhahEntriesCount > 0 ? (
+                  <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-700">
+                    +{hiddenRaudhahEntriesCount}
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <small className="mt-1 block text-xs text-slate-500">Not set yet</small>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-surface-container-lowest p-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
+            <div className="mt-1 flex flex-col gap-1">
+              <span
+                className={`inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none w-fit ${getVisaStatusClasses(
+                  row.visaStatus,
+                  isDarkMode,
+                )}`}
+              >
+                {row.visaStatus}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-surface-container-lowest p-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
+            <div className="mt-1 flex flex-col gap-1">
+              <span
+                className={`inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none w-fit ${getVisaTypeClasses(
+                  visaTypeLabel,
+                  isDarkMode,
+                )}`}
+              >
+                {visaTypeLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            type="button"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold tracking-[0.06em] text-on-primary shadow-cta-soft transition hover:bg-primary-container"
+            onClick={() => onOpenDetail(row)}
+          >
+            View Details
+          </button>
+        </div>
+      </article>
+    );
+  };
+
+  const renderMobileCard = (rowGroup: VisaRowGroup) => {
+    const { mainRow, followerRows } = rowGroup;
+    return (
+      <div key={mainRow.id} className="space-y-3">
+        {renderMobileCardSingle(mainRow, false)}
+        {followerRows.map(f => renderMobileCardSingle(f, true))}
+      </div>
+    );
+  };
+
+  const renderDesktopRowSingle = (row: VisaTrackingRow, isFollower = false) => {
+    const group = groupByCode.get(row.groupCode);
+    const visaTypeLabel = resolveVisaTypeLabel(group);
+    
+    const raudhahEntries = resolveRaudhahEntries(row, group);
+    const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
+    const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
+
+    return (
+      <article
+        key={row.id}
+        className="grid items-center gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-slate-50/30"
+        style={{ gridTemplateColumns: desktopTableGridTemplate }}
+      >
+        <div className="flex items-center gap-1.5 font-semibold text-slate-800 py-1">
+          <span>{row.groupCode}</span>
+        </div>
+
+        <div className="min-w-0 py-1 font-medium text-slate-700 truncate">
+          {row.groupName}
+        </div>
+
+        <div className="flex items-center py-1">
+          <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700 w-fit">
+            {row.pax} Pax
+          </span>
+        </div>
+
+        <div className="space-y-0.5 py-1">
+          {renderAgreementCell(row, "makkah", false, "desktop")}
+        </div>
+
+        <div className="space-y-0.5 py-1">
+          {renderAgreementCell(row, "madinah", false, "desktop")}
+        </div>
+
+        <div className="space-y-0.5 justify-self-center text-center py-1">
+          {raudhahEntries.length > 0 ? (
+            <div className="flex flex-wrap justify-center gap-1">
+              {visibleRaudhahEntries.map((entry) => (
+                <span
+                  key={`${row.id}-desktop-raudhah-${entry.key}`}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
+                    entry.status,
+                    isDarkMode,
+                  )}`}
+                  title={`${entry.dateLabel} - ${entry.status}`}
+                >
+                  <span>{entry.dateLabel}</span>
+                  <span aria-hidden="true">|</span>
+                  <span>{entry.status}</span>
+                </span>
+              ))}
+              {hiddenRaudhahEntriesCount > 0 ? (
+                <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
+                  +{hiddenRaudhahEntriesCount}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <small className="text-[11px] text-slate-500">Not set</small>
+          )}
+        </div>
+
+        <div className="justify-self-center flex flex-col gap-1 py-1">
+          <span
+            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaStatusClasses(
+              row.visaStatus,
+              isDarkMode,
+            )}`}
+          >
+            {row.visaStatus}
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-1 py-1">
+          <span
+            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaTypeClasses(
+              visaTypeLabel,
+              isDarkMode,
+            )}`}
+          >
+            {visaTypeLabel}
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-1.5 justify-start py-1">
+          <button
+            type="button"
+            className="inline-flex items-center whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
+            onClick={() => onOpenDetail(row)}
+          >
+            View Details
+          </button>
+        </div>
+      </article>
+    );
+  };
+
+  const renderDesktopRow = (rowGroup: VisaRowGroup) => {
+    const { mainRow, followerRows } = rowGroup;
+    return (
+      <div key={mainRow.id} className="divide-y divide-slate-100/50">
+        {renderDesktopRowSingle(mainRow, false)}
+        {followerRows.map(f => renderDesktopRowSingle(f, true))}
+      </div>
+    );
   };
 
   return (
@@ -562,7 +928,7 @@ export function VisaTrackingScreen({
         </article>
       </section>
 
-      {filteredRows.length === 0 ? (
+      {filteredGroupedRows.length === 0 ? (
         <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
             search_off
@@ -576,190 +942,7 @@ export function VisaTrackingScreen({
       ) : (
         <>
           <section className="space-y-3 md:hidden" aria-label="Visa tracking cards">
-            {paginatedRows.map((row) => {
-              const group = groupByCode.get(row.groupCode);
-              const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
-              const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
-              const hasMakkahAgreement = makkahAgreements.length > 0;
-              const hasMadinahAgreement = madinahAgreements.length > 0;
-              const makkahAgreementNumber = resolveVisaAgreementNumber(row, group, "makkah");
-              const madinahAgreementNumber = resolveVisaAgreementNumber(row, group, "madinah");
-              const visaTypeLabel = resolveVisaTypeLabel(group);
-              const makkahAgreementStatus = resolveCityAgreementApprovalStatus(row, group, "makkah");
-              const madinahAgreementStatus = resolveCityAgreementApprovalStatus(row, group, "madinah");
-              const raudhahEntries = resolveRaudhahEntries(row, group);
-              const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
-              const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
-              const agreementDateRange = resolveVisaAgreementDateRange(
-                row,
-                durationByGroupCode.get(row.groupCode) ?? 8,
-                group,
-              );
-
-              return (
-                <article
-                  key={row.id}
-                  className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{row.groupCode}</p>
-                      <p className="mt-0.5 text-sm font-medium text-slate-700">{row.groupName}</p>
-                    </div>
-
-                    <span className="inline-flex min-h-[28px] min-w-[68px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-700">
-                      {row.pax} Pax
-                    </span>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    <div className="rounded-xl bg-slate-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Makkah Agreement
-                      </p>
-                      <strong className="mt-1 block text-xs font-semibold text-slate-800">
-                        {makkahAgreementNumber}
-                      </strong>
-                      <small className={`block text-xs ${agreementDateTextClassName}`}>
-                        {hasMakkahAgreement
-                          ? `${formatVisaShortDate(agreementDateRange.makkahStartIso)} - ${formatVisaShortDate(
-                              agreementDateRange.makkahEndIso,
-                            )}`
-                          : "Stay dates pending"}
-                      </small>
-                      {hasMakkahAgreement ? (
-                        <SereneSelect
-                          value={toAgreementStatusSelectValue(makkahAgreementStatus)}
-                          className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
-                            makkahAgreementStatus,
-                            isDarkMode,
-                          )}`}
-                          onChange={(event) =>
-                            onUpdateAgreementStatus(
-                              row.groupCode,
-                              "makkah",
-                              fromAgreementStatusSelectValue(event.target.value),
-                            )
-                          }
-                          aria-label={`Update Makkah agreement status for ${row.groupCode}`}
-                        >
-                          <option value="approved">Approved</option>
-                          <option value="waiting">Waiting</option>
-                        </SereneSelect>
-                      ) : (
-                        <span className="mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[10px] font-bold leading-none text-on-tertiary-fixed-variant">
-                          Not linked
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="rounded-xl bg-slate-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Madinah Agreement
-                      </p>
-                      <strong className="mt-1 block text-xs font-semibold text-slate-800">
-                        {madinahAgreementNumber}
-                      </strong>
-                      <small className={`block text-xs ${agreementDateTextClassName}`}>
-                        {hasMadinahAgreement
-                          ? `${formatVisaShortDate(agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
-                              agreementDateRange.madinahEndIso,
-                            )}`
-                          : "Stay dates pending"}
-                      </small>
-                      {hasMadinahAgreement ? (
-                        <SereneSelect
-                          value={toAgreementStatusSelectValue(madinahAgreementStatus)}
-                          className={`serene-select-pill mt-1 w-[110px] text-[10px] font-bold ${getAgreementApprovalClasses(
-                            madinahAgreementStatus,
-                            isDarkMode,
-                          )}`}
-                          onChange={(event) =>
-                            onUpdateAgreementStatus(
-                              row.groupCode,
-                              "madinah",
-                              fromAgreementStatusSelectValue(event.target.value),
-                            )
-                          }
-                          aria-label={`Update Madinah agreement status for ${row.groupCode}`}
-                        >
-                          <option value="approved">Approved</option>
-                          <option value="waiting">Waiting</option>
-                        </SereneSelect>
-                      ) : (
-                        <span className="mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[10px] font-bold leading-none text-on-tertiary-fixed-variant">
-                          Not linked
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="rounded-xl bg-slate-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Raudhah Entry Date
-                      </p>
-                      {raudhahEntries.length > 0 ? (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {visibleRaudhahEntries.map((entry) => (
-                            <span
-                              key={`${row.id}-mobile-raudhah-${entry.key}`}
-                              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getRaudhahStatusClasses(
-                                entry.status,
-                                isDarkMode,
-                              )}`}
-                            >
-                              <span>{entry.dateLabel}</span>
-                              <span aria-hidden="true">|</span>
-                              <span>{entry.status}</span>
-                            </span>
-                          ))}
-                          {hiddenRaudhahEntriesCount > 0 ? (
-                            <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-700">
-                              +{hiddenRaudhahEntriesCount}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <small className="mt-1 block text-xs text-slate-500">Not set yet</small>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-surface-container-lowest p-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
-                      <span
-                        className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaStatusClasses(
-                          row.visaStatus,
-                          isDarkMode,
-                        )}`}
-                      >
-                        {row.visaStatus}
-                      </span>
-                    </div>
-
-                    <div className="rounded-xl bg-surface-container-lowest p-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
-                      <span
-                        className={`mt-1 inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getVisaTypeClasses(
-                          visaTypeLabel,
-                          isDarkMode,
-                        )}`}
-                      >
-                        {visaTypeLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold tracking-[0.06em] text-on-primary shadow-cta-soft transition hover:bg-primary-container"
-                    onClick={() => onOpenDetail(row)}
-                  >
-                    View Details
-                  </button>
-                </article>
-              );
-            })}
+            {paginatedRows.map((rowGroup) => renderMobileCard(rowGroup))}
           </section>
 
           <section className="serene-table-shell hidden md:block" aria-label="Visa tracking table">
@@ -781,180 +964,7 @@ export function VisaTrackingScreen({
                 </div>
 
                 <div className="divide-y divide-slate-100">
-                  {paginatedRows.map((row) => {
-                    const group = groupByCode.get(row.groupCode);
-                    const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
-                    const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
-                    const hasMakkahAgreement = makkahAgreements.length > 0;
-                    const hasMadinahAgreement = madinahAgreements.length > 0;
-                    const makkahAgreementNumber = resolveVisaAgreementNumber(row, group, "makkah");
-                    const madinahAgreementNumber = resolveVisaAgreementNumber(row, group, "madinah");
-                    const visaTypeLabel = resolveVisaTypeLabel(group);
-                    const makkahAgreementStatus = resolveCityAgreementApprovalStatus(row, group, "makkah");
-                    const madinahAgreementStatus = resolveCityAgreementApprovalStatus(row, group, "madinah");
-                    const raudhahEntries = resolveRaudhahEntries(row, group);
-                    const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
-                    const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
-                    const agreementDateRange = resolveVisaAgreementDateRange(
-                      row,
-                      durationByGroupCode.get(row.groupCode) ?? 8,
-                      group,
-                    );
-
-                    return (
-                      <article
-                        key={row.id}
-                        className="grid items-center gap-2.5 px-4 py-3 text-sm"
-                        style={{ gridTemplateColumns: desktopTableGridTemplate }}
-                      >
-                        <div className="font-semibold text-slate-800">{row.groupCode}</div>
-
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-700">{row.groupName}</p>
-                        </div>
-
-                        <div>
-                          <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
-                            {row.pax} Pax
-                          </span>
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <strong className="block break-all text-[13px] font-semibold leading-tight text-slate-800">
-                            {makkahAgreementNumber}
-                          </strong>
-                          <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
-                            {hasMakkahAgreement
-                              ? `${formatVisaShortDate(agreementDateRange.makkahStartIso)} - ${formatVisaShortDate(
-                                  agreementDateRange.makkahEndIso,
-                                )}`
-                              : "Stay dates pending"}
-                          </small>
-                          {hasMakkahAgreement ? (
-                            <SereneSelect
-                              value={toAgreementStatusSelectValue(makkahAgreementStatus)}
-                              className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
-                                makkahAgreementStatus,
-                                isDarkMode,
-                              )}`}
-                              onChange={(event) =>
-                                onUpdateAgreementStatus(
-                                  row.groupCode,
-                                  "makkah",
-                                  fromAgreementStatusSelectValue(event.target.value),
-                                )
-                              }
-                              aria-label={`Update Makkah agreement status for ${row.groupCode}`}
-                            >
-                              <option value="approved">Approved</option>
-                              <option value="waiting">Waiting</option>
-                            </SereneSelect>
-                          ) : (
-                            <span className="inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[11px] font-bold leading-none text-on-tertiary-fixed-variant">
-                              Not linked
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <strong className="block break-all text-[13px] font-semibold leading-tight text-slate-800">
-                            {madinahAgreementNumber}
-                          </strong>
-                          <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
-                            {hasMadinahAgreement
-                              ? `${formatVisaShortDate(agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
-                                  agreementDateRange.madinahEndIso,
-                                )}`
-                              : "Stay dates pending"}
-                          </small>
-                          {hasMadinahAgreement ? (
-                            <SereneSelect
-                              value={toAgreementStatusSelectValue(madinahAgreementStatus)}
-                              className={`serene-select-pill w-[96px] text-[11px] font-bold ${getAgreementApprovalClasses(
-                                madinahAgreementStatus,
-                                isDarkMode,
-                              )}`}
-                              onChange={(event) =>
-                                onUpdateAgreementStatus(
-                                  row.groupCode,
-                                  "madinah",
-                                  fromAgreementStatusSelectValue(event.target.value),
-                                )
-                              }
-                              aria-label={`Update Madinah agreement status for ${row.groupCode}`}
-                            >
-                              <option value="approved">Approved</option>
-                              <option value="waiting">Waiting</option>
-                            </SereneSelect>
-                          ) : (
-                            <span className="inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 text-[11px] font-bold leading-none text-on-tertiary-fixed-variant">
-                              Not linked
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="space-y-0.5 justify-self-center text-center">
-                          {raudhahEntries.length > 0 ? (
-                            <div className="flex flex-wrap justify-center gap-1">
-                              {visibleRaudhahEntries.map((entry) => (
-                                <span
-                                  key={`${row.id}-desktop-raudhah-${entry.key}`}
-                                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
-                                    entry.status,
-                                    isDarkMode,
-                                  )}`}
-                                  title={`${entry.dateLabel} - ${entry.status}`}
-                                >
-                                  <span>{entry.dateLabel}</span>
-                                  <span aria-hidden="true">|</span>
-                                  <span>{entry.status}</span>
-                                </span>
-                              ))}
-                              {hiddenRaudhahEntriesCount > 0 ? (
-                                <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
-                                  +{hiddenRaudhahEntriesCount}
-                                </span>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <small className="text-[11px] text-slate-500">Not set</small>
-                          )}
-                        </div>
-
-                        <div className="justify-self-center">
-                          <span
-                            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaStatusClasses(
-                              row.visaStatus,
-                              isDarkMode,
-                            )}`}
-                          >
-                            {row.visaStatus}
-                          </span>
-                        </div>
-
-                        <div>
-                          <span
-                            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaTypeClasses(
-                              visaTypeLabel,
-                              isDarkMode,
-                            )}`}
-                          >
-                            {visaTypeLabel}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-start">
-                          <button
-                            type="button"
-                            className="inline-flex items-center whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
-                            onClick={() => onOpenDetail(row)}
-                          >
-                            View Details
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
+                  {paginatedRows.map((rowGroup) => renderDesktopRow(rowGroup))}
                 </div>
               </div>
             </div>
@@ -965,7 +975,7 @@ export function VisaTrackingScreen({
       <PaginationControls
         currentPage={currentPage}
         totalPages={totalPages}
-        totalItems={filteredRows.length}
+        totalItems={filteredGroupedRows.length}
         rangeStart={rangeStart}
         rangeEnd={rangeEnd}
         itemLabel="groups"

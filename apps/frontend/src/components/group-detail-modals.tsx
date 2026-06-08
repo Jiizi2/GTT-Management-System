@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
@@ -57,6 +57,7 @@ function createGroupEditModalSchema() {
     .object({
       code: z.string().trim().min(1, "Group number tidak boleh kosong."),
       name: z.string().trim().min(1, "Group name tidak boleh kosong."),
+      parentGroupId: z.string().optional(),
       pax: z
         .string()
         .trim()
@@ -73,6 +74,8 @@ function createGroupEditModalSchema() {
           const parsed = Number.parseInt(value, 10);
           return Number.isFinite(parsed) && parsed > 0;
         }, "Required bus harus lebih dari 0."),
+      arrivalDate: z.string().trim().min(1, "Start Date wajib diisi."),
+      returnDate: z.string().trim().min(1, "End Date wajib diisi."),
     })
     .superRefine((values, context) => {
       const parsedPax = Number.parseInt(values.pax, 10);
@@ -92,6 +95,14 @@ function createGroupEditModalSchema() {
           code: z.ZodIssueCode.custom,
           path: ["totalBuses"],
           message: `Minimal ${minimumRequiredBusCount} bus diperlukan untuk ${parsedPax} pax.`,
+        });
+      }
+
+      if (values.returnDate < values.arrivalDate) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["returnDate"],
+          message: "End Date tidak boleh sebelum Start Date.",
         });
       }
     });
@@ -417,6 +428,10 @@ export function GroupEditModal({
   groupName,
   groupPax,
   requiredBusCount,
+  arrivalDate,
+  returnDate,
+  parentGroupId,
+  groups = [],
   onClose,
   onSave,
 }: {
@@ -424,12 +439,19 @@ export function GroupEditModal({
   groupName: string;
   groupPax: number;
   requiredBusCount: number;
+  arrivalDate: string;
+  returnDate: string;
+  parentGroupId?: string | null;
+  groups?: Array<{ id?: string; code: string; name: string }>;
   onClose: () => void;
   onSave: (values: {
     code: string;
     name: string;
     pax: number;
     totalBuses: number;
+    arrivalDate: string;
+    returnDate: string;
+    parentGroupId?: string | null;
   }) => { ok: true } | { ok: false; message: string } | Promise<{ ok: true } | { ok: false; message: string }>;
 }) {
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
@@ -440,14 +462,18 @@ export function GroupEditModal({
     reset,
     setError,
     watch,
+    control,
     formState: { errors, isSubmitting },
-  } = useForm<{ code: string; name: string; pax: string; totalBuses: string }>({
+  } = useForm<{ code: string; name: string; pax: string; totalBuses: string; arrivalDate: string; returnDate: string; parentGroupId?: string }>({
     resolver: zodResolver(groupEditModalSchema),
     defaultValues: {
       code: groupCode,
       name: groupName,
       pax: String(groupPax),
       totalBuses: String(requiredBusCount),
+      arrivalDate: arrivalDate,
+      returnDate: returnDate,
+      parentGroupId: parentGroupId || "none",
     },
   });
 
@@ -457,8 +483,11 @@ export function GroupEditModal({
       name: groupName,
       pax: String(groupPax),
       totalBuses: String(requiredBusCount),
+      arrivalDate: arrivalDate,
+      returnDate: returnDate,
+      parentGroupId: parentGroupId || "none",
     });
-  }, [groupCode, groupName, groupPax, requiredBusCount, reset]);
+  }, [groupCode, groupName, groupPax, requiredBusCount, arrivalDate, returnDate, parentGroupId, reset]);
 
   const codeErrorMessage = errors.code?.message;
   const nameErrorMessage = errors.name?.message;
@@ -510,6 +539,9 @@ export function GroupEditModal({
                 name: values.name.trim(),
                 pax: Number.parseInt(values.pax.trim(), 10),
                 totalBuses: Number.parseInt(values.totalBuses.trim(), 10),
+                arrivalDate: values.arrivalDate,
+                returnDate: values.returnDate,
+                parentGroupId: values.parentGroupId === "none" ? null : values.parentGroupId,
               });
               if (!result.ok) {
                 setError("root", {
@@ -560,6 +592,33 @@ export function GroupEditModal({
             <FieldErrorMessage fieldId="group-edit-name" message={nameErrorMessage} className={modalErrorClassName} />
 
             <label className={modalFieldClassName}>
+              <span>Ikuti data dari Group (Sharing Musyrif & Itinerary)</span>
+              <div className="relative">
+                <Controller
+                  control={control}
+                  name="parentGroupId"
+                  render={({ field }) => (
+                    <SereneSelect
+                      id="group-edit-parent"
+                      className={modalSelectClassName}
+                      value={field.value ?? "none"}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    >
+                      <option value="none">-- Mandiri (Tidak Terhubung) --</option>
+                      {groups
+                        .filter((g) => g.code !== groupCode)
+                        .map((g) => (
+                          <option key={g.id || g.code} value={g.id}>
+                            {g.code} - {g.name}
+                          </option>
+                        ))}
+                    </SereneSelect>
+                  )}
+                />
+              </div>
+            </label>
+
+            <label className={modalFieldClassName}>
               <span>Total Pax</span>
               <input
                 id="group-edit-pax"
@@ -575,6 +634,58 @@ export function GroupEditModal({
               />
             </label>
             <FieldErrorMessage fieldId="group-edit-pax" message={paxErrorMessage} className={modalErrorClassName} />
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={modalFieldClassName}>
+                <span>Start Date</span>
+                <Controller
+                  control={control}
+                  name="arrivalDate"
+                  render={({ field }) => (
+                    <DatePickerInput
+                      id="group-edit-arrival-date"
+                      inputClassName={modalInputClassName}
+                      value={field.value}
+                      onChange={field.onChange}
+                      ariaInvalid={getFieldAriaInvalid(errors.arrivalDate?.message)}
+                      ariaDescribedBy={getFieldDescribedBy("group-edit-arrival-date", {
+                        errorMessage: errors.arrivalDate?.message,
+                      })}
+                    />
+                  )}
+                />
+                <FieldErrorMessage
+                  fieldId="group-edit-arrival-date"
+                  message={errors.arrivalDate?.message}
+                  className={modalErrorClassName}
+                />
+              </label>
+
+              <label className={modalFieldClassName}>
+                <span>End Date</span>
+                <Controller
+                  control={control}
+                  name="returnDate"
+                  render={({ field }) => (
+                    <DatePickerInput
+                      id="group-edit-return-date"
+                      inputClassName={modalInputClassName}
+                      value={field.value}
+                      onChange={field.onChange}
+                      ariaInvalid={getFieldAriaInvalid(errors.returnDate?.message)}
+                      ariaDescribedBy={getFieldDescribedBy("group-edit-return-date", {
+                        errorMessage: errors.returnDate?.message,
+                      })}
+                    />
+                  )}
+                />
+                <FieldErrorMessage
+                  fieldId="group-edit-return-date"
+                  message={errors.returnDate?.message}
+                  className={modalErrorClassName}
+                />
+              </label>
+            </div>
 
             <label className={modalFieldClassName}>
               <span>Required Bus</span>

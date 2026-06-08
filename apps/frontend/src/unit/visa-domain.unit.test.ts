@@ -321,6 +321,16 @@ function testGenerateWhatsappCopyText(): void {
   assert.equal(copiedText.includes("BRN MAKKAH\nSwissotel\n28/03/2026 - 31/03/2026\n18014399405337794"), true);
   assert.equal(copiedText.includes("BRN MADINAH\nBurj Almarjan\n23/03/2026 - 28/03/2026\n15762599591351269"), true);
 
+  // Test with familyGroups
+  const childGroup: GroupData = {
+    ...group,
+    code: "902133274",
+    pax: 12,
+  };
+  const familyText = generateWhatsappCopyText(group, [group, childGroup]);
+  assert.equal(familyText.includes("NEED MOFA VISA ONLY GROUP CODE"), true);
+  assert.equal(familyText.includes("902133273 - 902133274 ( 17 ) PAX"), true);
+
   // Test with completely empty data (should yield placeholders)
   const emptyGroup: GroupData = {
     code: "",

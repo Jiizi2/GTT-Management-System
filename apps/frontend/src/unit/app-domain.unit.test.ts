@@ -550,6 +550,44 @@ function testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow(): void {
   assert.equal(checklistItems[0]?.scheduledTime, "20:00");
 }
 
+function testBuildChecklistItemsMergesLinkedGroups(): void {
+  const [todayIso] = getChecklistRangeDates();
+  
+  const parentGroup = createBaseGroup({
+    code: "PARENT-GP",
+    pax: 40,
+    itinerary: [
+      {
+        date: "Today",
+        year: todayIso.slice(0, 4),
+        category: "Arrival",
+        categoryKey: "arrival",
+        title: "Family Arrival",
+        meta: "08:00 | JED Airport",
+        icon: "flight_land",
+        isoDate: todayIso,
+        time: "08:00",
+        from: "JED Airport",
+        to: "Makkah Hotel",
+        requiresBus: true,
+      },
+    ],
+  });
+
+  const childGroup = createBaseGroup({
+    code: "CHILD-GP",
+    pax: 5,
+    parentGroupId: parentGroup.code,
+    itinerary: [],
+  });
+
+  const checklistItems = buildChecklistItemsFromGroups([parentGroup, childGroup]);
+  assert.equal(checklistItems.length, 1);
+  assert.equal(checklistItems[0].groupCode, "PARENT-GP");
+  assert.equal(checklistItems[0].groupPax, 45);
+  assert.deepEqual(checklistItems[0].groupCodes, ["PARENT-GP", "CHILD-GP"]);
+}
+
 function testOverviewAndStatusNormalizationHelpers(): void {
   const now = new Date();
   now.setHours(12, 0, 0, 0);
@@ -1119,6 +1157,7 @@ describe("app-domain", () => {
   runCase("agreement pax exceeding group pax does not mismatch", testAgreementPaxExceedsGroupPaxDoesNotMismatch);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
   runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);
+  runCase("checklist merges linked groups", testBuildChecklistItemsMergesLinkedGroups);
   runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);
   runCase("form/category helpers", testFormFactoryAndCategoryHelpers);
   runCase("schedule editing helpers", testScheduleEditingAndCityInferenceHelpers);

@@ -13,6 +13,8 @@ type BackendHotelAgreementDraftRecord = {
   hotelName?: string;
   agreementNumber?: string;
   pax?: number;
+  remainingPax?: number;
+  assignedGroups?: Array<{ groupCode: string; pax: number }>;
   status?: string;
   stayStart?: string | Date;
   stayEnd?: string | Date;
@@ -97,6 +99,13 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
     hotelName: readString(record.hotelName),
     agreementNumber: readString(record.agreementNumber),
     pax: Math.max(1, readNumber(record.pax, 1)),
+    remainingPax: record.remainingPax !== undefined ? Math.max(0, readNumber(record.remainingPax, 0)) : undefined,
+    assignedGroups: Array.isArray(record.assignedGroups)
+      ? record.assignedGroups.map((g) => ({
+          groupCode: readString(g.groupCode),
+          pax: Math.max(0, readNumber(g.pax, 0)),
+        }))
+      : [],
     status: mapBackendAgreementStatus(record.status),
     stayStartIso: toIsoDate(record.stayStart),
     stayEndIso: toIsoDate(record.stayEnd),
@@ -235,9 +244,16 @@ export async function assignAgreementDraftInBackend({
   return mappedDraft;
 }
 
-export async function unassignAgreementDraftInBackend(draftId: string): Promise<HotelAgreementDraft> {
+export async function unassignAgreementDraftInBackend({
+  draftId,
+  groupCode,
+}: {
+  draftId: string;
+  groupCode?: string;
+}): Promise<HotelAgreementDraft> {
+  const queryParams = groupCode ? `?groupCode=${encodeURIComponent(groupCode)}` : "";
   const { response, payload, responseText } = await fetchBackendParsed(
-    `/visa/agreement-drafts/${encodeURIComponent(draftId)}/unassign`,
+    `/visa/agreement-drafts/${encodeURIComponent(draftId)}/unassign${queryParams}`,
     {
       method: "POST",
     },

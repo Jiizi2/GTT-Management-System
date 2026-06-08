@@ -116,12 +116,16 @@ export class HotelAgreementDraftsController {
       "Melepas draft agreement dari group, menghapus link hotel agreement di visa setup group, dan mengembalikan draft ke inbox unassigned.",
   })
   @ApiParam({ name: "draftId", example: "cldraftagreementid123" })
+  @ApiQuery({ name: "groupCode", required: false, example: "9017001001" })
   @ApiOkResponse({
     description: "Draft agreement berhasil dilepas dari group.",
     type: HotelAgreementDraftResponseDto,
   })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
-  unassign(@Param("draftId") draftId: string) {
-    return this.hotelAgreementDraftsService.unassign(draftId);
+  unassign(
+    @Param("draftId") draftId: string,
+    @Query("groupCode") groupCode?: string,
+  ) {
+    return this.hotelAgreementDraftsService.unassign(draftId, groupCode);
   }
 }

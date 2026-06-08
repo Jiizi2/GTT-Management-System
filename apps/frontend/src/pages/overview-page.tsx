@@ -33,6 +33,7 @@ export function OverviewScreen({
   onToggleActiveOnly,
   onOverviewMonthFilterChange,
   onOpenDetail,
+  groups = [],
 }: {
   query: string;
   filteredGroups: GroupData[];
@@ -54,6 +55,7 @@ export function OverviewScreen({
   onToggleActiveOnly: (value: boolean) => void;
   onOverviewMonthFilterChange: (value: string) => void;
   onOpenDetail: (groupCode: string) => void;
+  groups?: GroupData[];
 }) {
   const hasQuery = query.trim().length > 0;
   const [currentPage, setCurrentPage] = useState(1);
@@ -290,7 +292,7 @@ export function OverviewScreen({
         aria-label="Group itinerary cards"
       >
         {filteredGroups.length > 0 ? (
-          paginatedGroups.map((group) => <GroupCard key={group.code} group={group} onOpenDetail={onOpenDetail} />)
+          paginatedGroups.map((group) => <GroupCard key={group.code} group={group} groups={groups} onOpenDetail={onOpenDetail} />)
         ) : (
           <article className="serene-empty-state col-span-full">
             <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
