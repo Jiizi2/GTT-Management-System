@@ -117,6 +117,7 @@ export class GroupsCommandService {
     idOrCode: string,
     payload: UpsertGroupItineraryItemDto,
   ): Promise<unknown> {
+    await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.addItineraryItemWithPrisma(idOrCode, payload);
     }
@@ -129,6 +130,7 @@ export class GroupsCommandService {
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
   ): Promise<unknown> {
+    await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.updateItineraryItemWithPrisma(idOrCode, itemId, payload);
     }
@@ -145,6 +147,7 @@ export class GroupsCommandService {
     idOrCode: string,
     itemId: string,
   ): Promise<unknown> {
+    await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.removeItineraryItemWithPrisma(idOrCode, itemId);
     }
@@ -218,6 +221,7 @@ export class GroupsCommandService {
     idOrCode: string,
     payload: ConfirmChecklistDriverDto,
   ): Promise<ChecklistAssignmentSyncResult> {
+    await this.ensureNotChildGroup(idOrCode, "checklist");
     if (this.dataSource === "prisma") {
       return this.confirmChecklistDriverWithPrisma(idOrCode, payload);
     }
@@ -229,6 +233,7 @@ export class GroupsCommandService {
     idOrCode: string,
     payload: ResetChecklistDriverDto,
   ): Promise<ChecklistAssignmentSyncResult> {
+    await this.ensureNotChildGroup(idOrCode, "checklist");
     if (this.dataSource === "prisma") {
       return this.resetChecklistDriverWithPrisma(idOrCode, payload);
     }
@@ -1276,6 +1281,7 @@ export class GroupsCommandService {
         totalBuses: payload.totalBuses,
         packageName: payload.packageName?.trim(),
         durationDays: payload.durationDays,
+        parentGroupId: payload.parentGroupId !== undefined ? (payload.parentGroupId?.trim() || null) : undefined,
       },
       select: groupDetailSelection,
     });
@@ -1300,5 +1306,37 @@ export class GroupsCommandService {
         id: current.id,
       },
     });
+  }
+
+  private async ensureNotChildGroup(
+    idOrCode: string,
+    operation: string,
+  ): Promise<void> {
+    if (this.dataSource === "prisma") {
+      const group = await this.prisma.group.findFirst({
+        where: {
+          OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
+        },
+        select: {
+          parentGroupId: true,
+          code: true,
+        },
+      });
+      if (group && group.parentGroupId) {
+        throw new ConflictException(
+          `Grup '${group.code}' adalah child group. Silakan edit ${operation} pada parent group.`,
+        );
+      }
+    } else {
+      const normalizedCode = idOrCode.trim().toUpperCase();
+      const group = this.memoryGroups.find(
+        (item) => item.id === idOrCode || item.code === normalizedCode,
+      );
+      if (group && group.parentGroupId) {
+        throw new ConflictException(
+          `Grup '${group.code}' adalah child group. Silakan edit ${operation} pada parent group.`,
+        );
+      }
+    }
   }
 }

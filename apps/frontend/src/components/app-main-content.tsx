@@ -106,6 +106,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
               onToggleActiveOnly={controller.handleToggleActiveOnly}
               onOverviewMonthFilterChange={controller.handleOverviewMonthFilterChange}
               onOpenDetail={controller.handleOpenDetail}
+              groups={controller.groupRecords}
             />
           }
         />
@@ -115,6 +116,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
             controller.selectedGroup ? (
               <LazyGroupDetail
                 group={controller.selectedGroup}
+                groups={controller.groupRecords}
                 onBack={controller.handleBackToOverview}
                 onDeleteGroup={controller.handleDeleteGroup}
                 onSaveGroup={controller.handleSaveGroupDetail}

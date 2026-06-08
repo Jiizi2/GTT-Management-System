@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 
@@ -254,12 +255,32 @@ function getRequiredBusBadgeLabel(group: GroupData): string | null {
   return `${resolveTotalBusCount(group.pax, group.totalBuses)} bus`;
 }
 
-export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDetail: (groupCode: string) => void }) {
+export function GroupCard({
+  group,
+  groups = [],
+  onOpenDetail,
+}: {
+  group: GroupData;
+  groups?: GroupData[];
+  onOpenDetail: (groupCode: string) => void;
+}) {
+  const familyGroups = useMemo(() => {
+    if (!groups || groups.length === 0) return [group];
+    const children = groups.filter(
+      (g) => g.parentGroupId && (g.parentGroupId === group.id || g.parentGroupId === group.code) && g.code !== group.code
+    );
+    return [group, ...children];
+  }, [groups, group]);
+
+  const totalPax = useMemo(() => {
+    return familyGroups.reduce((acc, g) => acc + g.pax, 0);
+  }, [familyGroups]);
+
   const itineraryPreview = buildItineraryPreview(group);
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
   const completeness = resolveGroupCompleteness(group);
   const metadataBadges = [
-    `${group.pax} Pax`,
+    `${totalPax} Pax`,
     ...(busBadgeLabel ? [busBadgeLabel] : []),
     group.packageName,
     getServiceTypeBadgeLabel(group),
@@ -276,6 +297,11 @@ export function GroupCard({ group, onOpenDetail }: { group: GroupData; onOpenDet
         <h2 className="mt-2 truncate font-display text-lg font-bold leading-tight text-on-surface-variant">
           {group.name}
         </h2>
+        {familyGroups.length > 1 && (
+          <p className="mt-1 text-xs text-on-surface-variant/80 font-medium">
+            Detail Pax: {familyGroups.map(g => `${g.code} (${g.pax} Pax)`).join(" + ")}
+          </p>
+        )}
         <div className="mt-2 flex min-h-4 flex-wrap items-center gap-1.5" aria-label="Group status">
           <span
             className={`inline-flex whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.08em] ${getStatusBadgeClasses(

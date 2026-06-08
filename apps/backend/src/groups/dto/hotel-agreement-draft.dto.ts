@@ -104,8 +104,16 @@ export class HotelAgreementDraftResponseDto {
   })
   notes?: string;
 
-  @ApiPropertyOptional({ example: "9017001001" })
+  @ApiPropertyOptional({ example: 9017001001 })
   groupCode?: string;
+
+  @ApiProperty({ example: 45 })
+  remainingPax?: number;
+
+  @ApiPropertyOptional({
+    example: [{ groupCode: "9017001001", pax: 23 }],
+  })
+  assignedGroups?: Array<{ groupCode: string; pax: number }>;
 
   @ApiProperty({ enum: ["UNASSIGNED", "ASSIGNED"], example: "UNASSIGNED" })
   assignmentStatus!: "UNASSIGNED" | "ASSIGNED";

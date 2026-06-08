@@ -55,6 +55,7 @@ export const groupSummarySelection = {
   totalBuses: true,
   packageName: true,
   durationDays: true,
+  parentGroupId: true,
   nextActivity: {
     select: {
       title: true,
@@ -79,6 +80,7 @@ export const groupDetailSelection = {
   totalBuses: true,
   packageName: true,
   durationDays: true,
+  parentGroupId: true,
   musyrif: {
     select: {
       name: true,

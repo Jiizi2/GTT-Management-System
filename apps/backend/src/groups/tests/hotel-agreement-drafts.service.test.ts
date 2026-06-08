@@ -303,6 +303,166 @@ async function testAutoRejectionDraft(): Promise<void> {
   }
 }
 
+async function testMultiGroupAssignment(): Promise<void> {
+  const { groupsService, draftsService, restore } =
+    await createMemoryServices();
+
+  try {
+    // 1. Create two groups
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-A",
+        pax: 23,
+      }),
+    );
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-B",
+        pax: 7,
+      }),
+    );
+
+    // 2. Create a draft with 30 pax
+    const draft = (await draftsService.create({
+      city: AgreementCity.MADINAH,
+      hotelName: "Swissotel Madinah",
+      agreementNumber: "AG-MULTI-30",
+      pax: 30,
+      status: AgreementApprovalStatus.APPROVED,
+      stayStart: "2026-06-14",
+      stayEnd: "2026-06-18",
+    })) as {
+      id: string;
+      remainingPax: number;
+    };
+
+    assert.equal(draft.remainingPax, 30);
+
+    // 3. Assign to GROUP-A (23 pax)
+    const assignedA = (await draftsService.assign(draft.id, {
+      groupCode: "GROUP-A",
+    })) as {
+      assignmentStatus: string;
+      remainingPax: number;
+      assignedGroups: Array<{ groupCode: string; pax: number }>;
+    };
+
+    assert.equal(assignedA.assignmentStatus, "UNASSIGNED"); // Not fully assigned yet
+    assert.equal(assignedA.remainingPax, 7);
+    assert.equal(assignedA.assignedGroups.length, 1);
+    assert.equal(assignedA.assignedGroups[0].groupCode, "GROUP-A");
+    assert.equal(assignedA.assignedGroups[0].pax, 23);
+
+    // Verify group A has the agreement with 23 pax
+    const groupA = (await groupsService.findOneByIdOrCode("GROUP-A")) as any;
+    assert.equal(groupA.visaSetup?.hotelAgreements?.length, 1);
+    assert.equal(groupA.visaSetup?.hotelAgreements?.[0]?.pax, 23);
+
+    // 4. Assign to GROUP-B (7 pax)
+    const assignedB = (await draftsService.assign(draft.id, {
+      groupCode: "GROUP-B",
+    })) as {
+      assignmentStatus: string;
+      remainingPax: number;
+      assignedGroups: Array<{ groupCode: string; pax: number }>;
+    };
+
+    assert.equal(assignedB.assignmentStatus, "ASSIGNED"); // Fully assigned now!
+    assert.equal(assignedB.remainingPax, 0);
+    assert.equal(assignedB.assignedGroups.length, 2);
+
+    // Verify group B has the agreement with 7 pax
+    const groupB = (await groupsService.findOneByIdOrCode("GROUP-B")) as any;
+    assert.equal(groupB.visaSetup?.hotelAgreements?.length, 1);
+    assert.equal(groupB.visaSetup?.hotelAgreements?.[0]?.pax, 7);
+
+    // 5. Trying to assign again when remaining pax is 0 should fail
+    await assert.rejects(
+      draftsService.assign(draft.id, { groupCode: "GROUP-A" }),
+      /fully assigned/i
+    );
+
+    // 6. Unassign only GROUP-A
+    const unassignedA = (await draftsService.unassign(draft.id, "GROUP-A")) as {
+      assignmentStatus: string;
+      remainingPax: number;
+      assignedGroups: Array<{ groupCode: string; pax: number }>;
+    };
+
+    assert.equal(unassignedA.assignmentStatus, "UNASSIGNED"); // Back to unassigned because remaining capacity is > 0
+    assert.equal(unassignedA.remainingPax, 23);
+    assert.equal(unassignedA.assignedGroups.length, 1);
+    assert.equal(unassignedA.assignedGroups[0].groupCode, "GROUP-B");
+
+    // Verify GROUP-A has 0 agreements, GROUP-B still has its agreement
+    const groupAPost = (await groupsService.findOneByIdOrCode("GROUP-A")) as any;
+    assert.equal(groupAPost.visaSetup?.hotelAgreements?.length, 0);
+
+    const groupBPost = (await groupsService.findOneByIdOrCode("GROUP-B")) as any;
+    assert.equal(groupBPost.visaSetup?.hotelAgreements?.length, 1);
+    assert.equal(groupBPost.visaSetup?.hotelAgreements?.[0]?.pax, 7);
+
+  } finally {
+    restore();
+  }
+}
+
+async function testDraftUpdateCascade(): Promise<void> {
+  const { groupsService, draftsService, restore } =
+    await createMemoryServices();
+
+  try {
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-C",
+        pax: 25,
+      }),
+    );
+
+    const draft = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Hotel Original",
+      agreementNumber: "AG-ORIGINAL",
+      pax: 30,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-15",
+    })) as {
+      id: string;
+    };
+
+    await draftsService.assign(draft.id, {
+      groupCode: "GROUP-C",
+    });
+
+    const groupPre = (await groupsService.findOneByIdOrCode("GROUP-C")) as any;
+    assert.equal(groupPre.visaSetup?.hotelAgreements?.length, 1);
+    assert.equal(groupPre.visaSetup?.hotelAgreements?.[0]?.hotelName, "Hotel Original");
+    assert.equal(groupPre.visaSetup?.hotelAgreements?.[0]?.agreementNumber, "AG-ORIGINAL");
+    assert.equal(groupPre.visaSetup?.hotelAgreements?.[0]?.status, AgreementApprovalStatus.WAITING);
+
+    await draftsService.update(draft.id, {
+      city: AgreementCity.MAKKAH,
+      hotelName: "Hotel Updated",
+      agreementNumber: "AG-UPDATED",
+      pax: 30,
+      status: AgreementApprovalStatus.APPROVED,
+      stayStart: "2026-06-11",
+      stayEnd: "2026-06-16",
+    });
+
+    const groupPost = (await groupsService.findOneByIdOrCode("GROUP-C")) as any;
+    assert.equal(groupPost.visaSetup?.hotelAgreements?.length, 1);
+    assert.equal(groupPost.visaSetup?.hotelAgreements?.[0]?.hotelName, "Hotel Updated");
+    assert.equal(groupPost.visaSetup?.hotelAgreements?.[0]?.agreementNumber, "AG-UPDATED");
+    assert.equal(groupPost.visaSetup?.hotelAgreements?.[0]?.status, AgreementApprovalStatus.APPROVED);
+    assert.equal(groupPost.visaSetup?.hotelAgreements?.[0]?.stayStart, "2026-06-11");
+    assert.equal(groupPost.visaSetup?.hotelAgreements?.[0]?.stayEnd, "2026-06-16");
+  } finally {
+    restore();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft create update delete",
@@ -319,6 +479,14 @@ async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft auto-rejection after 24h",
     testAutoRejectionDraft,
+  );
+  await runCase(
+    "hotel agreement draft multi-group assignment and capacity",
+    testMultiGroupAssignment,
+  );
+  await runCase(
+    "hotel agreement draft update cascade to linked agreements",
+    testDraftUpdateCascade,
   );
 }
 

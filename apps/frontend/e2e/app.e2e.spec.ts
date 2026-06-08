@@ -504,8 +504,6 @@ async function createGroupViaWorkspace(page: Page): Promise<{ groupCode: string;
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
   const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
   await expect(createdCard).toBeVisible();
-  await expect(createdCard.getByRole("link", { name: "Link Agreement" })).toBeVisible();
-  await expect(createdCard.getByRole("link", { name: "Build Itinerary" })).toBeVisible();
 
   return { groupCode, groupName };
 }
@@ -571,7 +569,8 @@ test("creates a new group from workspace flow", async ({ page }) => {
   const createdCard = page.locator("article").filter({ hasText: groupCode }).first();
   await expect(createdCard).toBeVisible();
   await expect(createdCard.getByText(groupName)).toBeVisible();
-  await createdCard.getByRole("link", { name: "Build Itinerary" }).click();
+  await createdCard.getByRole("button", { name: "View Detail" }).click();
+  await page.getByRole("link", { name: "Build Itinerary" }).click();
   await saveBaseTripsFromItineraryBuilder(page, groupCode);
   await page.getByRole("button", { name: "Back to Groups" }).click();
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();

@@ -57,7 +57,7 @@ export type MemoryVisaSetup = Omit<
 
 export type MemoryGroupRecord = Omit<
   CreateGroupDto,
-  "tone" | "totalBuses" | "itinerary" | "visaSetup" | "checklistAssignments"
+  "tone" | "totalBuses" | "itinerary" | "visaSetup" | "checklistAssignments" | "parentGroupId"
 > & {
   id: string;
   tone: GroupTone;
@@ -65,6 +65,7 @@ export type MemoryGroupRecord = Omit<
   itinerary: MemoryItineraryItem[];
   visaSetup?: MemoryVisaSetup;
   checklistAssignments: MemoryChecklistAssignment[];
+  parentGroupId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

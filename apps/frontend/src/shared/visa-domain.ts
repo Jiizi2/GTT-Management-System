@@ -207,16 +207,24 @@ export function isVisaRowActionRequired(row: VisaTrackingRow): boolean {
   return row.visaStatus !== "Issued";
 }
 
-export function generateWhatsappCopyText(group: GroupData | undefined): string {
+export function generateWhatsappCopyText(
+  group: GroupData | undefined,
+  familyGroups?: GroupData[],
+): string {
   if (!group) return "";
 
   const visaType = group.visaSetup?.busStatus === "Visa+" ? "VISA+" : "VISA ONLY";
-  const paxCount = String(group.pax || 0).padStart(2, "0");
-  const groupCode = group.code || "[GROUP_CODE]";
+  const combinedPax = familyGroups && familyGroups.length > 1
+    ? familyGroups.reduce((acc, g) => acc + g.pax, 0)
+    : (group.pax || 0);
+  const paxCount = String(combinedPax).padStart(2, "0");
+  const combinedGroupCode = familyGroups && familyGroups.length > 1
+    ? familyGroups.map(g => g.code).join(" - ")
+    : (group.code || "[GROUP_CODE]");
 
   const lines: string[] = [];
   lines.push(`NEED MOFA ${visaType} GROUP CODE`);
-  lines.push(`${groupCode} ( ${paxCount} ) PAX`);
+  lines.push(`${combinedGroupCode} ( ${paxCount} ) PAX`);
   lines.push("");
 
   lines.push("ARRIVAL");

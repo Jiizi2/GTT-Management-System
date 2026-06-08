@@ -139,6 +139,7 @@ export type GroupVisaSetup = {
 };
 
 export type GroupData = {
+  id?: string;
   code: string;
   name: string;
   status: string;
@@ -156,6 +157,7 @@ export type GroupData = {
   musyrif: Musyrif;
   visaSetup?: GroupVisaSetup;
   checklistAssignments?: GroupChecklistAssignment[];
+  parentGroupId?: string | null;
 };
 
 export type GroupCompletenessIssueKey =
@@ -246,6 +248,7 @@ export type ChecklistItem = {
   stationPickupTime: string;
   hotelPickupRequestTime: string;
   departureFlightTime: string;
+  groupCodes?: string[];
 };
 
 export type ChecklistDriverProfile = {
@@ -295,6 +298,8 @@ export type HotelAgreementDraft = {
   hotelName: string;
   agreementNumber: string;
   pax: number;
+  remainingPax?: number;
+  assignedGroups?: Array<{ groupCode: string; pax: number }>;
   status: AgreementApprovalStatus;
   stayStartIso: string;
   stayEndIso: string;
@@ -335,6 +340,7 @@ export type VisaTrackingRow = {
   makkahVerified: number;
   madinahVerified: number;
   outstandingAmount: number;
+  parentGroupId?: string | null;
 };
 
 export function formatLocalIsoDate(date: Date): string {
@@ -2398,7 +2404,7 @@ function hasAgreementPaxMismatch(group: GroupData): boolean {
         if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
           return false;
         }
-        return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
+        return Math.max(startMs, Date.parse(hStart)) <= Math.min(endMs, Date.parse(hEnd));
       });
       
       const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
@@ -2558,7 +2564,7 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
           if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
             return false;
           }
-          return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
+          return Math.max(startMs, Date.parse(hStart)) <= Math.min(endMs, Date.parse(hEnd));
         });
         
         const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
@@ -2609,6 +2615,7 @@ export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTracki
       makkahVerified,
       madinahVerified,
       outstandingAmount,
+      parentGroupId: group.parentGroupId,
     };
   });
 }
@@ -2631,10 +2638,34 @@ export function buildChecklistActivityLabel(item: ItineraryItem, categoryKey: st
 
 export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistItem[] {
   const allowedDateSet = new Set(getChecklistRangeDates());
-  const result: ChecklistItem[] = [];
+  const rawItems: ChecklistItem[] = [];
+
+  const getRootGroup = (group: GroupData): GroupData => {
+    const visited = new Set<string>([group.code.trim().toUpperCase()]);
+    let current = group;
+    while (current.parentGroupId) {
+      const parent = groups.find(
+        (g) => g.id === current.parentGroupId || g.code === current.parentGroupId
+      );
+      if (!parent) break;
+      const parentCode = parent.code.trim().toUpperCase();
+      if (visited.has(parentCode)) break;
+      visited.add(parentCode);
+      current = parent;
+    }
+    return current;
+  };
 
   groups.forEach((group) => {
-    const normalizedItinerary = expandTransferTrainItineraryItems(group.itinerary);
+    let itineraryToUse = group.itinerary;
+    if (group.parentGroupId) {
+      const parent = groups.find(p => p.id === group.parentGroupId || p.code === group.parentGroupId);
+      if (parent) {
+        itineraryToUse = parent.itinerary;
+      }
+    }
+
+    const normalizedItinerary = expandTransferTrainItineraryItems(itineraryToUse);
 
     normalizedItinerary.forEach((item, index) => {
       const tripDate = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
@@ -2658,7 +2689,7 @@ export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistIte
       const departureFlightTime = isDepartureActivity ? normalizedTime : "";
       const scheduledTime = transferByTrain ? trainDepartureTime : hotelPickupRequestTime || normalizedTime;
 
-      result.push({
+      rawItems.push({
         id: `${group.code}-${tripDate}-${index}-${categoryKey}`,
         groupCode: group.code,
         groupName: group.name,
@@ -2676,6 +2707,47 @@ export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistIte
         hotelPickupRequestTime,
         departureFlightTime,
       });
+    });
+  });
+
+  // Group and merge rawItems by rootGroupCode, tripDate, scheduledTime, activity, trip
+  const mergedMap = new Map<string, ChecklistItem[]>();
+  rawItems.forEach(item => {
+    const groupRecord = groups.find(g => g.code === item.groupCode);
+    const rootGroup = groupRecord ? getRootGroup(groupRecord) : groupRecord;
+    const rootCode = rootGroup ? rootGroup.code : item.groupCode;
+    const key = `${rootCode}|${item.tripDate}|${item.scheduledTime}|${item.activity}|${item.trip}`;
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, []);
+    }
+    mergedMap.get(key)!.push(item);
+  });
+
+  const result: ChecklistItem[] = [];
+  mergedMap.forEach((items, _key) => {
+    const firstItem = items[0];
+    const groupRecord = groups.find(g => g.code === firstItem.groupCode);
+    const rootGroup = groupRecord ? getRootGroup(groupRecord) : groupRecord;
+    const parentCode = rootGroup ? rootGroup.code : firstItem.groupCode;
+    const parentName = rootGroup ? rootGroup.name : firstItem.groupName;
+    const parentTotalBuses = rootGroup?.totalBuses;
+
+    const totalPax = items.reduce((sum, item) => sum + item.groupPax, 0);
+    const requiredBusCount = resolveTotalBusCount(totalPax, parentTotalBuses);
+
+    const uniqueCodes = Array.from(new Set(items.map(x => x.groupCode)));
+    const otherCodes = uniqueCodes.filter(c => c !== parentCode).sort();
+    const groupCodes = uniqueCodes.includes(parentCode) ? [parentCode, ...otherCodes] : otherCodes;
+
+    const primaryItem = items.find(x => x.groupCode === parentCode) || firstItem;
+
+    result.push({
+      ...primaryItem,
+      groupCode: parentCode,
+      groupName: parentName,
+      groupPax: totalPax,
+      requiredBusCount,
+      groupCodes,
     });
   });
 

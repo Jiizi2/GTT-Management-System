@@ -50,6 +50,7 @@ type BackendCreateGroupPayload = {
   totalBuses?: number;
   packageName: string;
   durationDays: number;
+  parentGroupId?: string | null;
   musyrif?: {
     name: string;
     phone: string;
@@ -146,6 +147,7 @@ type BackendGroupRecord = {
   code?: string;
   name?: string;
   status?: string;
+  parentGroupId?: string | null;
   arrivalDate?: string | Date | null;
   returnDate?: string | Date | null;
   tone?: string;
@@ -371,18 +373,18 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
     durationDays: group.durationDays,
     musyrif: group.musyrif
       ? {
-          name: group.musyrif.name.trim(),
-          phone: group.musyrif.phone.trim(),
-          avatar: group.musyrif.avatar.trim(),
-        }
+        name: group.musyrif.name.trim(),
+        phone: group.musyrif.phone.trim(),
+        avatar: group.musyrif.avatar.trim(),
+      }
       : undefined,
     nextActivity: group.nextActivity
       ? {
-          title: group.nextActivity.title.trim(),
-          dateLabel: group.nextActivity.date.trim(),
-          timeLabel: normalizedNextActivityTimeLabel,
-          icon: group.nextActivity.icon.trim(),
-        }
+        title: group.nextActivity.title.trim(),
+        dateLabel: group.nextActivity.date.trim(),
+        timeLabel: normalizedNextActivityTimeLabel,
+        icon: group.nextActivity.icon.trim(),
+      }
       : undefined,
     timeline: group.timeline.map((item, index) => ({
       sortOrder: index,
@@ -421,6 +423,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       text: text.trim(),
       pinned: false,
     })),
+    parentGroupId: group.parentGroupId || null,
   };
 
   if (group.visaSetup) {
@@ -965,38 +968,38 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
 
   const mappedVisaSetup = group.visaSetup
     ? {
-        visaStatus: mapBackendVisaStatus(group.visaSetup.visaStatus),
-        issuedDate: toIsoDate(group.visaSetup.issuedDate) ?? "",
-        syarikah: readString(group.visaSetup.syarikah, "Not assigned"),
-        busStatus: resolvedBusStatus,
-        paymentStatus: mapBackendPaymentStatus(group.visaSetup.paymentStatus),
-        makkahHotels: mappedHotelsByCity.makkahHotels,
-        madinahHotels: mappedHotelsByCity.madinahHotels,
-        raudhahAppointments: (group.visaSetup.raudhahAppointments ?? [])
-          .map((item, index) => {
-            const parsedDateIso = toIsoDate(item.date);
-            if (!parsedDateIso || !isIsoDateOnly(parsedDateIso)) {
-              return null;
-            }
+      visaStatus: mapBackendVisaStatus(group.visaSetup.visaStatus),
+      issuedDate: toIsoDate(group.visaSetup.issuedDate) ?? "",
+      syarikah: readString(group.visaSetup.syarikah, "Not assigned"),
+      busStatus: resolvedBusStatus,
+      paymentStatus: mapBackendPaymentStatus(group.visaSetup.paymentStatus),
+      makkahHotels: mappedHotelsByCity.makkahHotels,
+      madinahHotels: mappedHotelsByCity.madinahHotels,
+      raudhahAppointments: (group.visaSetup.raudhahAppointments ?? [])
+        .map((item, index) => {
+          const parsedDateIso = toIsoDate(item.date);
+          if (!parsedDateIso || !isIsoDateOnly(parsedDateIso)) {
+            return null;
+          }
 
-            return {
-              id: readString(item.id, `${code}-raudhah-${index + 1}`),
-              dateIso: parsedDateIso,
-              status: mapBackendRaudhahStatus(item.status),
-              tasrehPrinted: Boolean(item.tasrehPrinted),
-            };
-          })
-          .filter(
-            (
-              item,
-            ): item is {
-              id: string;
-              dateIso: string;
-              status: GroupRaudhahAppointment["status"];
-              tasrehPrinted: boolean;
-            } => item !== null,
-          ),
-      }
+          return {
+            id: readString(item.id, `${code}-raudhah-${index + 1}`),
+            dateIso: parsedDateIso,
+            status: mapBackendRaudhahStatus(item.status),
+            tasrehPrinted: Boolean(item.tasrehPrinted),
+          };
+        })
+        .filter(
+          (
+            item,
+          ): item is {
+            id: string;
+            dateIso: string;
+            status: GroupRaudhahAppointment["status"];
+            tasrehPrinted: boolean;
+          } => item !== null,
+        ),
+    }
     : undefined;
 
   const mappedChecklistAssignments = (group.checklistAssignments ?? []).reduce<GroupChecklistAssignment[]>(
@@ -1046,6 +1049,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
   );
 
   return {
+    id: group.id,
     code,
     name,
     status: resolvedStatus,
@@ -1067,6 +1071,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     },
     visaSetup: mappedVisaSetup,
     checklistAssignments: mappedChecklistAssignments,
+    parentGroupId: group.parentGroupId || undefined,
   };
 }
 
@@ -1145,10 +1150,10 @@ export async function createGroupIdentityInBackend(identity: GroupIdentityDraftP
     musyrif:
       identity.musyrifName?.trim() || identity.musyrifPhone?.trim()
         ? {
-            name: identity.musyrifName?.trim() || "Unassigned Musyrif",
-            phone: identity.musyrifPhone?.trim() || "-",
-            avatar: musyrifAvatar,
-          }
+          name: identity.musyrifName?.trim() || "Unassigned Musyrif",
+          phone: identity.musyrifPhone?.trim() || "-",
+          avatar: musyrifAvatar,
+        }
         : undefined,
   };
   const {
@@ -1199,6 +1204,7 @@ export async function updateGroupInBackend(groupCode: string, group: GroupData):
       totalBuses: group.totalBuses,
       packageName: group.packageName.trim(),
       durationDays: group.durationDays,
+      parentGroupId: group.parentGroupId || null,
     }),
   });
 

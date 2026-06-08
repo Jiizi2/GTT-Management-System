@@ -476,11 +476,16 @@ export class CreateGroupDto {
   @IsNotEmpty()
   packageName!: string;
 
-  @ApiProperty({ example: 9, minimum: 1, maximum: 90 })
+  @ApiPropertyOptional({ example: 10, minimum: 1, maximum: 90 })
   @IsInt()
   @Min(1)
   @Max(90)
   durationDays!: number;
+
+  @ApiPropertyOptional({ example: "cldraftparentid123" })
+  @IsOptional()
+  @IsString()
+  parentGroupId?: string;
 
   @ApiPropertyOptional({ type: () => CreateMusyrifDto })
   @IsOptional()

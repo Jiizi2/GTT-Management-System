@@ -36,6 +36,7 @@ export function projectMemoryGroupRecord(
     nextActivity: group.nextActivity,
     itinerary: group.itinerary,
     notes: group.notes,
+    parentGroupId: group.parentGroupId,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
   };

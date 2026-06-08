@@ -150,7 +150,7 @@ export class GroupsQueryService {
   }
 
   private async findOneWithPrisma(idOrCode: string) {
-    const group = await this.prisma.group.findFirst({
+    let group = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
       },
@@ -159,6 +159,32 @@ export class GroupsQueryService {
 
     if (!group) {
       throw new NotFoundException(`Group '${idOrCode}' not found.`);
+    }
+
+    if (group.parentGroupId) {
+      const parent = await this.prisma.group.findFirst({
+        where: { id: group.parentGroupId },
+        select: {
+          musyrif: groupDetailSelection.musyrif,
+          nextActivity: groupDetailSelection.nextActivity,
+          timeline: groupDetailSelection.timeline,
+          itinerary: groupDetailSelection.itinerary,
+          notes: groupDetailSelection.notes,
+          checklistAssignments: groupDetailSelection.checklistAssignments,
+        },
+      });
+
+      if (parent) {
+        group = {
+          ...group,
+          musyrif: parent.musyrif,
+          nextActivity: parent.nextActivity,
+          timeline: parent.timeline,
+          itinerary: parent.itinerary,
+          notes: parent.notes,
+          checklistAssignments: parent.checklistAssignments,
+        } as any;
+      }
     }
 
     return group;

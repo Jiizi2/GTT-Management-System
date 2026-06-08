@@ -56,4 +56,9 @@ export class UpdateGroupDto {
   @Min(1)
   @Max(90)
   durationDays?: number;
+
+  @ApiPropertyOptional({ example: "cldraftparentid123" })
+  @IsOptional()
+  @IsString()
+  parentGroupId?: string | null;
 }

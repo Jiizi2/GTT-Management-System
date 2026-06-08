@@ -30,6 +30,7 @@ type MemoryGroupPayloadFields = Pick<
   | "notes"
   | "visaSetup"
   | "checklistAssignments"
+  | "parentGroupId"
 >;
 
 function toIsoDateOnly(value: string): string {
@@ -57,6 +58,7 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
     totalBuses: payload.totalBuses ?? null,
     packageName: payload.packageName.trim(),
     durationDays: payload.durationDays,
+    parentGroupId: payload.parentGroupId?.trim() || null,
     musyrif: payload.musyrif
       ? {
           name: payload.musyrif.name.trim(),

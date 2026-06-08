@@ -367,7 +367,7 @@ function buildCompactAgreementSummary(group: GroupData, city: AgreementCityKey):
         if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
           return false;
         }
-        return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
+        return Math.max(startMs, Date.parse(hStart)) <= Math.min(endMs, Date.parse(hEnd));
       });
       
       const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
@@ -394,16 +394,34 @@ function buildCompactAgreementSummary(group: GroupData, city: AgreementCityKey):
 
 export function GroupDetail({
   group,
+  groups = [],
   onBack,
   onDeleteGroup,
   onSaveGroup,
 }: {
   group: GroupData;
+  groups?: GroupData[];
   onBack: () => void;
   onDeleteGroup: (groupCode: string) => void;
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
 }) {
   const [searchParams] = useSearchParams();
+  const familyGroups = useMemo(() => {
+    const currentGroup = group;
+    const parent = currentGroup.parentGroupId
+      ? (groups.find((g) => g.id === currentGroup.parentGroupId || g.code === currentGroup.parentGroupId) ?? null)
+      : currentGroup;
+    if (!parent) return [currentGroup];
+    const parentKey = parent.id || parent.code;
+    if (!parentKey) return [currentGroup];
+    const children = groups.filter(
+      (g) => g.parentGroupId && (g.parentGroupId === parent.id || g.parentGroupId === parent.code) && g.code !== parent.code
+    );
+    return [parent, ...children];
+  }, [groups, group]);
+  const totalPax = useMemo(() => {
+    return familyGroups.reduce((acc, g) => acc + g.pax, 0);
+  }, [familyGroups]);
   const [itineraryItems, setItineraryItems] = useState(() => sortItineraryByNearestDate(group.itinerary));
   const [noteItems, setNoteItems] = useState<NoteItem[]>(() => createNoteItems(group.notes, group.code));
   const [musyrifProfile, setMusyrifProfile] = useState<Musyrif>(group.musyrif);
@@ -722,6 +740,10 @@ export function GroupDetail({
     nextGroupCode = group.code,
     nextPax = group.pax,
     nextTotalBuses = group.totalBuses,
+    nextArrivalDate = group.arrivalDate,
+    nextReturnDate = group.returnDate,
+    nextDurationDays = group.durationDays,
+    nextParentGroupId = group.parentGroupId,
   }: {
     nextItinerary?: ItineraryItem[];
     nextNoteItems?: NoteItem[];
@@ -730,6 +752,10 @@ export function GroupDetail({
     nextGroupCode?: string;
     nextPax?: number;
     nextTotalBuses?: number;
+    nextArrivalDate?: string;
+    nextReturnDate?: string;
+    nextDurationDays?: number;
+    nextParentGroupId?: string | null;
   }): { ok: true } | { ok: false; message: string } => {
     const normalizedItinerary = sortItineraryByNearestDate(nextItinerary);
     const nextGroup: GroupData = {
@@ -738,6 +764,10 @@ export function GroupDetail({
       name: nextGroupName.trim(),
       pax: nextPax,
       totalBuses: nextTotalBuses,
+      arrivalDate: nextArrivalDate,
+      returnDate: nextReturnDate,
+      durationDays: nextDurationDays,
+      parentGroupId: nextParentGroupId,
       nextActivity: resolveNextActivityFromItinerary(normalizedItinerary, group.nextActivity),
       itinerary: normalizedItinerary,
       notes: nextNoteItems.map((item) => item.text),
@@ -959,22 +989,35 @@ export function GroupDetail({
     name: nextGroupName,
     pax: nextPax,
     totalBuses: nextTotalBuses,
+    arrivalDate: nextArrivalDate,
+    returnDate: nextReturnDate,
+    parentGroupId: nextParentGroupId,
   }: {
     code: string;
     name: string;
     pax: number;
     totalBuses: number;
+    arrivalDate: string;
+    returnDate: string;
+    parentGroupId?: string | null;
   }): { ok: true } | { ok: false; message: string } => {
     const normalizedCurrentGroupCode = group.code.trim().toUpperCase();
     const normalizedCurrentGroupName = group.name.trim();
     const normalizedNextPax = Math.max(1, Math.floor(nextPax));
     const normalizedNextTotalBuses = resolveTotalBusCount(normalizedNextPax, nextTotalBuses);
+    const nextDurationDays = Math.max(
+      1,
+      Math.floor((Date.parse(nextReturnDate) - Date.parse(nextArrivalDate)) / 86_400_000) + 1
+    );
 
     if (
       nextGroupCode === normalizedCurrentGroupCode &&
       nextGroupName === normalizedCurrentGroupName &&
       normalizedNextPax === group.pax &&
-      normalizedNextTotalBuses === requiredBusCount
+      normalizedNextTotalBuses === requiredBusCount &&
+      nextArrivalDate === group.arrivalDate &&
+      nextReturnDate === group.returnDate &&
+      nextParentGroupId === group.parentGroupId
     ) {
       setIsGroupEditModalOpen(false);
       return { ok: true };
@@ -985,6 +1028,10 @@ export function GroupDetail({
       nextGroupName,
       nextPax: normalizedNextPax,
       nextTotalBuses: normalizedNextTotalBuses,
+      nextArrivalDate,
+      nextReturnDate,
+      nextDurationDays,
+      nextParentGroupId,
     });
     if (!result.ok) {
       return result;
@@ -1039,7 +1086,7 @@ export function GroupDetail({
     const text = generateWhatsappCopyText({
       ...group,
       itinerary: itineraryItems,
-    });
+    }, familyGroups);
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -1107,21 +1154,29 @@ export function GroupDetail({
         <ThemeToggleButton className="ml-auto sm:mr-5" />
       </div>
 
-      <header className="flex flex-col gap-4 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient backdrop-blur md:flex-row md:items-start md:justify-between">
+      {group.parentGroupId && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-sm">
+          <span className="material-symbols-outlined text-sky-700" aria-hidden="true">info</span>
+          <div>
+            <strong>Grup Operasional Terhubung</strong>
+            <p className="mt-0.5 text-[11px] text-sky-700 font-medium">
+              Grup ini mewarisi data operasional dari Group ({groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}) (Musyrif & Itinerary) secara otomatis. Anda tidak dapat mengedit data operasional di grup ini.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <header className="flex flex-col gap-4 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient backdrop-blur md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">Group Detail</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            <span className="sm:hidden">Complete itinerary for {group.name}.</span>
-            <span className="hidden sm:inline">View complete itinerary and group information for {group.name}.</span>
-          </p>
         </div>
 
-        <div className="flex w-full flex-wrap items-center gap-2 self-stretch md:w-auto md:self-start">
+        <div className="flex flex-wrap items-center gap-2 md:w-auto">
           <Link
             to={buildVisaDetailPath(group.code)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-primary px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-primary-container sm:w-auto"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-3.5 py-2 text-xs font-bold text-on-primary transition hover:bg-primary-container"
           >
-            <span className="material-symbols-outlined" aria-hidden="true">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">
               fact_check
             </span>
             <span>Visa Detail</span>
@@ -1129,49 +1184,46 @@ export function GroupDetail({
 
           <button
             type="button"
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition sm:w-auto ${
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${
               isWhatsappCopied
                 ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
-                : "border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:border-primary/45 hover:text-primary"
+                : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-brand-primary hover:text-brand-primary"
             }`}
             onClick={handleCopyWhatsapp}
             aria-label={`Copy WhatsApp formatted details for ${group.name}`}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">
               {isWhatsappCopied ? "check" : "content_copy"}
             </span>
-            <span className="sm:hidden">{isWhatsappCopied ? "Copied" : "Copy WA"}</span>
-            <span className="hidden sm:inline">{isWhatsappCopied ? "Copied" : "Copy WhatsApp"}</span>
+            <span>{isWhatsappCopied ? "Copied" : "Copy WhatsApp"}</span>
           </button>
 
           <button
             type="button"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3 py-2 text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/15 sm:w-auto"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3.5 py-2 text-xs font-bold text-brand-tertiary transition hover:bg-brand-tertiary/15"
             onClick={handleDeleteGroup}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">
               delete
             </span>
-            <span className="sm:hidden">Delete</span>
-            <span className="hidden sm:inline">Delete Group</span>
+            <span>Delete Group</span>
           </button>
 
           <button
             type="button"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary/45 hover:text-primary sm:w-auto"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-surface-container-lowest px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
             onClick={handleExportPdf}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">
               picture_as_pdf
             </span>
-            <span className="sm:hidden">Export PDF</span>
-            <span className="hidden sm:inline">Export to PDF</span>
+            <span>Export to PDF</span>
           </button>
         </div>
       </header>
 
       <div className="space-y-6">
-        <div className="grid items-start gap-4 xl:grid-cols-[1.45fr_0.75fr]">
+        <div className="grid items-stretch gap-4 xl:grid-cols-[1.45fr_0.75fr]">
           <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="space-y-2 md:space-y-1">
@@ -1197,8 +1249,22 @@ export function GroupDetail({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-[1.65rem] font-extrabold tracking-tight text-brand-primary sm:text-[2.05rem]">
-                    {group.code}
+                    {familyGroups.length > 1 ? familyGroups.map(g => g.code).join(" - ") : group.code}
                   </h2>
+                  {familyGroups.length > 1 && (
+                    <span className={`inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600 ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
+                      <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
+                      <span>Terhubung:</span>
+                      {familyGroups.filter(g => g.code !== group.code).map((g, index) => (
+                        <span key={g.code}>
+                          {index > 0 && ", "}
+                          <Link to={`/groups/${g.code}`} className="font-bold text-slate-900 hover:underline">
+                            {g.code}
+                          </Link>
+                        </span>
+                      ))}
+                    </span>
+                  )}
                   <span className={`${statusBadgeClassName} hidden md:inline-flex`}>{group.status}</span>
                   <button
                     type="button"
@@ -1232,7 +1298,12 @@ export function GroupDetail({
                 <div className="flex items-start justify-between gap-3 border-b border-outline-variant/20 pb-3 sm:border-b-0 sm:pr-4">
                   <div>
                     <span className={detailKickerClassName}>Pilgrims</span>
-                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{group.pax}</p>
+                    <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{totalPax}</p>
+                    {familyGroups.length > 1 && (
+                      <p className="mt-1.5 text-xs text-on-surface-variant/75 font-medium leading-tight">
+                        Detail: {familyGroups.map(g => `${g.code} ${g.pax} pax`).join(" dan ")}
+                      </p>
+                    )}
                   </div>
                   <span className="material-symbols-outlined text-xl text-on-surface-variant/70" aria-hidden="true">
                     groups
@@ -1283,7 +1354,7 @@ export function GroupDetail({
                   </span>
                   <div className="min-w-0">
                     <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/75">
-                      Trip Window
+                      Period
                     </span>
                     <p className="mt-0.5 truncate text-sm font-bold text-on-surface">{formatGroupTripWindow(group)}</p>
                   </div>
@@ -1313,17 +1384,19 @@ export function GroupDetail({
                   </p>
                 ) : null}
 
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
-                  onClick={handleOpenMusyrifModal}
-                  aria-label={`Edit musyrif data for ${group.name}`}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    edit
-                  </span>
-                  <span>Edit</span>
-                </button>
+                {!group.parentGroupId && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
+                    onClick={handleOpenMusyrifModal}
+                    aria-label={`Edit musyrif data for ${group.name}`}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      edit
+                    </span>
+                    <span>Edit</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1412,66 +1485,70 @@ export function GroupDetail({
 
         {!completeness.isReadyForOperations ? (
           <section
-            className="rounded-3xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 p-5 text-on-tertiary-fixed-variant shadow-ambient"
+            className="rounded-2xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 px-4 py-3 text-on-tertiary-fixed-variant shadow-ambient"
             aria-label="Group completion status"
           >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex min-w-0 items-start gap-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <span
-                  className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest text-brand-primary"
                   aria-hidden="true"
                 >
-                  <span className="material-symbols-outlined text-xl">
+                  <span className="material-symbols-outlined text-lg">
                     pending_actions
                   </span>
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Workspace Status</p>
-                  <h2 className="mt-1 text-xl font-extrabold tracking-tight">{completeness.badgeLabel}</h2>
-                  <p className="mt-1 text-sm font-semibold">{completeness.primaryMessage}</p>
+                  <div className="flex flex-wrap items-center gap-x-2">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] opacity-80">Workspace Status:</span>
+                    <strong className="text-sm font-extrabold tracking-tight">{completeness.badgeLabel}</strong>
+                  </div>
+                  <p className="text-xs text-on-tertiary-fixed-variant/90 leading-tight mt-0.5">{completeness.primaryMessage}</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {completeness.issues.map((issue) => (
-                  <span
-                    key={issue.key}
-                    className="inline-flex rounded-lg bg-surface-container-lowest/75 px-2.5 py-1 text-xs font-bold uppercase tracking-[0.08em]"
-                    title={issue.message}
-                  >
-                    {issue.label}
-                  </span>
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {completeness.issues.map((issue) => (
+                    <span
+                      key={issue.key}
+                      className="inline-flex rounded bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em]"
+                      title={issue.message}
+                    >
+                      {issue.label}
+                    </span>
+                  ))}
+                </div>
+
+                {(shouldShowLinkAgreementAction || shouldShowCreateItineraryAction) && (
+                  <div className="flex items-center gap-1.5 lg:border-l lg:border-on-tertiary-fixed-variant/15 lg:pl-3">
+                    {shouldShowLinkAgreementAction ? (
+                      <Link
+                        to={`/agreement-inbox?groupCode=${encodeURIComponent(group.code)}`}
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-on-tertiary-fixed-variant/20 bg-surface-container-lowest px-2.5 text-xs font-bold text-brand-primary transition hover:bg-surface-container-low"
+                      >
+                        <span className="material-symbols-outlined text-xs" aria-hidden="true">
+                          link
+                        </span>
+                        <span>Link Agreement</span>
+                      </Link>
+                    ) : null}
+
+                    {shouldShowCreateItineraryAction ? (
+                      <Link
+                        to={buildGroupItineraryBuilderPath(group.code)}
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-2.5 text-xs font-bold text-on-primary transition hover:bg-primary-container"
+                      >
+                        <span className="material-symbols-outlined text-xs" aria-hidden="true">
+                          add_circle
+                        </span>
+                        <span>Build Itinerary</span>
+                      </Link>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </div>
-
-            {shouldShowLinkAgreementAction || shouldShowCreateItineraryAction ? (
-              <div className="mt-4 flex flex-col gap-2 border-t border-on-tertiary-fixed-variant/15 pt-4 sm:flex-row sm:items-center sm:justify-end">
-                {shouldShowLinkAgreementAction ? (
-                  <Link
-                    to={`/agreement-inbox?groupCode=${encodeURIComponent(group.code)}`}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-on-tertiary-fixed-variant/20 bg-surface-container-lowest px-3 text-sm font-bold text-brand-primary transition hover:bg-surface-container-low"
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      link
-                    </span>
-                    <span>Link Agreement</span>
-                  </Link>
-                ) : null}
-
-                {shouldShowCreateItineraryAction ? (
-                  <Link
-                    to={buildGroupItineraryBuilderPath(group.code)}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-brand-primary px-3 text-sm font-bold text-on-primary transition hover:bg-primary-container"
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      add_circle
-                    </span>
-                    <span>Build Itinerary</span>
-                  </Link>
-                ) : null}
-              </div>
-            ) : null}
           </section>
         ) : null}
 
@@ -1535,6 +1612,18 @@ export function GroupDetail({
                 </button>
               </div>
 
+              {group.parentGroupId && (
+                <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-xs">
+                  <span className="material-symbols-outlined text-base text-sky-700" aria-hidden="true">info</span>
+                  <div>
+                    <strong>Data Itinerary Terhubung</strong>
+                    <p className="mt-0.5 text-[11px] text-sky-600 font-medium">
+                      Grup ini mewarisi itinerary bersama dari Group Utama ({groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}). Edit itinerary di halaman Group Utama tersebut.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-4 space-y-3">
                 {itineraryItems.map((item, index) => {
                   const categoryKey = inferCategoryKey(item);
@@ -1567,28 +1656,30 @@ export function GroupDetail({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
-                              aria-label={`Edit ${item.title}`}
-                              onClick={() => handleOpenEditModal(index)}
-                            >
-                              <span className="material-symbols-outlined" aria-hidden="true">
-                                edit
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
-                              aria-label={`Delete ${item.title}`}
-                              onClick={() => handleOpenDeleteModal(index)}
-                            >
-                              <span className="material-symbols-outlined" aria-hidden="true">
-                                delete
-                              </span>
-                            </button>
-                          </div>
+                          {!group.parentGroupId && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
+                                aria-label={`Edit ${item.title}`}
+                                onClick={() => handleOpenEditModal(index)}
+                              >
+                                <span className="material-symbols-outlined" aria-hidden="true">
+                                  edit
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
+                                aria-label={`Delete ${item.title}`}
+                                onClick={() => handleOpenDeleteModal(index)}
+                              >
+                                <span className="material-symbols-outlined" aria-hidden="true">
+                                  delete
+                                </span>
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-3 min-w-0">
@@ -1628,43 +1719,47 @@ export function GroupDetail({
                           ) : null}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
-                            aria-label={`Edit ${item.title}`}
-                            onClick={() => handleOpenEditModal(index)}
-                          >
-                            <span className="material-symbols-outlined" aria-hidden="true">
-                              edit
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
-                            aria-label={`Delete ${item.title}`}
-                            onClick={() => handleOpenDeleteModal(index)}
-                          >
-                            <span className="material-symbols-outlined" aria-hidden="true">
-                              delete
-                            </span>
-                          </button>
-                        </div>
+                        {!group.parentGroupId && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
+                              aria-label={`Edit ${item.title}`}
+                              onClick={() => handleOpenEditModal(index)}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">
+                                edit
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
+                              aria-label={`Delete ${item.title}`}
+                              onClick={() => handleOpenDeleteModal(index)}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </article>
                   );
                 })}
 
-                <button
-                  type="button"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/10 md:text-base"
-                  onClick={handleOpenScheduleModal}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    add_circle
-                  </span>
-                  <span>Add Schedule</span>
-                </button>
+                {!group.parentGroupId && (
+                  <button
+                    type="button"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/10 md:text-base"
+                    onClick={handleOpenScheduleModal}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      add_circle
+                    </span>
+                    <span>Add Schedule</span>
+                  </button>
+                )}
               </div>
             </section>
           </div>
@@ -1697,14 +1792,16 @@ export function GroupDetail({
                 ))}
               </ul>
 
-              <button
-                type="button"
-                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-dashed border-brand-tertiary/55 bg-brand-neutral px-4 py-2.5 text-xs font-extrabold uppercase tracking-[0.08em] text-brand-tertiary transition hover:bg-brand-tertiary/12"
-                onClick={handleOpenNoteModal}
-              >
-                <span className="sm:hidden">Add Note</span>
-                <span className="hidden sm:inline">Add New Note</span>
-              </button>
+              {!group.parentGroupId && (
+                <button
+                  type="button"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-dashed border-brand-tertiary/55 bg-brand-neutral px-4 py-2.5 text-xs font-extrabold uppercase tracking-[0.08em] text-brand-tertiary transition hover:bg-brand-tertiary/12"
+                  onClick={handleOpenNoteModal}
+                >
+                  <span className="sm:hidden">Add Note</span>
+                  <span className="hidden sm:inline">Add New Note</span>
+                </button>
+              )}
             </section>
           </aside>
         </div>
@@ -1775,6 +1872,10 @@ export function GroupDetail({
               groupName={group.name}
               groupPax={group.pax}
               requiredBusCount={requiredBusCount}
+              arrivalDate={group.arrivalDate ?? ""}
+              returnDate={group.returnDate ?? ""}
+              parentGroupId={group.parentGroupId}
+              groups={groups}
               onClose={handleCloseGroupEditModal}
               onSave={handleSaveGroupEdit}
             />

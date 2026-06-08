@@ -732,6 +732,11 @@ export function useDashboardGroupRecords({
       : visibleGroupRecords;
 
     return sourceGroups.filter((group) => {
+      // Exclude child/follower groups from overview
+      if (group.parentGroupId) {
+        return false;
+      }
+
       if (shouldFilterOverviewByMonth && !doesGroupMatchOverviewMonth(group, overviewMonthFilter)) {
         return false;
       }
@@ -744,8 +749,21 @@ export function useDashboardGroupRecords({
         return true;
       }
 
-      return [group.code, group.name, group.packageName, group.status].some((value) =>
+      const matchesMain = [group.code, group.name, group.packageName, group.status].some((value) =>
         value.toLowerCase().includes(normalizedQuery),
+      );
+      if (matchesMain) {
+        return true;
+      }
+
+      // Check if any child group matches the query
+      const children = visibleGroupRecords.filter(
+        (g) => g.parentGroupId && (g.parentGroupId === group.id || g.parentGroupId === group.code) && g.code !== group.code
+      );
+      return children.some((child) =>
+        [child.code, child.name, child.packageName, child.status].some((value) =>
+          value.toLowerCase().includes(normalizedQuery),
+        ),
       );
     });
   }, [
@@ -786,16 +804,27 @@ export function useDashboardGroupRecords({
     [currentDashboardDate],
   );
   const overviewMetricSourceGroups = useMemo(
-    () =>
-      shouldFilterOverviewByMonth
+    () => {
+      const baseGroups = shouldFilterOverviewByMonth
         ? visibleGroupRecords.filter((group) => doesGroupMatchOverviewMonth(group, overviewMonthFilter))
-        : visibleGroupRecords,
+        : visibleGroupRecords;
+      // Exclude child groups from overview metrics to avoid itinerary double-counting
+      return baseGroups.filter((group) => !group.parentGroupId);
+    },
     [overviewMonthFilter, shouldFilterOverviewByMonth, visibleGroupRecords],
   );
 
   const overviewMetrics = useMemo(() => {
     const activeGroups = overviewMetricSourceGroups.filter((group) => group.tone === "active");
-    const activePilgrims = activeGroups.reduce((total, group) => total + group.pax, 0);
+    const activePilgrims = activeGroups.reduce((total, group) => {
+      // Find all child groups of this parent group in visibleGroupRecords
+      const children = visibleGroupRecords.filter(
+        (g) => g.parentGroupId && (g.parentGroupId === group.id || g.parentGroupId === group.code) && g.code !== group.code
+      );
+      const activeChildren = children.filter((c) => c.tone === "active");
+      const groupTotal = group.pax + activeChildren.reduce((sum, child) => sum + child.pax, 0);
+      return total + groupTotal;
+    }, 0);
     let totalTripsThisWeek = 0;
     let groupsArrivingThisWeek = 0;
     const tripCountByIsoDate = new Map<string, number>();
@@ -848,7 +877,7 @@ export function useDashboardGroupRecords({
           ? `Peak day: ${formatPeakTripDayLabel(peakTripDateIso)} (${peakTripCount} trips).`
           : "No trips scheduled this week.",
     };
-  }, [overviewMetricSourceGroups, weekEndIso, weekStartIso]);
+  }, [overviewMetricSourceGroups, visibleGroupRecords, weekEndIso, weekStartIso]);
 
   const statCards = useMemo<OverviewStatCard[]>(
     () => [

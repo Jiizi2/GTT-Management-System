@@ -580,7 +580,10 @@ export function AgreementInboxScreen() {
       await saveDraftMutation.mutateAsync({
         draft: values,
       });
-      await queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
       setFeedback({
         tone: "success",
         message: "Draft agreement berhasil disimpan.",
@@ -611,7 +614,10 @@ export function AgreementInboxScreen() {
         draftId: draft.id,
         draft: values,
       });
-      await queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
       setEditingDraft(null);
       setFeedback({ tone: "success", message: "Draft agreement berhasil diperbarui." });
     } catch (error: unknown) {
@@ -689,17 +695,17 @@ export function AgreementInboxScreen() {
     }
   };
 
-  const unassignDraftFromGroup = async (draft: HotelAgreementDraft) => {
+  const unassignDraftFromGroup = async (draft: HotelAgreementDraft, groupCode?: string) => {
     setFeedback(null);
     try {
-      await unassignDraftMutation.mutateAsync(draft.id);
+      await unassignDraftMutation.mutateAsync({ draftId: draft.id, groupCode });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
       ]);
       setFeedback({
         tone: "success",
-        message: `Agreement ${draft.agreementNumber} berhasil dikembalikan ke Unassigned.`,
+        message: `Agreement ${draft.agreementNumber} berhasil dilepas dari group.`,
       });
     } catch (error: unknown) {
       setFeedback({
@@ -922,7 +928,9 @@ export function AgreementInboxScreen() {
                         {draft.city === "makkah" ? "Makkah" : "Madinah"}
                       </span>
                       <span className="inline-flex rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-800">
-                        {draft.pax} Pax
+                        {draft.remainingPax !== undefined && draft.remainingPax < draft.pax
+                          ? `${draft.remainingPax}/${draft.pax} Pax`
+                          : `${draft.pax} Pax`}
                       </span>
                     </div>
                   </div>
@@ -984,38 +992,42 @@ export function AgreementInboxScreen() {
                   </div>
 
                   <div className="border-t border-dashed border-black/20 pt-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
                         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                           Group Link
                         </p>
-                        {isAssigned && draft.groupCode ? (
-                          <p className="mt-1 text-lg font-extrabold leading-tight text-slate-900">{draft.groupCode}</p>
+                        {draft.assignedGroups && draft.assignedGroups.length > 0 ? (
+                          <div className="mt-2 space-y-1.5 max-w-md">
+                            {draft.assignedGroups.map((link) => (
+                              <div key={link.groupCode} className="flex items-center justify-between gap-3 bg-surface-container-high/60 rounded-xl px-3 py-1.5 border border-black/5">
+                                <div className="min-w-0">
+                                  <span className="font-extrabold text-slate-900 text-sm">{link.groupCode}</span>
+                                  <span className="ml-2 text-xs font-semibold text-slate-500">({link.pax} Pax)</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                                  onClick={() => void unassignDraftFromGroup(draft, link.groupCode)}
+                                  disabled={unassignDraftMutation.isPending}
+                                >
+                                  <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                                    link_off
+                                  </span>
+                                  <span>Lepas</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <p className="mt-1 text-sm font-bold text-slate-900">Belum terhubung ke group</p>
                         )}
-                        <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
-                          {isAssigned && draft.groupCode
-                            ? draft.assignedAtIso
-                              ? `Assigned ${formatDraftDateTime(draft.assignedAtIso)}`
-                              : "Agreement sudah assigned"
-                            : `Created ${formatDraftDateTime(draft.createdAtIso)}`}
+                        <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
+                          Created {formatDraftDateTime(draft.createdAtIso)}
                         </p>
                       </div>
 
-                      {isAssigned ? (
-                        <button
-                          type="button"
-                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-100 px-3 text-sm font-bold text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => void unassignDraftFromGroup(draft)}
-                          disabled={unassignDraftMutation.isPending}
-                        >
-                          <span className="material-symbols-outlined text-base" aria-hidden="true">
-                            link_off
-                          </span>
-                          <span>{unassignDraftMutation.isPending ? "Unassigning..." : "Unassign"}</span>
-                        </button>
-                      ) : isRejected ? (
+                      {isRejected ? (
                         <div className="flex min-w-0 flex-col gap-1 sm:w-64">
                           <p className="text-xs font-semibold text-rose-600 flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -1024,7 +1036,7 @@ export function AgreementInboxScreen() {
                             <span>Draft ditolak. Harap edit nomor agreement dengan nomor baru untuk menghubungkan.</span>
                           </p>
                         </div>
-                      ) : (
+                      ) : (draft.remainingPax === undefined || draft.remainingPax > 0) ? (
                         <div className="flex min-w-0 flex-col gap-2 sm:w-64">
                           <label className="sr-only" htmlFor={`assign-${draft.id}`}>
                             Group number
@@ -1049,7 +1061,7 @@ export function AgreementInboxScreen() {
                             <span>{assignDraftMutation.isPending ? "Linking..." : "Link to Group"}</span>
                           </button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
