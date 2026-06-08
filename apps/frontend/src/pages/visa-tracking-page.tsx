@@ -547,7 +547,7 @@ export function VisaTrackingScreen({
           </div>
 
           <div className="flex flex-col gap-1 items-end shrink-0">
-            <span className="inline-flex min-h-[24px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-700">
+            <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
               {row.pax} Pax
             </span>
           </div>
@@ -577,7 +577,7 @@ export function VisaTrackingScreen({
                 {visibleRaudhahEntries.map((entry) => (
                   <span
                     key={`${row.id}-mobile-raudhah-${entry.key}`}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none ${getRaudhahStatusClasses(
+                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
                       entry.status,
                       isDarkMode,
                     )}`}
@@ -588,7 +588,7 @@ export function VisaTrackingScreen({
                   </span>
                 ))}
                 {hiddenRaudhahEntriesCount > 0 ? (
-                  <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[10px] font-bold leading-none text-slate-700">
+                  <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
                     +{hiddenRaudhahEntriesCount}
                   </span>
                 ) : null}
@@ -604,7 +604,7 @@ export function VisaTrackingScreen({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
             <div className="mt-1 flex flex-col gap-1">
               <span
-                className={`inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none w-fit ${getVisaStatusClasses(
+                className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none w-fit ${getVisaStatusClasses(
                   row.visaStatus,
                   isDarkMode,
                 )}`}
@@ -618,7 +618,7 @@ export function VisaTrackingScreen({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
             <div className="mt-1 flex flex-col gap-1">
               <span
-                className={`inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold leading-none w-fit ${getVisaTypeClasses(
+                className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none w-fit ${getVisaTypeClasses(
                   visaTypeLabel,
                   isDarkMode,
                 )}`}
@@ -675,7 +675,7 @@ export function VisaTrackingScreen({
         </div>
 
         <div className="flex items-center py-1">
-          <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700 w-fit">
+          <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-bold leading-none text-slate-700 w-fit">
             {row.pax} Pax
           </span>
         </div>
@@ -694,7 +694,7 @@ export function VisaTrackingScreen({
               {visibleRaudhahEntries.map((entry) => (
                 <span
                   key={`${row.id}-desktop-raudhah-${entry.key}`}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
+                  className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-bold leading-none ${getRaudhahStatusClasses(
                     entry.status,
                     isDarkMode,
                   )}`}
@@ -706,7 +706,7 @@ export function VisaTrackingScreen({
                 </span>
               ))}
               {hiddenRaudhahEntriesCount > 0 ? (
-                <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
+                <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-3 py-1.5 text-xs font-bold leading-none text-slate-700">
                   +{hiddenRaudhahEntriesCount}
                 </span>
               ) : null}
@@ -718,7 +718,7 @@ export function VisaTrackingScreen({
 
         <div className="justify-self-center flex flex-col gap-1 py-1">
           <span
-            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaStatusClasses(
+            className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none ${getVisaStatusClasses(
               row.visaStatus,
               isDarkMode,
             )}`}
@@ -727,9 +727,9 @@ export function VisaTrackingScreen({
           </span>
         </div>
 
-        <div className="flex flex-col gap-1 py-1">
+        <div className="flex flex-col items-start gap-1 py-1">
           <span
-            className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getVisaTypeClasses(
+            className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none w-fit ${getVisaTypeClasses(
               visaTypeLabel,
               isDarkMode,
             )}`}
@@ -738,13 +738,18 @@ export function VisaTrackingScreen({
           </span>
         </div>
 
-        <div className="flex flex-col gap-1.5 justify-start py-1">
+        <div className="flex items-center py-1">
           <button
             type="button"
-            className="inline-flex items-center whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
             onClick={() => onOpenDetail(row)}
+            title="View Details"
+            aria-label={`View details for group ${row.groupCode}`}
           >
-            View Details
+            <span className="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+              search
+            </span>
+            <span>View</span>
           </button>
         </div>
       </article>
