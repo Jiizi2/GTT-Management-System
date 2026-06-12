@@ -1,98 +1,51 @@
-# Dokumentasi Aplikasi (Umum)
+# Gambaran Aplikasi
 
-Dokumen ini menjelaskan gambaran menyeluruh aplikasi, fitur utama, peran pengguna, dan alur data antar komponen.
+Dashboard operasional Umrah untuk tim internal. Dipakai untuk monitoring grup perjalanan, penyusunan itinerary, checklist keberangkatan, tracking visa dan hotel agreement, manajemen invoice, serta administrasi user dan master data.
 
-## 1. Ringkasan Aplikasi
+## Arsitektur
 
-Dashboard ini dipakai untuk operasional travel/umrah, terutama untuk:
+Monorepo npm workspaces:
 
-- Monitoring grup perjalanan.
-- Penyusunan dan pemeliharaan itinerary.
-- Checklist operasional H-1 (driver/bus assignment).
-- Tracking status visa, hotel agreement, dan jadwal Raudhah.
-- Manajemen invoice.
-- Manajemen user dan master data (khusus super-admin).
+- `apps/frontend` — React SPA (dashboard web)
+- `apps/backend` — NestJS REST API
 
-Arsitektur proyek berbentuk monorepo:
+## Modul Fitur
 
-- `apps/frontend`: antarmuka pengguna (web dashboard).
-- `apps/backend`: API dan logika domain.
+| Modul | Fungsi |
+|---|---|
+| Overview | Statistik, daftar grup, pencarian, filter aktif/non-aktif |
+| Add New Group | Wizard pembuatan grup dengan itinerary dan data visa awal |
+| H-1 Checklist | Tugas keberangkatan dekat (driver/bus assignment) |
+| Visa Tracking | Status visa, hotel agreement Makkah/Madinah, jadwal Raudhah |
+| Agreement Inbox | Kelola dan assign hotel agreement draft ke grup |
+| Invoice | Daftar invoice, relasi client/grup, create/update invoice |
+| Raudhah Reminder | Ringkasan appointment Raudhah dan status cetak tasreh |
+| User Management | CRUD akun operasional (super-admin only) |
+| Master Data | Kelola opsi kategori master data (super-admin only) |
+| Profile | Pengaturan profil operator |
 
-## 2. Modul Fitur Utama
+## Peran Pengguna
 
-Modul pada dashboard:
+- `super-admin` — akses penuh termasuk User Management dan Master Data
+- `admin` — akses operasional standar
 
-- `Overview`: statistik mingguan, daftar grup, pencarian, filter aktif.
-- `Add New Group`: wizard pembuatan grup + itinerary + data visa awal.
-- `H-1 Checklist`: daftar tugas keberangkatan dekat waktu sekarang (today sampai H+2), termasuk driver assignment.
-- `Visa Tracking`: pemantauan status visa, pembayaran, agreement hotel Makkah/Madinah, dan jadwal Raudhah.
-- `Invoice`: daftar invoice, client, create/update invoice.
-- `Raudhah Reminder`: ringkasan appointment Raudhah dan status cetak tasreh.
-- `User Management`: CRUD user operasional (super-admin only).
-- `Master Data`: kelola opsi kategori master data (super-admin only).
-- `Profile`: pengaturan profil operator.
+## Alur Data
 
-## 3. Peran Pengguna dan Akses
+1. User login di frontend → token di-set sebagai HttpOnly cookie oleh backend.
+2. Frontend memverifikasi sesi via `/api/auth/session`.
+3. Request ke `/api/*` dikirim dengan `credentials: "include"` (cookie-based).
+4. Backend menyimpan data ke memory (dev) atau PostgreSQL via Prisma (production).
 
-Akses dasar:
+## Mode Runtime Backend
 
-- `super-admin`
-- `admin`
+| Mode | Keterangan |
+|---|---|
+| `DATA_SOURCE=memory` | Default dev, non-persisten, tidak butuh database |
+| `DATA_SOURCE=prisma` | Persisten ke PostgreSQL, wajib di `NODE_ENV=production` |
 
-Aturan penting:
+## Pengujian
 
-- Semua endpoint backend memakai auth guard global, kecuali endpoint public.
-- Fitur `User Management` dan `Master Data` dibatasi hanya untuk `super-admin`.
-
-## 4. Alur Data End-to-End
-
-Alur umum:
-
-1. User login di frontend (`/api/auth/login`).
-2. Backend menyimpan token akses pada cookie `HttpOnly` dan mengembalikan snapshot sesi aman ke frontend.
-3. Frontend hanya menyimpan snapshot sesi non-sensitif untuk restore UX, lalu memverifikasi ulang lewat `/api/auth/session`.
-4. Request frontend ke `/api/*` dikirim dengan `credentials: "include"`.
-5. Backend menyimpan/ambil data dari:
-   - mode `memory` (default, non-persisten), atau
-   - mode `prisma` (persisten ke PostgreSQL).
-
-Hardening yang sekarang aktif:
-
-- security headers dasar di bootstrap backend,
-- cookie auth `HttpOnly` + `SameSite=Lax`,
-- proteksi CSRF berbasis origin untuk request write yang memakai cookie,
-- login rate limiting,
-- larangan bootstrap default auth users di production,
-- validasi secret produksi yang lebih ketat.
-
-Polanya bersifat optimistic di frontend:
-
-- UI di-update lebih dulu.
-- Sync ke backend dilakukan setelahnya.
-- Jika sync gagal dan host lokal, frontend tetap bisa fallback lokal; jika bukan lokal, state bisa di-reset dari backend.
-
-## 5. Mode Runtime Data
-
-Backend mendukung dua mode:
-
-- `DATA_SOURCE=memory`:
-  - cepat untuk development awal.
-  - data tidak persisten.
-  - tersedia dummy/default records di memori.
-- `DATA_SOURCE=prisma`:
-  - menggunakan PostgreSQL melalui Prisma.
-  - data persisten.
-  - cocok untuk staging/production.
-
-Di `NODE_ENV=production`, backend mewajibkan `DATA_SOURCE=prisma`.
-
-## 6. Kualitas dan Pengujian
-
-Suite yang tersedia:
-
-- Unit test frontend dan backend.
-- Integration test backend (Prisma + database).
-- API e2e backend.
-- UI e2e frontend (Playwright) dengan backend yang dijalankan saat test.
-
-Semua check + test + build saat ini dijalankan manual dari lokal sesuai release flow.
+- Unit test frontend dan backend
+- Integration test backend (Prisma + database)
+- API e2e backend
+- UI e2e frontend (Playwright)

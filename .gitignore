@@ -37,3 +37,6 @@ apps/backend/prisma/dev.db-journal
 Thumbs.db
 .vscode/
 .idea/
+
+# Internal documentation (tidak di-commit ke repo)
+docs/internal/
