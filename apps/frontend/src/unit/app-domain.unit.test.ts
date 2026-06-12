@@ -395,7 +395,7 @@ function testGroupCompletenessFlagsMissingPartsAndMismatches(): void {
           agreementNumber: "D-1",
           pax: 45,
           status: "Approved",
-          stayStartIso: "2099-01-04",
+          stayStartIso: "2099-01-03",
           stayEndIso: "2099-01-05",
         },
       ],
@@ -1148,12 +1148,63 @@ function testAgreementPaxExceedsGroupPaxDoesNotMismatch(): void {
   assert.equal(hasPaxMismatchIncomplete, true);
 }
 
+function testGroupCompletenessCalculatesDailyPaxCorrectly(): void {
+  // Test sequential agreements
+  const sequentialGroup = createBaseGroup({
+    code: "UNIT-SEQ",
+    pax: 46,
+    itinerary: [], // simplify
+    visaSetup: {
+      visaStatus: "Draft",
+      syarikah: "",
+      paymentStatus: "Unpaid",
+      makkahHotels: [
+        { id: "m-1", hotelName: "H1", agreementNumber: "A1", pax: 23, status: "Approved", stayStartIso: "2024-01-22", stayEndIso: "2024-01-25" },
+        { id: "m-2", hotelName: "H2", agreementNumber: "A2", pax: 23, status: "Approved", stayStartIso: "2024-01-25", stayEndIso: "2024-01-26" },
+      ],
+      madinahHotels: [],
+      raudhahAppointments: [],
+    },
+  });
+  
+  // They cover 23 pax each but on different nights, so max coverage is 23. Group needs 46, so mismatch = true.
+  assert.equal(
+    resolveGroupCompleteness(sequentialGroup).issues.some((i) => i.key === "pax-mismatch"),
+    true,
+  );
+
+  // Test overlapping agreements
+  const overlappingGroup = createBaseGroup({
+    code: "UNIT-OVR",
+    pax: 30,
+    itinerary: [],
+    visaSetup: {
+      visaStatus: "Draft",
+      syarikah: "",
+      paymentStatus: "Unpaid",
+      makkahHotels: [
+        { id: "m-1", hotelName: "H1", agreementNumber: "A1", pax: 23, status: "Approved", stayStartIso: "2024-01-22", stayEndIso: "2024-01-25" },
+        { id: "m-2", hotelName: "H2", agreementNumber: "A2", pax: 7, status: "Approved", stayStartIso: "2024-01-22", stayEndIso: "2024-01-25" },
+      ],
+      madinahHotels: [],
+      raudhahAppointments: [],
+    },
+  });
+
+  // They cover the same nights and sum to 30. Group needs 30. Mismatch = false.
+  assert.equal(
+    resolveGroupCompleteness(overlappingGroup).issues.some((i) => i.key === "pax-mismatch"),
+    false,
+  );
+}
+
 describe("app-domain", () => {
   runCase("raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
   runCase("route helper behavior", testRouteHelpersForCategorySpecificBehavior);
   runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
   runCase("visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
   runCase("group completeness helper", testGroupCompletenessFlagsMissingPartsAndMismatches);
+  runCase("group completeness calculates daily pax correctly", testGroupCompletenessCalculatesDailyPaxCorrectly);
   runCase("agreement pax exceeding group pax does not mismatch", testAgreementPaxExceedsGroupPaxDoesNotMismatch);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
   runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);

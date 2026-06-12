@@ -89,8 +89,12 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
 
   const city = readString(record.city).toUpperCase() === "MADINAH" ? "madinah" : "makkah";
   const groupCode = readString(record.groupCode ?? "", "");
-  const assignmentStatus =
-    readString(record.assignmentStatus).toUpperCase() === "ASSIGNED" || groupCode ? "Assigned" : "Unassigned";
+  const isAssigned = readString(record.assignmentStatus).toUpperCase() === "ASSIGNED" || groupCode;
+  const assignmentStatus = isAssigned
+    ? record.remainingPax !== undefined && record.remainingPax > 0
+      ? "Partially Assigned"
+      : "Assigned"
+    : "Unassigned";
 
   return {
     id,

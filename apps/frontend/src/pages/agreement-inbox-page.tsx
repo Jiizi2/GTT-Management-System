@@ -96,9 +96,13 @@ function formatDraftDateTime(value: string): string {
 }
 
 function getAssignmentBadgeClasses(draft: HotelAgreementDraft): string {
-  return draft.assignmentStatus === "Assigned"
-    ? "border-brand-primary/25 bg-brand-primary/12 text-brand-primary"
-    : "border-amber-200 bg-amber-100 text-amber-800";
+  if (draft.assignmentStatus === "Assigned") {
+    return "border-brand-primary/25 bg-brand-primary/12 text-brand-primary";
+  }
+  if (draft.assignmentStatus === "Partially Assigned") {
+    return "border-emerald-200 bg-emerald-100 text-emerald-800";
+  }
+  return "border-amber-200 bg-amber-100 text-amber-800";
 }
 
 function getApprovalBadgeClasses(draft: HotelAgreementDraft): string {
@@ -873,7 +877,7 @@ export function AgreementInboxScreen() {
         ) : null}
 
         {paginatedDrafts.map((draft) => {
-          const isAssigned = draft.assignmentStatus === "Assigned";
+          const isAssigned = draft.assignmentStatus === "Assigned" || draft.assignmentStatus === "Partially Assigned";
           const isRejected = draft.status === "Rejected";
           const isApproved = draft.status === "Approved";
 
