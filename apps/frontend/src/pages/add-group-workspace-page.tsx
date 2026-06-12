@@ -1166,7 +1166,7 @@ export function InputItineraryScreen({
                     control={control}
                     render={({ field }) => (
                       <SereneSelect
-                        className="w-full text-left bg-surface-container-lowest border-outline-variant/45 h-12"
+                        className={selectClassName}
                         value={field.value ?? ""}
                         onChange={field.onChange}
                       >
