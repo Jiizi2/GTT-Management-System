@@ -42,6 +42,7 @@ export type EffectiveGroupIdentityState = {
   effectiveEndDate: string;
   effectiveMusyrifName: string;
   effectiveMusyrifPhone: string;
+  effectiveBusStatus: "Visa Only" | "Visa+";
 };
 
 export type InputItineraryValidationState = {
@@ -277,6 +278,7 @@ export function resolveEffectiveGroupIdentityState({
   endDate,
   musyrifName,
   musyrifPhone,
+  busStatus,
 }: {
   sectionMode: ItinerarySectionMode;
   identityDraft?: NewGroupItineraryDraft | null;
@@ -290,6 +292,7 @@ export function resolveEffectiveGroupIdentityState({
   endDate: string;
   musyrifName: string;
   musyrifPhone: string;
+  busStatus: "Visa Only" | "Visa+";
 }): EffectiveGroupIdentityState {
   const isIdentityOnlyMode = sectionMode === "identity-only";
   const isScheduleOnlyMode = sectionMode === "schedule-only";
@@ -311,6 +314,7 @@ export function resolveEffectiveGroupIdentityState({
     : endDate;
   const effectiveMusyrifName = isScheduleOnlyMode ? (identityDraft?.musyrifName ?? musyrifName) : musyrifName;
   const effectiveMusyrifPhone = isScheduleOnlyMode ? (identityDraft?.musyrifPhone ?? musyrifPhone) : musyrifPhone;
+  const effectiveBusStatus = isScheduleOnlyMode ? (identityDraft?.busStatus ?? busStatus) : busStatus;
 
   return {
     isIdentityOnlyMode,
@@ -324,6 +328,7 @@ export function resolveEffectiveGroupIdentityState({
     effectiveEndDate,
     effectiveMusyrifName,
     effectiveMusyrifPhone,
+    effectiveBusStatus,
   };
 }
 

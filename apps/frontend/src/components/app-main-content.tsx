@@ -184,6 +184,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 onDeleteGroup={controller.handleDeleteVisaGroup}
                 onSaveGroup={controller.handleSaveVisaGroupDetail}
                 onUpdateVisaStatus={controller.handleUpdateVisaStatus}
+                onUpdateVisaType={controller.handleUpdateVisaType}
                 onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
                 onUpdateSyarikah={controller.handleUpdateSyarikah}
                 onUpdateVisaHotel={controller.handleUpdateVisaHotel}

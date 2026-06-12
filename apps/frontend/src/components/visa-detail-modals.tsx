@@ -691,3 +691,65 @@ export function VisaRaudhahModal({
     </ModalShell>
   );
 }
+
+const visaTypeModalSchema = z.object({
+  value: z.enum(["Visa Only", "Visa+"]),
+});
+
+export function VisaTypeModal({
+  initialValue,
+  onClose,
+  onSave,
+}: {
+  initialValue: "Visa Only" | "Visa+";
+  onClose: () => void;
+  onSave: (nextValue: "Visa Only" | "Visa+") => void | Promise<void>;
+}) {
+  const {
+    control,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<{ value: "Visa Only" | "Visa+" }>({
+    resolver: zodResolver(visaTypeModalSchema),
+    defaultValues: {
+      value: initialValue,
+    },
+  });
+
+  return (
+    <ModalShell
+      title="Edit Visa Type"
+      description="Update the visa service type for this group."
+      icon="fact_check"
+      onClose={onClose}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() => void handleSubmit(({ value }) => void onSave(value))()}
+          saveLabel="Save Changes"
+          isSaving={isSubmitting}
+        />
+      }
+    >
+      <label className={modalFieldClassName}>
+        <span>Visa Type</span>
+        <div className="relative">
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <SereneSelect
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+              >
+                <option value="Visa Only">Visa Only</option>
+                <option value="Visa+">Visa+</option>
+              </SereneSelect>
+            )}
+          />
+        </div>
+      </label>
+    </ModalShell>
+  );
+}

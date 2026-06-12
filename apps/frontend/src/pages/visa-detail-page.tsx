@@ -60,6 +60,9 @@ const LazyVisaRaudhahModal = lazy(async () => ({
 const LazyVisaStatusModal = lazy(async () => ({
   default: (await import("../components/visa-detail-modals")).VisaStatusModal,
 }));
+const LazyVisaTypeModal = lazy(async () => ({
+  default: (await import("../components/visa-detail-modals")).VisaTypeModal,
+}));
 
 function VisaDetailModalFallback() {
   if (typeof document === "undefined") {
@@ -655,6 +658,7 @@ export function VisaTrackingDetailScreen({
   onDeleteGroup,
   onSaveGroup,
   onUpdateVisaStatus,
+  onUpdateVisaType,
   onUpdatePaymentStatus,
   onUpdateSyarikah,
   onUpdateVisaHotel,
@@ -679,6 +683,7 @@ export function VisaTrackingDetailScreen({
   onDeleteVisaHotel: (groupCode: string, city: "makkah" | "madinah", hotelId: string) => void;
   onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
+  onUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
 }) {
   const [activeGroupCode, setActiveGroupCode] = useState(initialRow.groupCode);
   const allVisaRows = useMemo(() => Domain.buildVisaTrackingRowsFromGroups(groups), [groups]);
@@ -714,7 +719,7 @@ export function VisaTrackingDetailScreen({
   }, [activeRow.groupCode, activeRow.paymentStatus]);
 
   const [activeModal, setActiveModal] = useState<
-    "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | null
+    "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | "visa-type" | null
   >(null);
   const [hotelCityDraft, setHotelCityDraft] = useState<"makkah" | "madinah">("makkah");
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
@@ -958,6 +963,10 @@ export function VisaTrackingDetailScreen({
     setActiveModal("visa-status");
   };
 
+  const openVisaTypeModal = () => {
+    setActiveModal("visa-type");
+  };
+
   const openPaymentStatusModal = () => {
     setActiveModal("payment-status");
   };
@@ -1099,8 +1108,13 @@ export function VisaTrackingDetailScreen({
     return result;
   };
 
-  const saveVisaStatus = (nextValue: VisaStatus) => {
-    onUpdateVisaStatus(row.groupCode, nextValue);
+  const saveVisaStatus = (nextStatus: VisaStatus) => {
+    onUpdateVisaStatus(row.groupCode, nextStatus);
+    closeModal();
+  };
+
+  const saveVisaType = (nextType: "Visa Only" | "Visa+") => {
+    onUpdateVisaType(row.groupCode, nextType);
     closeModal();
   };
 
@@ -1458,7 +1472,7 @@ export function VisaTrackingDetailScreen({
         </section>
       ) : null}
 
-      <section className="grid gap-3 md:grid-cols-3" aria-label="Quick status">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Quick status">
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Status</p>
@@ -1474,6 +1488,28 @@ export function VisaTrackingDetailScreen({
             className={`${getIconButtonClasses()} shrink-0`}
             aria-label="Edit visa status"
             onClick={openVisaStatusModal}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              edit
+            </span>
+          </button>
+        </article>
+
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
+            <div
+              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses("success")}`}
+            >
+              <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
+              <strong>{group?.visaSetup?.busStatus ?? "Visa Only"}</strong>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`${getIconButtonClasses()} shrink-0`}
+            aria-label="Edit visa type"
+            onClick={openVisaTypeModal}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               edit
@@ -2026,6 +2062,10 @@ export function VisaTrackingDetailScreen({
         <Suspense fallback={<VisaDetailModalFallback />}>
           {activeModal === "visa-status" ? (
             <LazyVisaStatusModal initialValue={row.visaStatus} onClose={closeModal} onSave={saveVisaStatus} />
+          ) : null}
+
+          {activeModal === "visa-type" ? (
+            <LazyVisaTypeModal initialValue={(group?.visaSetup?.busStatus as "Visa Only" | "Visa+") ?? "Visa Only"} onClose={closeModal} onSave={saveVisaType} />
           ) : null}
 
           {activeModal === "payment-status" ? (

@@ -131,6 +131,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleOpenVisaDetail: routeState.handleOpenVisaDetail,
     handleUpdateAgreementStatus: groupRecordsState.handleUpdateAgreementStatus,
     handleUpdateVisaStatus: groupRecordsState.handleUpdateVisaStatus,
+    handleUpdateVisaType: groupRecordsState.handleUpdateVisaType,
     handleUpdatePaymentStatus: groupRecordsState.handleUpdatePaymentStatus,
     handleUpdateSyarikah: groupRecordsState.handleUpdateSyarikah,
     handleUpdateVisaHotel: groupRecordsState.handleUpdateVisaHotel,

@@ -107,7 +107,7 @@ export type Musyrif = {
 export type AgreementApprovalStatus = "Waiting for Approval" | "Approved" | "Rejected";
 
 export type GroupRaudhahStatus = "Free" | "After" | "Before";
-export type BusStatus = "Visa+";
+export type BusStatus = "Visa Only" | "Visa+";
 
 export type GroupAgreementHotel = {
   id: string;
@@ -427,6 +427,7 @@ export type NewGroupItineraryDraft = {
   endDate?: string;
   musyrifName?: string;
   musyrifPhone?: string;
+  busStatus?: BusStatus;
   itinerary?: ItineraryItem[];
   timeline?: [TimelineItem, TimelineItem];
   nextActivity?: NextActivity;
