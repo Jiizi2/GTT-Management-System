@@ -1,348 +1,248 @@
 # Peta Kodebase
 
-Dokumen ini dibuat dari pembacaan struktur kode yang aktif saat ini. Fokusnya bukan manual penggunaan aplikasi, tetapi panduan cepat untuk memahami bagaimana monorepo ini disusun, file mana yang jadi titik masuk, dan alur data utama dari frontend sampai backend.
+Panduan navigasi cepat monorepo GTT untuk developer baru maupun AI assistant. Fokus pada struktur folder, titik masuk, dan alur data utama.
 
-## 1. Gambaran Besar
+## Struktur Root
 
-Monorepo ini berisi dashboard operasional travel/umrah dengan dua aplikasi utama:
+```
+c:\vibe coding\
+├── apps/
+│   ├── frontend/      ← React SPA (port 4173 dev)
+│   └── backend/       ← NestJS REST API (port 3001 dev)
+├── docs/              ← Dokumentasi teknis
+├── deploy/            ← Script dan Dockerfile untuk VPS
+├── package.json       ← Root workspace + script shortcut
+├── docker-compose.yml ← Dev DB PostgreSQL
+└── docker-compose.prod.yml
+```
 
-- `apps/frontend`: aplikasi web untuk tim operasional.
-- `apps/backend`: REST API untuk auth, grup, invoice, dan master data.
+## Quick Start
 
-Alur runtime utamanya:
+```bash
+# Mode paling ringan (tanpa database)
+npm install
+npm run dev:backend   # http://localhost:3001/api
+npm run dev:frontend  # http://localhost:4173
 
-1. User membuka frontend.
-2. Frontend memverifikasi sesi ke backend lewat cookie auth.
-3. Dashboard memuat data grup, invoice, master data, dan modul lain via `/api/*`.
-4. Backend menyimpan data ke memory atau PostgreSQL, tergantung `DATA_SOURCE`.
+# Mode dengan PostgreSQL
+docker compose up -d
+# isi apps/backend/.env
+npm run db:generate:backend
+npm run db:migrate:backend
+npm run db:seed:backend
+npm run dev:backend
+```
 
-## 2. Struktur Root
+---
 
-Folder dan file penting di root:
+## Frontend (`apps/frontend/src/`)
 
-- `package.json`
-  - root npm workspace untuk `apps/*`
-  - menyatukan script build, test, QA, dan database
-- `docker-compose.yml`
-  - PostgreSQL lokal untuk development
-- `docker-compose.prod.yml`
-  - stack production sederhana: `web` + `backend` + `postgres`
-- `docs/`
-  - dokumentasi operasional, backend, frontend, deployment, dan QA
-- `deploy/web/`
-  - Dockerfile frontend web dan konfigurasi nginx
+### Titik Masuk
 
-Script root yang paling penting:
+| File | Peran |
+|---|---|
+| `index.tsx` | Mount React app ke DOM |
+| `app.tsx` | Auth gate: login screen atau dashboard shell |
+| `components/dashboard-workspace-shell.tsx` | Shell utama dashboard (sidebar + main content + mobile nav) |
+| `components/app-main-content.tsx` | Router halaman dalam dashboard, lazy loading |
 
-- `npm run dev:frontend`
-- `npm run dev:backend`
-- `npm run verify`
-- `npm run qa`
-- `npm run db:migrate:backend`
-- `npm run db:seed:backend`
+### Struktur Direktori
 
-## 3. Cara Menjalankan Secara Lokal
+```
+src/
+├── app.tsx
+├── index.tsx
+├── styles.css              ← Global CSS + design tokens
+├── components/             ← Komponen UI reusable
+├── pages/                  ← Halaman per modul
+├── hooks/                  ← Custom hooks + business logic
+│   └── app-controller/     ← Sub-controller dashboard
+├── shared/                 ← Domain types, API client, routes, query keys
+└── theme/                  ← Dark/light mode provider
+```
 
-Mode paling ringan:
+### Halaman dan Route
 
-1. `npm install`
-2. `npm run dev:backend`
-3. `npm run dev:frontend`
+| Route | File | Akses |
+|---|---|---|
+| `/login` | `pages/login-page.tsx` | Public |
+| `/overview` | `pages/overview-page.tsx` | Semua |
+| `/groups/:code` | `pages/group-detail-page.tsx` | Semua |
+| `/itinerary-builder/:code` | `pages/group-itinerary-builder-page.tsx` | Semua |
+| `/new-group` | `pages/new-group-screen.tsx` | Semua |
+| `/checklist` | `pages/checklist-page.tsx` | Semua |
+| `/visa` | `pages/visa-tracking-page.tsx` | Semua |
+| `/visa/:code` | `pages/visa-detail-page.tsx` | Semua |
+| `/agreement-inbox` | `pages/agreement-inbox-page.tsx` | Semua |
+| `/invoice` | `pages/invoice-list-page.tsx` | Semua |
+| `/raudhah-reminder` | `pages/raudhah-reminder-page.tsx` | Semua |
+| `/user-management` | `pages/manage-role-page.tsx` | super-admin |
+| `/master-data` | `pages/master-data-page.tsx` | super-admin |
+| `/profile` | `pages/profile-page.tsx` | Semua |
 
-Pada mode ini backend default memakai `DATA_SOURCE=memory`, jadi tidak butuh database.
+### File Shared Penting
 
-Kalau ingin mode persisten:
+| File | Isi |
+|---|---|
+| `shared/app-domain.ts` | Semua TypeScript types domain (GroupData, VisaTrackingRow, dll.) |
+| `shared/visa-domain.ts` | Logic visa: format tanggal, generate WhatsApp copy text |
+| `shared/app-route.ts` | Route builder functions |
+| `shared/api-client.ts` | `fetchBackend()` + `fetchBackendParsed()` |
+| `shared/query-keys.ts` | Semua TanStack Query keys |
+| `shared/auth-session.ts` | Session storage (non-sensitif) |
 
-1. `docker compose up -d`
-2. isi `apps/backend/.env`
-3. jalankan:
-   - `npm run db:generate:backend`
-   - `npm run db:migrate:backend`
-   - `npm run db:seed:backend`
+### Hooks Penting
 
-## 4. Peta Frontend
+| Hook | Fungsi |
+|---|---|
+| `hooks/use-app-controller.ts` | Controller utama dashboard — menyatukan semua state |
+| `hooks/use-app-controller-backend.ts` | Semua interaksi API + mapping frontend↔backend |
+| `hooks/app-controller/use-dashboard-group-records.ts` | State sinkronisasi group records |
+| `hooks/use-auth-session-query.ts` | Query/mutation auth (login, logout, session) |
+| `hooks/use-groups-query.ts` | TanStack Query untuk daftar grup |
+| `hooks/use-invoice-backend.ts` | Fetch dan mutasi invoice |
+| `hooks/use-master-data-backend.ts` | Fetch dan mutasi master data |
 
-Lokasi frontend ada di `apps/frontend`.
+### Auth Flow Frontend
 
-Titik masuk utama:
-
-- `src/index.tsx`
-  - mount React app
-- `src/app.tsx`
-  - auth gate utama
-  - memutuskan apakah user masuk ke login screen atau dashboard shell
-- `src/components/dashboard-workspace-shell.tsx`
-  - shell utama dashboard desktop/mobile
-- `src/components/app-main-content.tsx`
-  - route dashboard dan lazy loading halaman
-
-Direktori penting:
-
-- `src/pages/`
-  - halaman per modul seperti overview, group detail, checklist, visa, invoice, profile
-- `src/hooks/`
-  - orchestration state, query/mutation, dan adapter backend
-- `src/shared/`
-  - helper lintas modul seperti route builder, API client, query keys, session restore, domain mapper
-- `src/components/`
-  - layout shell dan komponen UI reusable
-- `src/theme/`
-  - theme provider dan mode tema
-
-## 5. Alur Frontend
-
-### Auth flow
-
-File kunci:
-
-- `apps/frontend/src/app.tsx`
-- `apps/frontend/src/hooks/use-auth-session-query.ts`
-- `apps/frontend/src/shared/auth-session.ts`
-
-Alurnya:
-
-1. App memanggil `useAuthSessionQuery()`.
-2. Frontend mencoba restore snapshot sesi non-sensitif.
-3. Backend diverifikasi lagi lewat `/api/auth/session`.
-4. Jika valid, user masuk ke dashboard.
-5. Jika tidak valid, user diarahkan ke `/login`.
+1. `useAuthSessionQuery()` dipanggil di `app.tsx`.
+2. Snapshot sesi non-sensitif dicoba restore dari storage lokal.
+3. Sesi diverifikasi ulang ke backend via `/api/auth/session`.
+4. Jika valid → masuk dashboard. Jika tidak → redirect `/login`.
 
 Catatan penting:
+- Token **tidak** disimpan di JavaScript storage.
+- Request ke backend memakai `credentials: "include"` (cookie-based).
+
+---
+
+## Backend (`apps/backend/src/`)
+
+### Titik Masuk
+
+| File | Peran |
+|---|---|
+| `main.ts` | Bootstrap NestJS: CORS, helmet, validation pipe, swagger, prefix `/api` |
+| `app.module.ts` | Root module: rakit semua modul + global config logging throttling |
+
+### Modul Backend
+
+| Modul | Lokasi | Fungsi |
+|---|---|---|
+| `AuthModule` | `src/auth/` | Login/logout/session, user management, JWT cookie |
+| `GroupsModule` | `src/groups/` | CRUD grup, itinerary, visa, checklist, audit log |
+| `InvoicesModule` | `src/invoices/` | CRUD invoice dan invoice client |
+| `MasterDataModule` | `src/master-data/` | Lookup options lintas modul |
+| `PrismaModule` | `src/prisma/` | Prisma service shared |
+| `HealthModule` | `src/health/` | `GET /api/health` untuk health probe |
+| `RuntimeMaintenanceModule` | `src/runtime-maintenance/` | Mode maintenance |
+
+### Arsitektur Modul Groups
+
+Modul `groups` memakai layered architecture:
+
+```
+src/groups/
+├── http/           ← Controllers (HTTP layer)
+├── application/    ← Business logic (service layer)
+├── domain/         ← Pure domain functions
+├── infrastructure/ ← Memory store + Prisma builders
+└── dto/            ← Data Transfer Objects
+```
+
+### Endpoint Utama
+
+```
+# Auth
+POST   /api/auth/login         (public)
+POST   /api/auth/logout        (public)
+GET    /api/auth/session
+GET    /api/auth/users         (super-admin)
+POST   /api/auth/users         (super-admin)
+PATCH  /api/auth/users/:id     (super-admin)
+PUT    /api/auth/users/:id/password (super-admin)
+DELETE /api/auth/users/:id     (super-admin)
+
+# Groups
+GET    /api/groups             ?q=&page=&pageSize=&filter=&projection=
+GET    /api/groups/:idOrCode
+GET    /api/groups/audit-logs  ?groupCode=&limit=
+POST   /api/groups
+PUT    /api/groups/:idOrCode
+PATCH  /api/groups/:idOrCode
+DELETE /api/groups/:idOrCode
+POST   /api/groups/:id/itinerary
+PATCH  /api/groups/:id/itinerary/:itemId
+DELETE /api/groups/:id/itinerary/:itemId
+POST   /api/groups/:id/checklist/confirm-driver
+POST   /api/groups/:id/checklist/reset-driver
+POST   /api/groups/:id/visa/hotels
+PATCH  /api/groups/:id/visa/hotels/:hotelId
+DELETE /api/groups/:id/visa/hotels/:hotelId
+PUT    /api/groups/:id/visa/raudhah
+
+# Hotel Agreement Drafts
+GET    /api/hotel-agreement-drafts
+POST   /api/hotel-agreement-drafts
+PATCH  /api/hotel-agreement-drafts/:id
+POST   /api/hotel-agreement-drafts/:id/assign
+DELETE /api/hotel-agreement-drafts/:id
+
+# Invoices
+GET    /api/invoices
+GET    /api/invoices/clients
+POST   /api/invoices
+PATCH  /api/invoices/:id
+
+# Master Data
+GET    /api/master-data/categories
+GET    /api/master-data/options    ?categoryKey=&includeInactive=
+POST   /api/master-data/options    (super-admin)
+PATCH  /api/master-data/options/:id (super-admin)
+```
+
+### Database Schema
+
+File: `apps/backend/prisma/schema.prisma`
+
+Model utama: `AuthUser`, `Group`, `ItineraryItem`, `ChecklistAssignment`, `ChecklistDriver`, `VisaSetup`, `VisaHotelAgreement`, `RaudhahAppointment`, `HotelAgreementDraft`, `InvoiceClient`, `Invoice`, `MasterDataOption`.
+
+`Group` adalah entitas pusat — memiliki relasi ke hampir semua model operasional.
+
+### Keamanan
+
+- Semua endpoint dilindungi `AuthGuard` global, kecuali yang `@Public()`.
+- Session via HttpOnly cookie (`SameSite=Lax`, `Secure` di production).
+- Bearer token didukung untuk kompatibilitas internal/test.
+- Login rate limiter aktif (persisten di PostgreSQL mode prisma).
+- Global throttling via `@nestjs/throttler`.
+- Proteksi CSRF berbasis origin untuk write request via cookie.
 
-- token tidak disimpan di JavaScript storage
-- request backend memakai `credentials: "include"`
-- backend mengandalkan cookie `HttpOnly`
+### OpenAPI / Swagger
 
-### Dashboard flow
+- UI: `GET /api/docs`
+- JSON: `GET /api/docs/json`
 
-File kunci:
+---
 
-- `apps/frontend/src/components/dashboard-workspace-shell.tsx`
-- `apps/frontend/src/hooks/use-app-controller.ts`
-- `apps/frontend/src/hooks/app-controller/use-dashboard-group-records.ts`
+## Alur Data End-to-End (Contoh: Load Daftar Grup)
 
-Shell dashboard memakai satu controller utama untuk:
+```
+OverviewScreen
+  ↓ useAppController
+    ↓ use-dashboard-group-records.ts
+      ↓ use-groups-query.ts (TanStack Query)
+        ↓ fetchBackend("GET /api/groups")
+          ↓ GroupsController.findAll()
+            ↓ GroupsService.findAll()
+              ↓ memory store ATAU Prisma (tergantung DATA_SOURCE)
+```
 
-- state navigasi
-- daftar grup
-- detail grup/visa yang sedang dipilih
-- feedback sinkronisasi UI ke backend
+---
 
-Artinya, modul overview, checklist, visa, raudhah reminder, dan sebagian alur detail grup masih berbagi sumber data grup yang sama.
+## Titik Masuk Terbaik Untuk Membaca Kode
 
-### Route frontend aktif
-
-Route utama dibangun di `apps/frontend/src/components/app-main-content.tsx`:
-
-- `/login`
-- `/overview`
-- `/groups/:groupCode`
-- `/new-group`
-- `/checklist`
-- `/visa`
-- `/visa/:groupCode`
-- `/invoice`
-- `/raudhah-reminder`
-- `/user-management`
-- `/master-data`
-- `/profile`
-
-Sebagian besar route di-load secara lazy agar bundle awal tetap ringan.
-
-## 6. Modul Frontend yang Paling Penting
-
-- `Overview`
-  - daftar grup, ringkasan, filter, dan entry ke detail group
-- `New Group`
-  - input grup baru dan itinerary awal
-- `Checklist`
-  - kebutuhan driver dan assignment keberangkatan
-- `Visa Tracking`
-  - status visa, hotel agreement, dan Raudhah
-- `Invoice`
-  - daftar invoice, create/edit invoice, relasi ke grup/client
-- `User Management`
-  - CRUD user backend, hanya untuk `super-admin`
-- `Master Data`
-  - kelola opsi dinamis lintas modul
-
-## 7. Peta Backend
-
-Lokasi backend ada di `apps/backend`.
-
-Titik masuk utama:
-
-- `src/main.ts`
-  - bootstrap NestJS
-  - set CORS, helmet, validation pipe, exception filter, swagger, dan prefix `/api`
-- `src/app.module.ts`
-  - root module yang merakit semua modul backend
-
-Modul yang terdaftar saat ini:
-
-- `AuthModule`
-- `PrismaModule`
-- `RuntimeMaintenanceModule`
-- `HealthModule`
-- `GroupsModule`
-- `InvoicesModule`
-- `MasterDataModule`
-
-Cross-cutting concern yang aktif global:
-
-- `@nestjs/config` untuk env validation
-- `nestjs-pino` untuk structured logging
-- `@nestjs/throttler` untuk rate limiting global
-- `helmet` untuk security headers
-- `ApiExceptionFilter` untuk format error konsisten
-
-## 8. Alur Backend
-
-### Auth
-
-File kunci:
-
-- `apps/backend/src/auth/auth.controller.ts`
-- `apps/backend/src/auth/auth.service.ts`
-- `apps/backend/src/auth/auth.guard.ts`
-
-Peran utamanya:
-
-- login/logout/session
-- manajemen user
-- role guard untuk endpoint khusus
-- browser session lewat cookie `HttpOnly`
-
-### Groups
-
-File kunci:
-
-- `apps/backend/src/groups/http/groups.controller.ts`
-- `apps/backend/src/groups/application/groups.service.ts`
-- `apps/backend/src/groups/application/groups-command.service.ts`
-- `apps/backend/src/groups/application/groups-query.service.ts`
-
-Modul `groups` adalah inti domain aplikasi. Ia menangani:
-
-- CRUD grup
-- itinerary
-- checklist driver
-- visa hotel agreement
-- appointment Raudhah
-- audit log perubahan grup
-
-Strukturnya sudah mulai domain-first:
-
-- `http/`
-- `application/`
-- `domain/`
-- `infrastructure/`
-
-### Invoices
-
-File kunci:
-
-- `apps/backend/src/invoices/invoices.controller.ts`
-- `apps/backend/src/invoices/invoices.service.ts`
-
-Modul ini mengelola:
-
-- daftar invoice
-- daftar client invoice
-- create/update invoice
-
-### Master Data
-
-File kunci:
-
-- `apps/backend/src/master-data/master-data.controller.ts`
-- `apps/backend/src/master-data/master-data.service.ts`
-
-Master data dipakai untuk opsi dinamis lintas modul frontend seperti dropdown dan pilihan kategori tertentu.
-
-## 9. Model Data Inti
-
-Skema database didefinisikan di `apps/backend/prisma/schema.prisma`.
-
-Entitas utama:
-
-- `AuthUser`
-- `Group`
-- `GroupAuditLog`
-- `ItineraryItem`
-- `ChecklistAssignment`
-- `ChecklistDriver`
-- `VisaSetup`
-- `VisaHotelAgreement`
-- `RaudhahAppointment`
-- `InvoiceClient`
-- `Invoice`
-- `MasterDataOption`
-- `AuthLoginRateLimitBucket`
-- `AppThrottleBucket`
-
-Hubungan domain yang paling penting:
-
-- satu `Group` menjadi pusat banyak data operasional
-- `Group` punya itinerary, visa setup, checklist assignment, audit log, invoice, dan invoice client
-- `VisaSetup` punya hotel agreement dan appointment Raudhah
-- `ChecklistAssignment` bisa terkait ke `ItineraryItem`
-
-## 10. Mode Penyimpanan Data
-
-Backend punya dua mode:
-
-- `DATA_SOURCE=memory`
-  - cepat untuk development
-  - non-persisten
-- `DATA_SOURCE=prisma`
-  - persisten ke PostgreSQL
-  - dipakai untuk staging/production
-
-Kesan dari implementasinya:
-
-- banyak service memang dirancang bisa berjalan di dua mode
-- `groups.service.ts` misalnya punya jalur memory dan Prisma sekaligus
-- production dipaksa ke mode `prisma`
-
-## 11. Docker Compose
-
-### `docker-compose.yml`
-
-Dipakai untuk development database lokal.
-
-Service:
-
-- `postgres`
-  - image `postgres:16-alpine`
-  - port host default `6543`
-  - volume `gtt_postgres_data`
-
-### `docker-compose.prod.yml`
-
-Dipakai untuk deployment stack sederhana.
-
-Service:
-
-- `web`
-  - build dari `deploy/web/Dockerfile`
-  - expose port web default `8080`
-- `backend`
-  - build dari `apps/backend/Dockerfile`
-  - jalan di mode `prisma`
-  - membaca env dari `apps/backend/.env`
-- `postgres`
-  - hanya expose internal network Compose
-
-Interpretasi arsitekturnya:
-
-- frontend production disajikan lewat nginx container
-- nginx berbicara ke backend di jaringan internal Compose
-- PostgreSQL sengaja tidak dibuka ke host pada mode production Compose
-
-## 12. Titik Masuk Terbaik Saat Mau Membaca Kode
-
-Kalau baru pertama kali masuk ke repo ini, urutan baca yang paling efektif:
+Urutan baca yang efektif untuk developer baru:
 
 1. `README.md`
 2. `docs/application-overview.md`
@@ -352,9 +252,3 @@ Kalau baru pertama kali masuk ke repo ini, urutan baca yang paling efektif:
 6. `apps/backend/src/app.module.ts`
 7. `apps/backend/prisma/schema.prisma`
 8. `apps/backend/src/groups/application/groups.service.ts`
-
-Urutan ini memberi gambaran dari UI, route, API bootstrap, lalu ke model data dan domain inti.
-
-## 13. Kesimpulan Singkat
-
-Kodebase ini adalah monorepo operasional yang cukup rapi dengan pembagian jelas antara frontend dashboard dan backend API. Pusat domain bisnisnya ada di modul `groups`, sedangkan auth, invoice, dan master data menjadi modul pendukung utama. Untuk development cepat, backend bisa jalan tanpa database; untuk deployment nyata, arsitekturnya diarahkan ke PostgreSQL + Docker Compose.
