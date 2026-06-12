@@ -175,7 +175,7 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
       const summarySelect = (summaryFindManyArgs as { select?: Record<string, unknown> }).select ?? {};
       assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "itinerary"), true);
       assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "notes"), true);
-      assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "visaSetup"), false);
+      assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "visaSetup"), true);
       assert.equal(Object.prototype.hasOwnProperty.call(summarySelect, "checklistAssignments"), false);
     } finally {
       restore();

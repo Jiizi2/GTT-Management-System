@@ -66,6 +66,27 @@ export const groupSummarySelection = {
   },
   itinerary: groupItinerarySelection,
   notes: groupNotesSelection,
+  visaSetup: {
+    select: {
+      visaStatus: true,
+      issuedDate: true,
+      syarikah: true,
+      paymentStatus: true,
+      hotelAgreements: {
+        orderBy: [{ city: "asc" }, { stayStart: "asc" }],
+        select: {
+          id: true,
+          city: true,
+          hotelName: true,
+          agreementNumber: true,
+          pax: true,
+          status: true,
+          stayStart: true,
+          stayEnd: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.GroupSelect;
 
 export const groupDetailSelection = {

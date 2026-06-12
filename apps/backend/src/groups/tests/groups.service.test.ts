@@ -203,7 +203,8 @@ async function testSearchFilterPagination(): Promise<void> {
     );
     assert.equal(
       Object.prototype.hasOwnProperty.call(summaryGroup, "visaSetup"),
-      false,
+      true,
+      "summary projection MUST NOT omit visaSetup anymore because frontend dashboard needs it for completeness calculation",
     );
     assert.equal(
       Object.prototype.hasOwnProperty.call(
