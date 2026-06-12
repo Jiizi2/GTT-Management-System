@@ -10,7 +10,7 @@ import type {
 
 type MemoryGroupSummary = Omit<
   MemoryGroupRecord,
-  "musyrif" | "timeline" | "visaSetup" | "checklistAssignments"
+  "musyrif" | "timeline" | "checklistAssignments"
 >;
 
 export function projectMemoryGroupRecord(
@@ -36,6 +36,7 @@ export function projectMemoryGroupRecord(
     nextActivity: group.nextActivity,
     itinerary: group.itinerary,
     notes: group.notes,
+    visaSetup: group.visaSetup,
     parentGroupId: group.parentGroupId,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
