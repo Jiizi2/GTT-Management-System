@@ -314,6 +314,7 @@ function resolveRequestedGroupProjection({
   if (
     selectedGroupCode ||
     selectedVisaGroupCode ||
+    activeNav === "overview" ||
     activeNav === "checklist" ||
     activeNav === "visa" ||
     activeNav === "invoice" ||
