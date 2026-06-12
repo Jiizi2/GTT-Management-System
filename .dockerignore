@@ -14,7 +14,7 @@ apps/frontend/playwright-report
 .idea
 *.log
 .env
-.env.*
 apps/*/.env
 apps/*/.env.*
 
+**/*.tsbuildinfo
