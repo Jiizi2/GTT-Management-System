@@ -1424,28 +1424,28 @@ export function VisaTrackingDetailScreen({
 
       {agreementIssues.length > 0 ? (
         <section
-          className="rounded-3xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 p-4 text-on-tertiary-fixed-variant shadow-sm"
+          className="rounded-2xl border border-tertiary-fixed/65 bg-tertiary-fixed/70 px-4 py-3 text-on-tertiary-fixed-variant shadow-sm"
           aria-label="Agreement setup status"
         >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <span
-                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest"
                 aria-hidden="true"
               >
-                <span className="material-symbols-outlined text-lg">
+                <span className="material-symbols-outlined text-base">
                   link
                 </span>
               </span>
-              <div className="min-w-0">
-                <p className="text-xs font-extrabold uppercase tracking-[0.16em]">Agreement Status</p>
-                <h2 className="mt-1 text-lg font-extrabold">Agreement Needs Attention</h2>
-                <p className="mt-1 text-sm font-semibold">{primaryAgreementMessage}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                <h2 className="text-sm font-extrabold leading-tight">Agreement Needs Attention</h2>
+                <span className="hidden sm:inline text-tertiary-fixed/40">|</span>
+                <p className="text-xs font-medium leading-tight">{primaryAgreementMessage}</p>
+                <div className="flex flex-wrap gap-1.5 sm:ml-auto">
                   {agreementIssues.slice(0, 4).map((issue) => (
                     <span
                       key={issue.key}
-                      className="rounded-md bg-surface-container-lowest/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.08em]"
+                      className="rounded bg-surface-container-lowest/80 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide"
                       title={issue.message}
                     >
                       {issue.label}
