@@ -800,7 +800,7 @@ export function VisaTrackingDetailScreen({
     };
 
     for (const draft of agreementDraftsQuery.data ?? []) {
-      if (draft.assignmentStatus !== "Unassigned") {
+      if (draft.assignmentStatus === "Assigned") {
         continue;
       }
 
