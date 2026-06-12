@@ -56,6 +56,7 @@ export type AppController = {
   handleOpenVisaDetail: (row: VisaTrackingRow) => void;
   handleUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
   handleUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus) => void;
+  handleUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
   handleUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   handleUpdateSyarikah: (groupCode: string, syarikah: string) => void;
   handleUpdateVisaHotel: (

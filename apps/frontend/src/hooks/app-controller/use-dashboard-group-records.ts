@@ -1096,6 +1096,16 @@ export function useDashboardGroupRecords({
     [updateVisaSetupForGroupAndSync],
   );
 
+  const handleUpdateVisaType = useCallback(
+    (groupCode: string, visaType: "Visa Only" | "Visa+") => {
+      updateVisaSetupForGroupAndSync(groupCode, ({ visaSetup }) => ({
+        ...visaSetup,
+        busStatus: visaType,
+      }));
+    },
+    [updateVisaSetupForGroupAndSync],
+  );
+
   const handleUpdatePaymentStatus = useCallback(
     (groupCode: string, paymentStatus: VisaPaymentStatus) => {
       updateVisaSetupForGroupAndSync(groupCode, ({ visaSetup }) => ({
@@ -1599,6 +1609,7 @@ export function useDashboardGroupRecords({
     handleDeleteVisaGroup,
     handleUpdateAgreementStatus,
     handleUpdateVisaStatus,
+    handleUpdateVisaType,
     handleUpdatePaymentStatus,
     handleUpdateSyarikah,
     handleUpdateVisaHotel,

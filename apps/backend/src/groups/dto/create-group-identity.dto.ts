@@ -62,4 +62,9 @@ export class CreateGroupIdentityDto {
   @ValidateNested()
   @Type(() => CreateMusyrifDto)
   musyrif?: CreateMusyrifDto;
+
+  @ApiPropertyOptional({ example: "Visa Only" })
+  @IsOptional()
+  @IsString()
+  busStatus?: string;
 }

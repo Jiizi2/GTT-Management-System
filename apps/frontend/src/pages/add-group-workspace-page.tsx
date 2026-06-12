@@ -60,6 +60,7 @@ function createIdentityFormSchema(requireIdentityFields: boolean) {
       groupNumber: requireIdentityFields ? z.string().trim().min(1, "Group number wajib diisi.") : z.string(),
       groupName: requireIdentityFields ? z.string().trim().min(1, "Group name wajib diisi.") : z.string(),
       packageType: requireIdentityFields ? z.string().trim().min(1, "Package type wajib diisi.") : z.string(),
+      busStatus: z.enum(["Visa Only", "Visa+"]),
       paxCount: requireIdentityFields
         ? z
             .string()
@@ -271,6 +272,7 @@ export function InputItineraryScreen({
       endDate: "",
       musyrifName: "",
       musyrifPhone: "",
+      busStatus: "Visa Only",
     },
   });
   const {
@@ -324,6 +326,7 @@ export function InputItineraryScreen({
   const endDate = watch("endDate");
   const musyrifName = watch("musyrifName");
   const musyrifPhone = watch("musyrifPhone");
+  const busStatusValue = watch("busStatus");
   const {
     isIdentityOnlyMode,
     isScheduleOnlyMode,
@@ -336,6 +339,7 @@ export function InputItineraryScreen({
     effectiveEndDate,
     effectiveMusyrifName,
     effectiveMusyrifPhone,
+    effectiveBusStatus,
   } = resolveEffectiveGroupIdentityState({
     sectionMode,
     identityDraft,
@@ -349,6 +353,7 @@ export function InputItineraryScreen({
     endDate,
     musyrifName,
     musyrifPhone,
+    busStatus: busStatusValue,
   });
   const {
     hasInvalidDateRange,
@@ -874,6 +879,7 @@ export function InputItineraryScreen({
       endDate: effectiveEndDate,
       musyrifName: effectiveMusyrifName.trim(),
       musyrifPhone: effectiveMusyrifPhone.trim(),
+      busStatus: effectiveBusStatus,
     };
     const hasDraftBaseValue = Boolean(
       baseDraft.groupCode ||
@@ -1150,6 +1156,30 @@ export function InputItineraryScreen({
                   />
                   {identityErrors.packageType ? (
                     <p className="text-xs font-semibold text-error">{identityErrors.packageType.message}</p>
+                  ) : null}
+                </label>
+
+                <label className={fieldClassName}>
+                  <span>Visa Type</span>
+                  <Controller
+                    name="busStatus"
+                    control={control}
+                    render={({ field }) => (
+                      <SereneSelect
+                        className="w-full text-left bg-surface-container-lowest border-outline-variant/45 h-12"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      >
+                        <option value="" disabled>
+                          Select Visa Type
+                        </option>
+                        <option value="Visa Only">Visa Only</option>
+                        <option value="Visa+">Visa+</option>
+                      </SereneSelect>
+                    )}
+                  />
+                  {identityErrors.busStatus ? (
+                    <p className="text-xs font-semibold text-error">{identityErrors.busStatus.message}</p>
                   ) : null}
                 </label>
 

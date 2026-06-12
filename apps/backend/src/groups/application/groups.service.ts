@@ -453,6 +453,14 @@ export class GroupsService {
           sortOrder: 0,
           text: "Group workspace created from identity entry. Agreement and itinerary can be linked later.",
         },
+        ...(payload.busStatus
+          ? [
+              {
+                sortOrder: 1,
+                text: `Bus status: ${payload.busStatus}`,
+              },
+            ]
+          : []),
       ],
       checklistAssignments: [],
     };

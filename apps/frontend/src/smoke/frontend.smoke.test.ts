@@ -707,6 +707,7 @@ async function testEffectiveIdentityModeHelpers(): Promise<void> {
     endDate: "2026-07-09",
     musyrifName: "Local Musyrif",
     musyrifPhone: "0700",
+    busStatus: "Visa+",
   });
 
   assertEqual(scheduleOnly.isScheduleOnlyMode, true);
@@ -739,6 +740,7 @@ async function testEffectiveIdentityModeHelpers(): Promise<void> {
     endDate: "2026-07-16",
     musyrifName: "Local 2",
     musyrifPhone: "0710",
+    busStatus: "Visa+",
   });
 
   assertEqual(scheduleOnlyWithPrefillFallback.effectiveStartDate, "2026-10-10");
@@ -762,6 +764,7 @@ async function testEffectiveIdentityModeHelpers(): Promise<void> {
     endDate: "2026-11-09",
     musyrifName: "Local 3",
     musyrifPhone: "0720",
+    busStatus: "Visa Only",
   });
 
   assertEqual(identityOnly.isIdentityOnlyMode, true);

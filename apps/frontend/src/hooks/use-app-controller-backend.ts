@@ -37,6 +37,7 @@ export type GroupIdentityDraftPayload = {
   durationDays?: number;
   musyrifName?: string;
   musyrifPhone?: string;
+  busStatus?: "Visa+" | "Visa Only";
 };
 
 type BackendCreateGroupPayload = {
@@ -418,11 +419,17 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       destinationPickupTime: normalizeStoredTimeLabel(item.destinationPickupTime?.trim() ?? "") || undefined,
       hotelPickupRequestTime: normalizeStoredTimeLabel(item.hotelPickupRequestTime?.trim() ?? "") || undefined,
     })),
-    notes: group.notes.map((text, index) => ({
-      sortOrder: index,
-      text: text.trim(),
-      pinned: false,
-    })),
+    notes: (() => {
+      const filteredNotes = group.notes.filter((text) => !/^bus status\s*:/i.test(text));
+      if (group.visaSetup?.busStatus) {
+        filteredNotes.push(`Bus status: ${group.visaSetup.busStatus}`);
+      }
+      return filteredNotes.map((text, index) => ({
+        sortOrder: index,
+        text: text.trim(),
+        pinned: false,
+      }));
+    })(),
     parentGroupId: group.parentGroupId || null,
   };
 
@@ -1155,6 +1162,7 @@ export async function createGroupIdentityInBackend(identity: GroupIdentityDraftP
           avatar: musyrifAvatar,
         }
         : undefined,
+    busStatus: identity.busStatus,
   };
   const {
     response,
