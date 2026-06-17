@@ -527,7 +527,7 @@ function getRemainingPaxForDraft(draft: HotelAgreementDraft, group: GroupData | 
     if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
       return false;
     }
-    return Math.max(draftStartMs, Date.parse(hStart)) <= Math.min(draftEndMs, Date.parse(hEnd));
+    return Math.max(draftStartMs, Date.parse(hStart)) < Math.min(draftEndMs, Date.parse(hEnd));
   });
   
   const assignedSum = overlappingHotels.reduce((sum, h) => sum + Math.max(0, h.pax || 0), 0);
@@ -691,12 +691,9 @@ export function VisaTrackingDetailScreen({
     return allVisaRows.find((r) => r.groupCode === activeGroupCode) ?? initialRow;
   }, [allVisaRows, activeGroupCode, initialRow]);
 
-  // Shadow row prop with activeRow
-  const row = activeRow;
-
   // Find family groups for tabs
   const familyGroups = useMemo(() => {
-    const currentGroup = groups.find((item) => item.code === row.groupCode) ?? null;
+    const currentGroup = groups.find((item) => item.code === activeRow.groupCode) ?? null;
     if (!currentGroup) return [];
     const parent = currentGroup.parentGroupId
       ? (groups.find((g) => g.id === currentGroup.parentGroupId || g.code === currentGroup.parentGroupId) ?? null)
@@ -708,7 +705,48 @@ export function VisaTrackingDetailScreen({
       (g) => g.parentGroupId && (g.parentGroupId === parent.id || g.parentGroupId === parent.code) && g.code !== parent.code
     );
     return [parent, ...children];
-  }, [groups, row.groupCode]);
+  }, [groups, activeRow.groupCode]);
+
+  // Merged row for family groups
+  const mergedFamilyRow = useMemo(() => {
+    if (familyGroups.length <= 1) {
+      return activeRow;
+    }
+    
+    const parent = familyGroups[0];
+    const parentRow = allVisaRows.find(r => r.groupCode === parent.code) ?? activeRow;
+    
+    // Combine pax
+    const totalPax = familyGroups.reduce((sum, g) => sum + g.pax, 0);
+
+    // Combine hotels and tag with ownerGroupCode
+    const makkahHotels: GroupAgreementHotel[] = [];
+    const madinahHotels: GroupAgreementHotel[] = [];
+    
+    for (const g of familyGroups) {
+      const gRow = allVisaRows.find(r => r.groupCode === g.code);
+      const gData = groups.find(r => r.code === g.code);
+      if (gRow && gData) {
+        const mHotels = gData.visaSetup?.makkahHotels.map(h => ({ ...h, ownerGroupCode: g.code })) || [];
+        const madHotels = gData.visaSetup?.madinahHotels.map(h => ({ ...h, ownerGroupCode: g.code })) || [];
+        makkahHotels.push(...mHotels);
+        madinahHotels.push(...madHotels);
+      }
+    }
+    
+    return {
+      ...parentRow,
+      pax: totalPax,
+      makkahVerified: makkahHotels.reduce((sum, h) => sum + h.pax, 0),
+      madinahVerified: madinahHotels.reduce((sum, h) => sum + h.pax, 0),
+      makkahHotels,
+      madinahHotels,
+    };
+  }, [familyGroups, activeRow, allVisaRows, groups]);
+
+  // Shadow row prop with mergedFamilyRow
+  const row = mergedFamilyRow;
+
 
   const queryClient = useQueryClient();
   const agreementDraftsQuery = useAgreementDraftsQuery("", "all");
@@ -725,6 +763,7 @@ export function VisaTrackingDetailScreen({
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
   const [hotelDraftId, setHotelDraftId] = useState<string | null>(null);
   const [hotelDraftSeed, setHotelDraftSeed] = useState<VisaHotelEditFormState | null>(null);
+  const [hotelDraftOwnerGroupCode, setHotelDraftOwnerGroupCode] = useState<string | null>(null);
   const [addingHotelCity, setAddingHotelCity] = useState<"makkah" | "madinah" | null>(null);
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
@@ -778,13 +817,13 @@ export function VisaTrackingDetailScreen({
   );
   const primaryAgreementMessage = agreementIssues[0]?.message ?? "Agreement hotel sudah tersambung.";
 
-  const totalPax = group?.pax ?? row.pax;
+  const totalPax = row.pax ?? group?.pax ?? 0;
   const requiredBusCount = resolveTotalBusCount(totalPax, group?.totalBuses);
   const durationDays = group?.durationDays ?? 8;
   const agreementDateRange = resolveVisaAgreementDateRange(row, durationDays, group ?? undefined);
 
-  const makkahAgreements = getGroupAgreementHotelsByCity(group ?? undefined, "makkah");
-  const madinahAgreements = getGroupAgreementHotelsByCity(group ?? undefined, "madinah");
+  const makkahAgreements: GroupAgreementHotel[] = (row as any).makkahHotels ?? getGroupAgreementHotelsByCity(group ?? undefined, "makkah");
+  const madinahAgreements: GroupAgreementHotel[] = (row as any).madinahHotels ?? getGroupAgreementHotelsByCity(group ?? undefined, "madinah");
   const connectedAgreementKeys = useMemo(
     () =>
       new Set([
@@ -980,12 +1019,14 @@ export function VisaTrackingDetailScreen({
     mode: "add" | "edit",
     hotelId?: string,
     seed?: VisaHotelEditFormState,
+    ownerGroupCode?: string,
   ) => {
     setAddingHotelCity(null);
     setHotelCityDraft(city);
     setHotelDraftMode(mode);
     setHotelDraftId(mode === "edit" ? (hotelId ?? null) : null);
     setHotelDraftSeed(seed ?? null);
+    setHotelDraftOwnerGroupCode(ownerGroupCode ?? null);
     setActiveModal("hotel");
   };
 
@@ -994,7 +1035,7 @@ export function VisaTrackingDetailScreen({
     agreement: GroupAgreementHotel,
     isStoredAgreement: boolean,
   ) => {
-    openHotelModal(city, "edit", isStoredAgreement ? agreement.id : undefined, buildHotelDraftFromAgreement(agreement));
+    openHotelModal(city, "edit", isStoredAgreement ? agreement.id : undefined, buildHotelDraftFromAgreement(agreement), agreement.ownerGroupCode);
   };
 
   const openDeleteAgreementConfirm = (
@@ -1027,6 +1068,7 @@ export function VisaTrackingDetailScreen({
   const closeModal = () => {
     setActiveModal(null);
     setHotelDraftSeed(null);
+    setHotelDraftOwnerGroupCode(null);
   };
 
   const openGroupEditModal = () => {
@@ -1130,8 +1172,9 @@ export function VisaTrackingDetailScreen({
   };
 
   const saveHotel = (hotel: VisaHotelEditFormState) => {
+    const targetGroupCode = hotelDraftOwnerGroupCode ?? activeRow.groupCode;
     onUpdateVisaHotel(
-      row.groupCode,
+      targetGroupCode,
       hotelCityDraft,
       hotel,
       hotelDraftMode === "edit" ? (hotelDraftId ?? undefined) : undefined,
@@ -1145,7 +1188,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const saveAddHotelInline = (city: "makkah" | "madinah", hotel: VisaHotelEditFormState) => {
-    onUpdateVisaHotel(row.groupCode, city, hotel);
+    onUpdateVisaHotel(activeRow.groupCode, city, hotel);
     setAddingHotelCity(null);
   };
 
@@ -1164,7 +1207,7 @@ export function VisaTrackingDetailScreen({
     try {
       await assignAgreementDraftInBackend({
         draftId: draft.id,
-        groupCode: row.groupCode,
+        groupCode: activeRow.groupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1173,7 +1216,7 @@ export function VisaTrackingDetailScreen({
       setAddingHotelCity(null);
       setDraftAssignFeedback({
         tone: "success",
-        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${row.groupCode}.`,
+        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${activeRow.groupCode}.`,
       });
     } catch (error: unknown) {
       setDraftAssignFeedback({
@@ -1197,7 +1240,8 @@ export function VisaTrackingDetailScreen({
     }
 
     if (!deleteAgreementDraft.draft) {
-      onDeleteVisaHotel(row.groupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
+      const targetGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? activeRow.groupCode;
+      onDeleteVisaHotel(targetGroupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
       setDeleteAgreementDraft(null);
       return;
     }
@@ -1207,7 +1251,7 @@ export function VisaTrackingDetailScreen({
     try {
       await unassignAgreementDraftInBackend({
         draftId: deleteAgreementDraft.draft.id,
-        groupCode: row.groupCode,
+        groupCode: deleteAgreementDraft.agreement.ownerGroupCode ?? activeRow.groupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1634,6 +1678,11 @@ export function VisaTrackingDetailScreen({
                         <h3 className="truncate text-base font-semibold text-slate-900">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                         </h3>
+                        {agreement.ownerGroupCode && familyGroups.length > 1 && agreement.ownerGroupCode !== activeGroupCode && (
+                          <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            Milik: {agreement.ownerGroupCode}
+                          </span>
+                        )}
                         <span
                           className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getAgreementStatusClasses(
                             agreement.status === "Approved",
@@ -1786,6 +1835,11 @@ export function VisaTrackingDetailScreen({
                         <h3 className="truncate text-base font-semibold text-slate-900">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                         </h3>
+                        {agreement.ownerGroupCode && familyGroups.length > 1 && agreement.ownerGroupCode !== activeGroupCode && (
+                          <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            Milik: {agreement.ownerGroupCode}
+                          </span>
+                        )}
                         <span
                           className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getAgreementStatusClasses(
                             agreement.status === "Approved",

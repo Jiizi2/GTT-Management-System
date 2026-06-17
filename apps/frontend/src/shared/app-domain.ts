@@ -118,6 +118,7 @@ export type GroupAgreementHotel = {
   status: AgreementApprovalStatus;
   stayStartIso: string;
   stayEndIso: string;
+  ownerGroupCode?: string;
 };
 
 export type GroupRaudhahAppointment = {
