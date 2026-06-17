@@ -278,38 +278,77 @@ export function generateWhatsappCopyText(
     return trimmed || "[DATE]";
   };
 
-  const makkahHotels = group.visaSetup?.makkahHotels || [];
-  lines.push("BRN MAKKAH");
-  if (makkahHotels.length > 0) {
-    makkahHotels.forEach((hotel) => {
-      lines.push(hotel.hotelName?.trim() || "[HOTEL MAKKAH NAME]");
-      const start = formatBrnDate(hotel.stayStartIso);
-      const end = formatBrnDate(hotel.stayEndIso);
-      lines.push(`${start} - ${end}`);
-      lines.push(hotel.agreementNumber?.trim() || "[BRN_CODE]");
+  type HotelEntry = {
+    groupCode: string;
+    hotelName: string;
+    stayStartIso?: string;
+    stayEndIso?: string;
+    agreementNumber: string;
+    pax: number;
+  };
+
+  const allGroups = familyGroups && familyGroups.length > 0 ? familyGroups : [group];
+
+  const makkahHotels: HotelEntry[] = [];
+  const madinahHotels: HotelEntry[] = [];
+
+  allGroups.forEach((g) => {
+    g.visaSetup?.makkahHotels.forEach((h) => {
+      makkahHotels.push({
+        groupCode: g.code,
+        hotelName: h.hotelName,
+        stayStartIso: h.stayStartIso,
+        stayEndIso: h.stayEndIso,
+        agreementNumber: h.agreementNumber,
+        pax: h.pax,
+      });
     });
-  } else {
-    lines.push("[HOTEL MAKKAH NAME]");
-    lines.push("[START_DATE] - [END_DATE]");
-    lines.push("[BRN_CODE]");
-  }
+    g.visaSetup?.madinahHotels.forEach((h) => {
+      madinahHotels.push({
+        groupCode: g.code,
+        hotelName: h.hotelName,
+        stayStartIso: h.stayStartIso,
+        stayEndIso: h.stayEndIso,
+        agreementNumber: h.agreementNumber,
+        pax: h.pax,
+      });
+    });
+  });
+
+  const printHotels = (hotels: HotelEntry[], defaultName: string) => {
+    if (hotels.length === 0) {
+      lines.push(defaultName);
+      lines.push("[START_DATE] - [END_DATE]");
+      lines.push("[GROUP_CODE]: [BRN_CODE] ([PAX] PAX)");
+      return;
+    }
+
+    const grouped = new Map<string, HotelEntry[]>();
+    for (const h of hotels) {
+      const key = `${h.hotelName.trim()}|${h.stayStartIso || ""}|${h.stayEndIso || ""}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(h);
+    }
+
+    for (const entries of grouped.values()) {
+      const first = entries[0];
+      lines.push(first.hotelName?.trim() || defaultName);
+      const start = formatBrnDate(first.stayStartIso);
+      const end = formatBrnDate(first.stayEndIso);
+      lines.push(`${start} - ${end}`);
+      for (const e of entries) {
+        const brnCode = e.agreementNumber?.trim() || "[BRN_CODE]";
+        lines.push(`${e.groupCode}: ${brnCode} (${e.pax} PAX)`);
+      }
+    }
+  };
+
+  lines.push("BRN MAKKAH");
+  printHotels(makkahHotels, "[HOTEL MAKKAH NAME]");
   lines.push("");
 
-  const madinahHotels = group.visaSetup?.madinahHotels || [];
   lines.push("BRN MADINAH");
-  if (madinahHotels.length > 0) {
-    madinahHotels.forEach((hotel) => {
-      lines.push(hotel.hotelName?.trim() || "[HOTEL MADINAH NAME]");
-      const start = formatBrnDate(hotel.stayStartIso);
-      const end = formatBrnDate(hotel.stayEndIso);
-      lines.push(`${start} - ${end}`);
-      lines.push(hotel.agreementNumber?.trim() || "[BRN_CODE]");
-    });
-  } else {
-    lines.push("[HOTEL MADINAH NAME]");
-    lines.push("[START_DATE] - [END_DATE]");
-    lines.push("[BRN_CODE]");
-  }
+  printHotels(madinahHotels, "[HOTEL MADINAH NAME]");
 
   return lines.join("\n");
 }
