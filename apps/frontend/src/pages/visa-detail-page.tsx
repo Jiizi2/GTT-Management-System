@@ -822,8 +822,8 @@ export function VisaTrackingDetailScreen({
   const durationDays = group?.durationDays ?? 8;
   const agreementDateRange = resolveVisaAgreementDateRange(row, durationDays, group ?? undefined);
 
-  const makkahAgreements: GroupAgreementHotel[] = (row as any).makkahHotels ?? getGroupAgreementHotelsByCity(group ?? undefined, "makkah");
-  const madinahAgreements: GroupAgreementHotel[] = (row as any).madinahHotels ?? getGroupAgreementHotelsByCity(group ?? undefined, "madinah");
+  const makkahAgreements: GroupAgreementHotel[] = getGroupAgreementHotelsByCity(group ?? undefined, "makkah");
+  const madinahAgreements: GroupAgreementHotel[] = getGroupAgreementHotelsByCity(group ?? undefined, "madinah");
   const connectedAgreementKeys = useMemo(
     () =>
       new Set([
