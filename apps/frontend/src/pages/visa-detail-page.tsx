@@ -527,7 +527,7 @@ function getRemainingPaxForDraft(draft: HotelAgreementDraft, group: GroupData | 
     if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
       return false;
     }
-    return Math.max(draftStartMs, Date.parse(hStart)) <= Math.min(draftEndMs, Date.parse(hEnd));
+    return Math.max(draftStartMs, Date.parse(hStart)) < Math.min(draftEndMs, Date.parse(hEnd));
   });
   
   const assignedSum = overlappingHotels.reduce((sum, h) => sum + Math.max(0, h.pax || 0), 0);
