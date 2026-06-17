@@ -138,7 +138,7 @@ function createSmokeGroup(): GroupData {
           pax: 40,
           status: "Approved",
           stayStartIso: transferIso,
-          stayEndIso: transferIso,
+          stayEndIso: departureIso,
         },
       ],
       madinahHotels: [
@@ -149,7 +149,7 @@ function createSmokeGroup(): GroupData {
           pax: 40,
           status: "Approved",
           stayStartIso: departureIso,
-          stayEndIso: departureIso,
+          stayEndIso: getLocalIsoDateWithOffset(3),
         },
       ],
       raudhahAppointments: [

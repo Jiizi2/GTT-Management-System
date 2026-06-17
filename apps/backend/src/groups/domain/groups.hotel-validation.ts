@@ -129,11 +129,8 @@ function validateHotelAgreementContinuity(
     const previous = combinedAndSorted[index - 1];
     const current = combinedAndSorted[index];
     if (current.stayStart !== previous.stayEnd) {
-      const previousLabel = toAgreementCityLabel(previous.city);
-      const currentLabel = toAgreementCityLabel(current.city);
-      throw new BadRequestException(
-        `Hotel agreement dates must be connected. ${previousLabel} Stay End ${previous.stayEnd} must match ${currentLabel} Stay Start ${current.stayStart}.`,
-      );
+      // Soft rules: Do not throw BadRequestException for gaps or disconnected dates.
+      // The frontend will handle displaying warnings to the user.
     }
   }
 }
@@ -156,9 +153,8 @@ export function validateHotelAgreementRules(
     (agreement) => agreement.city === AgreementCity.MAKKAH,
   );
   if (shouldRequireMakkah && makkahHotels.length === 0) {
-    throw new BadRequestException(
-      "Makkah agreement is required when hotel agreements are provided.",
-    );
+    // Soft rules: Do not throw BadRequestException if Makkah agreement is missing.
+    // The frontend will handle displaying warnings to the user.
   }
 
   validateHotelAgreementContinuity(hotelAgreements);

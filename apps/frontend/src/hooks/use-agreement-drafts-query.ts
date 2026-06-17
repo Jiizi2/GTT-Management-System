@@ -114,9 +114,7 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
     stayStartIso: toIsoDate(record.stayStart),
     stayEndIso: toIsoDate(record.stayEnd),
     notes: readString(record.notes ?? "", ""),
-    groupCode: groupCode || undefined,
     assignmentStatus,
-    assignedAtIso: toIsoDateTime(record.assignedAt) || undefined,
     createdAtIso: toIsoDateTime(record.createdAt),
     updatedAtIso: toIsoDateTime(record.updatedAt),
   };

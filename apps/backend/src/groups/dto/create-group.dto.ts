@@ -485,7 +485,7 @@ export class CreateGroupDto {
   @ApiPropertyOptional({ example: "cldraftparentid123" })
   @IsOptional()
   @IsString()
-  parentGroupId?: string;
+  parentGroupId?: string | null;
 
   @ApiPropertyOptional({ type: () => CreateMusyrifDto })
   @IsOptional()

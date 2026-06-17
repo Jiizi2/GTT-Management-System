@@ -45,6 +45,9 @@ const LazyDeleteGroupModal = lazy(async () => ({
 const LazyGroupEditModal = lazy(async () => ({
   default: (await import("../components/group-detail-modals")).GroupEditModal,
 }));
+const LazyUnlinkGroupConfirmModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).UnlinkGroupConfirmModal,
+}));
 const LazyPaymentStatusModal = lazy(async () => ({
   default: (await import("../components/visa-detail-modals")).PaymentStatusModal,
 }));
@@ -259,10 +262,13 @@ function doesAgreementMatchAssignedDraft({
     return true;
   }
 
+  const isAssignedToGroup = draft.assignedGroups?.some(
+    (g) => normalizeAgreementMatchValue(g.groupCode) === normalizeAgreementMatchValue(groupCode)
+  ) ?? false;
+
   return (
-    draft.assignmentStatus === "Assigned" &&
+    isAssignedToGroup &&
     draft.city === city &&
-    normalizeAgreementMatchValue(draft.groupCode) === normalizeAgreementMatchValue(groupCode) &&
     normalizeAgreementMatchValue(draft.agreementNumber) === normalizeAgreementMatchValue(agreement.agreementNumber)
   );
 }
@@ -590,11 +596,11 @@ function AgreementInboxDraftAssignmentList({
         <div className="mt-3 space-y-2">
           {drafts.map((draft) => {
             const isAssigning = assigningDraftId === draft.id;
-            const draftRemainingPax = getRemainingPaxForDraft(draft, group);
             const draftAvailablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
-            const hasRemainingPax = draftRemainingPax > 0;
-            const fitsRemainingPax = draftAvailablePax > 0;
-            const isAssignable = hasRemainingPax && fitsRemainingPax && !assigningDraftId;
+            const isAlreadyAssignedToGroup = draft.assignedGroups?.some(
+              (g) => normalizeAgreementMatchValue(g.groupCode) === normalizeAgreementMatchValue(group?.code ?? "")
+            ) ?? false;
+            const isAssignable = draftAvailablePax > 0 && !assigningDraftId && !isAlreadyAssignedToGroup;
 
             return (
               <article
@@ -622,11 +628,13 @@ function AgreementInboxDraftAssignmentList({
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
                     {formatAgreementDraftStayRange(draft)}
                   </p>
-                  {!hasRemainingPax ? (
-                    <p className="mt-1 text-[11px] font-semibold text-amber-700">Pax {cityLabel} sudah penuh.</p>
-                  ) : !fitsRemainingPax ? (
+                  {draftAvailablePax <= 0 ? (
                     <p className="mt-1 text-[11px] font-semibold text-amber-700">
                       Draft ini sudah terpakai sepenuhnya.
+                    </p>
+                  ) : isAlreadyAssignedToGroup ? (
+                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                      Sudah di-assign ke grup ini.
                     </p>
                   ) : null}
                 </div>
@@ -686,6 +694,7 @@ export function VisaTrackingDetailScreen({
   onUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
 }) {
   const [activeGroupCode, setActiveGroupCode] = useState(initialRow.groupCode);
+  const [unlinkingGroup, setUnlinkingGroup] = useState<GroupData | null>(null);
   const allVisaRows = useMemo(() => Domain.buildVisaTrackingRowsFromGroups(groups), [groups]);
   const activeRow = useMemo(() => {
     return allVisaRows.find((r) => r.groupCode === activeGroupCode) ?? initialRow;
@@ -788,6 +797,7 @@ export function VisaTrackingDetailScreen({
     isGroupEditModalOpen ||
     isDeleteGroupModalOpen ||
     isClearRaudhahConfirmOpen ||
+    unlinkingGroup !== null ||
     deleteAgreementDraft !== null;
   const clearRaudhahDialogRef = useModalFocusTrap<HTMLDivElement>({
     isActive: isClearRaudhahConfirmOpen,
@@ -1071,6 +1081,15 @@ export function VisaTrackingDetailScreen({
     setHotelDraftOwnerGroupCode(null);
   };
 
+  const handleOpenUnlinkModal = (g: GroupData) => setUnlinkingGroup(g);
+  const handleCloseUnlinkModal = () => setUnlinkingGroup(null);
+  const handleConfirmUnlink = () => {
+    if (unlinkingGroup) {
+      onSaveGroup({ ...unlinkingGroup, parentGroupId: null }, unlinkingGroup.code);
+      setUnlinkingGroup(null);
+    }
+  };
+
   const openGroupEditModal = () => {
     if (!group) {
       return;
@@ -1330,10 +1349,27 @@ export function VisaTrackingDetailScreen({
   }, [hasBlockingModal]);
 
   useEffect(() => {
+    if (!hasBlockingModal) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeModal();
+        setUnlinkingGroup(null);
+        setIsGroupEditModalOpen(false);
+        setIsDeleteGroupModalOpen(false);
+        setIsClearRaudhahConfirmOpen(false);
+        setDeleteAgreementDraft(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [hasBlockingModal]);
+
+  useEffect(() => {
     setAddingHotelCity(null);
     setHotelDraftSeed(null);
     setIsGroupEditModalOpen(false);
     setIsDeleteGroupModalOpen(false);
+    setUnlinkingGroup(null);
     setDeleteAgreementDraft(null);
     setIsRaudhahTemplateCopied(false);
     setIsWhatsappCopied(false);
@@ -1399,7 +1435,7 @@ export function VisaTrackingDetailScreen({
                 <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
                 <span>Terhubung:</span>
                 {familyGroups.filter(g => g.code !== activeGroupCode).map((g, index) => (
-                  <span key={g.code}>
+                  <span key={g.code} className="inline-flex items-center gap-1">
                     {index > 0 && ", "}
                     <button
                       type="button"
@@ -1407,6 +1443,14 @@ export function VisaTrackingDetailScreen({
                       className="font-bold text-slate-900 hover:underline"
                     >
                       {g.code}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenUnlinkModal(g)}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
+                      title="Pisahkan grup ini"
+                    >
+                      <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
                     </button>
                   </span>
                 ))}
@@ -2151,6 +2195,16 @@ export function VisaTrackingDetailScreen({
               onSave={saveRaudhah}
             />
           ) : null}
+        </Suspense>
+      ) : null}
+
+      {unlinkingGroup ? (
+        <Suspense fallback={<VisaDetailModalFallback />}>
+          <LazyUnlinkGroupConfirmModal
+            groupCode={unlinkingGroup.code}
+            onClose={handleCloseUnlinkModal}
+            onConfirm={handleConfirmUnlink}
+          />
         </Suspense>
       ) : null}
 

@@ -59,8 +59,6 @@ type PrismaHotelAgreementDraftRecord = {
   stayStart: Date;
   stayEnd: Date;
   notes: string | null;
-  group?: { code: string } | null;
-  assignedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -275,13 +273,6 @@ export class HotelAgreementDraftsService {
           stayEnd: toUtcMidnightDate(normalizedPayload.stayEnd),
           notes: normalizedPayload.notes ?? null,
         },
-        include: {
-          group: {
-            select: {
-              code: true,
-            },
-          },
-        },
       });
 
       const { remainingPax, assignedGroups } = await this.getPrismaDraftRemainingAndGroups(created);
@@ -329,13 +320,6 @@ export class HotelAgreementDraftsService {
           stayStart: toUtcMidnightDate(normalizedPayload.stayStart),
           stayEnd: toUtcMidnightDate(normalizedPayload.stayEnd),
           notes: normalizedPayload.notes ?? null,
-        },
-        include: {
-          group: {
-            select: {
-              code: true,
-            },
-          },
         },
       });
 
@@ -391,14 +375,35 @@ export class HotelAgreementDraftsService {
 
   async remove(draftId: string): Promise<void> {
     if (this.dataSource === "prisma") {
-      const removed = await this.prisma.hotelAgreementDraft.deleteMany({
+      const draft = await this.prisma.hotelAgreementDraft.findUnique({
         where: { id: draftId },
       });
-      if (removed.count === 0) {
-        throw new NotFoundException(
-          `Hotel agreement draft '${draftId}' not found.`,
-        );
+      if (!draft) {
+        throw new NotFoundException(`Hotel agreement draft '${draftId}' not found.`);
       }
+
+      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
+        where: {
+          agreementNumber: draft.agreementNumber,
+          city: draft.city,
+        },
+        include: {
+          visaSetup: {
+            include: {
+              group: true,
+            },
+          },
+        },
+      });
+
+      if (assignedAgreements.length > 0) {
+        const groupCodes = Array.from(new Set(assignedAgreements.map(a => a.visaSetup?.group?.code).filter(Boolean))).join(", ");
+        throw new BadRequestException(`Draft tidak dapat dihapus karena sudah di-assign pada grup: ${groupCodes}`);
+      }
+
+      await this.prisma.hotelAgreementDraft.deleteMany({
+        where: { id: draftId },
+      });
       return;
     }
 
@@ -406,9 +411,14 @@ export class HotelAgreementDraftsService {
       (draft) => draft.id === draftId,
     );
     if (draftIndex === -1) {
-      throw new NotFoundException(
-        `Hotel agreement draft '${draftId}' not found.`,
-      );
+      throw new NotFoundException(`Hotel agreement draft '${draftId}' not found.`);
+    }
+
+    const draft = this.memoryDrafts[draftIndex];
+    const { assignedGroups } = await this.getMemoryDraftRemainingAndGroups(draft);
+    if (assignedGroups.length > 0) {
+      const groupCodes = Array.from(new Set(assignedGroups.map(g => g.groupCode))).join(", ");
+      throw new BadRequestException(`Draft tidak dapat dihapus karena sudah di-assign pada grup: ${groupCodes}`);
     }
 
     this.memoryDrafts.splice(draftIndex, 1);
@@ -426,13 +436,6 @@ export class HotelAgreementDraftsService {
     if (this.dataSource === "prisma") {
       const draft = await this.prisma.hotelAgreementDraft.findUnique({
         where: { id: draftId },
-        include: {
-          group: {
-            select: {
-              code: true,
-            },
-          },
-        },
       });
       if (!draft) {
         throw new NotFoundException(
@@ -523,20 +526,13 @@ export class HotelAgreementDraftsService {
 
       const nextRemaining = remainingCapacity - paxToAssign;
 
-      const assigned = await this.prisma.hotelAgreementDraft.update({
-        where: { id: draft.id },
-        data: {
-          groupId: nextRemaining <= 0 ? targetGroup.id : null,
-          assignedAt: nextRemaining <= 0 ? new Date() : null,
-        },
-        include: {
-          group: {
-            select: {
-              code: true,
-            },
-          },
-        },
+      const assigned = await this.prisma.hotelAgreementDraft.findUnique({
+        where: { id: draft.id }
       });
+
+      if (!assigned) {
+        throw new NotFoundException(`Draft not found after assignment.`);
+      }
 
       const { assignedGroups } = await this.getPrismaDraftRemainingAndGroups(assigned);
       return this.mapPrismaDraft(assigned, nextRemaining, assignedGroups);
@@ -611,15 +607,7 @@ export class HotelAgreementDraftsService {
     );
 
     const nextRemaining = remainingCapacity - paxToAssign;
-    if (nextRemaining <= 0) {
-      draft.groupCode = normalizedGroupCode;
-      draft.assignedAt = new Date().toISOString();
-      draft.updatedAt = draft.assignedAt;
-    } else {
-      draft.groupCode = undefined;
-      draft.assignedAt = undefined;
-      draft.updatedAt = new Date().toISOString();
-    }
+    draft.updatedAt = new Date().toISOString();
 
     const { assignedGroups } = await this.getMemoryDraftRemainingAndGroups(draft);
     return this.mapMemoryDraft(draft, nextRemaining, assignedGroups);
@@ -628,15 +616,7 @@ export class HotelAgreementDraftsService {
   async unassign(draftId: string, groupCode?: string): Promise<unknown> {
     if (this.dataSource === "prisma") {
       const draft = await this.prisma.hotelAgreementDraft.findUnique({
-        where: { id: draftId },
-        include: {
-          group: {
-            select: {
-              id: true,
-              code: true,
-            },
-          },
-        },
+        where: { id: draftId }
       });
       if (!draft) {
         throw new NotFoundException(
@@ -645,9 +625,6 @@ export class HotelAgreementDraftsService {
       }
 
       let targetGroupCode = groupCode?.trim().toUpperCase();
-      if (!targetGroupCode && draft.group) {
-        targetGroupCode = draft.group.code;
-      }
 
       if (targetGroupCode) {
         const targetGroup = await this.prisma.group.findFirst({
@@ -708,20 +685,12 @@ export class HotelAgreementDraftsService {
         }
       }
 
-      const unassigned = await this.prisma.hotelAgreementDraft.update({
-        where: { id: draft.id },
-        data: {
-          groupId: null,
-          assignedAt: null,
-        },
-        include: {
-          group: {
-            select: {
-              code: true,
-            },
-          },
-        },
+      const unassigned = await this.prisma.hotelAgreementDraft.findUnique({
+        where: { id: draft.id }
       });
+      if (!unassigned) {
+        throw new NotFoundException(`Draft not found after unassignment.`);
+      }
 
       const nextAssigned = await this.prisma.visaHotelAgreement.findMany({
         where: {
@@ -770,8 +739,6 @@ export class HotelAgreementDraftsService {
       }
     }
 
-    draft.groupCode = undefined;
-    draft.assignedAt = undefined;
     draft.updatedAt = new Date().toISOString();
 
     const groups = (await this.groupsService.findAll()) as GroupWithVisaHotelAgreements[];
@@ -873,9 +840,25 @@ export class HotelAgreementDraftsService {
     const where: Prisma.HotelAgreementDraftWhereInput = {};
 
     if (status === "assigned") {
-      where.groupId = { not: null };
+      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({ select: { agreementNumber: true, city: true } });
+      const assignedPairs = Array.from(new Set(assignedAgreements.map(a => `${a.city}:${a.agreementNumber}`)));
+      if (assignedPairs.length > 0) {
+        where.OR = assignedPairs.map(p => {
+          const [c, n] = p.split(":");
+          return { city: c as any, agreementNumber: n };
+        });
+      } else {
+        where.id = "no-match"; // force empty result
+      }
     } else if (status === "unassigned") {
-      where.groupId = null;
+      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({ select: { agreementNumber: true, city: true } });
+      const assignedPairs = Array.from(new Set(assignedAgreements.map(a => `${a.city}:${a.agreementNumber}`)));
+      if (assignedPairs.length > 0) {
+        where.NOT = assignedPairs.map(p => {
+          const [c, n] = p.split(":");
+          return { city: c as any, agreementNumber: n };
+        });
+      }
     }
 
     if (normalizedQuery) {
@@ -904,14 +887,6 @@ export class HotelAgreementDraftsService {
             mode: "insensitive",
           },
         },
-        {
-          group: {
-            code: {
-              contains: normalizedQuery,
-              mode: "insensitive",
-            },
-          },
-        },
       ];
     }
 
@@ -919,20 +894,10 @@ export class HotelAgreementDraftsService {
       where,
       orderBy: [
         {
-          assignedAt: "asc",
-        },
-        {
           createdAt: "desc",
         },
       ],
-      include: {
-        group: {
-          select: {
-            code: true,
-          },
-        },
-      },
-    });
+      });
 
     const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
       include: {
@@ -1035,45 +1000,7 @@ export class HotelAgreementDraftsService {
     };
   }
 
-  private async findAssignedPrismaHotelForDraft(
-    draft: PrismaHotelAgreementDraftRecord & {
-      groupId?: string | null;
-    },
-  ): Promise<{ id: string } | null> {
-    if (!draft.groupId) {
-      return null;
-    }
 
-    const hotels = await this.prisma.visaHotelAgreement.findMany({
-      where: {
-        visaSetup: {
-          groupId: draft.groupId,
-        },
-        city: draft.city,
-        agreementNumber: draft.agreementNumber,
-      },
-      select: {
-        id: true,
-        hotelName: true,
-        pax: true,
-        stayStart: true,
-        stayEnd: true,
-      },
-    });
-
-    return (
-      hotels.find(
-        (hotel) =>
-          hotel.hotelName.trim().toUpperCase() ===
-            draft.hotelName.trim().toUpperCase() &&
-          hotel.pax === draft.pax &&
-          toIsoDateOnly(hotel.stayStart) === toIsoDateOnly(draft.stayStart) &&
-          toIsoDateOnly(hotel.stayEnd) === toIsoDateOnly(draft.stayEnd),
-      ) ??
-      hotels[0] ??
-      null
-    );
-  }
 
   private mapMemoryDraft(
     draft: MemoryHotelAgreementDraft,
@@ -1093,9 +1020,9 @@ export class HotelAgreementDraftsService {
       stayStart: draft.stayStart,
       stayEnd: draft.stayEnd,
       notes: draft.notes,
-      groupCode: draft.groupCode,
-      assignmentStatus: draft.groupCode ? "ASSIGNED" : "UNASSIGNED",
-      assignedAt: draft.assignedAt,
+      groupCode: undefined,
+      assignmentStatus: remainingPax !== undefined && remainingPax <= 0 ? "Assigned" : (assignedGroups && assignedGroups.length > 0 ? "Partially Assigned" : "Unassigned"),
+      assignedAt: undefined,
       createdAt: draft.createdAt,
       updatedAt: draft.updatedAt,
     };
@@ -1119,9 +1046,9 @@ export class HotelAgreementDraftsService {
       stayStart: toIsoDateOnly(draft.stayStart),
       stayEnd: toIsoDateOnly(draft.stayEnd),
       notes: draft.notes ?? undefined,
-      groupCode: draft.group?.code,
-      assignmentStatus: draft.group ? "ASSIGNED" : "UNASSIGNED",
-      assignedAt: toIsoDateTime(draft.assignedAt),
+      groupCode: undefined,
+      assignmentStatus: remainingPax !== undefined && remainingPax <= 0 ? "Assigned" : (assignedGroups && assignedGroups.length > 0 ? "Partially Assigned" : "Unassigned"),
+      assignedAt: undefined,
       createdAt: draft.createdAt.toISOString(),
       updatedAt: draft.updatedAt.toISOString(),
     };
