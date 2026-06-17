@@ -367,7 +367,7 @@ function buildCompactAgreementSummary(group: GroupData, city: AgreementCityKey):
         if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
           return false;
         }
-        return Math.max(startMs, Date.parse(hStart)) <= Math.min(endMs, Date.parse(hEnd));
+        return Math.max(startMs, Date.parse(hStart)) < Math.min(endMs, Date.parse(hEnd));
       });
       
       const sum = periodHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
