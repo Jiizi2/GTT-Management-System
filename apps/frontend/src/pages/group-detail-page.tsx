@@ -59,6 +59,9 @@ const LazyGroupEditModal = lazy(async () => ({
 const LazyMusyrifModal = lazy(async () => ({
   default: (await import("../components/group-detail-modals")).MusyrifModal,
 }));
+const LazyUnlinkGroupConfirmModal = lazy(async () => ({
+  default: (await import("../components/group-detail-modals")).UnlinkGroupConfirmModal,
+}));
 const LazyNoteModal = lazy(async () => ({
   default: (await import("../components/group-detail-modals")).NoteModal,
 }));
@@ -443,13 +446,17 @@ export function GroupDetail({
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
+  const [unlinkingGroup, setUnlinkingGroup] = useState<GroupData | null>(null);
+
   const isEditModalOpen = editingIndex !== null && editScheduleForm !== null;
   const deletingItem = deletingIndex !== null ? (itineraryItems[deletingIndex] ?? null) : null;
   const isDeleteModalOpen = deletingItem !== null;
+  const isUnlinkModalOpen = unlinkingGroup !== null;
   const hasOpenModal =
     isScheduleModalOpen ||
     isEditModalOpen ||
     isDeleteModalOpen ||
+    isUnlinkModalOpen ||
     isNoteModalOpen ||
     isMusyrifModalOpen ||
     isDeleteGroupModalOpen ||
@@ -471,6 +478,7 @@ export function GroupDetail({
         setIsMusyrifModalOpen(false);
         setIsDeleteGroupModalOpen(false);
         setIsGroupEditModalOpen(false);
+        setUnlinkingGroup(null);
       }
     };
 
@@ -700,6 +708,7 @@ export function GroupDetail({
     setIsNoteModalOpen(false);
     setIsDeleteGroupModalOpen(false);
     setIsGroupEditModalOpen(false);
+    setUnlinkingGroup(null);
   }, [applyScheduleHotelAutofill, group.code, group.itinerary, group.name, group.notes, group.musyrif]);
 
   const detailKickerClassName = "text-xs font-semibold uppercase tracking-[0.14em] text-on-surface-variant/80";
@@ -1041,6 +1050,21 @@ export function GroupDetail({
     return { ok: true };
   };
 
+  const handleOpenUnlinkModal = (childGroup: GroupData) => {
+    setUnlinkingGroup(childGroup);
+  };
+
+  const handleCloseUnlinkModal = () => {
+    setUnlinkingGroup(null);
+  };
+
+  const handleConfirmUnlink = () => {
+    if (unlinkingGroup) {
+      onSaveGroup({ ...unlinkingGroup, parentGroupId: null }, unlinkingGroup.code);
+      setUnlinkingGroup(null);
+    }
+  };
+
   const handleSaveMusyrif = ({ name, phone }: { name: string; phone: string }) => {
     const nextMusyrif: Musyrif = {
       ...musyrifProfile,
@@ -1256,11 +1280,19 @@ export function GroupDetail({
                       <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
                       <span>Terhubung:</span>
                       {familyGroups.filter(g => g.code !== group.code).map((g, index) => (
-                        <span key={g.code}>
+                        <span key={g.code} className="inline-flex items-center gap-1">
                           {index > 0 && ", "}
                           <Link to={`/groups/${g.code}`} className="font-bold text-slate-900 hover:underline">
                             {g.code}
                           </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenUnlinkModal(g)}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
+                            title="Pisahkan grup ini"
+                          >
+                            <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
+                          </button>
                         </span>
                       ))}
                     </span>
@@ -1878,6 +1910,14 @@ export function GroupDetail({
               groups={groups}
               onClose={handleCloseGroupEditModal}
               onSave={handleSaveGroupEdit}
+            />
+          ) : null}
+
+          {isUnlinkModalOpen && unlinkingGroup ? (
+            <LazyUnlinkGroupConfirmModal
+              groupCode={unlinkingGroup.code}
+              onClose={handleCloseUnlinkModal}
+              onConfirm={handleConfirmUnlink}
             />
           ) : null}
 

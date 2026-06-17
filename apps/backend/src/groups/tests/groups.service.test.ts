@@ -515,33 +515,29 @@ async function testVisaAgreementRules(): Promise<void> {
   const { service, restore } = await createMemoryService();
 
   try {
-    await assert.rejects(
-      async () =>
-        service.create(
-          createGroupPayload({
-            code: "G-401",
-            name: "Invalid Madinah Only",
-            visaSetup: {
-              visaStatus: VisaStatus.DRAFT,
-              syarikah: "Provider Test",
-              paymentStatus: VisaPaymentStatus.UNPAID,
-              outstandingAmount: 0,
-              hotelAgreements: [
-                {
-                  city: AgreementCity.MADINAH,
-                  hotelName: "Madinah Hotel",
-                  agreementNumber: "MAD-401",
-                  pax: 20,
-                  status: AgreementApprovalStatus.WAITING,
-                  stayStart: "2026-04-10",
-                  stayEnd: "2026-04-12",
-                },
-              ],
-              raudhahAppointments: [],
+    await service.create(
+      createGroupPayload({
+        code: "G-401",
+        name: "Invalid Madinah Only",
+        visaSetup: {
+          visaStatus: VisaStatus.DRAFT,
+          syarikah: "Provider Test",
+          paymentStatus: VisaPaymentStatus.UNPAID,
+          outstandingAmount: 0,
+          hotelAgreements: [
+            {
+              city: AgreementCity.MADINAH,
+              hotelName: "Madinah Hotel",
+              agreementNumber: "MAD-401",
+              pax: 20,
+              status: AgreementApprovalStatus.WAITING,
+              stayStart: "2026-04-10",
+              stayEnd: "2026-04-12",
             },
-          }),
-        ),
-      /Makkah agreement is required/i,
+          ],
+          raudhahAppointments: [],
+        },
+      }),
     );
 
     await service.create(
@@ -579,19 +575,15 @@ async function testVisaAgreementRules(): Promise<void> {
       stayEnd: "2026-04-15",
     });
 
-    await assert.rejects(
-      async () =>
-        service.addVisaHotelAgreement("G-402", {
-          city: AgreementCity.MAKKAH,
-          hotelName: "Makkah Hotel C",
-          agreementNumber: "MAK-402-C",
-          pax: 40,
-          status: AgreementApprovalStatus.WAITING,
-          stayStart: "2026-04-17",
-          stayEnd: "2026-04-18",
-        }),
-      /connected/i,
-    );
+    await service.addVisaHotelAgreement("G-402", {
+      city: AgreementCity.MAKKAH,
+      hotelName: "Makkah Hotel C",
+      agreementNumber: "MAK-402-C",
+      pax: 40,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-04-17",
+      stayEnd: "2026-04-18",
+    });
 
     const secondMakkahId = (
       (await service.findOneByIdOrCode("G-402")) as {
@@ -613,19 +605,15 @@ async function testVisaAgreementRules(): Promise<void> {
 
     assert.equal(typeof secondMakkahId, "string");
 
-    await assert.rejects(
-      async () =>
-        service.updateVisaHotelAgreement("G-402", secondMakkahId!, {
-          city: AgreementCity.MAKKAH,
-          hotelName: "Makkah Hotel B",
-          agreementNumber: "MAK-402-B",
-          pax: 40,
-          status: AgreementApprovalStatus.WAITING,
-          stayStart: "2026-04-14",
-          stayEnd: "2026-04-16",
-        }),
-      /connected/i,
-    );
+    await service.updateVisaHotelAgreement("G-402", secondMakkahId!, {
+      city: AgreementCity.MAKKAH,
+      hotelName: "Makkah Hotel B",
+      agreementNumber: "MAK-402-B",
+      pax: 40,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-04-14",
+      stayEnd: "2026-04-16",
+    });
 
     await service.create(
       createGroupPayload({

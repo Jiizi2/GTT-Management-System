@@ -305,9 +305,7 @@ export type HotelAgreementDraft = {
   stayStartIso: string;
   stayEndIso: string;
   notes: string;
-  groupCode?: string;
   assignmentStatus: AgreementDraftAssignmentStatus;
-  assignedAtIso?: string;
   createdAtIso: string;
   updatedAtIso: string;
 };
@@ -2531,7 +2529,14 @@ export function resolveGroupCompleteness(group: GroupData): GroupCompletenessSum
   const coversItinerary =
     isContinuous && periods[0].startIso === earliestIsoDate && periods[0].endIso === latestIsoDate;
 
-  if (
+  if (hasAnyAgreement && !isContinuous) {
+    issues.push({
+      key: "date-mismatch",
+      severity: "warning",
+      label: "Dates",
+      message: "Terdapat tanggal kosong (gap) antar agreement hotel.",
+    });
+  } else if (
     hasAnyAgreement &&
     hasItinerary &&
     earliestIsoDate &&

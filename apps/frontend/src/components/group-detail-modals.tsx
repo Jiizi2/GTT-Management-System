@@ -253,6 +253,80 @@ export function MusyrifModal({
   );
 }
 
+export function UnlinkGroupConfirmModal({
+  groupCode,
+  onClose,
+  onConfirm,
+}: {
+  groupCode: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+
+  return (
+    <ModalPortal>
+      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+        <div
+          ref={dialogRef}
+          className={`${modalShellClassName} w-full max-w-xl`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="unlink-group-title"
+          tabIndex={-1}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className={modalHeaderBarClassName}>
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                link_off
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="serene-dialog-close-shell hover:border-brand-primary hover:text-brand-primary"
+              onClick={onClose}
+              aria-label="Close unlink confirmation popup"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                close
+              </span>
+            </button>
+          </div>
+
+          <div className={modalBodyClassName}>
+            <h2 id="unlink-group-title" className="text-2xl font-bold tracking-tight text-slate-900">
+              Pisahkan dari grup utama?
+            </h2>
+            <div className="mt-2 text-sm leading-relaxed text-slate-600">
+              <p>
+                Anda akan melepaskan grup <strong>{groupCode}</strong> menjadi mandiri. Hubungan (Sharing Musyrif & Itinerary) dengan grup utamanya akan terputus.
+              </p>
+            </div>
+
+            <div className="mt-8 flex flex-col-reverse justify-end gap-3 sm:flex-row">
+              <button type="button" className={modalSecondaryButtonClassName} onClick={onClose}>
+                Batalkan
+              </button>
+              <button
+                type="button"
+                className={modalDangerBrandButtonClassName}
+                onClick={() => {
+                  onConfirm();
+                  onClose();
+                }}
+              >
+                Pisahkan Grup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}
+
 export function DeleteConfirmModal({
   item,
   onClose,

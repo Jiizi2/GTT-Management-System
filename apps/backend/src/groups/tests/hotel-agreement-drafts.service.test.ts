@@ -86,7 +86,7 @@ async function testCreateUpdateDeleteDraft(): Promise<void> {
     };
 
     assert.equal(created.agreementNumber, "AG-DRAFT-001");
-    assert.equal(created.assignmentStatus, "UNASSIGNED");
+    assert.equal(created.assignmentStatus, "Unassigned");
 
     const updated = (await draftsService.update(created.id, {
       city: AgreementCity.MAKKAH,
@@ -136,11 +136,11 @@ async function testAssignDraftToGroup(): Promise<void> {
       groupCode: "DRAFT-G-001",
     })) as {
       assignmentStatus: string;
-      groupCode: string;
+      assignedGroups: Array<{ groupCode: string }>;
     };
 
-    assert.equal(assigned.assignmentStatus, "ASSIGNED");
-    assert.equal(assigned.groupCode, "DRAFT-G-001");
+    assert.equal(assigned.assignmentStatus, "Assigned");
+    assert.equal(assigned.assignedGroups[0]?.groupCode, "DRAFT-G-001");
 
     const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as {
       visaSetup?: {
@@ -182,11 +182,11 @@ async function testAssignDraftToGroup(): Promise<void> {
       groupCode: "DRAFT-G-002",
     })) as {
       assignmentStatus: string;
-      groupCode: string;
+      assignedGroups: Array<{ groupCode: string }>;
     };
 
-    assert.equal(assignedMadinah.assignmentStatus, "ASSIGNED");
-    assert.equal(assignedMadinah.groupCode, "DRAFT-G-002");
+    assert.equal(assignedMadinah.assignmentStatus, "Assigned");
+    assert.equal(assignedMadinah.assignedGroups[0]?.groupCode, "DRAFT-G-002");
 
     const madinahFirstGroup = (await groupsService.findOneByIdOrCode(
       "DRAFT-G-002",
@@ -236,11 +236,11 @@ async function testUnassignDraftFromGroup(): Promise<void> {
 
     const unassigned = (await draftsService.unassign(created.id)) as {
       assignmentStatus: string;
-      groupCode?: string;
+      assignedGroups: Array<unknown>;
     };
 
-    assert.equal(unassigned.assignmentStatus, "UNASSIGNED");
-    assert.equal(unassigned.groupCode, undefined);
+    assert.equal(unassigned.assignmentStatus, "Unassigned");
+    assert.equal(unassigned.assignedGroups.length, 0);
 
     const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as {
       visaSetup?: {
@@ -347,7 +347,7 @@ async function testMultiGroupAssignment(): Promise<void> {
       assignedGroups: Array<{ groupCode: string; pax: number }>;
     };
 
-    assert.equal(assignedA.assignmentStatus, "UNASSIGNED"); // Not fully assigned yet
+    assert.equal(assignedA.assignmentStatus, "Partially Assigned"); // Not fully assigned yet
     assert.equal(assignedA.remainingPax, 7);
     assert.equal(assignedA.assignedGroups.length, 1);
     assert.equal(assignedA.assignedGroups[0].groupCode, "GROUP-A");
@@ -367,7 +367,7 @@ async function testMultiGroupAssignment(): Promise<void> {
       assignedGroups: Array<{ groupCode: string; pax: number }>;
     };
 
-    assert.equal(assignedB.assignmentStatus, "ASSIGNED"); // Fully assigned now!
+    assert.equal(assignedB.assignmentStatus, "Assigned"); // Fully assigned now!
     assert.equal(assignedB.remainingPax, 0);
     assert.equal(assignedB.assignedGroups.length, 2);
 
@@ -389,7 +389,7 @@ async function testMultiGroupAssignment(): Promise<void> {
       assignedGroups: Array<{ groupCode: string; pax: number }>;
     };
 
-    assert.equal(unassignedA.assignmentStatus, "UNASSIGNED"); // Back to unassigned because remaining capacity is > 0
+    assert.equal(unassignedA.assignmentStatus, "Partially Assigned"); // Back to partially assigned because remaining capacity is > 0 and GROUP-B is still assigned
     assert.equal(unassignedA.remainingPax, 23);
     assert.equal(unassignedA.assignedGroups.length, 1);
     assert.equal(unassignedA.assignedGroups[0].groupCode, "GROUP-B");

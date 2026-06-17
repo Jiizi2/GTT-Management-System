@@ -142,7 +142,6 @@ model Group {
   auditLogs          GroupAuditLog[]
   invoiceClients     InvoiceClient[]
   invoices           Invoice[]
-  agreementDrafts    HotelAgreementDraft[]
   parentGroupId      String?
   parentGroup        Group?                @relation("GroupToGroup", fields: [parentGroupId], references: [id], onDelete: SetNull)
   childGroups        Group[]               @relation("GroupToGroup")
@@ -322,7 +321,6 @@ model VisaHotelAgreement {
 
 model HotelAgreementDraft {
   id              String                  @id @default(cuid())
-  groupId         String?
   city            AgreementCity
   agentName       String?
   hotelName       String
@@ -332,12 +330,9 @@ model HotelAgreementDraft {
   stayStart       DateTime
   stayEnd         DateTime
   notes           String?
-  assignedAt      DateTime?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
-  group           Group?                  @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
-  @@index([groupId])
   @@index([agreementNumber])
   @@index([city, stayStart])
 }
