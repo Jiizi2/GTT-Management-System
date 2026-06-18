@@ -314,12 +314,12 @@ function testGenerateWhatsappCopyText(): void {
 
   const copiedText = generateWhatsappCopyText(group);
   
-  assert.equal(copiedText.includes("NEED MOFA VISA ONLY GROUP CODE"), true);
-  assert.equal(copiedText.includes("902133273 ( 05 ) PAX"), true);
+  assert.equal(copiedText.includes("*NEED MOFA VISA ONLY GROUP CODE*"), true);
+  assert.equal(copiedText.includes("902133273 *( 05 PAX )*"), true);
   assert.equal(copiedText.includes("DOH - JED / QR1190 / 07.30 / 22 MAR 2026"), true);
   assert.equal(copiedText.includes("JED - CGK / SV822 / 12.55 / 14 APR 2026"), true);
-  assert.equal(copiedText.includes("BRN MAKKAH\nSwissotel\n28/03/2026 - 31/03/2026\n18014399405337794"), true);
-  assert.equal(copiedText.includes("BRN MADINAH\nBurj Almarjan\n23/03/2026 - 28/03/2026\n15762599591351269"), true);
+  assert.equal(copiedText.includes("🏨 *BRN MAKKAH*\n*Swissotel*\n📅 28/03/2026 - 31/03/2026\n└─ 902133273: 18014399405337794 (40 PAX)"), true);
+  assert.equal(copiedText.includes("🏨 *BRN MADINAH*\n*Burj Almarjan*\n📅 23/03/2026 - 28/03/2026\n└─ 902133273: 15762599591351269 (40 PAX)"), true);
 
   // Test with familyGroups
   const childGroup: GroupData = {
@@ -328,8 +328,10 @@ function testGenerateWhatsappCopyText(): void {
     pax: 12,
   };
   const familyText = generateWhatsappCopyText(group, [group, childGroup]);
-  assert.equal(familyText.includes("NEED MOFA VISA ONLY GROUP CODE"), true);
-  assert.equal(familyText.includes("902133273 - 902133274 ( 17 ) PAX"), true);
+  assert.equal(familyText.includes("*NEED MOFA VISA ONLY GROUP CODE*"), true);
+  assert.equal(familyText.includes("├─ 902133273 (5 PAX)"), true);
+  assert.equal(familyText.includes("└─ 902133274 (12 PAX)"), true);
+  assert.equal(familyText.includes("*TOTAL: 17 PAX*"), true);
 
   // Test with completely empty data (should yield placeholders)
   const emptyGroup: GroupData = {
@@ -348,11 +350,11 @@ function testGenerateWhatsappCopyText(): void {
   };
 
   const emptyText = generateWhatsappCopyText(emptyGroup);
-  assert.equal(emptyText.includes("NEED MOFA VISA ONLY GROUP CODE"), true);
-  assert.equal(emptyText.includes("[GROUP_CODE] ( 00 ) PAX"), true);
+  assert.equal(emptyText.includes("*NEED MOFA VISA ONLY GROUP CODE*"), true);
+  assert.equal(emptyText.includes("[GROUP_CODE] *( 00 PAX )*"), true);
   assert.equal(emptyText.includes("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]"), true);
-  assert.equal(emptyText.includes("BRN MAKKAH\n[HOTEL MAKKAH NAME]\n[START_DATE] - [END_DATE]\n[BRN_CODE]"), true);
-  assert.equal(emptyText.includes("BRN MADINAH\n[HOTEL MADINAH NAME]\n[START_DATE] - [END_DATE]\n[BRN_CODE]"), true);
+  assert.equal(emptyText.includes("🏨 *BRN MAKKAH*\n*[HOTEL MAKKAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
+  assert.equal(emptyText.includes("🏨 *BRN MADINAH*\n*[HOTEL MADINAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
 }
 
 describe("visa-domain", () => {
