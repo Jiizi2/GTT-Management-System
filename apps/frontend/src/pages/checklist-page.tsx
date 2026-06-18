@@ -522,22 +522,23 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         ? `${scheduleDate} | HOTEL PICKUP ${formatScheduleTime(checklistItem.hotelPickupRequestTime)} | FLIGHT ${formatScheduleTime(checklistItem.departureFlightTime || checklistItem.scheduledTime)}`
         : `${scheduleDate} | ${scheduleTime}`;
     const driverLines = assignment.drivers.flatMap((driver, index) => [
-      `DRIVER NAME ${index + 1} : ${(driver.name || "-").toUpperCase()}`,
-      `DRIVER PHONE ${index + 1} : ${driver.phone || "-"}`,
-      `DRIVER PLATE ${index + 1} : ${(driver.plateNumber || "-").toUpperCase()}`,
+      `👨🏻‍✈️ DRIVER NAME ${index + 1}  : ${(driver.name || "-").toUpperCase()}`,
+      `📱 DRIVER PHONE ${index + 1} : ${driver.phone || "-"}`,
+      `🪪 DRIVER PLATE ${index + 1} : ${(driver.plateNumber || "-").toUpperCase()}`,
+      ...(index < assignment.drivers.length - 1 ? [""] : []),
     ]);
 
     const payload = [
-      "*GROUP DETAILS*",
+      "📝 *GROUP DETAILS*",
       "```",
-      `GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
-      `GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
-      `TOTAL BUS    : ${checklistItem.requiredBusCount}`,
-      `TRIP         : ${tripLabel}`,
-      `SCHEDULE     : ${scheduleDetails}`,
+      `🏷️ GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
+      `👥 GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
+      `🚌 TOTAL BUS    : ${checklistItem.requiredBusCount}`,
+      `🛣️ TRIP         : ${tripLabel}`,
+      `⏰ SCHEDULE     : ${scheduleDetails}`,
       "```",
       "",
-      "*DRIVER DETAILS*",
+      "👨🏻‍✈️ *DRIVER DETAILS*",
       "```",
       ...driverLines,
       "```",
@@ -577,13 +578,13 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         ? `${scheduleDate} | HOTEL PICKUP ${formatScheduleTime(checklistItem.hotelPickupRequestTime)} | FLIGHT ${formatScheduleTime(checklistItem.departureFlightTime || checklistItem.scheduledTime)}`
         : `${scheduleDate} | ${scheduleTime}`;
     const payload = [
-      "*GROUP DETAILS*",
+      "📝 *GROUP DETAILS*",
       "```",
-      `GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
-      `GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
-      `TOTAL BUS    : ${checklistItem.requiredBusCount}`,
-      `TRIP         : ${tripLabel}`,
-      `SCHEDULE     : ${scheduleDetails}`,
+      `🏷️ GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
+      `👥 GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
+      `🚌 TOTAL BUS    : ${checklistItem.requiredBusCount}`,
+      `🛣️ TRIP         : ${tripLabel}`,
+      `⏰ SCHEDULE     : ${scheduleDetails}`,
       "```",
     ].join("\n");
 

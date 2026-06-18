@@ -218,16 +218,21 @@ export function generateWhatsappCopyText(
     ? familyGroups.reduce((acc, g) => acc + g.pax, 0)
     : (group.pax || 0);
   const paxCount = String(combinedPax).padStart(2, "0");
-  const combinedGroupCode = familyGroups && familyGroups.length > 1
-    ? familyGroups.map(g => g.code).join(" - ")
-    : (group.code || "[GROUP_CODE]");
-
   const lines: string[] = [];
-  lines.push(`NEED MOFA ${visaType} GROUP CODE`);
-  lines.push(`${combinedGroupCode} ( ${paxCount} ) PAX`);
+  lines.push(`*NEED MOFA ${visaType} GROUP CODE*`);
+
+  if (familyGroups && familyGroups.length > 1) {
+    familyGroups.forEach((g, i) => {
+      const prefix = i === familyGroups.length - 1 ? "└─" : "├─";
+      lines.push(`${prefix} ${g.code || "[GROUP_CODE]"} (${g.pax || 0} PAX)`);
+    });
+    lines.push(`*TOTAL: ${paxCount} PAX*`);
+  } else {
+    lines.push(`${group.code || "[GROUP_CODE]"} *( ${paxCount} PAX )*`);
+  }
   lines.push("");
 
-  lines.push("ARRIVAL");
+  lines.push("✈️ *ARRIVAL*");
   const flightItems = (group.itinerary || []).filter(
     (item) => item.category?.toLowerCase() === "arrival" || item.category?.toLowerCase() === "departure"
   );
@@ -317,9 +322,9 @@ export function generateWhatsappCopyText(
 
   const printHotels = (hotels: HotelEntry[], defaultName: string) => {
     if (hotels.length === 0) {
-      lines.push(defaultName);
-      lines.push("[START_DATE] - [END_DATE]");
-      lines.push("[GROUP_CODE]: [BRN_CODE] ([PAX] PAX)");
+      lines.push(`*${defaultName}*`);
+      lines.push("📅 [START_DATE] - [END_DATE]");
+      lines.push("└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)");
       return;
     }
 
@@ -330,24 +335,32 @@ export function generateWhatsappCopyText(
       grouped.get(key)!.push(h);
     }
 
+    let isFirstGroup = true;
     for (const entries of grouped.values()) {
+      if (!isFirstGroup) {
+        lines.push("");
+      }
+      isFirstGroup = false;
+
       const first = entries[0];
-      lines.push(first.hotelName?.trim() || defaultName);
+      lines.push(`*${first.hotelName?.trim() || defaultName}*`);
       const start = formatBrnDate(first.stayStartIso);
       const end = formatBrnDate(first.stayEndIso);
-      lines.push(`${start} - ${end}`);
-      for (const e of entries) {
+      lines.push(`📅 ${start} - ${end}`);
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
         const brnCode = e.agreementNumber?.trim() || "[BRN_CODE]";
-        lines.push(`${e.groupCode}: ${brnCode} (${e.pax} PAX)`);
+        const prefix = i === entries.length - 1 ? "└─" : "├─";
+        lines.push(`${prefix} ${e.groupCode}: ${brnCode} (${e.pax} PAX)`);
       }
     }
   };
 
-  lines.push("BRN MAKKAH");
+  lines.push("🏨 *BRN MAKKAH*");
   printHotels(makkahHotels, "[HOTEL MAKKAH NAME]");
   lines.push("");
 
-  lines.push("BRN MADINAH");
+  lines.push("🏨 *BRN MADINAH*");
   printHotels(madinahHotels, "[HOTEL MADINAH NAME]");
 
   return lines.join("\n");
