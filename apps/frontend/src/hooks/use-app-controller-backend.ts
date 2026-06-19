@@ -46,6 +46,10 @@ import {
   parseBackendGroupRecordArray,
   type BackendGroupRecord,
 } from "./groups-contract";
+export {
+  getVisaAgreementValidationError,
+  sortHotelsByStayStart,
+} from "./visa-agreement-validation";
 
 export type GroupFetchProjection = "summary" | "detail";
 
@@ -429,75 +433,6 @@ function toIsoDateWithAddedDays(isoDate: string, dayOffset: number): string | nu
   }
 
   return new Date(baseMs + dayOffset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-export function sortHotelsByStayStart(hotels: GroupAgreementHotel[]): GroupAgreementHotel[] {
-  return [...hotels].sort((left, right) => {
-    const dateDiff = left.stayStartIso.localeCompare(right.stayStartIso);
-    if (dateDiff !== 0) {
-      return dateDiff;
-    }
-
-    return left.id.localeCompare(right.id);
-  });
-}
-
-function getCityAgreementContinuityError(
-  cityLabel: "Makkah" | "Madinah",
-  hotels: GroupAgreementHotel[],
-): string | null {
-  if (hotels.length < 2) {
-    return null;
-  }
-
-  const sortedHotels = sortHotelsByStayStart(hotels);
-  for (let index = 0; index < sortedHotels.length; index += 1) {
-    const currentHotel = sortedHotels[index];
-    const currentStartMs = parseIsoDateToUtcMiddayMs(currentHotel.stayStartIso);
-    const currentEndMs = parseIsoDateToUtcMiddayMs(currentHotel.stayEndIso);
-    if (currentStartMs === null || currentEndMs === null) {
-      return `Tanggal agreement ${cityLabel} tidak valid.`;
-    }
-
-    if (currentEndMs < currentStartMs) {
-      return `Tanggal akhir agreement ${cityLabel} harus setelah atau sama dengan tanggal mulai.`;
-    }
-
-    if (index === 0) {
-      continue;
-    }
-
-    const previousHotel = sortedHotels[index - 1];
-    const expectedNextStartIso = toIsoDateWithAddedDays(previousHotel.stayEndIso, 1);
-    if (!expectedNextStartIso) {
-      return `Tanggal agreement ${cityLabel} tidak valid.`;
-    }
-
-    if (currentHotel.stayStartIso !== expectedNextStartIso) {
-      return `Tanggal agreement ${cityLabel} harus tersambung. Setelah ${previousHotel.stayEndIso} wajib mulai ${expectedNextStartIso}.`;
-    }
-  }
-
-  return null;
-}
-
-export function getVisaAgreementValidationError(visaSetup: GroupVisaSetup): string | null {
-  const totalHotels = visaSetup.makkahHotels.length + visaSetup.madinahHotels.length;
-  if (totalHotels > 0 && visaSetup.makkahHotels.length === 0) {
-    return "Agreement Makkah wajib diisi minimal 1 hotel.";
-  }
-
-  const makkahContinuityError = getCityAgreementContinuityError("Makkah", visaSetup.makkahHotels);
-  if (makkahContinuityError) {
-    return makkahContinuityError;
-  }
-
-  const madinahContinuityError = getCityAgreementContinuityError("Madinah", visaSetup.madinahHotels);
-  if (madinahContinuityError) {
-    return madinahContinuityError;
-  }
-
-  return null;
 }
 
 function readNumber(value: unknown, fallback: number): number {
