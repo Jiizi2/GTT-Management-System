@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, Logger } from "@nestjs/common";
 import { AgreementCity } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
 
@@ -44,14 +44,16 @@ function validateAndSortHotelAgreementDateSegments(
       const cityLabel = toAgreementCityLabel(agreement.city);
 
       if (stayStartMs === null || stayEndMs === null) {
-        throw new BadRequestException(
-          `${cityLabel} agreement dates must use YYYY-MM-DD format.`,
+        Logger.warn(
+          `${cityLabel} agreement dates must use YYYY-MM-DD format. Received: ${stayStart} to ${stayEnd}`,
+          "HotelAgreementValidation"
         );
       }
 
-      if (stayEndMs < stayStartMs) {
-        throw new BadRequestException(
-          `${cityLabel} agreement end date must be on or after the start date.`,
+      if (stayStartMs !== null && stayEndMs !== null && stayEndMs < stayStartMs) {
+        Logger.warn(
+          `${cityLabel} agreement end date must be on or after the start date. Received: ${stayStart} to ${stayEnd}`,
+          "HotelAgreementValidation"
         );
       }
 
@@ -59,8 +61,8 @@ function validateAndSortHotelAgreementDateSegments(
         ...agreement,
         stayStart,
         stayEnd,
-        stayStartMs,
-        stayEndMs,
+        stayStartMs: stayStartMs ?? 0,
+        stayEndMs: stayEndMs ?? 0,
       };
     })
     .sort((left, right) => {

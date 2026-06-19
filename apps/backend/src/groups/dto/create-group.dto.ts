@@ -3,9 +3,11 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupStatus,
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
+  BusStatus,
 } from "@prisma/client";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
@@ -299,6 +301,11 @@ export class CreateVisaSetupDto {
   @IsDateString()
   issuedDate?: string;
 
+  @ApiPropertyOptional({ enum: BusStatus, example: BusStatus.VISA_ONLY })
+  @IsOptional()
+  @IsEnum(BusStatus)
+  busStatus?: BusStatus;
+
   @ApiProperty({ example: "Nusuk Premium" })
   @IsString()
   @IsNotEmpty()
@@ -442,10 +449,9 @@ export class CreateGroupDto {
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ example: "Active" })
-  @IsString()
-  @IsNotEmpty()
-  status!: string;
+  @ApiProperty({ enum: GroupStatus, example: GroupStatus.ACTIVE })
+  @IsEnum(GroupStatus)
+  status!: GroupStatus;
 
   @ApiProperty({ example: "2026-04-12" })
   @IsDateString()

@@ -73,5 +73,9 @@ export function resolveConfiguredNodeEnv(configService: ConfigService | undefine
 export function resolveConfiguredDataSource(
   configService: ConfigService | undefined,
 ): RuntimeDataSource {
+  const nodeEnv = resolveConfiguredNodeEnv(configService);
+  if (nodeEnv === "production") {
+    return "prisma";
+  }
   return resolveDataSource(resolveConfiguredString(configService, "DATA_SOURCE"));
 }

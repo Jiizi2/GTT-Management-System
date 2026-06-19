@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { GroupTone, Prisma } from "@prisma/client";
+import { GroupStatus, GroupTone, Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../../config/app-config";
 import { createStructuredLogger } from "../../logging/create-structured-logger";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -408,7 +408,7 @@ export class GroupsService {
     return {
       code: normalizedCode,
       name: groupName,
-      status: "Entry Only",
+      status: GroupStatus.INCOMPLETE,
       arrivalDate,
       returnDate,
       tone: GroupTone.ACTIVE,

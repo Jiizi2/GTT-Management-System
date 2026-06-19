@@ -660,7 +660,7 @@ function AgreementInboxDraftAssignmentList({
 }
 
 export function VisaTrackingDetailScreen({
-  row: initialRow,
+  row,
   groups,
   onBack,
   onDeleteGroup,
@@ -693,68 +693,6 @@ export function VisaTrackingDetailScreen({
   onClearRaudhahAppointment: (groupCode: string) => void;
   onUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
 }) {
-  const [activeGroupCode, setActiveGroupCode] = useState(initialRow.groupCode);
-  const [unlinkingGroup, setUnlinkingGroup] = useState<GroupData | null>(null);
-  const allVisaRows = useMemo(() => Domain.buildVisaTrackingRowsFromGroups(groups), [groups]);
-  const activeRow = useMemo(() => {
-    return allVisaRows.find((r) => r.groupCode === activeGroupCode) ?? initialRow;
-  }, [allVisaRows, activeGroupCode, initialRow]);
-
-  // Find family groups for tabs
-  const familyGroups = useMemo(() => {
-    const currentGroup = groups.find((item) => item.code === activeRow.groupCode) ?? null;
-    if (!currentGroup) return [];
-    const parent = currentGroup.parentGroupId
-      ? (groups.find((g) => g.id === currentGroup.parentGroupId || g.code === currentGroup.parentGroupId) ?? null)
-      : currentGroup;
-    if (!parent) return [currentGroup];
-    const parentKey = parent.id || parent.code;
-    if (!parentKey) return [currentGroup];
-    const children = groups.filter(
-      (g) => g.parentGroupId && (g.parentGroupId === parent.id || g.parentGroupId === parent.code) && g.code !== parent.code
-    );
-    return [parent, ...children];
-  }, [groups, activeRow.groupCode]);
-
-  // Merged row for family groups
-  const mergedFamilyRow = useMemo(() => {
-    if (familyGroups.length <= 1) {
-      return activeRow;
-    }
-    
-    const parent = familyGroups[0];
-    const parentRow = allVisaRows.find(r => r.groupCode === parent.code) ?? activeRow;
-    
-    // Combine pax
-    const totalPax = familyGroups.reduce((sum, g) => sum + g.pax, 0);
-
-    // Combine hotels and tag with ownerGroupCode
-    const makkahHotels: GroupAgreementHotel[] = [];
-    const madinahHotels: GroupAgreementHotel[] = [];
-    
-    for (const g of familyGroups) {
-      const gRow = allVisaRows.find(r => r.groupCode === g.code);
-      const gData = groups.find(r => r.code === g.code);
-      if (gRow && gData) {
-        const mHotels = gData.visaSetup?.makkahHotels.map(h => ({ ...h, ownerGroupCode: g.code })) || [];
-        const madHotels = gData.visaSetup?.madinahHotels.map(h => ({ ...h, ownerGroupCode: g.code })) || [];
-        makkahHotels.push(...mHotels);
-        madinahHotels.push(...madHotels);
-      }
-    }
-    
-    return {
-      ...parentRow,
-      pax: totalPax,
-      makkahVerified: makkahHotels.reduce((sum, h) => sum + h.pax, 0),
-      madinahVerified: madinahHotels.reduce((sum, h) => sum + h.pax, 0),
-      makkahHotels,
-      madinahHotels,
-    };
-  }, [familyGroups, activeRow, allVisaRows, groups]);
-
-  // Shadow row prop with mergedFamilyRow
-  const row = mergedFamilyRow;
 
 
   const queryClient = useQueryClient();
@@ -762,8 +700,8 @@ export function VisaTrackingDetailScreen({
   const [paymentStatus, setPaymentStatus] = useState<VisaPaymentStatus>(row.paymentStatus);
 
   useEffect(() => {
-    setPaymentStatus(activeRow.paymentStatus);
-  }, [activeRow.groupCode, activeRow.paymentStatus]);
+    setPaymentStatus(row.paymentStatus);
+  }, [row.groupCode, row.paymentStatus]);
 
   const [activeModal, setActiveModal] = useState<
     "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | "visa-type" | null
@@ -797,7 +735,6 @@ export function VisaTrackingDetailScreen({
     isGroupEditModalOpen ||
     isDeleteGroupModalOpen ||
     isClearRaudhahConfirmOpen ||
-    unlinkingGroup !== null ||
     deleteAgreementDraft !== null;
   const clearRaudhahDialogRef = useModalFocusTrap<HTMLDivElement>({
     isActive: isClearRaudhahConfirmOpen,
@@ -1081,14 +1018,7 @@ export function VisaTrackingDetailScreen({
     setHotelDraftOwnerGroupCode(null);
   };
 
-  const handleOpenUnlinkModal = (g: GroupData) => setUnlinkingGroup(g);
-  const handleCloseUnlinkModal = () => setUnlinkingGroup(null);
-  const handleConfirmUnlink = () => {
-    if (unlinkingGroup) {
-      onSaveGroup({ ...unlinkingGroup, parentGroupId: null }, unlinkingGroup.code);
-      setUnlinkingGroup(null);
-    }
-  };
+
 
   const openGroupEditModal = () => {
     if (!group) {
@@ -1191,7 +1121,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const saveHotel = (hotel: VisaHotelEditFormState) => {
-    const targetGroupCode = hotelDraftOwnerGroupCode ?? activeRow.groupCode;
+    const targetGroupCode = hotelDraftOwnerGroupCode ?? row.groupCode;
     onUpdateVisaHotel(
       targetGroupCode,
       hotelCityDraft,
@@ -1207,7 +1137,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const saveAddHotelInline = (city: "makkah" | "madinah", hotel: VisaHotelEditFormState) => {
-    onUpdateVisaHotel(activeRow.groupCode, city, hotel);
+    onUpdateVisaHotel(row.groupCode, city, hotel);
     setAddingHotelCity(null);
   };
 
@@ -1226,7 +1156,7 @@ export function VisaTrackingDetailScreen({
     try {
       await assignAgreementDraftInBackend({
         draftId: draft.id,
-        groupCode: activeRow.groupCode,
+        groupCode: row.groupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1235,7 +1165,7 @@ export function VisaTrackingDetailScreen({
       setAddingHotelCity(null);
       setDraftAssignFeedback({
         tone: "success",
-        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${activeRow.groupCode}.`,
+        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${row.groupCode}.`,
       });
     } catch (error: unknown) {
       setDraftAssignFeedback({
@@ -1259,7 +1189,7 @@ export function VisaTrackingDetailScreen({
     }
 
     if (!deleteAgreementDraft.draft) {
-      const targetGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? activeRow.groupCode;
+      const targetGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? row.groupCode;
       onDeleteVisaHotel(targetGroupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
       setDeleteAgreementDraft(null);
       return;
@@ -1270,7 +1200,7 @@ export function VisaTrackingDetailScreen({
     try {
       await unassignAgreementDraftInBackend({
         draftId: deleteAgreementDraft.draft.id,
-        groupCode: deleteAgreementDraft.agreement.ownerGroupCode ?? activeRow.groupCode,
+        groupCode: deleteAgreementDraft.agreement.ownerGroupCode ?? row.groupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1312,6 +1242,21 @@ export function VisaTrackingDetailScreen({
   };
 
   const handleCopyWhatsapp = async () => {
+    let familyGroups: GroupData[] = [];
+    if (group) {
+      const parent = group.parentGroupId
+        ? (groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId) ?? null)
+        : group;
+      if (parent) {
+        const children = groups.filter(
+          (g) => g.parentGroupId && (g.parentGroupId === parent.id || g.parentGroupId === parent.code) && g.code !== parent.code
+        );
+        familyGroups = [parent, ...children];
+      } else {
+        familyGroups = [group];
+      }
+    }
+
     const text = generateWhatsappCopyText(group ?? undefined, familyGroups);
     try {
       if (navigator.clipboard?.writeText) {
@@ -1353,7 +1298,7 @@ export function VisaTrackingDetailScreen({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closeModal();
-        setUnlinkingGroup(null);
+
         setIsGroupEditModalOpen(false);
         setIsDeleteGroupModalOpen(false);
         setIsClearRaudhahConfirmOpen(false);
@@ -1369,7 +1314,7 @@ export function VisaTrackingDetailScreen({
     setHotelDraftSeed(null);
     setIsGroupEditModalOpen(false);
     setIsDeleteGroupModalOpen(false);
-    setUnlinkingGroup(null);
+
     setDeleteAgreementDraft(null);
     setIsRaudhahTemplateCopied(false);
     setIsWhatsappCopied(false);
@@ -1428,34 +1373,8 @@ export function VisaTrackingDetailScreen({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-primary">Visa Detail</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              {familyGroups.length > 1 ? familyGroups.map(g => g.code).join(" - ") : row.groupCode}
+              {row.groupCode}
             </h1>
-            {familyGroups.length > 1 && (
-              <span className={`inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600 ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
-                <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
-                <span>Terhubung:</span>
-                {familyGroups.filter(g => g.code !== activeGroupCode).map((g, index) => (
-                  <span key={g.code} className="inline-flex items-center gap-1">
-                    {index > 0 && ", "}
-                    <button
-                      type="button"
-                      onClick={() => setActiveGroupCode(g.code)}
-                      className="font-bold text-slate-900 hover:underline"
-                    >
-                      {g.code}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenUnlinkModal(g)}
-                      className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
-                      title="Pisahkan grup ini"
-                    >
-                      <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
-                    </button>
-                  </span>
-                ))}
-              </span>
-            )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <p className="min-w-0 break-words">{group?.name ?? row.groupName}</p>
@@ -1722,11 +1641,7 @@ export function VisaTrackingDetailScreen({
                         <h3 className="truncate text-base font-semibold text-slate-900">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                         </h3>
-                        {agreement.ownerGroupCode && familyGroups.length > 1 && agreement.ownerGroupCode !== activeGroupCode && (
-                          <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-                            Milik: {agreement.ownerGroupCode}
-                          </span>
-                        )}
+
                         <span
                           className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getAgreementStatusClasses(
                             agreement.status === "Approved",
@@ -1879,11 +1794,7 @@ export function VisaTrackingDetailScreen({
                         <h3 className="truncate text-base font-semibold text-slate-900">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                         </h3>
-                        {agreement.ownerGroupCode && familyGroups.length > 1 && agreement.ownerGroupCode !== activeGroupCode && (
-                          <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-                            Milik: {agreement.ownerGroupCode}
-                          </span>
-                        )}
+
                         <span
                           className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${getAgreementStatusClasses(
                             agreement.status === "Approved",
@@ -2198,15 +2109,7 @@ export function VisaTrackingDetailScreen({
         </Suspense>
       ) : null}
 
-      {unlinkingGroup ? (
-        <Suspense fallback={<VisaDetailModalFallback />}>
-          <LazyUnlinkGroupConfirmModal
-            groupCode={unlinkingGroup.code}
-            onClose={handleCloseUnlinkModal}
-            onConfirm={handleConfirmUnlink}
-          />
-        </Suspense>
-      ) : null}
+
 
       {deleteAgreementDraft ? (
         <div

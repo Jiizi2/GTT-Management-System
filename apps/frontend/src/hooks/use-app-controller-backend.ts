@@ -104,6 +104,7 @@ type BackendCreateGroupPayload = {
     visaStatus?: "DRAFT" | "PENDING" | "ISSUED";
     issuedDate?: string;
     syarikah: string;
+    busStatus?: "VISA_ONLY" | "VISA_PLUS";
     paymentStatus?: "PAID" | "UNPAID" | "PARTIAL";
     outstandingAmount?: number;
     hotelAgreements?: Array<{
@@ -208,6 +209,7 @@ type BackendGroupRecord = {
     visaStatus?: string;
     issuedDate?: string | Date | null;
     syarikah?: string;
+    busStatus?: string;
     paymentStatus?: string;
     hotelAgreements?: Array<{
       id?: string;
@@ -440,6 +442,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       visaStatus: mapVisaStatusToBackend(group.visaSetup.visaStatus),
       issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate) ? normalizedIssuedDate : undefined,
       syarikah: resolvedSyarikah,
+      busStatus: mapFrontendBusStatusToBackend(group.visaSetup.busStatus),
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
       outstandingAmount: 0,
       hotelAgreements: [
@@ -681,6 +684,16 @@ function mapBackendToneToFrontend(tone: string | undefined, status: string | und
   return "active";
 }
 
+function mapBackendGroupStatusToFrontend(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized === "ACTIVE") return "Active";
+  if (normalized === "INACTIVE") return "Inactive";
+  if (normalized === "COMPLETED") return "Completed";
+  if (normalized === "INCOMPLETE") return "Incomplete";
+  if (normalized === "ENTRY_ONLY") return "Incomplete";
+  return value?.trim() || fallback;
+}
+
 function mapBackendVisaStatus(value: string | undefined): GroupVisaSetup["visaStatus"] {
   const normalized = value?.trim().toUpperCase() ?? "";
   if (normalized === "ISSUED") {
@@ -757,21 +770,20 @@ function inferHotelNameFromItineraryRecord(record: {
   return "";
 }
 
-function resolveBusStatusFromNotes(notes: string[]): GroupVisaSetup["busStatus"] {
-  const marker = notes.find((note) => /^bus status\s*:/i.test(note));
-  if (!marker) {
-    return undefined;
-  }
+function mapFrontendBusStatusToBackend(busStatus: "Visa+" | "Visa Only" | undefined): "VISA_PLUS" | "VISA_ONLY" | undefined {
+  if (busStatus === "Visa+") return "VISA_PLUS";
+  if (busStatus === "Visa Only") return "VISA_ONLY";
+  return undefined;
+}
 
-  // Backward compatibility: legacy notes used "Bus Internal/Bus Luar".
-  if (/bus\s*(internal|luar)/i.test(marker)) {
+function mapBackendBusStatusToFrontend(value: string | undefined): GroupVisaSetup["busStatus"] {
+  const normalized = value?.trim().toUpperCase() ?? "";
+  if (normalized === "VISA_PLUS") {
     return "Visa+";
   }
-
-  if (/visa\s*\+/i.test(marker) || /visa\s*plus/i.test(marker)) {
-    return "Visa+";
+  if (normalized === "VISA_ONLY") {
+    return "Visa Only";
   }
-
   return undefined;
 }
 
@@ -943,7 +955,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
   const resolvedTone = resolveCurrentGroupTone(backendTone, sortedItinerary);
   const resolvedStatus =
     resolvedTone === backendTone
-      ? readString(group.status, getStatusByTone(resolvedTone))
+      ? mapBackendGroupStatusToFrontend(group.status, getStatusByTone(resolvedTone))
       : getStatusByTone(resolvedTone);
   const pax = Math.max(1, readNumber(group.pax, 1));
   const durationDays = Math.max(1, readNumber(group.durationDays, 8));
@@ -966,7 +978,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     )
     .map((item) => readString(item.text))
     .filter((item) => item.length > 0);
-  const resolvedBusStatus = resolveBusStatusFromNotes(mappedNotes);
+  const resolvedBusStatus = mapBackendBusStatusToFrontend(group.visaSetup?.busStatus);
   const mappedHotelsByCity = mapBackendHotelsByCity({
     hotelAgreements: group.visaSetup?.hotelAgreements,
     groupCode: code,
@@ -1162,7 +1174,7 @@ export async function createGroupIdentityInBackend(identity: GroupIdentityDraftP
           avatar: musyrifAvatar,
         }
         : undefined,
-    busStatus: identity.busStatus,
+    busStatus: mapFrontendBusStatusToBackend(identity.busStatus),
   };
   const {
     response,

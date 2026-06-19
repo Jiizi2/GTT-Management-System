@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
-import { AgreementCity, Prisma } from "@prisma/client";
+import { AgreementCity, Prisma, GroupStatus } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
@@ -71,7 +71,7 @@ function createGroupPayload(overrides: Partial<CreateGroupDto> = {}): CreateGrou
   return {
     code: "GRP-BASE",
     name: "Base Group",
-    status: "Active",
+    status: GroupStatus.ACTIVE,
     arrivalDate: "2026-04-10",
     returnDate: "2026-04-18",
     pax: 40,
@@ -257,6 +257,7 @@ async function testPrismaReplaceSuccessAndGuards(): Promise<void> {
           selectLookup: () => current,
         }),
         findUnique: async () => ({ id: "grp-2" }),
+        findUniqueOrThrow: async () => ({ id: "grp-2" }),
       },
     } as unknown as PrismaService;
 
@@ -465,6 +466,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           selectLookup: () => currentGroup,
         }),
         findUnique: async () => null,
+        findUniqueOrThrow: async () => { throw new Error("not found"); },
         update: async (args: Record<string, unknown>) => {
           updatedPayload = args;
           return {
@@ -480,7 +482,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       const updated = (await service.update("GRP-OLD", {
         code: " grp-new ",
         name: " Updated Group ",
-        status: " Active ",
+        status: GroupStatus.ACTIVE as any,
         arrivalDate: "2026-04-11",
         returnDate: "2026-04-19",
         packageName: " Premium ",
@@ -505,7 +507,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       assert.equal(where.id, "grp-1");
       assert.equal(data.code, "GRP-NEW");
       assert.equal(data.name, "Updated Group");
-      assert.equal(data.status, "Active");
+      assert.equal(data.status, GroupStatus.ACTIVE);
       assert.equal(data.packageName, "Premium");
       assert.equal(
         data.searchDocument,
@@ -532,6 +534,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           selectLookup: () => currentGroup,
         }),
         findUnique: async () => ({ id: "grp-2" }),
+        findUniqueOrThrow: async () => ({ id: "grp-2" }),
       },
     } as unknown as PrismaService;
 
@@ -593,6 +596,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           selectLookup: () => currentGroup,
         }),
         findUnique: async () => null,
+        findUniqueOrThrow: async () => { throw new Error("not found"); },
       },
     } as unknown as PrismaService;
 
@@ -626,7 +630,7 @@ async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
       name: "Group Remove",
       arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
       returnDate: new Date("2026-04-18T00:00:00.000Z"),
-      status: "Active",
+      status: GroupStatus.ACTIVE,
     };
     const prismaMock = {
       group: {
@@ -699,7 +703,7 @@ async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
       name: "Group Remove",
       arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
       returnDate: new Date("2026-04-18T00:00:00.000Z"),
-      status: "Active",
+      status: GroupStatus.ACTIVE,
     };
     const prismaMock = {
       group: {

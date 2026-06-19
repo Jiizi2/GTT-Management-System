@@ -194,3 +194,6 @@ export const groupDetailSelection = {
     },
   },
 } satisfies Prisma.GroupSelect;
+
+export type GroupDetailRecord = Prisma.GroupGetPayload<{ select: typeof groupDetailSelection }>;
+export type GroupSummaryRecord = Prisma.GroupGetPayload<{ select: typeof groupSummarySelection }>;

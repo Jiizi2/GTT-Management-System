@@ -15,6 +15,17 @@ function createPrismaService(prismaMock: PrismaService): {
     create: async () => ({}),
     findMany: async () => [],
   };
+  prismaRecord.$transaction ??= async (fn: any) => fn(prismaMock);
+  prismaRecord.group = prismaRecord.group || {};
+  const groupRecord = prismaRecord.group as Record<string, unknown>;
+  groupRecord.findMany ??= async () => [];
+  groupRecord.updateMany ??= async () => ({ count: 0 });
+  groupRecord.findUnique ??= groupRecord.findFirst;
+  prismaRecord.hotelAgreementDraft ??= { updateMany: async () => ({ count: 0 }) };
+  prismaRecord.visaSetup ??= { findUnique: async () => null, upsert: async () => ({ id: "visa-1" }) };
+  prismaRecord.raudhahAppointment ??= { deleteMany: async () => ({ count: 0 }), createMany: async () => ({ count: 0 }) };
+  groupRecord.findUnique ??= groupRecord.findFirst;
+  
   const service = new GroupsService(prismaMock);
 
   return {

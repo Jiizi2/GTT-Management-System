@@ -8,6 +8,7 @@ import {
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
+  GroupStatus,
 } from "@prisma/client";
 import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
 import type { CreateGroupDto } from "../dto/create-group.dto";
@@ -91,7 +92,7 @@ export function createDefaultMemoryGroups(): MemoryGroupRecord[] {
       id: randomUUID(),
       code: "9017000001",
       name: "Dummy Trip Lengkap",
-      status: "Active",
+      status: GroupStatus.ACTIVE,
       arrivalDate: arrivalIso,
       returnDate: departureIso,
       tone: GroupTone.ACTIVE,
@@ -491,7 +492,7 @@ export function updateInMemory(
     ...current,
     code: nextCode ?? current.code,
     name: payload.name?.trim() ?? current.name,
-    status: payload.status?.trim() ?? current.status,
+    status: payload.status ?? current.status,
     arrivalDate: nextArrivalDate,
     returnDate: nextReturnDate,
     tone: payload.tone ?? current.tone,

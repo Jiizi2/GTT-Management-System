@@ -16,6 +16,8 @@ import type {
 } from "../dto/hotel-agreement-draft.dto";
 import type { UpsertGroupVisaHotelDto } from "../dto/group-operations.dto";
 import { GroupsService } from "./groups.service";
+import { GroupsCommandService } from "./groups-command.service";
+import { GroupDetailRecord } from "../infrastructure/groups.prisma-include";
 
 type DraftStatusFilter = "assigned" | "unassigned";
 

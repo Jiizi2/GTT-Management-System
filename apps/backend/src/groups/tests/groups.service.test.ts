@@ -3,6 +3,7 @@ import {
   AgreementApprovalStatus,
   AgreementCity,
   GroupRaudhahStatus,
+  GroupStatus,
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
@@ -22,7 +23,7 @@ async function createMemoryService(): Promise<{
   const existingGroups = await service.findAll();
   if (Array.isArray(existingGroups)) {
     for (const group of existingGroups) {
-      const code = (group as { code?: unknown }).code;
+      const code = (group as unknown as { code?: unknown }).code;
       if (typeof code === "string" && code.trim()) {
         await service.remove(code);
       }
@@ -47,7 +48,7 @@ function createGroupPayload(
   return {
     code: "G-000",
     name: "Base Group",
-    status: "Active",
+    status: GroupStatus.ACTIVE,
     arrivalDate: "2026-04-10",
     returnDate: "2026-04-18",
     pax: 40,
@@ -118,7 +119,7 @@ async function testSearchFilterPagination(): Promise<void> {
       createGroupPayload({
         code: "G-104",
         name: "Inactive Archive",
-        status: "Inactive",
+        status: GroupStatus.INACTIVE,
         tone: GroupTone.INACTIVE,
         visaSetup: {
           visaStatus: VisaStatus.ISSUED,
@@ -146,7 +147,7 @@ async function testSearchFilterPagination(): Promise<void> {
       pageSize: 2,
     });
     assert.equal(Array.isArray(pagedResult), false);
-    const paged = pagedResult as {
+    const paged = pagedResult as unknown as {
       items: unknown[];
       total: number;
       page: number;
@@ -269,7 +270,7 @@ async function testCreateIdentityWorkspace(): Promise<void> {
         phone: " 081234 ",
         avatar: " https://example.com/avatar.png ",
       },
-    })) as {
+    })) as unknown as {
       code: string;
       name: string;
       status: string;
@@ -281,7 +282,7 @@ async function testCreateIdentityWorkspace(): Promise<void> {
 
     assert.equal(created.code, "G-IDENTITY");
     assert.equal(created.name, "Nusuk Entry Group");
-    assert.equal(created.status, "Entry Only");
+    assert.equal(created.status, GroupStatus.INCOMPLETE);
     assert.equal(created.itinerary.length, 0);
     assert.equal(created.visaSetup, undefined);
     assert.equal(created.musyrif.name, "Ust Identity");
@@ -327,7 +328,7 @@ async function testItineraryCrudWithAudit(): Promise<void> {
       fromLocation: "JED Airport",
       toLocation: "Makkah Hotel",
       notes: "Driver waiting at gate 4",
-    })) as {
+    })) as unknown as {
       itinerary: Array<{ id: string; title: string; sortOrder: number }>;
     };
 
@@ -347,7 +348,7 @@ async function testItineraryCrudWithAudit(): Promise<void> {
       fromLocation: "JED Airport",
       toLocation: "Makkah Hotel",
       notes: "Updated note",
-    })) as {
+    })) as unknown as {
       itinerary: Array<{ id: string; title: string }>;
     };
 
@@ -356,7 +357,7 @@ async function testItineraryCrudWithAudit(): Promise<void> {
     const afterRemove = (await service.removeItineraryItem(
       "G-201",
       itemId,
-    )) as {
+    )) as unknown as {
       itinerary: unknown[];
     };
     assert.equal(afterRemove.itinerary.length, 0);
@@ -392,7 +393,7 @@ async function testItineraryTitleFallbackWithoutExplicitTitle(): Promise<void> {
       time: "08:00",
       fromLocation: "Makkah Hotel",
       toLocation: "Madinah Hotel",
-    })) as {
+    })) as unknown as {
       itinerary: Array<{ id: string; title: string }>;
     };
 
@@ -424,7 +425,7 @@ async function testVisaAndRaudhahOps(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-04-10",
       stayEnd: "2026-04-13",
-    })) as {
+    })) as unknown as {
       visaSetup: {
         hotelAgreements: Array<{ id: string; status: AgreementApprovalStatus }>;
       };
@@ -449,7 +450,7 @@ async function testVisaAndRaudhahOps(): Promise<void> {
         stayStart: "2026-04-10",
         stayEnd: "2026-04-13",
       },
-    )) as {
+    )) as unknown as {
       visaSetup: {
         hotelAgreements: Array<{ status: AgreementApprovalStatus }>;
       };
@@ -462,7 +463,7 @@ async function testVisaAndRaudhahOps(): Promise<void> {
     const afterRemoveHotel = (await service.removeVisaHotelAgreement(
       "G-301",
       hotelId,
-    )) as {
+    )) as unknown as {
       visaSetup: { hotelAgreements: unknown[] };
     };
     assert.equal(afterRemoveHotel.visaSetup.hotelAgreements.length, 0);
@@ -473,7 +474,7 @@ async function testVisaAndRaudhahOps(): Promise<void> {
         date: "2026-04-15",
         status: GroupRaudhahStatus.AFTER,
       },
-    )) as {
+    )) as unknown as {
       visaSetup: {
         raudhahAppointments: Array<{
           date: string;
@@ -489,7 +490,7 @@ async function testVisaAndRaudhahOps(): Promise<void> {
         date: "2026-04-16",
         status: GroupRaudhahStatus.BEFORE,
       },
-    )) as {
+    )) as unknown as {
       visaSetup: {
         raudhahAppointments: Array<{
           date: string;
@@ -555,7 +556,7 @@ async function testVisaAgreementRules(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-04-10",
       stayEnd: "2026-04-12",
-    })) as {
+    })) as unknown as {
       visaSetup: {
         hotelAgreements: Array<{
           id: string;
@@ -586,7 +587,7 @@ async function testVisaAgreementRules(): Promise<void> {
     });
 
     const secondMakkahId = (
-      (await service.findOneByIdOrCode("G-402")) as {
+      (await service.findOneByIdOrCode("G-402")) as unknown as {
         visaSetup: {
           hotelAgreements: Array<{
             id: string;
@@ -630,7 +631,7 @@ async function testVisaAgreementRules(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-05-01",
       stayEnd: "2026-05-03",
-    })) as {
+    })) as unknown as {
       visaSetup: {
         hotelAgreements: Array<{
           id: string;
@@ -659,7 +660,7 @@ async function testVisaAgreementRules(): Promise<void> {
     const afterRemoveMakkah = (await service.removeVisaHotelAgreement(
       "G-403",
       makkahHotelId!,
-    )) as {
+    )) as unknown as {
       visaSetup: {
         hotelAgreements: Array<{
           city: AgreementCity;
@@ -692,7 +693,7 @@ async function testVisaAgreementRules(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-06-01",
       stayEnd: "2026-06-03",
-    })) as {
+    })) as unknown as {
       visaSetup: {
         hotelAgreements: Array<{
           city: AgreementCity;
@@ -759,7 +760,7 @@ async function testChecklistIdentityAvoidsSameTimeCollision(): Promise<void> {
       },
     });
 
-    const group = (await service.findOneByIdOrCode("G-501")) as {
+    const group = (await service.findOneByIdOrCode("G-501")) as unknown as {
       checklistAssignments: Array<{
         activity: string;
         scheduledTime: string;
@@ -801,7 +802,7 @@ async function testParentChildGroupInheritanceAndValidation(): Promise<void> {
         code: "G-PARENT",
         name: "Parent Group",
       }),
-    )) as { id: string };
+    )) as unknown as { id: string };
 
     const child = (await service.create(
       createGroupPayload({
@@ -809,7 +810,7 @@ async function testParentChildGroupInheritanceAndValidation(): Promise<void> {
         name: "Child Group",
         parentGroupId: parent.id,
       }),
-    )) as { id: string; parentGroupId?: string | null };
+    )) as unknown as { id: string; parentGroupId?: string | null };
 
     assert.equal(child.parentGroupId, parent.id);
 
@@ -826,7 +827,7 @@ async function testParentChildGroupInheritanceAndValidation(): Promise<void> {
     });
 
     // 2. Fetch child group, verify itinerary is inherited
-    const fetchedChild = (await service.findOneByIdOrCode("G-CHILD")) as {
+    const fetchedChild = (await service.findOneByIdOrCode("G-CHILD")) as unknown as {
       itinerary: Array<{ title: string }>;
     };
     assert.equal(fetchedChild.itinerary.length, 1);

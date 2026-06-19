@@ -3,6 +3,7 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupStatus,
   GroupTone,
   Prisma,
   VisaPaymentStatus,
@@ -191,7 +192,7 @@ function buildGroupWriteData(
   return {
     code: normalizedCode,
     name: payload.name.trim(),
-    status: payload.status.trim(),
+    status: payload.status ?? GroupStatus.INCOMPLETE,
     searchDocument: buildGroupSearchDocument({
       code: normalizedCode,
       name: payload.name,

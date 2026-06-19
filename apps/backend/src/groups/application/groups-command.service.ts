@@ -1263,7 +1263,7 @@ export class GroupsCommandService {
       data: {
         code: nextCode,
         name: payload.name?.trim(),
-        status: payload.status?.trim(),
+        status: payload.status as any,
         searchDocument: buildGroupSearchDocument({
           code: nextCode ?? current.code,
           name: payload.name?.trim() ?? current.name,

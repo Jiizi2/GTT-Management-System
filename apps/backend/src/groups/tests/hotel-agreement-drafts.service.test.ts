@@ -21,7 +21,7 @@ async function createMemoryServices(): Promise<{
   const existingGroups = await groupsService.findAll();
   if (Array.isArray(existingGroups)) {
     for (const group of existingGroups) {
-      const code = (group as { code?: unknown }).code;
+      const code = (group as any as { code?: unknown }).code;
       if (typeof code === "string" && code.trim()) {
         await groupsService.remove(code);
       }
@@ -47,7 +47,7 @@ function createGroupPayload(
   return {
     code: "DRAFT-G-001",
     name: "Draft Target Group",
-    status: "Active",
+    status: "ACTIVE",
     arrivalDate: "2026-06-10",
     returnDate: "2026-06-18",
     pax: 45,
@@ -79,7 +79,7 @@ async function testCreateUpdateDeleteDraft(): Promise<void> {
       stayStart: "2026-06-10",
       stayEnd: "2026-06-13",
       notes: "Received before group code.",
-    })) as {
+    })) as any as {
       id: string;
       agreementNumber: string;
       assignmentStatus: string;
@@ -96,7 +96,7 @@ async function testCreateUpdateDeleteDraft(): Promise<void> {
       status: AgreementApprovalStatus.APPROVED,
       stayStart: "2026-06-10",
       stayEnd: "2026-06-13",
-    })) as {
+    })) as any as {
       hotelName: string;
       agreementNumber: string;
       status: string;
@@ -128,13 +128,13 @@ async function testAssignDraftToGroup(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-06-10",
       stayEnd: "2026-06-13",
-    })) as {
+    })) as any as {
       id: string;
     };
 
     const assigned = (await draftsService.assign(created.id, {
       groupCode: "DRAFT-G-001",
-    })) as {
+    })) as any as {
       assignmentStatus: string;
       assignedGroups: Array<{ groupCode: string }>;
     };
@@ -142,7 +142,7 @@ async function testAssignDraftToGroup(): Promise<void> {
     assert.equal(assigned.assignmentStatus, "Assigned");
     assert.equal(assigned.assignedGroups[0]?.groupCode, "DRAFT-G-001");
 
-    const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as {
+    const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as any as {
       visaSetup?: {
         hotelAgreements?: Array<{
           agreementNumber: string;
@@ -174,13 +174,13 @@ async function testAssignDraftToGroup(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-06-14",
       stayEnd: "2026-06-18",
-    })) as {
+    })) as any as {
       id: string;
     };
 
     const assignedMadinah = (await draftsService.assign(createdMadinah.id, {
       groupCode: "DRAFT-G-002",
-    })) as {
+    })) as any as {
       assignmentStatus: string;
       assignedGroups: Array<{ groupCode: string }>;
     };
@@ -190,7 +190,7 @@ async function testAssignDraftToGroup(): Promise<void> {
 
     const madinahFirstGroup = (await groupsService.findOneByIdOrCode(
       "DRAFT-G-002",
-    )) as {
+    )) as any as {
       visaSetup?: {
         hotelAgreements?: Array<{
           agreementNumber: string;
@@ -226,7 +226,7 @@ async function testUnassignDraftFromGroup(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-06-10",
       stayEnd: "2026-06-13",
-    })) as {
+    })) as any as {
       id: string;
     };
 
@@ -234,7 +234,7 @@ async function testUnassignDraftFromGroup(): Promise<void> {
       groupCode: "DRAFT-G-001",
     });
 
-    const unassigned = (await draftsService.unassign(created.id)) as {
+    const unassigned = (await draftsService.unassign(created.id)) as any as {
       assignmentStatus: string;
       assignedGroups: Array<unknown>;
     };
@@ -242,7 +242,7 @@ async function testUnassignDraftFromGroup(): Promise<void> {
     assert.equal(unassigned.assignmentStatus, "Unassigned");
     assert.equal(unassigned.assignedGroups.length, 0);
 
-    const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as {
+    const group = (await groupsService.findOneByIdOrCode("DRAFT-G-001")) as any as {
       visaSetup?: {
         hotelAgreements?: Array<unknown>;
       };
@@ -274,7 +274,7 @@ async function testAutoRejectionDraft(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-06-10",
       stayEnd: "2026-06-13",
-    })) as { id: string; status: string };
+    })) as any as { id: string; status: string };
 
     assert.equal(created.status, AgreementApprovalStatus.WAITING);
 
@@ -331,7 +331,7 @@ async function testMultiGroupAssignment(): Promise<void> {
       status: AgreementApprovalStatus.APPROVED,
       stayStart: "2026-06-14",
       stayEnd: "2026-06-18",
-    })) as {
+    })) as any as {
       id: string;
       remainingPax: number;
     };
@@ -341,7 +341,7 @@ async function testMultiGroupAssignment(): Promise<void> {
     // 3. Assign to GROUP-A (23 pax)
     const assignedA = (await draftsService.assign(draft.id, {
       groupCode: "GROUP-A",
-    })) as {
+    })) as any as {
       assignmentStatus: string;
       remainingPax: number;
       assignedGroups: Array<{ groupCode: string; pax: number }>;
@@ -361,7 +361,7 @@ async function testMultiGroupAssignment(): Promise<void> {
     // 4. Assign to GROUP-B (7 pax)
     const assignedB = (await draftsService.assign(draft.id, {
       groupCode: "GROUP-B",
-    })) as {
+    })) as any as {
       assignmentStatus: string;
       remainingPax: number;
       assignedGroups: Array<{ groupCode: string; pax: number }>;
@@ -383,7 +383,7 @@ async function testMultiGroupAssignment(): Promise<void> {
     );
 
     // 6. Unassign only GROUP-A
-    const unassignedA = (await draftsService.unassign(draft.id, "GROUP-A")) as {
+    const unassignedA = (await draftsService.unassign(draft.id, "GROUP-A")) as any as {
       assignmentStatus: string;
       remainingPax: number;
       assignedGroups: Array<{ groupCode: string; pax: number }>;
@@ -427,7 +427,7 @@ async function testDraftUpdateCascade(): Promise<void> {
       status: AgreementApprovalStatus.WAITING,
       stayStart: "2026-06-10",
       stayEnd: "2026-06-15",
-    })) as {
+    })) as any as {
       id: string;
     };
 

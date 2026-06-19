@@ -402,6 +402,57 @@ function buildLocalIdentityGroup(identity: GroupIdentityDraftPayload): GroupData
   };
 }
 
+function applyOptimisticGroupUpdate(
+  current: GroupData[],
+  nextGroup: GroupData,
+  sourceGroupCode?: string,
+): GroupData[] {
+  const normalizedSourceGroupCode = sourceGroupCode?.trim().toUpperCase();
+  const nextGroupCode = nextGroup.code.trim().toUpperCase();
+  const isParent = !nextGroup.parentGroupId;
+
+  let next = [...current];
+  const existingIndex = next.findIndex((item) => item.code.trim().toUpperCase() === nextGroupCode);
+  
+  if (existingIndex !== -1) {
+    next[existingIndex] = nextGroup;
+    if (normalizedSourceGroupCode && normalizedSourceGroupCode !== nextGroupCode) {
+      const sourceIndex = next.findIndex(
+        (item, index) => index !== existingIndex && item.code.trim().toUpperCase() === normalizedSourceGroupCode,
+      );
+      if (sourceIndex !== -1) {
+        next.splice(sourceIndex, 1);
+      }
+    }
+  } else if (normalizedSourceGroupCode) {
+    const sourceIndex = next.findIndex((item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode);
+    if (sourceIndex !== -1) {
+      next[sourceIndex] = nextGroup;
+    } else {
+      next = [nextGroup, ...next];
+    }
+  } else {
+    next = [nextGroup, ...next];
+  }
+
+  if (isParent) {
+    next = next.map((group) => {
+      if (group.parentGroupId && (group.parentGroupId === nextGroup.id || group.parentGroupId === nextGroupCode)) {
+        return {
+          ...group,
+          arrivalDate: nextGroup.arrivalDate,
+          returnDate: nextGroup.returnDate,
+          packageName: nextGroup.packageName,
+          visaSetup: nextGroup.visaSetup,
+        };
+      }
+      return group;
+    });
+  }
+
+  return next;
+}
+
 export function useDashboardGroupRecords({
   activeNav,
   query,
@@ -981,7 +1032,7 @@ export function useDashboardGroupRecords({
       });
       const rollbackSnapshot = captureGroupRecordsSnapshot();
 
-      commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
+      commitGroupRecords((current) => applyOptimisticGroupUpdate(current, nextGroup));
 
       runBackendSync({
         task: replaceGroupMutation.mutateAsync({ groupCode, group: nextGroup }),
@@ -1189,7 +1240,7 @@ export function useDashboardGroupRecords({
       });
 
       const rollbackSnapshot = captureGroupRecordsSnapshot();
-      commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
+      commitGroupRecords((current) => applyOptimisticGroupUpdate(current, nextGroup));
 
       runBackendSync({
         task: saveVisaHotelMutation
@@ -1201,9 +1252,7 @@ export function useDashboardGroupRecords({
           })
           .then((backendGroup) => {
             const normalizedBackendGroup = normalizeGroupStatus(backendGroup);
-            commitGroupRecords((current) =>
-              current.map((group) => (group.code === groupCode ? normalizedBackendGroup : group)),
-            );
+            commitGroupRecords((current) => applyOptimisticGroupUpdate(current, normalizedBackendGroup));
           }),
         successMessage: "Agreement hotel berhasil disimpan.",
         failureMessage: "Agreement hotel belum berhasil disimpan ke backend.",
@@ -1250,7 +1299,7 @@ export function useDashboardGroupRecords({
         visaSetup: nextVisaSetup,
       });
       const rollbackSnapshot = captureGroupRecordsSnapshot();
-      commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
+      commitGroupRecords((current) => applyOptimisticGroupUpdate(current, nextGroup));
 
       runBackendSync({
         task: deleteVisaHotelMutation
@@ -1260,9 +1309,7 @@ export function useDashboardGroupRecords({
           })
           .then((backendGroup) => {
             const normalizedBackendGroup = normalizeGroupStatus(backendGroup);
-            commitGroupRecords((current) =>
-              current.map((group) => (group.code === groupCode ? normalizedBackendGroup : group)),
-            );
+            commitGroupRecords((current) => applyOptimisticGroupUpdate(current, normalizedBackendGroup));
           }),
         successMessage: "Agreement hotel berhasil dihapus.",
         failureMessage: "Penghapusan agreement hotel belum berhasil disimpan ke backend.",
@@ -1464,35 +1511,7 @@ export function useDashboardGroupRecords({
 
       navigateToGroupDetail(nextGroup.code, { replace: true });
 
-      commitGroupRecords((current) => {
-        const existingIndex = current.findIndex((item) => item.code === nextGroup.code);
-        if (existingIndex !== -1) {
-          const next = [...current];
-          next[existingIndex] = nextGroup;
-
-          if (normalizedSourceGroupCode && normalizedSourceGroupCode !== nextGroup.code) {
-            const sourceIndex = next.findIndex(
-              (item, index) => index !== existingIndex && item.code.trim().toUpperCase() === normalizedSourceGroupCode,
-            );
-            if (sourceIndex !== -1) {
-              next.splice(sourceIndex, 1);
-            }
-          }
-
-          return next;
-        }
-
-        if (normalizedSourceGroupCode) {
-          const sourceIndex = current.findIndex((item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode);
-          if (sourceIndex !== -1) {
-            const next = [...current];
-            next[sourceIndex] = nextGroup;
-            return next;
-          }
-        }
-
-        return [nextGroup, ...current];
-      });
+      commitGroupRecords((current) => applyOptimisticGroupUpdate(current, nextGroup, sourceGroupCode));
 
       runBackendSync({
         task: replaceGroupMutation.mutateAsync({
@@ -1551,35 +1570,7 @@ export function useDashboardGroupRecords({
 
       navigateToVisaDetail(nextGroup.code, { replace: true });
 
-      commitGroupRecords((current) => {
-        const existingIndex = current.findIndex((item) => item.code === nextGroup.code);
-        if (existingIndex !== -1) {
-          const next = [...current];
-          next[existingIndex] = nextGroup;
-
-          if (normalizedSourceGroupCode && normalizedSourceGroupCode !== nextGroup.code) {
-            const sourceIndex = next.findIndex(
-              (item, index) => index !== existingIndex && item.code.trim().toUpperCase() === normalizedSourceGroupCode,
-            );
-            if (sourceIndex !== -1) {
-              next.splice(sourceIndex, 1);
-            }
-          }
-
-          return next;
-        }
-
-        if (normalizedSourceGroupCode) {
-          const sourceIndex = current.findIndex((item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode);
-          if (sourceIndex !== -1) {
-            const next = [...current];
-            next[sourceIndex] = nextGroup;
-            return next;
-          }
-        }
-
-        return [nextGroup, ...current];
-      });
+      commitGroupRecords((current) => applyOptimisticGroupUpdate(current, nextGroup, sourceGroupCode));
 
       runBackendSync({
         task: replaceGroupMutation.mutateAsync({

@@ -4,6 +4,7 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupStatus,
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
@@ -16,7 +17,7 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
   return {
     code: "MEM-001",
     name: " Memory Group ",
-    status: " Active ",
+    status: GroupStatus.ACTIVE,
     arrivalDate: "2026-04-10",
     returnDate: "2026-04-18",
     tone: GroupTone.ACTIVE,
@@ -201,7 +202,7 @@ function testBuildMemoryGroupPayloadFieldsNormalizationAndDefaults(): void {
   const timeline = fields.timeline ?? [];
   const notes = fields.notes ?? [];
   assert.equal(fields.name, "Memory Group");
-  assert.equal(fields.status, "Active");
+  assert.equal(fields.status, GroupStatus.ACTIVE);
   assert.equal(fields.packageName, "Standard Gold");
   assert.equal(fields.arrivalDate, "2026-04-10");
   assert.equal(fields.returnDate, "2026-04-18");

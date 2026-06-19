@@ -1,6 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import type { PrismaService } from "../../prisma/prisma.service";
-import { groupDetailSelection, groupSummarySelection } from "../infrastructure/groups.prisma-include";
+import { groupDetailSelection, groupSummarySelection, GroupDetailRecord, GroupSummaryRecord } from "../infrastructure/groups.prisma-include";
 import {
   buildGroupWhere,
   findAllFromMemory,
@@ -27,7 +27,7 @@ export class GroupsQueryService {
   async findAll(
     query?: string,
     options?: FindAllOptions,
-  ): Promise<unknown[] | PaginatedGroupList<unknown>> {
+  ): Promise<GroupSummaryRecord[] | GroupDetailRecord[] | PaginatedGroupList<GroupSummaryRecord | GroupDetailRecord>> {
     const projection = options?.projection ?? "detail";
     if (this.dataSource === "prisma") {
       return this.findAllWithPrisma(query, {
@@ -39,15 +39,15 @@ export class GroupsQueryService {
     const source = findAllFromMemory(this.memoryGroups, query, options?.filter, options?.activeOnly ?? false).map((group) =>
       projectMemoryGroupRecord(group, projection),
     );
-    return paginateGroupItems(source, options);
+    return paginateGroupItems(source, options) as unknown as PaginatedGroupList<GroupSummaryRecord | GroupDetailRecord>;
   }
 
-  async findOneByIdOrCode(idOrCode: string): Promise<unknown> {
+  async findOneByIdOrCode(idOrCode: string): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.findOneWithPrisma(idOrCode);
     }
 
-    return findOneFromMemory(this.memoryGroups, idOrCode);
+    return findOneFromMemory(this.memoryGroups, idOrCode) as unknown as GroupDetailRecord;
   }
 
   async listAuditLogs(groupCode?: string, limit?: number): Promise<MemoryAuditLog[]> {
@@ -113,7 +113,7 @@ export class GroupsQueryService {
   private async findAllWithPrisma(
     query?: string,
     options?: FindAllOptions,
-  ): Promise<unknown[] | PaginatedGroupList<unknown>> {
+  ): Promise<GroupSummaryRecord[] | GroupDetailRecord[] | PaginatedGroupList<GroupSummaryRecord | GroupDetailRecord>> {
     const where = buildGroupWhere(query, options?.filter, options?.activeOnly ?? false);
     const pageState = resolvePaginationState(options);
     const select = options?.projection === "summary" ? groupSummarySelection : groupDetailSelection;
@@ -149,7 +149,7 @@ export class GroupsQueryService {
     };
   }
 
-  private async findOneWithPrisma(idOrCode: string) {
+  private async findOneWithPrisma(idOrCode: string): Promise<GroupDetailRecord> {
     let group = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -183,7 +183,7 @@ export class GroupsQueryService {
           itinerary: parent.itinerary,
           notes: parent.notes,
           checklistAssignments: parent.checklistAssignments,
-        } as any;
+        } as GroupDetailRecord;
       }
     }
 

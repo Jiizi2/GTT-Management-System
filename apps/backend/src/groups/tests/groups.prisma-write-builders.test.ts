@@ -8,6 +8,7 @@ import {
   Prisma,
   VisaPaymentStatus,
   VisaStatus,
+  GroupStatus,
 } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
 import {
@@ -19,7 +20,7 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
   return {
     code: "G-900",
     name: " Builder Test Group ",
-    status: " Active ",
+    status: GroupStatus.ACTIVE,
     arrivalDate: "2026-04-10",
     returnDate: "2026-04-18",
     tone: GroupTone.ACTIVE,
@@ -121,7 +122,7 @@ function testTrimAndDefaultMappings(): void {
   const createDataAny = createData as any;
 
   assert.equal(createDataAny.name, "Builder Test Group");
-  assert.equal(createDataAny.status, "Active");
+  assert.equal(createDataAny.status, GroupStatus.ACTIVE);
   assert.equal(createDataAny.packageName, "Standard Gold");
   assert.equal(
     createDataAny.searchDocument,

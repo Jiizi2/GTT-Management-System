@@ -7,6 +7,7 @@ import {
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
+import { GroupStatus } from "@prisma/client";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {
   const previous = process.env.DATA_SOURCE;
@@ -39,7 +40,7 @@ function createGroupPayload(overrides: Partial<CreateGroupDto> = {}): CreateGrou
   return {
     code: "EDGE-000",
     name: "Edge Group",
-    status: "Active",
+    status: GroupStatus.ACTIVE,
     arrivalDate: "2026-04-10",
     returnDate: "2026-04-18",
     pax: 40,

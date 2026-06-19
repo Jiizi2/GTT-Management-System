@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Domain from "../shared/app-domain";
 import type {
   AgreementApprovalStatus,
@@ -232,6 +232,19 @@ export function VisaTrackingScreen({
   const [activeFilter, setActiveFilter] = useState<VisaFilterId>("all");
   const [issuedMonthFilter, setIssuedMonthFilter] = useState(() => currentIssuedMonthKey);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }, []);
 
   const visaRows = useMemo(() => buildVisaTrackingRowsFromGroups(groups), [groups]);
   const visaRowsByCode = useMemo(() => new Map(visaRows.map((row) => [row.groupCode, row] as const)), [visaRows]);
@@ -523,13 +536,19 @@ export function VisaTrackingScreen({
     );
   };
 
-  const renderMobileCardSingle = (row: VisaTrackingRow, isFollower = false) => {
+  const renderMobileCardSingle = (row: VisaTrackingRow, isFollower = false, accordion?: { isExpanded: boolean; onToggle: () => void; followerCount: number }, parentRow?: VisaTrackingRow) => {
     const group = groupByCode.get(row.groupCode);
-    const visaTypeLabel = resolveVisaTypeLabel(group);
+    const parentGroup = parentRow ? groupByCode.get(parentRow.groupCode) : undefined;
     
-    const raudhahEntries = resolveRaudhahEntries(row, group);
+    const activeGroup = isFollower && parentGroup ? parentGroup : group;
+    const activeRow = isFollower && parentRow ? parentRow : row;
+
+    const visaTypeLabel = resolveVisaTypeLabel(activeGroup);
+    
+    const raudhahEntries = resolveRaudhahEntries(activeRow, activeGroup);
     const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
     const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
+    const activeVisaStatus = row.visaStatus;
 
     return (
       <article
@@ -539,9 +558,22 @@ export function VisaTrackingScreen({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold text-slate-900">
-                {row.groupCode}
-              </p>
+              {accordion ? (
+                <button
+                  type="button"
+                  onClick={accordion.onToggle}
+                  className="flex items-center gap-1 hover:text-primary transition-colors focus:outline-none text-left group"
+                >
+                  <span className="text-[16px] font-bold text-slate-400 group-hover:text-primary transition-colors w-4 text-center inline-block">
+                    {accordion.isExpanded ? "-" : "+"}
+                  </span>
+                  <p className="text-sm font-semibold text-slate-900">{row.groupCode}</p>
+                </button>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-slate-900">{row.groupCode}</p>
+                </>
+              )}
             </div>
             <p className="mt-1 text-sm font-medium text-slate-700">{row.groupName}</p>
           </div>
@@ -605,11 +637,11 @@ export function VisaTrackingScreen({
             <div className="mt-1 flex flex-col gap-1">
               <span
                 className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none w-fit ${getVisaStatusClasses(
-                  row.visaStatus,
+                  activeVisaStatus,
                   isDarkMode,
                 )}`}
               >
-                {row.visaStatus}
+                {activeVisaStatus}
               </span>
             </div>
           </div>
@@ -644,21 +676,28 @@ export function VisaTrackingScreen({
 
   const renderMobileCard = (rowGroup: VisaRowGroup) => {
     const { mainRow, followerRows } = rowGroup;
+
     return (
       <div key={mainRow.id} className="space-y-3">
-        {renderMobileCardSingle(mainRow, false)}
-        {followerRows.map(f => renderMobileCardSingle(f, true))}
+        {renderMobileCardSingle(mainRow, false, undefined)}
+        {followerRows.map(f => renderMobileCardSingle(f, true, undefined, mainRow))}
       </div>
     );
   };
 
-  const renderDesktopRowSingle = (row: VisaTrackingRow, isFollower = false) => {
+  const renderDesktopRowSingle = (row: VisaTrackingRow, isFollower = false, accordion?: { isExpanded: boolean; onToggle: () => void; followerCount: number }, parentRow?: VisaTrackingRow) => {
     const group = groupByCode.get(row.groupCode);
-    const visaTypeLabel = resolveVisaTypeLabel(group);
+    const parentGroup = parentRow ? groupByCode.get(parentRow.groupCode) : undefined;
     
-    const raudhahEntries = resolveRaudhahEntries(row, group);
+    const activeGroup = isFollower && parentGroup ? parentGroup : group;
+    const activeRow = isFollower && parentRow ? parentRow : row;
+
+    const visaTypeLabel = resolveVisaTypeLabel(activeGroup);
+    
+    const raudhahEntries = resolveRaudhahEntries(activeRow, activeGroup);
     const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
     const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
+    const activeVisaStatus = row.visaStatus;
 
     return (
       <article
@@ -667,7 +706,23 @@ export function VisaTrackingScreen({
         style={{ gridTemplateColumns: desktopTableGridTemplate }}
       >
         <div className="flex items-center gap-1.5 font-semibold text-slate-800 py-1">
-          <span>{row.groupCode}</span>
+          {accordion ? (
+            <button
+              type="button"
+              onClick={accordion.onToggle}
+              className="flex items-center gap-1 hover:text-primary transition-colors focus:outline-none group"
+              title={accordion.isExpanded ? "Collapse child groups" : "Expand child groups"}
+            >
+              <span className="text-[16px] font-bold text-slate-400 group-hover:text-primary transition-colors w-4 text-center inline-block">
+                {accordion.isExpanded ? "-" : "+"}
+              </span>
+              <span>{row.groupCode}</span>
+            </button>
+          ) : (
+            <>
+              <span>{row.groupCode}</span>
+            </>
+          )}
         </div>
 
         <div className="min-w-0 py-1 font-medium text-slate-700 truncate">
@@ -719,11 +774,11 @@ export function VisaTrackingScreen({
         <div className="justify-self-center flex flex-col gap-1 py-1">
           <span
             className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none ${getVisaStatusClasses(
-              row.visaStatus,
+              activeVisaStatus,
               isDarkMode,
             )}`}
           >
-            {row.visaStatus}
+            {activeVisaStatus}
           </span>
         </div>
 
@@ -758,10 +813,18 @@ export function VisaTrackingScreen({
 
   const renderDesktopRow = (rowGroup: VisaRowGroup) => {
     const { mainRow, followerRows } = rowGroup;
+    const isExpanded = expandedGroups.has(mainRow.id);
+
     return (
       <div key={mainRow.id} className="divide-y divide-slate-100/50">
-        {renderDesktopRowSingle(mainRow, false)}
-        {followerRows.map(f => renderDesktopRowSingle(f, true))}
+        {renderDesktopRowSingle(
+          mainRow, 
+          false, 
+          followerRows.length > 0 
+            ? { isExpanded, onToggle: () => toggleGroup(mainRow.id), followerCount: followerRows.length }
+            : undefined
+        )}
+        {isExpanded && followerRows.map(f => renderDesktopRowSingle(f, true, undefined, mainRow))}
       </div>
     );
   };

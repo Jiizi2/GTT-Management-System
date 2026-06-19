@@ -4,6 +4,7 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupStatus,
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
@@ -50,7 +51,7 @@ function toIsoDateOnly(value: string): string {
 export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGroupPayloadFields {
   return {
     name: payload.name.trim(),
-    status: payload.status.trim(),
+    status: payload.status ?? GroupStatus.INCOMPLETE,
     arrivalDate: toIsoDateOnly(payload.arrivalDate),
     returnDate: toIsoDateOnly(payload.returnDate),
     tone: payload.tone ?? GroupTone.ACTIVE,
