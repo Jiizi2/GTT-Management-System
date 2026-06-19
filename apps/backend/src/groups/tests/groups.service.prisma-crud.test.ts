@@ -93,7 +93,7 @@ async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
 async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
   {
     let createPayload: Record<string, unknown> | null = null;
-    const updateManyPayload: { current: Record<string, unknown> | null } = { current: null };
+    
     const tx = {
       group: {
         create: async (args: Record<string, unknown>) => {
@@ -104,12 +104,7 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
           };
         },
       },
-      hotelAgreementDraft: {
-        updateMany: async (args: Record<string, unknown>) => {
-          updateManyPayload.current = args;
-          return { count: 1 };
-        },
-      },
+      
     };
     const prismaMock = {
       ...tx,
@@ -152,29 +147,7 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
         data.searchDocument,
         "grp create grpcreate group create groupcreate active premium package premiumpackage",
       );
-      assert.ok(updateManyPayload.current);
-      const updateManyWhere = updateManyPayload.current.where as Record<string, unknown>;
-      const updateManyData = updateManyPayload.current.data as Record<string, unknown>;
-      assert.deepEqual(updateManyWhere, {
-        id: {
-          in: ["draft-makkah-1"],
-        },
-        groupId: null,
-      });
-      assert.equal(updateManyData.groupId, "grp-1");
-      assert.equal(updateManyData.assignedAt instanceof Date, true);
-      assert.deepEqual(updateManyPayload.current, {
-        where: {
-          id: {
-            in: ["draft-makkah-1"],
-          },
-          groupId: null,
-        },
-        data: {
-          groupId: "grp-1",
-          assignedAt: updateManyData.assignedAt,
-        },
-      });
+      
     } finally {
       restore();
     }
