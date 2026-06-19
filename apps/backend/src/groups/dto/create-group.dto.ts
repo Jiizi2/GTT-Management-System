@@ -5,6 +5,7 @@ import {
   GroupRaudhahStatus,
   GroupLifecycleStatus,
   GroupTone,
+  VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -304,6 +305,11 @@ export class CreateVisaSetupDto {
   @IsString()
   @IsNotEmpty()
   syarikah!: string;
+
+  @ApiPropertyOptional({ enum: VisaBusStatus, example: VisaBusStatus.VISA_ONLY })
+  @IsOptional()
+  @IsEnum(VisaBusStatus)
+  busStatus?: VisaBusStatus;
 
   @ApiPropertyOptional({
     enum: VisaPaymentStatus,

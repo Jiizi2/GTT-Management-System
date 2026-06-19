@@ -40,6 +40,8 @@ export type GroupIdentityDraftPayload = {
   busStatus?: "Visa+" | "Visa Only";
 };
 
+type BackendVisaBusStatus = "VISA_ONLY" | "VISA_PLUS";
+
 type BackendCreateGroupPayload = {
   code: string;
   name: string;
@@ -104,6 +106,7 @@ type BackendCreateGroupPayload = {
     visaStatus?: "DRAFT" | "PENDING" | "ISSUED";
     issuedDate?: string;
     syarikah: string;
+    busStatus?: BackendVisaBusStatus;
     paymentStatus?: "PAID" | "UNPAID" | "PARTIAL";
     outstandingAmount?: number;
     hotelAgreements?: Array<{
@@ -209,6 +212,7 @@ type BackendGroupRecord = {
     visaStatus?: string;
     issuedDate?: string | Date | null;
     syarikah?: string;
+    busStatus?: string | null;
     paymentStatus?: string;
     hotelAgreements?: Array<{
       id?: string;
@@ -276,6 +280,18 @@ function mapPaymentStatusToBackend(status: VisaPaymentStatus): "PAID" | "UNPAID"
   }
 
   return "UNPAID";
+}
+
+function mapBusStatusToBackend(status: GroupVisaSetup["busStatus"]): BackendVisaBusStatus | undefined {
+  if (status === "Visa+") {
+    return "VISA_PLUS";
+  }
+
+  if (status === "Visa Only") {
+    return "VISA_ONLY";
+  }
+
+  return undefined;
 }
 
 function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" {
@@ -441,6 +457,7 @@ function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
       visaStatus: mapVisaStatusToBackend(group.visaSetup.visaStatus),
       issuedDate: /^\d{4}-\d{2}-\d{2}$/.test(normalizedIssuedDate) ? normalizedIssuedDate : undefined,
       syarikah: resolvedSyarikah,
+      busStatus: mapBusStatusToBackend(group.visaSetup.busStatus),
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
       outstandingAmount: 0,
       hotelAgreements: [
@@ -728,6 +745,19 @@ function mapBackendPaymentStatus(value: string | undefined): GroupVisaSetup["pay
   return "Unpaid";
 }
 
+function mapBackendBusStatus(value: string | null | undefined): GroupVisaSetup["busStatus"] {
+  const normalized = value?.trim().toUpperCase() ?? "";
+  if (normalized === "VISA_PLUS" || normalized === "VISA+" || normalized === "VISA PLUS") {
+    return "Visa+";
+  }
+
+  if (normalized === "VISA_ONLY" || normalized === "VISA ONLY") {
+    return "Visa Only";
+  }
+
+  return undefined;
+}
+
 function mapBackendAgreementStatus(value: string | undefined): AgreementApprovalStatus {
   return value?.trim().toUpperCase() === "APPROVED" ? "Approved" : "Waiting for Approval";
 }
@@ -988,7 +1018,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     )
     .map((item) => readString(item.text))
     .filter((item) => item.length > 0);
-  const resolvedBusStatus = resolveBusStatusFromNotes(mappedNotes);
+  const resolvedBusStatus = mapBackendBusStatus(group.visaSetup?.busStatus) ?? resolveBusStatusFromNotes(mappedNotes);
   const mappedHotelsByCity = mapBackendHotelsByCity({
     hotelAgreements: group.visaSetup?.hotelAgreements,
     groupCode: code,

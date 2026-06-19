@@ -7,6 +7,7 @@ import {
   GroupLifecycleStatus,
   GroupTone,
   Prisma,
+  VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -84,6 +85,7 @@ function testTrimAndDefaultMappings(): void {
     ],
     visaSetup: {
       syarikah: " Nusuk ",
+      busStatus: VisaBusStatus.VISA_PLUS,
       hotelAgreements: [
         {
           city: AgreementCity.MAKKAH,
@@ -143,6 +145,7 @@ function testTrimAndDefaultMappings(): void {
   const visaSetup = createDataAny.visaSetup.create;
   assert.equal(visaSetup.visaStatus, VisaStatus.DRAFT);
   assert.equal(visaSetup.issuedDate, null);
+  assert.equal(visaSetup.busStatus, VisaBusStatus.VISA_PLUS);
   assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.UNPAID);
   assert.equal((visaSetup.outstandingAmount as Prisma.Decimal).toString(), "0");
   assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MAKKAH);

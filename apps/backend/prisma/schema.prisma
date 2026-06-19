@@ -32,6 +32,11 @@ enum VisaPaymentStatus {
   PARTIAL
 }
 
+enum VisaBusStatus {
+  VISA_ONLY
+  VISA_PLUS
+}
+
 enum AgreementApprovalStatus {
   WAITING
   APPROVED
@@ -303,6 +308,7 @@ model VisaSetup {
   visaStatus          VisaStatus           @default(DRAFT)
   issuedDate          DateTime?
   syarikah            String
+  busStatus           VisaBusStatus?
   paymentStatus       VisaPaymentStatus    @default(UNPAID)
   outstandingAmount   Decimal              @default(0) @db.Decimal(12, 2)
   createdAt           DateTime             @default(now())
