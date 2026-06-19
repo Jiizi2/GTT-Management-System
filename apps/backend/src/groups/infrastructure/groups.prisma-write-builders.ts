@@ -9,6 +9,7 @@ import {
   VisaStatus,
 } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
+import { resolveGroupLifecycleStatus } from "../domain/groups.lifecycle-status";
 import { resolveItineraryTitle } from "../domain/groups-itinerary-title";
 import { buildGroupSearchDocument } from "../domain/groups.search-document";
 
@@ -189,10 +190,12 @@ function buildGroupWriteData(
   normalizedCode: string,
   options: BuildGroupWriteDataOptions,
 ) {
+  const lifecycleStatus = payload.lifecycleStatus ?? resolveGroupLifecycleStatus(payload.status);
   return {
     code: normalizedCode,
     name: payload.name.trim(),
     status: payload.status.trim(),
+    lifecycleStatus,
     searchDocument: buildGroupSearchDocument({
       code: normalizedCode,
       name: payload.name,

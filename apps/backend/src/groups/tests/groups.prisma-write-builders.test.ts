@@ -4,6 +4,7 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupLifecycleStatus,
   GroupTone,
   Prisma,
   VisaPaymentStatus,
@@ -123,6 +124,7 @@ function testTrimAndDefaultMappings(): void {
 
   assert.equal(createDataAny.name, "Builder Test Group");
   assert.equal(createDataAny.status, "Active");
+  assert.equal(createDataAny.lifecycleStatus, GroupLifecycleStatus.ACTIVE);
   assert.equal(createDataAny.packageName, "Standard Gold");
   assert.equal(
     createDataAny.searchDocument,
@@ -182,6 +184,8 @@ function testItineraryTitleFallbackWithoutExplicitTitle(): void {
 
 function testExplicitStatusesAreRespected(): void {
   const payload = createPayload({
+    status: "Entry Only",
+    lifecycleStatus: GroupLifecycleStatus.ENTRY_ONLY,
     tone: GroupTone.INACTIVE,
     visaSetup: {
       visaStatus: VisaStatus.ISSUED,
@@ -232,6 +236,8 @@ function testExplicitStatusesAreRespected(): void {
   const createDataAny = createData as any;
   const visaSetup = createDataAny.visaSetup.create;
 
+  assert.equal(createDataAny.status, "Entry Only");
+  assert.equal(createDataAny.lifecycleStatus, GroupLifecycleStatus.ENTRY_ONLY);
   assert.equal(createDataAny.tone, GroupTone.INACTIVE);
   assert.equal(visaSetup.visaStatus, VisaStatus.ISSUED);
   assert.equal((visaSetup.issuedDate as Date).toISOString().slice(0, 10), "2026-04-14");
