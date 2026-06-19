@@ -33,6 +33,10 @@ import {
   validateTravelDateRangeOrThrow,
 } from "../domain/groups.shared";
 import {
+  resolveGroupLifecycleStatus,
+  toGroupStatusLabel,
+} from "../domain/groups.lifecycle-status";
+import {
   addItineraryItemInMemory,
   addVisaHotelAgreementInMemory,
   confirmChecklistDriverInMemory,
@@ -1225,6 +1229,7 @@ export class GroupsCommandService {
         code: true,
         name: true,
         status: true,
+        lifecycleStatus: true,
         arrivalDate: true,
         returnDate: true,
         packageName: true,
@@ -1257,17 +1262,20 @@ export class GroupsCommandService {
       requestedParentGroupId: payload.parentGroupId,
       currentGroup: current,
     });
+    const nextLifecycleStatus = payload.lifecycleStatus ?? (payload.status !== undefined ? resolveGroupLifecycleStatus(payload.status) : undefined);
+    const nextStatus = payload.status?.trim() ?? (payload.lifecycleStatus ? toGroupStatusLabel(payload.lifecycleStatus) : undefined);
 
     return this.prisma.group.update({
       where: { id: current.id },
       data: {
         code: nextCode,
         name: payload.name?.trim(),
-        status: payload.status?.trim(),
+        status: nextStatus,
+        lifecycleStatus: nextLifecycleStatus,
         searchDocument: buildGroupSearchDocument({
           code: nextCode ?? current.code,
           name: payload.name?.trim() ?? current.name,
-          status: payload.status?.trim() ?? current.status,
+          status: nextStatus ?? current.status,
           packageName: payload.packageName?.trim() ?? current.packageName,
         }),
         arrivalDate: payload.arrivalDate

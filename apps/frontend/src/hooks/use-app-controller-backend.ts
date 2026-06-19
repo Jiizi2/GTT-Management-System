@@ -148,6 +148,7 @@ type BackendGroupRecord = {
   code?: string;
   name?: string;
   status?: string;
+  lifecycleStatus?: "ENTRY_ONLY" | "ACTIVE" | "INACTIVE" | "COMPLETED" | "ARCHIVED" | null;
   parentGroupId?: string | null;
   arrivalDate?: string | Date | null;
   returnDate?: string | Date | null;
@@ -681,6 +682,26 @@ function mapBackendToneToFrontend(tone: string | undefined, status: string | und
   return "active";
 }
 
+function mapBackendLifecycleStatusToLabel(value: unknown): string | undefined {
+  if (value === "ENTRY_ONLY") {
+    return "Entry Only";
+  }
+  if (value === "ACTIVE") {
+    return "Active";
+  }
+  if (value === "INACTIVE") {
+    return "In Active";
+  }
+  if (value === "COMPLETED") {
+    return "Completed";
+  }
+  if (value === "ARCHIVED") {
+    return "Archived";
+  }
+
+  return undefined;
+}
+
 function mapBackendVisaStatus(value: string | undefined): GroupVisaSetup["visaStatus"] {
   const normalized = value?.trim().toUpperCase() ?? "";
   if (normalized === "ISSUED") {
@@ -941,9 +962,10 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
 
   const backendTone = mapBackendToneToFrontend(group.tone, group.status);
   const resolvedTone = resolveCurrentGroupTone(backendTone, sortedItinerary);
+  const lifecycleStatusLabel = mapBackendLifecycleStatusToLabel(group.lifecycleStatus);
   const resolvedStatus =
     resolvedTone === backendTone
-      ? readString(group.status, getStatusByTone(resolvedTone))
+      ? lifecycleStatusLabel ?? readString(group.status, getStatusByTone(resolvedTone))
       : getStatusByTone(resolvedTone);
   const pax = Math.max(1, readNumber(group.pax, 1));
   const durationDays = Math.max(1, readNumber(group.durationDays, 8));
@@ -1060,6 +1082,7 @@ function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData | null 
     code,
     name,
     status: resolvedStatus,
+    lifecycleStatus: group.lifecycleStatus ?? undefined,
     tone: resolvedTone,
     pax,
     totalBuses: resolveTotalBusCount(pax, readNumber(group.totalBuses, 0) || undefined),

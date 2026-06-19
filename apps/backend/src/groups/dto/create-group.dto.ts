@@ -3,6 +3,7 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupLifecycleStatus,
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
@@ -446,6 +447,11 @@ export class CreateGroupDto {
   @IsString()
   @IsNotEmpty()
   status!: string;
+
+  @ApiPropertyOptional({ enum: GroupLifecycleStatus, example: GroupLifecycleStatus.ACTIVE })
+  @IsOptional()
+  @IsEnum(GroupLifecycleStatus)
+  lifecycleStatus?: GroupLifecycleStatus;
 
   @ApiProperty({ example: "2026-04-12" })
   @IsDateString()

@@ -12,6 +12,14 @@ enum GroupTone {
   INACTIVE
 }
 
+enum GroupLifecycleStatus {
+  ENTRY_ONLY
+  ACTIVE
+  INACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
 enum VisaStatus {
   DRAFT
   PENDING
@@ -122,6 +130,7 @@ model Group {
   code               String                @unique
   name               String
   status             String
+  lifecycleStatus    GroupLifecycleStatus  @default(ACTIVE)
   searchDocument     String                @default("")
   tone               GroupTone             @default(ACTIVE)
   arrivalDate        DateTime
@@ -147,6 +156,7 @@ model Group {
   childGroups        Group[]               @relation("GroupToGroup")
 
   @@index([createdAt])
+  @@index([lifecycleStatus])
 }
 
 model GroupAuditLog {

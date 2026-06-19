@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
-import { AgreementCity, Prisma } from "@prisma/client";
+import { AgreementCity, GroupLifecycleStatus, Prisma } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
@@ -10,6 +10,7 @@ type PrismaGroupRecord = {
   code: string;
   name?: string;
   status?: string;
+  packageName?: string;
   arrivalDate: Date;
   returnDate: Date;
 };
@@ -560,6 +561,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           code?: string;
           name?: string;
           status?: string;
+          lifecycleStatus?: GroupLifecycleStatus;
           searchDocument?: string;
           arrivalDate?: Date;
           returnDate?: Date;
@@ -571,6 +573,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       assert.equal(data.code, "GRP-NEW");
       assert.equal(data.name, "Updated Group");
       assert.equal(data.status, "Active");
+      assert.equal(data.lifecycleStatus, GroupLifecycleStatus.ACTIVE);
       assert.equal(data.packageName, "Premium");
       assert.equal(
         data.searchDocument,
@@ -579,6 +582,54 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       assert.equal(data.durationDays, 10);
       assert.equal(data.arrivalDate?.toISOString().slice(0, 10), "2026-04-11");
       assert.equal(data.returnDate?.toISOString().slice(0, 10), "2026-04-19");
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let updatedPayload: Record<string, unknown> | null = null;
+    const currentGroup: PrismaGroupRecord = {
+      id: "grp-1",
+      code: "GRP-OLD",
+      name: "Old Group",
+      status: "Active",
+      packageName: "Pending Package",
+      arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
+      returnDate: new Date("2026-04-18T00:00:00.000Z"),
+    };
+    const prismaMock = {
+      group: {
+        findFirst: createGroupFindFirstMock({
+          selectLookup: () => currentGroup,
+        }),
+        update: async (args: Record<string, unknown>) => {
+          updatedPayload = args;
+          return {
+            id: "grp-1",
+            code: "GRP-OLD",
+          };
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await service.update("GRP-OLD", {
+        lifecycleStatus: GroupLifecycleStatus.COMPLETED,
+      });
+
+      assert.ok(updatedPayload);
+      const data = (updatedPayload as {
+        data: {
+          status?: string;
+          lifecycleStatus?: GroupLifecycleStatus;
+          searchDocument?: string;
+        };
+      }).data;
+      assert.equal(data.status, "Completed");
+      assert.equal(data.lifecycleStatus, GroupLifecycleStatus.COMPLETED);
+      assert.equal(data.searchDocument, "grp old grpold old group oldgroup completed pending package pendingpackage");
     } finally {
       restore();
     }

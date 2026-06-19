@@ -52,6 +52,7 @@ export type NavItem = {
 export type SessionAccessTier = "super-admin" | "admin";
 
 export type StatusTone = "active" | "inactive";
+export type GroupLifecycleStatus = "ENTRY_ONLY" | "ACTIVE" | "INACTIVE" | "COMPLETED" | "ARCHIVED";
 
 export type TimelineItem = {
   date: string;
@@ -144,6 +145,7 @@ export type GroupData = {
   code: string;
   name: string;
   status: string;
+  lifecycleStatus?: GroupLifecycleStatus;
   tone: StatusTone;
   pax: number;
   totalBuses?: number;

@@ -4,6 +4,7 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupLifecycleStatus,
   GroupTone,
   VisaPaymentStatus,
   VisaStatus,
@@ -281,6 +282,9 @@ export class GroupSummaryResponseDto {
 
   @ApiProperty({ example: "Active" })
   status!: string;
+
+  @ApiProperty({ enum: GroupLifecycleStatus, example: GroupLifecycleStatus.ACTIVE })
+  lifecycleStatus!: GroupLifecycleStatus;
 
   @ApiProperty({ enum: GroupTone, example: GroupTone.ACTIVE })
   tone!: GroupTone;

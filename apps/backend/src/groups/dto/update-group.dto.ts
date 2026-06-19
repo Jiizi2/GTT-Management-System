@@ -1,4 +1,4 @@
-import { GroupTone } from "@prisma/client";
+import { GroupLifecycleStatus, GroupTone } from "@prisma/client";
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -17,6 +17,11 @@ export class UpdateGroupDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiPropertyOptional({ enum: GroupLifecycleStatus, example: GroupLifecycleStatus.COMPLETED })
+  @IsOptional()
+  @IsEnum(GroupLifecycleStatus)
+  lifecycleStatus?: GroupLifecycleStatus;
 
   @ApiPropertyOptional({ example: "2026-04-12" })
   @IsOptional()
