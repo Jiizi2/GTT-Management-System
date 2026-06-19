@@ -11,9 +11,11 @@ import {
 import { findOneFromMemory } from "../infrastructure/groups.memory-store";
 import type {
   FindAllOptions,
+  GroupDetailRecord,
+  GroupListResult,
   MemoryAuditLog,
   MemoryGroupRecord,
-  PaginatedGroupList,
+  PrismaGroupDetailRecord,
 } from "../groups.service-types";
 
 export class GroupsQueryService {
@@ -27,7 +29,7 @@ export class GroupsQueryService {
   async findAll(
     query?: string,
     options?: FindAllOptions,
-  ): Promise<unknown[] | PaginatedGroupList<unknown>> {
+  ): Promise<GroupListResult> {
     const projection = options?.projection ?? "detail";
     if (this.dataSource === "prisma") {
       return this.findAllWithPrisma(query, {
@@ -42,7 +44,7 @@ export class GroupsQueryService {
     return paginateGroupItems(source, options);
   }
 
-  async findOneByIdOrCode(idOrCode: string): Promise<unknown> {
+  async findOneByIdOrCode(idOrCode: string): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.findOneWithPrisma(idOrCode);
     }
@@ -113,7 +115,7 @@ export class GroupsQueryService {
   private async findAllWithPrisma(
     query?: string,
     options?: FindAllOptions,
-  ): Promise<unknown[] | PaginatedGroupList<unknown>> {
+  ): Promise<GroupListResult> {
     const where = buildGroupWhere(query, options?.filter, options?.activeOnly ?? false);
     const pageState = resolvePaginationState(options);
     const select = options?.projection === "summary" ? groupSummarySelection : groupDetailSelection;
@@ -149,7 +151,7 @@ export class GroupsQueryService {
     };
   }
 
-  private async findOneWithPrisma(idOrCode: string) {
+  private async findOneWithPrisma(idOrCode: string): Promise<PrismaGroupDetailRecord> {
     let group = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -175,15 +177,21 @@ export class GroupsQueryService {
       });
 
       if (parent) {
-        group = {
-          ...group,
+        const inheritedFields: Pick<
+          PrismaGroupDetailRecord,
+          "musyrif" | "nextActivity" | "timeline" | "itinerary" | "notes" | "checklistAssignments"
+        > = {
           musyrif: parent.musyrif,
           nextActivity: parent.nextActivity,
           timeline: parent.timeline,
           itinerary: parent.itinerary,
           notes: parent.notes,
           checklistAssignments: parent.checklistAssignments,
-        } as any;
+        };
+        group = {
+          ...group,
+          ...inheritedFields,
+        };
       }
     }
 
