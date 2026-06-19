@@ -181,6 +181,86 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
   }
 
   {
+    let createPayload: Record<string, unknown> | null = null;
+    const tx = {
+      group: {
+        create: async (args: Record<string, unknown>) => {
+          createPayload = args;
+          return {
+            id: "grp-child",
+            code: "GRP-CHILD",
+          };
+        },
+      },
+    };
+    const prismaMock = {
+      group: {
+        findFirst: async () => ({
+          id: "parent-id-1",
+          code: "GRP-PARENT",
+          parentGroupId: null,
+        }),
+      },
+      $transaction: async (callback: (transactionClient: typeof tx) => Promise<unknown>) => callback(tx),
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      const created = (await service.create(
+        createGroupPayload({
+          code: "grp-child",
+          parentGroupId: "GRP-PARENT",
+        }),
+      )) as { code?: string };
+
+      assert.equal(created.code, "GRP-CHILD");
+      assert.ok(createPayload);
+      const data = (createPayload as { data: { parentGroupId?: string | null } }).data;
+      assert.equal(data.parentGroupId, "parent-id-1");
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let transactionCalls = 0;
+    const prismaMock = {
+      group: {
+        findFirst: async () => ({
+          id: "grp-child-parent",
+          code: "GRP-CHILD-PARENT",
+          parentGroupId: "grp-grandparent",
+        }),
+      },
+      $transaction: async () => {
+        transactionCalls += 1;
+        throw new Error("grandchild create should be rejected before transaction");
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await assert.rejects(
+        () =>
+          service.create(
+            createGroupPayload({
+              code: "GRP-GRANDCHILD",
+              parentGroupId: "GRP-CHILD-PARENT",
+            }),
+          ),
+        (error: unknown) => {
+          assert.equal(error instanceof ConflictException, true);
+          assert.match((error as Error).message, /cannot be used as parent/i);
+          return true;
+        },
+      );
+      assert.equal(transactionCalls, 0);
+    } finally {
+      restore();
+    }
+  }
+
+  {
     const tx = {
       group: {
         create: async () => {
@@ -548,6 +628,58 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           return true;
         },
       );
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let updateCalls = 0;
+    const currentGroup: PrismaGroupRecord = {
+      id: "grp-parent",
+      code: "GRP-PARENT",
+      name: "Parent Group",
+      status: "Active",
+      arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
+      returnDate: new Date("2026-04-18T00:00:00.000Z"),
+    };
+    const prismaMock = {
+      group: {
+        findFirst: async (args: { where?: { OR?: Array<{ id?: string; code?: string }> } }) => {
+          const lookupValues = args.where?.OR ?? [];
+          if (lookupValues.some((item) => item.id === "GRP-PARENT" || item.code === "GRP-PARENT")) {
+            return currentGroup;
+          }
+
+          return {
+            id: "grp-other-parent",
+            code: "GRP-OTHER-PARENT",
+            parentGroupId: null,
+          };
+        },
+        findUnique: async () => null,
+        count: async () => 1,
+        update: async () => {
+          updateCalls += 1;
+          throw new Error("group with children should not become a child");
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await assert.rejects(
+        () =>
+          service.update("GRP-PARENT", {
+            parentGroupId: "GRP-OTHER-PARENT",
+          }),
+        (error: unknown) => {
+          assert.equal(error instanceof ConflictException, true);
+          assert.match((error as Error).message, /already has child groups/i);
+          return true;
+        },
+      );
+      assert.equal(updateCalls, 0);
     } finally {
       restore();
     }

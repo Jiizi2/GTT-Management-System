@@ -57,6 +57,11 @@ import type {
   MemoryGroupRecord,
 } from "../groups.service-types";
 
+type PrismaParentLinkCurrentGroup = {
+  id: string;
+  code: string;
+};
+
 function collectSourceDraftIds(payload: CreateGroupDto): string[] {
   return [
     ...new Set(
@@ -1022,11 +1027,18 @@ export class GroupsCommandService {
   private async createWithPrisma(payload: CreateGroupDto) {
     const normalizedCode = payload.code.trim().toUpperCase();
     const sourceDraftIds = collectSourceDraftIds(payload);
+    const parentGroupId = await this.validateParentGroupLinkWithPrisma({
+      requestedParentGroupId: payload.parentGroupId,
+    });
+    const normalizedPayload: CreateGroupDto = {
+      ...payload,
+      parentGroupId,
+    };
 
     try {
       return await this.prisma.$transaction(async (tx) => {
         const created = await tx.group.create({
-          data: buildGroupCreateData(payload, normalizedCode),
+          data: buildGroupCreateData(normalizedPayload, normalizedCode),
           select: groupDetailSelection,
         });
 
@@ -1098,8 +1110,16 @@ export class GroupsCommandService {
     const legacyItinerarySortOrderById = new Map<string, number>(
       current.itinerary.map((item) => [item.id, item.sortOrder]),
     );
+    const parentGroupId = await this.validateParentGroupLinkWithPrisma({
+      requestedParentGroupId: payload.parentGroupId,
+      currentGroup: current,
+    });
+    const normalizedPayload: CreateGroupDto = {
+      ...payload,
+      parentGroupId,
+    };
     const checklistSortOrderHints = new Map<string, number>();
-    (payload.checklistAssignments ?? []).forEach((assignment) => {
+    (normalizedPayload.checklistAssignments ?? []).forEach((assignment) => {
       const legacyItineraryId = assignment.itineraryItemId?.trim();
       if (!legacyItineraryId) {
         return;
@@ -1159,7 +1179,7 @@ export class GroupsCommandService {
 
       const replaced = await tx.group.update({
         where: { id: current.id },
-        data: buildGroupReplaceData(payload, normalizedCode),
+        data: buildGroupReplaceData(normalizedPayload, normalizedCode),
         select: groupDetailSelection,
       });
 
@@ -1257,6 +1277,10 @@ export class GroupsCommandService {
       ? parseIsoDateOnly(payload.returnDate)
       : current.returnDate.toISOString().slice(0, 10);
     validateTravelDateRangeOrThrow(nextArrivalDateIso, nextReturnDateIso);
+    const parentGroupId = await this.validateParentGroupLinkWithPrisma({
+      requestedParentGroupId: payload.parentGroupId,
+      currentGroup: current,
+    });
 
     return this.prisma.group.update({
       where: { id: current.id },
@@ -1281,10 +1305,74 @@ export class GroupsCommandService {
         totalBuses: payload.totalBuses,
         packageName: payload.packageName?.trim(),
         durationDays: payload.durationDays,
-        parentGroupId: payload.parentGroupId !== undefined ? (payload.parentGroupId?.trim() || null) : undefined,
+        parentGroupId,
       },
       select: groupDetailSelection,
     });
+  }
+
+  private async validateParentGroupLinkWithPrisma(input: {
+    requestedParentGroupId?: string | null;
+    currentGroup?: PrismaParentLinkCurrentGroup;
+  }): Promise<string | null | undefined> {
+    if (input.requestedParentGroupId === undefined) {
+      return undefined;
+    }
+
+    const requestedParentGroupId = input.requestedParentGroupId?.trim() ?? "";
+    if (!requestedParentGroupId) {
+      return null;
+    }
+
+    const currentGroup = input.currentGroup;
+    if (
+      currentGroup &&
+      (requestedParentGroupId === currentGroup.id ||
+        requestedParentGroupId.toUpperCase() === currentGroup.code)
+    ) {
+      throw new ConflictException("A group cannot be linked as its own parent.");
+    }
+
+    const parentGroup = await this.prisma.group.findFirst({
+      where: {
+        OR: [
+          { id: requestedParentGroupId },
+          { code: requestedParentGroupId.toUpperCase() },
+        ],
+      },
+      select: {
+        id: true,
+        code: true,
+        parentGroupId: true,
+      },
+    });
+
+    if (!parentGroup) {
+      throw new NotFoundException(
+        `Parent group '${requestedParentGroupId}' not found.`,
+      );
+    }
+
+    if (parentGroup.parentGroupId) {
+      throw new ConflictException(
+        `Group '${parentGroup.code}' is a child group and cannot be used as parent.`,
+      );
+    }
+
+    if (currentGroup) {
+      const childCount = await this.prisma.group.count({
+        where: {
+          parentGroupId: currentGroup.id,
+        },
+      });
+      if (childCount > 0) {
+        throw new ConflictException(
+          `Group '${currentGroup.code}' already has child groups and cannot become a child group.`,
+        );
+      }
+    }
+
+    return parentGroup.id;
   }
 
   private async removeWithPrisma(idOrCode: string): Promise<void> {
