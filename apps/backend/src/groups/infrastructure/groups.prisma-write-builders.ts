@@ -123,6 +123,7 @@ function buildVisaSetupCreate(visaSetup: CreateGroupDto["visaSetup"]) {
         visaSetup.hotelAgreements && visaSetup.hotelAgreements.length > 0
           ? {
               create: visaSetup.hotelAgreements.map((hotel) => ({
+                sourceDraftId: hotel.sourceDraftId?.trim() || null,
                 city: hotel.city ?? AgreementCity.MAKKAH,
                 hotelName: hotel.hotelName.trim(),
                 agreementNumber: hotel.agreementNumber.trim(),

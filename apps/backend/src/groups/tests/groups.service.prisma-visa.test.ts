@@ -78,6 +78,7 @@ async function testPrismaAddVisaHotelAgreement(): Promise<void> {
   try {
     const result = (await service.addVisaHotelAgreement("GRP-PRISMA", {
       city: AgreementCity.MAKKAH,
+      sourceDraftId: " draft-add-1 ",
       hotelName: " Swissotel ",
       agreementNumber: " AG-PR-1 ",
       pax: 45,
@@ -91,6 +92,7 @@ async function testPrismaAddVisaHotelAgreement(): Promise<void> {
       createdPayload as {
         data: {
           visaSetupId: string;
+          sourceDraftId: string | null;
           city: AgreementCity;
           hotelName: string;
           agreementNumber: string;
@@ -103,6 +105,7 @@ async function testPrismaAddVisaHotelAgreement(): Promise<void> {
     ).data;
 
     assert.equal(data.visaSetupId, "visa-1");
+    assert.equal(data.sourceDraftId, "draft-add-1");
     assert.equal(data.city, AgreementCity.MAKKAH);
     assert.equal(data.hotelName, "Swissotel");
     assert.equal(data.agreementNumber, "AG-PR-1");
@@ -150,6 +153,7 @@ async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
       "mad-1",
       {
         city: AgreementCity.MADINAH,
+        sourceDraftId: " draft-update-1 ",
         hotelName: " Pullman ",
         agreementNumber: " AG-PR-2 ",
         pax: 45,
@@ -165,6 +169,7 @@ async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
       updatedPayload as {
         data: {
           city: AgreementCity;
+          sourceDraftId: string | null;
           hotelName: string;
           agreementNumber: string;
           pax: number;
@@ -175,6 +180,7 @@ async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
       }
     ).data;
     assert.equal(data.city, AgreementCity.MADINAH);
+    assert.equal(data.sourceDraftId, "draft-update-1");
     assert.equal(data.hotelName, "Pullman");
     assert.equal(data.agreementNumber, "AG-PR-2");
     assert.equal(data.status, AgreementApprovalStatus.APPROVED);

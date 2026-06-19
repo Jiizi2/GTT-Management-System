@@ -76,6 +76,7 @@ export const groupSummarySelection = {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
           id: true,
+          sourceDraftId: true,
           city: true,
           hotelName: true,
           agreementNumber: true,
@@ -141,6 +142,7 @@ export const groupDetailSelection = {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
           id: true,
+          sourceDraftId: true,
           city: true,
           hotelName: true,
           agreementNumber: true,

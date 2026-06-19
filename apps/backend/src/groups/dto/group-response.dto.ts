@@ -140,6 +140,9 @@ export class GroupVisaHotelAgreementResponseDto {
   @ApiProperty({ example: "clhotelagreementid123" })
   id!: string;
 
+  @ApiPropertyOptional({ example: "cldraftagreementid123" })
+  sourceDraftId?: string | null;
+
   @ApiProperty({ enum: AgreementCity, example: AgreementCity.MAKKAH })
   city!: AgreementCity;
 

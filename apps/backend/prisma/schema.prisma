@@ -305,6 +305,7 @@ model VisaSetup {
 model VisaHotelAgreement {
   id              String                  @id @default(cuid())
   visaSetupId     String
+  sourceDraftId   String?
   city            AgreementCity
   hotelName       String
   agreementNumber String
@@ -315,8 +316,10 @@ model VisaHotelAgreement {
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
   visaSetup       VisaSetup               @relation(fields: [visaSetupId], references: [id], onDelete: Cascade)
+  sourceDraft     HotelAgreementDraft?    @relation(fields: [sourceDraftId], references: [id], onDelete: SetNull)
 
   @@index([visaSetupId, city, stayStart])
+  @@index([sourceDraftId])
 }
 
 model HotelAgreementDraft {
@@ -332,6 +335,7 @@ model HotelAgreementDraft {
   notes           String?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
+  linkedHotelAgreements VisaHotelAgreement[]
 
   @@index([agreementNumber])
   @@index([city, stayStart])

@@ -143,7 +143,13 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
       assert.equal(created.code, "GRP-CREATE");
       assert.ok(createPayload);
       const data = (createPayload as {
-        data: { code?: string; name?: string; packageName?: string; searchDocument?: string };
+        data: {
+          code?: string;
+          name?: string;
+          packageName?: string;
+          searchDocument?: string;
+          visaSetup?: { create?: { hotelAgreements?: { create?: Array<{ sourceDraftId?: string | null }> } } };
+        };
       }).data;
       assert.equal(data.code, "GRP-CREATE");
       assert.equal(data.name, "Group Create");
@@ -152,6 +158,7 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
         data.searchDocument,
         "grp create grpcreate group create groupcreate active premium package premiumpackage",
       );
+      assert.equal(data.visaSetup?.create?.hotelAgreements?.create?.[0]?.sourceDraftId, "draft-makkah-1");
       assert.equal(hotelDraftUpdateManyCalls, 0);
     } finally {
       restore();
