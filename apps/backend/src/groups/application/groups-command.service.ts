@@ -58,7 +58,9 @@ import {
 } from "../infrastructure/groups.prisma-write-builders";
 import type {
   ChecklistAssignmentSyncResult,
+  GroupDetailRecord,
   MemoryGroupRecord,
+  PrismaGroupDetailRecord,
 } from "../groups.service-types";
 
 type PrismaParentLinkCurrentGroup = {
@@ -73,7 +75,7 @@ export class GroupsCommandService {
     private readonly memoryGroups: MemoryGroupRecord[],
   ) {}
 
-  async create(payload: CreateGroupDto): Promise<unknown> {
+  async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
 
@@ -84,7 +86,7 @@ export class GroupsCommandService {
     return createInMemory(this.memoryGroups, payload);
   }
 
-  async replace(idOrCode: string, payload: CreateGroupDto): Promise<unknown> {
+  async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
 
@@ -95,7 +97,7 @@ export class GroupsCommandService {
     return replaceInMemory(this.memoryGroups, idOrCode, payload);
   }
 
-  async update(idOrCode: string, payload: UpdateGroupDto): Promise<unknown> {
+  async update(idOrCode: string, payload: UpdateGroupDto): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.updateWithPrisma(idOrCode, payload);
     }
@@ -115,7 +117,7 @@ export class GroupsCommandService {
   async addItineraryItem(
     idOrCode: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.addItineraryItemWithPrisma(idOrCode, payload);
@@ -128,7 +130,7 @@ export class GroupsCommandService {
     idOrCode: string,
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.updateItineraryItemWithPrisma(idOrCode, itemId, payload);
@@ -145,7 +147,7 @@ export class GroupsCommandService {
   async removeItineraryItem(
     idOrCode: string,
     itemId: string,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.removeItineraryItemWithPrisma(idOrCode, itemId);
@@ -157,7 +159,7 @@ export class GroupsCommandService {
   async addVisaHotelAgreement(
     idOrCode: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.addVisaHotelAgreementWithPrisma(idOrCode, payload);
     }
@@ -169,7 +171,7 @@ export class GroupsCommandService {
     idOrCode: string,
     hotelId: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.updateVisaHotelAgreementWithPrisma(
         idOrCode,
@@ -189,7 +191,7 @@ export class GroupsCommandService {
   async removeVisaHotelAgreement(
     idOrCode: string,
     hotelId: string,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.removeVisaHotelAgreementWithPrisma(idOrCode, hotelId);
     }
@@ -204,7 +206,7 @@ export class GroupsCommandService {
   async upsertPrimaryRaudhahAppointment(
     idOrCode: string,
     payload: UpsertGroupRaudhahDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.upsertPrimaryRaudhahAppointmentWithPrisma(idOrCode, payload);
     }
@@ -593,7 +595,7 @@ export class GroupsCommandService {
   private async addItineraryItemWithPrisma(
     idOrCode: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const requestedSortOrder = payload.sortOrder;
     const maxAttempts = requestedSortOrder === undefined ? 3 : 1;
@@ -685,7 +687,7 @@ export class GroupsCommandService {
     idOrCode: string,
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const existing = await this.prisma.itineraryItem.findFirst({
       where: {
@@ -774,7 +776,7 @@ export class GroupsCommandService {
   private async removeItineraryItemWithPrisma(
     idOrCode: string,
     itemId: string,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const removed = await this.prisma.itineraryItem.deleteMany({
       where: {
@@ -795,7 +797,7 @@ export class GroupsCommandService {
   private async addVisaHotelAgreementWithPrisma(
     idOrCode: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const visaSetup = await this.resolveOrCreatePrismaVisaSetup(group.id);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
@@ -848,7 +850,7 @@ export class GroupsCommandService {
     idOrCode: string,
     hotelId: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
       where: {
@@ -910,7 +912,7 @@ export class GroupsCommandService {
   private async removeVisaHotelAgreementWithPrisma(
     idOrCode: string,
     hotelId: string,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
       where: {
@@ -965,7 +967,7 @@ export class GroupsCommandService {
   private async upsertPrimaryRaudhahAppointmentWithPrisma(
     idOrCode: string,
     payload: UpsertGroupRaudhahDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const visaSetup = await this.resolveOrCreatePrismaVisaSetup(group.id);
     const primary = await this.prisma.raudhahAppointment.findFirst({
@@ -1005,7 +1007,7 @@ export class GroupsCommandService {
     return this.findOneWithPrisma(group.id);
   }
 
-  private async findOneWithPrisma(idOrCode: string) {
+  private async findOneWithPrisma(idOrCode: string): Promise<PrismaGroupDetailRecord> {
     const group = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -1020,7 +1022,7 @@ export class GroupsCommandService {
     return group;
   }
 
-  private async createWithPrisma(payload: CreateGroupDto) {
+  private async createWithPrisma(payload: CreateGroupDto): Promise<PrismaGroupDetailRecord> {
     const normalizedCode = payload.code.trim().toUpperCase();
     const parentGroupId = await this.validateParentGroupLinkWithPrisma({
       requestedParentGroupId: payload.parentGroupId,
@@ -1053,7 +1055,7 @@ export class GroupsCommandService {
     }
   }
 
-  private async replaceWithPrisma(idOrCode: string, payload: CreateGroupDto) {
+  private async replaceWithPrisma(idOrCode: string, payload: CreateGroupDto): Promise<PrismaGroupDetailRecord> {
     const current = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -1219,7 +1221,7 @@ export class GroupsCommandService {
     });
   }
 
-  private async updateWithPrisma(idOrCode: string, payload: UpdateGroupDto) {
+  private async updateWithPrisma(idOrCode: string, payload: UpdateGroupDto): Promise<PrismaGroupDetailRecord> {
     const current = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
