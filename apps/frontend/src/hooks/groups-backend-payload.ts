@@ -178,6 +178,23 @@ export function mapVisaHotelEditFormToBackendPayload(city: "makkah" | "madinah",
   };
 }
 
+export function mapGroupUpdateToBackendPayload(group: GroupData) {
+  const { arrivalDate, returnDate } = resolveGroupTravelDates(group);
+  return {
+    code: group.code.trim().toUpperCase(),
+    name: group.name.trim(),
+    status: group.status.trim(),
+    arrivalDate,
+    returnDate,
+    tone: mapToneToBackend(group.tone),
+    pax: group.pax,
+    totalBuses: group.totalBuses,
+    packageName: group.packageName.trim(),
+    durationDays: group.durationDays,
+    parentGroupId: group.parentGroupId || null,
+  };
+}
+
 function isIsoDateOnly(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }

@@ -5,9 +5,8 @@ import { mapBackendGroupToFrontend } from "./groups-backend-mapper";
 import {
   mapGroupIdentityDraftToBackendPayload,
   mapGroupToBackendPayload,
-  mapToneToBackend,
+  mapGroupUpdateToBackendPayload,
   mapVisaHotelEditFormToBackendPayload,
-  resolveGroupTravelDates,
   type GroupIdentityDraftPayload,
 } from "./groups-backend-payload";
 import {
@@ -109,7 +108,6 @@ export async function createGroupIdentityInBackend(identity: GroupIdentityDraftP
 }
 
 export async function updateGroupInBackend(groupCode: string, group: GroupData): Promise<void> {
-  const { arrivalDate, returnDate } = resolveGroupTravelDates(group);
   const {
     response,
     payload: responsePayload,
@@ -119,19 +117,7 @@ export async function updateGroupInBackend(groupCode: string, group: GroupData):
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      code: group.code.trim().toUpperCase(),
-      name: group.name.trim(),
-      status: group.status.trim(),
-      arrivalDate,
-      returnDate,
-      tone: mapToneToBackend(group.tone),
-      pax: group.pax,
-      totalBuses: group.totalBuses,
-      packageName: group.packageName.trim(),
-      durationDays: group.durationDays,
-      parentGroupId: group.parentGroupId || null,
-    }),
+    body: JSON.stringify(mapGroupUpdateToBackendPayload(group)),
   });
 
   if (!response.ok) {
