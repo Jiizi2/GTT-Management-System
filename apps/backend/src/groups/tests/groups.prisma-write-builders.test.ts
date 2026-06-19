@@ -86,6 +86,7 @@ function testTrimAndDefaultMappings(): void {
       hotelAgreements: [
         {
           city: AgreementCity.MAKKAH,
+          sourceDraftId: " draft-builder-1 ",
           hotelName: " Makkah Hotel ",
           agreementNumber: " AG-101 ",
           pax: 45,
@@ -143,6 +144,7 @@ function testTrimAndDefaultMappings(): void {
   assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.UNPAID);
   assert.equal((visaSetup.outstandingAmount as Prisma.Decimal).toString(), "0");
   assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MAKKAH);
+  assert.equal(visaSetup.hotelAgreements.create[0].sourceDraftId, "draft-builder-1");
   assert.equal(visaSetup.hotelAgreements.create[0].status, AgreementApprovalStatus.WAITING);
   assert.equal(visaSetup.raudhahAppointments.create[0].status, GroupRaudhahStatus.FREE);
   assert.equal(visaSetup.hotelAgreements.create[0].hotelName, "Makkah Hotel");

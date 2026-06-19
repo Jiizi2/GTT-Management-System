@@ -826,6 +826,7 @@ export class GroupsCommandService {
     await this.prisma.visaHotelAgreement.create({
       data: {
         visaSetupId: visaSetup.id,
+        sourceDraftId: payload.sourceDraftId?.trim() || null,
         city: payload.city,
         hotelName: payload.hotelName.trim(),
         agreementNumber: payload.agreementNumber.trim(),
@@ -888,6 +889,7 @@ export class GroupsCommandService {
     await this.prisma.visaHotelAgreement.update({
       where: { id: hotelId },
       data: {
+        sourceDraftId: payload.sourceDraftId?.trim() || null,
         city: payload.city,
         hotelName: payload.hotelName.trim(),
         agreementNumber: payload.agreementNumber.trim(),
