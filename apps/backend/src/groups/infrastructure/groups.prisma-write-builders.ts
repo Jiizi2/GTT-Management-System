@@ -118,6 +118,7 @@ function buildVisaSetupCreate(visaSetup: CreateGroupDto["visaSetup"]) {
       visaStatus: visaSetup.visaStatus ?? VisaStatus.DRAFT,
       issuedDate: visaSetup.issuedDate ? toUtcMidnight(visaSetup.issuedDate) : null,
       syarikah: visaSetup.syarikah.trim(),
+      busStatus: visaSetup.busStatus ?? null,
       paymentStatus: visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
       outstandingAmount: new Prisma.Decimal(visaSetup.outstandingAmount ?? 0),
       hotelAgreements:

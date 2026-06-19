@@ -72,6 +72,7 @@ export const groupSummarySelection = {
       visaStatus: true,
       issuedDate: true,
       syarikah: true,
+      busStatus: true,
       paymentStatus: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
@@ -139,6 +140,7 @@ export const groupDetailSelection = {
       visaStatus: true,
       issuedDate: true,
       syarikah: true,
+      busStatus: true,
       paymentStatus: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],

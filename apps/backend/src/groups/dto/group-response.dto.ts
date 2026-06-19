@@ -6,6 +6,7 @@ import {
   GroupRaudhahStatus,
   GroupLifecycleStatus,
   GroupTone,
+  VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -195,6 +196,13 @@ export class GroupVisaSetupResponseDto {
 
   @ApiProperty({ example: "Nusuk Premium" })
   syarikah!: string;
+
+  @ApiPropertyOptional({
+    enum: VisaBusStatus,
+    example: VisaBusStatus.VISA_ONLY,
+    nullable: true,
+  })
+  busStatus?: VisaBusStatus | null;
 
   @ApiProperty({
     enum: VisaPaymentStatus,
