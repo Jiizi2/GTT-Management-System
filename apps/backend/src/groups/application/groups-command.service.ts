@@ -57,16 +57,6 @@ import type {
   MemoryGroupRecord,
 } from "../groups.service-types";
 
-function collectSourceDraftIds(payload: CreateGroupDto): string[] {
-  return [
-    ...new Set(
-      (payload.visaSetup?.hotelAgreements ?? [])
-        .map((agreement) => agreement.sourceDraftId?.trim())
-        .filter((draftId): draftId is string => Boolean(draftId)),
-    ),
-  ];
-}
-
 export class GroupsCommandService {
   constructor(
     private readonly prisma: PrismaService,
@@ -1021,7 +1011,6 @@ export class GroupsCommandService {
 
   private async createWithPrisma(payload: CreateGroupDto) {
     const normalizedCode = payload.code.trim().toUpperCase();
-    const sourceDraftIds = collectSourceDraftIds(payload);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1029,21 +1018,6 @@ export class GroupsCommandService {
           data: buildGroupCreateData(payload, normalizedCode),
           select: groupDetailSelection,
         });
-
-        if (sourceDraftIds.length > 0) {
-          await tx.hotelAgreementDraft.updateMany({
-            where: {
-              id: {
-                in: sourceDraftIds,
-              },
-              groupId: null,
-            },
-            data: {
-              groupId: created.id,
-              assignedAt: new Date(),
-            },
-          });
-        }
 
         return created;
       });
