@@ -526,6 +526,45 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
   }
 }
 
+async function testPrismaListClientsAllowsDuplicateSortOrder(): Promise<void> {
+  let findManyArgs: Record<string, unknown> | null = null;
+  const prismaMock = {
+    invoiceClient: {
+      findMany: async (args: Record<string, unknown>) => {
+        findManyArgs = args;
+        return [
+          {
+            id: "cli-earlier",
+            name: "Earlier Client",
+            sortOrder: 4,
+            group: null,
+          },
+          {
+            id: "cli-later",
+            name: "Later Client",
+            sortOrder: 4,
+            group: null,
+          },
+        ];
+      },
+    },
+  } as unknown as PrismaService;
+
+  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  try {
+    const clients = await service.listClients();
+    const orderBy = (findManyArgs as Record<string, unknown> | null)?.orderBy;
+    assert.deepEqual(orderBy, [{ sortOrder: "asc" }, { createdAt: "asc" }]);
+    assert.equal(clients.length, 2);
+    assert.deepEqual(
+      clients.map((client) => client.label),
+      ["04. Earlier Client", "04. Later Client"],
+    );
+  } finally {
+    restore();
+  }
+}
+
 async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> {
   let rawReadCalls = 0;
   let rawWriteCalls = 0;
@@ -1113,6 +1152,7 @@ async function main(): Promise<void> {
   await runCase("invoice update validation errors", testUpdateValidationErrors);
   await runCase("invoice findAll missing client guard", testFindAllThrowsWhenInvoiceClientIsMissing);
   await runCase("invoice prisma list and findAll mapping", testPrismaListAndFindAllMapping);
+  await runCase("invoice prisma list clients allows duplicate sort order", testPrismaListClientsAllowsDuplicateSortOrder);
   await runCase("invoice prisma findAll prefers inline down payment column", testPrismaFindAllPrefersInlineDownPaymentColumn);
   await runCase("invoice prisma create retry and fallback serial", testPrismaCreateSupportsRetryAndFallbackSerialResolution);
   await runCase(
