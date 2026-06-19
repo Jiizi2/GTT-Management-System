@@ -2,6 +2,7 @@ import {
   formatScheduleTime,
   getItineraryIsoDate,
   getLocalIsoDateWithOffset,
+  musyrifAvatar,
   parseTimeForInput,
 } from "../shared/app-domain";
 import type { GroupData, VisaHotelEditFormState } from "../shared/app-domain";
@@ -124,8 +125,44 @@ type BackendCreateGroupPayload = {
   }>;
 };
 
+export type GroupIdentityDraftPayload = {
+  groupCode: string;
+  groupName?: string;
+  packageName?: string;
+  pax?: number;
+  totalBuses?: number;
+  arrivalDate?: string;
+  returnDate?: string;
+  durationDays?: number;
+  musyrifName?: string;
+  musyrifPhone?: string;
+  busStatus?: "Visa+" | "Visa Only";
+};
+
 export function mapToneToBackend(tone: GroupData["tone"]): "ACTIVE" | "INACTIVE" {
   return tone === "active" ? "ACTIVE" : "INACTIVE";
+}
+
+export function mapGroupIdentityDraftToBackendPayload(identity: GroupIdentityDraftPayload) {
+  return {
+    code: identity.groupCode.trim().toUpperCase(),
+    name: identity.groupName?.trim() || undefined,
+    packageName: identity.packageName?.trim() || undefined,
+    pax: identity.pax,
+    totalBuses: identity.totalBuses,
+    arrivalDate: identity.arrivalDate?.trim() || undefined,
+    returnDate: identity.returnDate?.trim() || undefined,
+    durationDays: identity.durationDays,
+    musyrif:
+      identity.musyrifName?.trim() || identity.musyrifPhone?.trim()
+        ? {
+          name: identity.musyrifName?.trim() || "Unassigned Musyrif",
+          phone: identity.musyrifPhone?.trim() || "-",
+          avatar: musyrifAvatar,
+        }
+        : undefined,
+    busStatus: identity.busStatus,
+  };
 }
 
 export function mapVisaHotelEditFormToBackendPayload(city: "makkah" | "madinah", hotel: VisaHotelEditFormState) {

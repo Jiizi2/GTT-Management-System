@@ -1,13 +1,14 @@
-import { musyrifAvatar } from "../shared/app-domain";
 import type { GroupData, VisaHotelEditFormState } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
 import { mapBackendGroupToFrontend } from "./groups-backend-mapper";
 import {
+  mapGroupIdentityDraftToBackendPayload,
   mapGroupToBackendPayload,
   mapToneToBackend,
   mapVisaHotelEditFormToBackendPayload,
   resolveGroupTravelDates,
+  type GroupIdentityDraftPayload,
 } from "./groups-backend-payload";
 import {
   parseBackendGroupRecord,
@@ -17,22 +18,9 @@ export {
   getVisaAgreementValidationError,
   sortHotelsByStayStart,
 } from "./visa-agreement-validation";
+export type { GroupIdentityDraftPayload } from "./groups-backend-payload";
 
 export type GroupFetchProjection = "summary" | "detail";
-
-export type GroupIdentityDraftPayload = {
-  groupCode: string;
-  groupName?: string;
-  packageName?: string;
-  pax?: number;
-  totalBuses?: number;
-  arrivalDate?: string;
-  returnDate?: string;
-  durationDays?: number;
-  musyrifName?: string;
-  musyrifPhone?: string;
-  busStatus?: "Visa+" | "Visa Only";
-};
 
 export async function fetchGroupsFromBackend({
   signal,
@@ -94,25 +82,6 @@ export async function createGroupInBackend(group: GroupData): Promise<void> {
 }
 
 export async function createGroupIdentityInBackend(identity: GroupIdentityDraftPayload): Promise<GroupData> {
-  const body = {
-    code: identity.groupCode.trim().toUpperCase(),
-    name: identity.groupName?.trim() || undefined,
-    packageName: identity.packageName?.trim() || undefined,
-    pax: identity.pax,
-    totalBuses: identity.totalBuses,
-    arrivalDate: identity.arrivalDate?.trim() || undefined,
-    returnDate: identity.returnDate?.trim() || undefined,
-    durationDays: identity.durationDays,
-    musyrif:
-      identity.musyrifName?.trim() || identity.musyrifPhone?.trim()
-        ? {
-          name: identity.musyrifName?.trim() || "Unassigned Musyrif",
-          phone: identity.musyrifPhone?.trim() || "-",
-          avatar: musyrifAvatar,
-        }
-        : undefined,
-    busStatus: identity.busStatus,
-  };
   const {
     response,
     payload: responsePayload,
@@ -122,7 +91,7 @@ export async function createGroupIdentityInBackend(identity: GroupIdentityDraftP
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(mapGroupIdentityDraftToBackendPayload(identity)),
   });
 
   if (!response.ok) {
