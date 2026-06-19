@@ -4,7 +4,7 @@ import {
   getLocalIsoDateWithOffset,
   parseTimeForInput,
 } from "../shared/app-domain";
-import type { GroupData } from "../shared/app-domain";
+import type { GroupData, VisaHotelEditFormState } from "../shared/app-domain";
 import {
   mapAgreementStatusToBackend,
   mapBusStatusToBackend,
@@ -126,6 +126,19 @@ type BackendCreateGroupPayload = {
 
 export function mapToneToBackend(tone: GroupData["tone"]): "ACTIVE" | "INACTIVE" {
   return tone === "active" ? "ACTIVE" : "INACTIVE";
+}
+
+export function mapVisaHotelEditFormToBackendPayload(city: "makkah" | "madinah", hotel: VisaHotelEditFormState) {
+  const parsedPax = Number.parseInt(hotel.pax, 10);
+  return {
+    city: city === "madinah" ? ("MADINAH" as const) : ("MAKKAH" as const),
+    hotelName: hotel.hotelName.trim(),
+    agreementNumber: hotel.agreementNumber.trim(),
+    pax: Number.isFinite(parsedPax) ? parsedPax : 1,
+    status: mapAgreementStatusToBackend(hotel.status),
+    stayStart: hotel.stayStartIso.trim(),
+    stayEnd: hotel.stayEndIso.trim(),
+  };
 }
 
 function isIsoDateOnly(value: string): boolean {
