@@ -23,6 +23,11 @@ import type {
 } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
+import {
+  parseBackendGroupRecord,
+  parseBackendGroupRecordArray,
+  type BackendGroupRecord,
+} from "./groups-contract";
 
 export type GroupFetchProjection = "summary" | "detail";
 
@@ -144,114 +149,6 @@ type BackendCreateGroupPayload = {
       isVerified?: boolean;
     }>;
   }>;
-};
-
-type BackendGroupRecord = {
-  id?: string;
-  code?: string;
-  name?: string;
-  status?: string;
-  lifecycleStatus?: "ENTRY_ONLY" | "ACTIVE" | "INACTIVE" | "COMPLETED" | "ARCHIVED" | null;
-  parentGroupId?: string | null;
-  arrivalDate?: string | Date | null;
-  returnDate?: string | Date | null;
-  tone?: string;
-  pax?: number;
-  totalBuses?: number | null;
-  packageName?: string;
-  durationDays?: number;
-  musyrif?: {
-    name?: string;
-    phone?: string;
-    avatar?: string;
-  } | null;
-  nextActivity?: {
-    title?: string;
-    dateLabel?: string;
-    timeLabel?: string;
-    icon?: string;
-  } | null;
-  timeline?: Array<{
-    sortOrder?: number;
-    dateLabel?: string;
-    title?: string;
-    isCurrent?: boolean;
-    nextActivity?: string | null;
-  }> | null;
-  itinerary?: Array<{
-    sortOrder?: number;
-    dateLabel?: string;
-    yearLabel?: string;
-    category?: string;
-    categoryKey?: string | null;
-    title?: string;
-    meta?: string;
-    icon?: string;
-    highlighted?: boolean;
-    isoDate?: string | Date | null;
-    time?: string | null;
-    flightNumber?: string | null;
-    hotelName?: string | null;
-    fromHotelName?: string | null;
-    fromLocation?: string | null;
-    toLocation?: string | null;
-    cityTourCity?: string | null;
-    requiresBus?: boolean;
-    notes?: string | null;
-    transferByTrain?: boolean;
-    trainDepartureTime?: string | null;
-    destinationPickupTime?: string | null;
-    hotelPickupRequestTime?: string | null;
-  }> | null;
-  notes?: Array<{
-    sortOrder?: number;
-    text?: string;
-    pinned?: boolean;
-  }> | null;
-  visaSetup?: {
-    visaStatus?: string;
-    issuedDate?: string | Date | null;
-    syarikah?: string;
-    busStatus?: string | null;
-    paymentStatus?: string;
-    hotelAgreements?: Array<{
-      id?: string;
-      city?: string;
-      sourceDraftId?: string | null;
-      hotelName?: string;
-      agreementNumber?: string;
-      pax?: number;
-      status?: string;
-      stayStart?: string | Date;
-      stayEnd?: string | Date;
-    }> | null;
-    raudhahAppointments?: Array<{
-      id?: string;
-      date?: string | Date;
-      status?: string;
-      tasrehPrinted?: boolean;
-    }> | null;
-  } | null;
-  checklistAssignments?: Array<{
-    id?: string;
-    itineraryItemId?: string | null;
-    tripDate?: string | Date;
-    activity?: string;
-    tripLabel?: string;
-    requiredBusCount?: number;
-    scheduledTime?: string;
-    transferByTrain?: boolean;
-    trainDepartureTime?: string | null;
-    stationPickupTime?: string | null;
-    status?: string;
-    drivers?: Array<{
-      slotNumber?: number;
-      name?: string;
-      phone?: string;
-      plateNumber?: string;
-      isVerified?: boolean;
-    }> | null;
-  }> | null;
 };
 
 function mapToneToBackend(tone: GroupData["tone"]): "ACTIVE" | "INACTIVE" {
@@ -1167,12 +1064,9 @@ export async function fetchGroupsFromBackend({
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Backend fetch failed"));
   }
 
-  if (!Array.isArray(payload)) {
-    throw new Error("Backend fetch failed: response is not an array.");
-  }
-
-  const mappedGroups = payload
-    .map((item) => mapBackendGroupToFrontend(item as BackendGroupRecord))
+  const records = parseBackendGroupRecordArray(payload, "Backend fetch failed");
+  const mappedGroups = records
+    .map((item) => mapBackendGroupToFrontend(item))
     .filter((item): item is GroupData => item !== null);
 
   return mappedGroups;
@@ -1235,7 +1129,7 @@ export async function createGroupIdentityInBackend(identity: GroupIdentityDraftP
     );
   }
 
-  const mappedGroup = mapBackendGroupToFrontend(responsePayload as BackendGroupRecord);
+  const mappedGroup = mapBackendGroupToFrontend(parseBackendGroupRecord(responsePayload, "Identity create failed"));
   if (!mappedGroup) {
     throw new Error("Identity create failed: response is not a group record.");
   }
@@ -1354,7 +1248,7 @@ export async function saveVisaHotelAgreementInBackend({
     );
   }
 
-  const mappedGroup = mapBackendGroupToFrontend(responsePayload as BackendGroupRecord);
+  const mappedGroup = mapBackendGroupToFrontend(parseBackendGroupRecord(responsePayload, "Hotel agreement save failed"));
   if (!mappedGroup) {
     throw new Error("Hotel agreement save failed: response is not a group record.");
   }
@@ -1383,7 +1277,7 @@ export async function deleteVisaHotelAgreementInBackend({
     );
   }
 
-  const mappedGroup = mapBackendGroupToFrontend(responsePayload as BackendGroupRecord);
+  const mappedGroup = mapBackendGroupToFrontend(parseBackendGroupRecord(responsePayload, "Hotel agreement delete failed"));
   if (!mappedGroup) {
     throw new Error("Hotel agreement delete failed: response is not a group record.");
   }
