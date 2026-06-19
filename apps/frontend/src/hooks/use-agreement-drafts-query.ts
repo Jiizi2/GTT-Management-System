@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import type { AgreementApprovalStatus, HotelAgreementDraft, HotelAgreementDraftFormState } from "../shared/app-domain";
+import type { HotelAgreementDraft, HotelAgreementDraftFormState } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
+import {
+  mapAgreementStatusToBackend,
+  mapBackendAgreementStatus,
+} from "../shared/backend-enums";
 import { agreementDraftQueryKeys } from "../shared/query-keys";
 import {
   parseBackendAgreementDraftRecord,
@@ -43,27 +47,6 @@ function toIsoDateTime(value: unknown): string {
   }
 
   return readString(value);
-}
-
-function mapBackendAgreementStatus(value: string | undefined): AgreementApprovalStatus {
-  const upper = value?.trim().toUpperCase();
-  if (upper === "APPROVED") {
-    return "Approved";
-  }
-  if (upper === "REJECTED") {
-    return "Rejected";
-  }
-  return "Waiting for Approval";
-}
-
-function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" | "REJECTED" {
-  if (status === "Approved") {
-    return "APPROVED";
-  }
-  if (status === "Rejected") {
-    return "REJECTED";
-  }
-  return "WAITING";
 }
 
 function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreementDraft | null {
