@@ -10,7 +10,6 @@ import {
   resolveTotalBusCount,
 } from "../shared/app-domain";
 import type {
-  AgreementApprovalStatus,
   ChecklistAssignmentStatus,
   GroupChecklistAssignment,
   GroupAgreementHotel,
@@ -18,11 +17,30 @@ import type {
   GroupRaudhahAppointment,
   GroupVisaSetup,
   VisaHotelEditFormState,
-  VisaPaymentStatus,
-  VisaStatus,
 } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
+import {
+  mapAgreementStatusToBackend,
+  mapBackendAgreementStatus,
+  mapBackendBusStatus,
+  mapBackendChecklistStatus,
+  mapBackendLifecycleStatusToLabel,
+  mapBackendPaymentStatus,
+  mapBackendRaudhahStatus,
+  mapBackendVisaStatus,
+  mapBusStatusToBackend,
+  mapChecklistStatusToBackend,
+  mapPaymentStatusToBackend,
+  mapRaudhahStatusToBackend,
+  mapVisaStatusToBackend,
+  type BackendAgreementApprovalStatus,
+  type BackendChecklistAssignmentStatus,
+  type BackendRaudhahStatus,
+  type BackendVisaBusStatus,
+  type BackendVisaPaymentStatus,
+  type BackendVisaStatus,
+} from "../shared/backend-enums";
 import {
   parseBackendGroupRecord,
   parseBackendGroupRecordArray,
@@ -44,8 +62,6 @@ export type GroupIdentityDraftPayload = {
   musyrifPhone?: string;
   busStatus?: "Visa+" | "Visa Only";
 };
-
-type BackendVisaBusStatus = "VISA_ONLY" | "VISA_PLUS";
 
 type BackendCreateGroupPayload = {
   code: string;
@@ -108,11 +124,11 @@ type BackendCreateGroupPayload = {
     pinned?: boolean;
   }>;
   visaSetup?: {
-    visaStatus?: "DRAFT" | "PENDING" | "ISSUED";
+    visaStatus?: BackendVisaStatus;
     issuedDate?: string;
     syarikah: string;
     busStatus?: BackendVisaBusStatus;
-    paymentStatus?: "PAID" | "UNPAID" | "PARTIAL";
+    paymentStatus?: BackendVisaPaymentStatus;
     outstandingAmount?: number;
     hotelAgreements?: Array<{
       city: "MAKKAH" | "MADINAH";
@@ -120,13 +136,13 @@ type BackendCreateGroupPayload = {
       hotelName: string;
       agreementNumber: string;
       pax: number;
-      status?: "WAITING" | "APPROVED";
+      status?: BackendAgreementApprovalStatus;
       stayStart: string;
       stayEnd: string;
     }>;
     raudhahAppointments?: Array<{
       date: string;
-      status?: "FREE" | "AFTER" | "BEFORE";
+      status?: BackendRaudhahStatus;
       tasrehPrinted?: boolean;
     }>;
   };
@@ -140,7 +156,7 @@ type BackendCreateGroupPayload = {
     transferByTrain?: boolean;
     trainDepartureTime?: string;
     stationPickupTime?: string;
-    status?: "NOT_COMPLETE" | "ASSIGNED";
+    status?: BackendChecklistAssignmentStatus;
     drivers?: Array<{
       slotNumber?: number;
       name: string;
@@ -153,62 +169,6 @@ type BackendCreateGroupPayload = {
 
 function mapToneToBackend(tone: GroupData["tone"]): "ACTIVE" | "INACTIVE" {
   return tone === "active" ? "ACTIVE" : "INACTIVE";
-}
-
-function mapVisaStatusToBackend(status: VisaStatus): "DRAFT" | "PENDING" | "ISSUED" {
-  if (status === "Issued") {
-    return "ISSUED";
-  }
-
-  if (status === "Pending") {
-    return "PENDING";
-  }
-
-  return "DRAFT";
-}
-
-function mapPaymentStatusToBackend(status: VisaPaymentStatus): "PAID" | "UNPAID" | "PARTIAL" {
-  if (status === "Paid") {
-    return "PAID";
-  }
-
-  if (status === "Partial") {
-    return "PARTIAL";
-  }
-
-  return "UNPAID";
-}
-
-function mapBusStatusToBackend(status: GroupVisaSetup["busStatus"]): BackendVisaBusStatus | undefined {
-  if (status === "Visa+") {
-    return "VISA_PLUS";
-  }
-
-  if (status === "Visa Only") {
-    return "VISA_ONLY";
-  }
-
-  return undefined;
-}
-
-function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" {
-  return status === "Approved" ? "APPROVED" : "WAITING";
-}
-
-function mapRaudhahStatusToBackend(status: GroupRaudhahAppointment["status"]): "FREE" | "AFTER" | "BEFORE" {
-  if (status === "After") {
-    return "AFTER";
-  }
-
-  if (status === "Before") {
-    return "BEFORE";
-  }
-
-  return "FREE";
-}
-
-function mapChecklistStatusToBackend(status: ChecklistAssignmentStatus): "NOT_COMPLETE" | "ASSIGNED" {
-  return status === "Assigned" ? "ASSIGNED" : "NOT_COMPLETE";
 }
 
 function isIsoDateOnly(value: string): boolean {
@@ -594,86 +554,6 @@ function mapBackendToneToFrontend(tone: string | undefined, status: string | und
   }
 
   return "active";
-}
-
-function mapBackendLifecycleStatusToLabel(value: unknown): string | undefined {
-  if (value === "ENTRY_ONLY") {
-    return "Entry Only";
-  }
-  if (value === "ACTIVE") {
-    return "Active";
-  }
-  if (value === "INACTIVE") {
-    return "In Active";
-  }
-  if (value === "COMPLETED") {
-    return "Completed";
-  }
-  if (value === "ARCHIVED") {
-    return "Archived";
-  }
-
-  return undefined;
-}
-
-function mapBackendVisaStatus(value: string | undefined): GroupVisaSetup["visaStatus"] {
-  const normalized = value?.trim().toUpperCase() ?? "";
-  if (normalized === "ISSUED") {
-    return "Issued";
-  }
-
-  if (normalized === "PENDING") {
-    return "Pending";
-  }
-
-  return "Draft";
-}
-
-function mapBackendPaymentStatus(value: string | undefined): GroupVisaSetup["paymentStatus"] {
-  const normalized = value?.trim().toUpperCase() ?? "";
-  if (normalized === "PAID") {
-    return "Paid";
-  }
-
-  if (normalized === "PARTIAL") {
-    return "Partial";
-  }
-
-  return "Unpaid";
-}
-
-function mapBackendBusStatus(value: string | null | undefined): GroupVisaSetup["busStatus"] {
-  const normalized = value?.trim().toUpperCase() ?? "";
-  if (normalized === "VISA_PLUS" || normalized === "VISA+" || normalized === "VISA PLUS") {
-    return "Visa+";
-  }
-
-  if (normalized === "VISA_ONLY" || normalized === "VISA ONLY") {
-    return "Visa Only";
-  }
-
-  return undefined;
-}
-
-function mapBackendAgreementStatus(value: string | undefined): AgreementApprovalStatus {
-  return value?.trim().toUpperCase() === "APPROVED" ? "Approved" : "Waiting for Approval";
-}
-
-function mapBackendRaudhahStatus(value: string | undefined): GroupRaudhahAppointment["status"] {
-  const normalized = value?.trim().toUpperCase() ?? "";
-  if (normalized === "AFTER") {
-    return "After";
-  }
-
-  if (normalized === "BEFORE") {
-    return "Before";
-  }
-
-  return "Free";
-}
-
-function mapBackendChecklistStatus(value: string | undefined): ChecklistAssignmentStatus {
-  return value?.trim().toUpperCase() === "ASSIGNED" ? "Assigned" : "Not Complete";
 }
 
 function inferHotelNameFromItineraryRecord(record: {

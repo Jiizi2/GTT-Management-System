@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { backendGroupLifecycleStatuses } from "../shared/backend-enums";
 
 const backendDateValueSchema = z.union([z.string(), z.date()]);
 
@@ -125,7 +126,7 @@ export const backendGroupRecordSchema = z
     code: z.string().min(1),
     name: z.string().min(1),
     status: z.string().optional(),
-    lifecycleStatus: z.enum(["ENTRY_ONLY", "ACTIVE", "INACTIVE", "COMPLETED", "ARCHIVED"]).nullable().optional(),
+    lifecycleStatus: z.enum(backendGroupLifecycleStatuses).nullable().optional(),
     parentGroupId: z.string().nullable().optional(),
     arrivalDate: backendDateValueSchema.nullable().optional(),
     returnDate: backendDateValueSchema.nullable().optional(),
