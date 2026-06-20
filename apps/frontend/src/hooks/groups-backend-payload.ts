@@ -169,6 +169,7 @@ export function mapVisaHotelEditFormToBackendPayload(city: "makkah" | "madinah",
   const parsedPax = Number.parseInt(hotel.pax, 10);
   return {
     city: city === "madinah" ? ("MADINAH" as const) : ("MAKKAH" as const),
+    sourceDraftId: hotel.sourceDraftId?.trim() || undefined,
     hotelName: hotel.hotelName.trim(),
     agreementNumber: hotel.agreementNumber.trim(),
     pax: Number.isFinite(parsedPax) ? parsedPax : 1,

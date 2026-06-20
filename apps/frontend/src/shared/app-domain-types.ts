@@ -410,6 +410,7 @@ export type NewGroupRaudhahFormState = {
 };
 
 export type VisaHotelEditFormState = {
+  sourceDraftId?: string;
   hotelName: string;
   agreementNumber: string;
   pax: string;

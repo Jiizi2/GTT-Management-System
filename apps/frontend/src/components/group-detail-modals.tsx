@@ -301,7 +301,8 @@ export function UnlinkGroupConfirmModal({
             </h2>
             <div className="mt-2 text-sm leading-relaxed text-slate-600">
               <p>
-                Anda akan melepaskan grup <strong>{groupCode}</strong> menjadi mandiri. Hubungan (Sharing Musyrif & Itinerary) dengan grup utamanya akan terputus.
+                Anda akan melepaskan grup <strong>{groupCode}</strong> menjadi mandiri. Sharing Musyrif dan Itinerary
+                dengan grup utamanya akan terputus, sementara data visa dan agreement tetap tersimpan di grup ini.
               </p>
             </div>
 

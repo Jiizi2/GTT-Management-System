@@ -44,6 +44,7 @@ const paymentStatusModalSchema = z.object({
 
 const hotelModalSchema = z
   .object({
+    sourceDraftId: z.string().optional(),
     hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
     agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
     pax: z
@@ -417,6 +418,7 @@ export function VisaHotelModal({
       }
     >
       <div className="grid gap-3 md:grid-cols-2">
+        <input type="hidden" {...register("sourceDraftId")} />
         <label className={modalFieldClassName}>
           <span>Hotel Name</span>
           <input
