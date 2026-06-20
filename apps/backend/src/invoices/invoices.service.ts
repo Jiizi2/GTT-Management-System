@@ -554,6 +554,8 @@ export class InvoicesService implements OnModuleInit {
             return existingByName;
           }
 
+          await this.acquirePrismaTransactionLock(tx, "invoice-client-sort-order", "global");
+
           const maxSortOrderAggregate = await tx.invoiceClient.aggregate({
             _max: {
               sortOrder: true,
