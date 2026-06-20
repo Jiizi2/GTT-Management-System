@@ -418,15 +418,18 @@ export function DeleteConfirmModal({
 export function DeleteGroupModal({
   groupCode,
   groupName,
+  childGroupCount = 0,
   onClose,
   onConfirm,
 }: {
   groupCode: string;
   groupName: string;
+  childGroupCount?: number;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+  const hasChildGroups = childGroupCount > 0;
 
   return (
     <ModalPortal>
@@ -468,6 +471,13 @@ export function DeleteGroupModal({
               undone.
             </p>
 
+            {hasChildGroups ? (
+              <div className="rounded-2xl border border-brand-tertiary/30 bg-brand-tertiary/10 px-3 py-2 text-sm font-semibold text-brand-tertiary">
+                This group has {childGroupCount} linked child {childGroupCount === 1 ? "group" : "groups"}. Unlink the
+                child {childGroupCount === 1 ? "group" : "groups"} before deleting the parent group.
+              </div>
+            ) : null}
+
             <div className={`${modalInfoSectionClassName} grid gap-2`}>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Group Code</span>
@@ -481,7 +491,12 @@ export function DeleteGroupModal({
           </div>
 
           <div className="serene-dialog-footer-bar">
-            <button type="button" className={modalDangerBrandButtonClassName} onClick={onConfirm}>
+            <button
+              type="button"
+              className={`${modalDangerBrandButtonClassName} disabled:cursor-not-allowed disabled:opacity-45`}
+              onClick={onConfirm}
+              disabled={hasChildGroups}
+            >
               <span className="material-symbols-outlined" aria-hidden="true">
                 delete
               </span>

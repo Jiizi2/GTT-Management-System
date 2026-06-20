@@ -38,6 +38,7 @@ import {
   replaceGroupInBackend,
   saveVisaHotelAgreementInBackend,
   sortHotelsByStayStart,
+  updateGroupInBackend,
   type GroupFetchProjection,
   type GroupIdentityDraftPayload,
 } from "../use-app-controller-backend";
@@ -325,6 +326,100 @@ function resolveRequestedGroupProjection({
   return "summary";
 }
 
+export function shouldUseRemoteGroupSearch({
+  activeNav,
+  usesGroupRecords,
+  requestedProjection,
+}: {
+  activeNav: NavId;
+  usesGroupRecords: boolean;
+  requestedProjection: GroupFetchProjection;
+}): boolean {
+  // Overview needs the full summary list so child-group matches can resolve
+  // back to the parent card before the final local filter runs.
+  return usesGroupRecords && requestedProjection === "summary" && activeNav !== "overview";
+}
+
+export function filterOverviewGroups({
+  sourceGroups,
+  allGroups,
+  normalizedQuery,
+  isActiveOnly,
+  shouldFilterByMonth,
+  overviewMonthFilter,
+}: {
+  sourceGroups: GroupData[];
+  allGroups: GroupData[];
+  normalizedQuery: string;
+  isActiveOnly: boolean;
+  shouldFilterByMonth: boolean;
+  overviewMonthFilter: string;
+}): GroupData[] {
+  return sourceGroups.filter((group) => {
+    // Exclude child/follower groups from overview cards.
+    if (group.parentGroupId) {
+      return false;
+    }
+
+    if (shouldFilterByMonth && !doesGroupMatchOverviewMonth(group, overviewMonthFilter)) {
+      return false;
+    }
+
+    if (isActiveOnly && group.tone !== "active") {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    const matchesMain = [group.code, group.name, group.packageName, group.status].some((value) =>
+      value.toLowerCase().includes(normalizedQuery),
+    );
+    if (matchesMain) {
+      return true;
+    }
+
+    const children = allGroups.filter(
+      (candidate) =>
+        candidate.parentGroupId &&
+        (candidate.parentGroupId === group.id || candidate.parentGroupId === group.code) &&
+        candidate.code !== group.code,
+    );
+    return children.some((child) =>
+      [child.code, child.name, child.packageName, child.status].some((value) =>
+        value.toLowerCase().includes(normalizedQuery),
+      ),
+    );
+  });
+}
+
+export function resolveGroupDetailRecord(
+  group: GroupData | null,
+  allGroups: GroupData[],
+): GroupData | null {
+  if (!group?.parentGroupId) {
+    return group;
+  }
+
+  const parent = allGroups.find(
+    (candidate) => candidate.id === group.parentGroupId || candidate.code === group.parentGroupId,
+  );
+  if (!parent) {
+    return group;
+  }
+
+  return {
+    ...group,
+    musyrif: parent.musyrif,
+    nextActivity: parent.nextActivity,
+    timeline: parent.timeline,
+    itinerary: parent.itinerary,
+    notes: parent.notes,
+    checklistAssignments: parent.checklistAssignments,
+  };
+}
+
 function isIsoDateOnly(value: string | undefined): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
 }
@@ -445,7 +540,11 @@ export function useDashboardGroupRecords({
   const currentDashboardDate = useCurrentDashboardDate();
   const currentOverviewMonthKey = useMemo(() => getCurrentMonthKey(currentDashboardDate), [currentDashboardDate]);
   const shouldFilterOverviewByMonth = activeNav === "overview" && overviewMonthFilter !== "all";
-  const shouldUseRemoteSearch = usesGroupRecords && requestedProjection === "summary";
+  const shouldUseRemoteSearch = shouldUseRemoteGroupSearch({
+    activeNav,
+    usesGroupRecords,
+    requestedProjection,
+  });
 
   const groupsQuery = useGroupsQuery(requestedProjection, usesGroupRecords, shouldUseRemoteOverviewActiveOnly);
   const searchQuery = useGroupsSearchQuery(
@@ -465,6 +564,10 @@ export function useDashboardGroupRecords({
   const replaceGroupMutation = useMutation({
     mutationFn: ({ groupCode, group }: { groupCode: string; group: GroupData }) =>
       replaceGroupInBackend(groupCode, group),
+    retry: false,
+  });
+  const updateGroupMutation = useMutation({
+    mutationFn: ({ groupCode, group }: { groupCode: string; group: GroupData }) => updateGroupInBackend(groupCode, group),
     retry: false,
   });
   const deleteGroupMutation = useMutation({
@@ -731,40 +834,13 @@ export function useDashboardGroupRecords({
         })
       : visibleGroupRecords;
 
-    return sourceGroups.filter((group) => {
-      // Exclude child/follower groups from overview
-      if (group.parentGroupId) {
-        return false;
-      }
-
-      if (shouldFilterOverviewByMonth && !doesGroupMatchOverviewMonth(group, overviewMonthFilter)) {
-        return false;
-      }
-
-      if (isActiveOnly && group.tone !== "active") {
-        return false;
-      }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      const matchesMain = [group.code, group.name, group.packageName, group.status].some((value) =>
-        value.toLowerCase().includes(normalizedQuery),
-      );
-      if (matchesMain) {
-        return true;
-      }
-
-      // Check if any child group matches the query
-      const children = visibleGroupRecords.filter(
-        (g) => g.parentGroupId && (g.parentGroupId === group.id || g.parentGroupId === group.code) && g.code !== group.code
-      );
-      return children.some((child) =>
-        [child.code, child.name, child.packageName, child.status].some((value) =>
-          value.toLowerCase().includes(normalizedQuery),
-        ),
-      );
+    return filterOverviewGroups({
+      sourceGroups,
+      allGroups: visibleGroupRecords,
+      normalizedQuery,
+      isActiveOnly,
+      shouldFilterByMonth: shouldFilterOverviewByMonth,
+      overviewMonthFilter,
     });
   }, [
     groupRecordsByCode,
@@ -789,15 +865,16 @@ export function useDashboardGroupRecords({
     );
   }, [selectedVisaGroupCode, visaTrackingRows]);
 
-  const selectedGroup = useMemo(
-    () =>
-      selectedGroupCode
-        ? (visibleGroupRecords.find(
-            (group) => group.code.trim().toUpperCase() === selectedGroupCode.trim().toUpperCase(),
-          ) ?? null)
-        : null,
-    [selectedGroupCode, visibleGroupRecords],
-  );
+  const selectedGroup = useMemo(() => {
+    if (!selectedGroupCode) {
+      return null;
+    }
+
+    const selectedRecord =
+      visibleGroupRecords.find((group) => group.code.trim().toUpperCase() === selectedGroupCode.trim().toUpperCase()) ??
+      null;
+    return resolveGroupDetailRecord(selectedRecord, visibleGroupRecords);
+  }, [selectedGroupCode, visibleGroupRecords]);
 
   const { weekStartIso, weekEndIso } = useMemo(
     () => getCurrentWeekIsoRange(currentDashboardDate),
@@ -1509,6 +1586,93 @@ export function useDashboardGroupRecords({
     [captureGroupRecordsSnapshot, commitGroupRecords, navigateToGroupDetail, replaceGroupMutation, runBackendSync],
   );
 
+  const handlePatchGroupDetail = useCallback(
+    (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
+      const normalizedGroup = normalizeGroupStatus(group);
+      const normalizedSourceGroupCode = sourceGroupCode?.trim().toUpperCase();
+      const normalizedNextGroupCode = normalizedGroup.code.trim().toUpperCase();
+      const normalizedNextGroupName = normalizedGroup.name.trim();
+      const nextGroup: GroupData = {
+        ...normalizedGroup,
+        code: normalizedNextGroupCode,
+        name: normalizedNextGroupName,
+      };
+      if (!normalizedNextGroupCode) {
+        return {
+          ok: false,
+          message: "Group number tidak boleh kosong.",
+        };
+      }
+
+      if (!normalizedNextGroupName) {
+        return {
+          ok: false,
+          message: "Group name tidak boleh kosong.",
+        };
+      }
+
+      const hasDuplicateCode = groupRecordsRef.current.some(
+        (item) =>
+          item.code.trim().toUpperCase() === normalizedNextGroupCode &&
+          item.code.trim().toUpperCase() !== normalizedSourceGroupCode,
+      );
+      if (hasDuplicateCode) {
+        return {
+          ok: false,
+          message: "Group number sudah dipakai oleh group lain.",
+        };
+      }
+
+      const backendTargetGroupCode = normalizedSourceGroupCode ?? normalizedNextGroupCode;
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+
+      navigateToGroupDetail(nextGroup.code, { replace: true });
+
+      commitGroupRecords((current) => {
+        const existingIndex = current.findIndex((item) => item.code === nextGroup.code);
+        if (existingIndex !== -1) {
+          const next = [...current];
+          next[existingIndex] = nextGroup;
+
+          if (normalizedSourceGroupCode && normalizedSourceGroupCode !== nextGroup.code) {
+            const sourceIndex = next.findIndex(
+              (item, index) => index !== existingIndex && item.code.trim().toUpperCase() === normalizedSourceGroupCode,
+            );
+            if (sourceIndex !== -1) {
+              next.splice(sourceIndex, 1);
+            }
+          }
+
+          return next;
+        }
+
+        if (normalizedSourceGroupCode) {
+          const sourceIndex = current.findIndex((item) => item.code.trim().toUpperCase() === normalizedSourceGroupCode);
+          if (sourceIndex !== -1) {
+            const next = [...current];
+            next[sourceIndex] = nextGroup;
+            return next;
+          }
+        }
+
+        return [nextGroup, ...current];
+      });
+
+      runBackendSync({
+        task: updateGroupMutation.mutateAsync({
+          groupCode: backendTargetGroupCode,
+          group: nextGroup,
+        }),
+        successMessage: "Perubahan identity group berhasil disimpan.",
+        failureMessage: (error: unknown) =>
+          resolveDashboardSyncFailureMessage(error, "Perubahan identity group belum berhasil disimpan ke backend."),
+        rollbackSnapshot,
+      });
+      return { ok: true };
+    },
+    [captureGroupRecordsSnapshot, commitGroupRecords, navigateToGroupDetail, runBackendSync, updateGroupMutation],
+  );
+
   const handleSaveVisaGroupDetail = useCallback(
     (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
       const normalizedGroup = normalizeGroupStatus(group);
@@ -1620,6 +1784,7 @@ export function useDashboardGroupRecords({
     handleSaveInputGroup,
     handleSaveGroupIdentity,
     handleSaveGroupDetail,
+    handlePatchGroupDetail,
     handleSaveVisaGroupDetail,
   };
 }

@@ -120,6 +120,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 onBack={controller.handleBackToOverview}
                 onDeleteGroup={controller.handleDeleteGroup}
                 onSaveGroup={controller.handleSaveGroupDetail}
+                onPatchGroup={controller.handlePatchGroupDetail}
               />
             ) : (
               <LazyPlaceholderScreen

@@ -862,6 +862,14 @@ async function testParentChildGroupInheritanceAndValidation(): Promise<void> {
         }),
       /adalah child group. Silakan edit checklist pada parent group/i,
     );
+
+    await assert.rejects(
+      async () => service.remove("G-PARENT"),
+      /still has child groups and cannot be deleted/i,
+    );
+
+    await service.remove("G-CHILD");
+    await service.remove("G-PARENT");
   } finally {
     restore();
   }

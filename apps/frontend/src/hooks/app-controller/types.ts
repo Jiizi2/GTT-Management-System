@@ -74,6 +74,7 @@ export type AppController = {
   handleSaveInputGroup: (group: GroupData) => void;
   handleSaveGroupIdentity: (identity: GroupIdentityDraftPayload) => void;
   handleSaveGroupDetail: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
+  handlePatchGroupDetail: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   handleSaveVisaGroupDetail: (
     group: GroupData,
     sourceGroupCode?: string,

@@ -1368,11 +1368,23 @@ export class GroupsCommandService {
       },
       select: {
         id: true,
+        code: true,
       },
     });
 
     if (!current) {
       throw new NotFoundException(`Group '${idOrCode}' not found.`);
+    }
+
+    const childCount = await this.prisma.group.count({
+      where: {
+        parentGroupId: current.id,
+      },
+    });
+    if (childCount > 0) {
+      throw new ConflictException(
+        `Group '${current.code}' still has child groups and cannot be deleted. Unlink child groups first.`,
+      );
     }
 
     await this.prisma.group.delete({

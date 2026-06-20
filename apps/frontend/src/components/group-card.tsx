@@ -280,7 +280,7 @@ export function GroupCard({
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
   const completeness = resolveGroupCompleteness(group);
   const metadataBadges = [
-    `${totalPax} Pax`,
+    `${totalPax} Linked Pax`,
     ...(busBadgeLabel ? [busBadgeLabel] : []),
     group.packageName,
     getServiceTypeBadgeLabel(group),
@@ -299,7 +299,7 @@ export function GroupCard({
         </h2>
         {familyGroups.length > 1 && (
           <p className="mt-1 text-xs text-on-surface-variant/80 font-medium">
-            Detail Pax: {familyGroups.map(g => `${g.code} (${g.pax} Pax)`).join(" + ")}
+            Linked Pax Detail: {familyGroups.map(g => `${g.code} (${g.pax} Pax)`).join(" + ")}
           </p>
         )}
         <div className="mt-2 flex min-h-4 flex-wrap items-center gap-1.5" aria-label="Group status">
