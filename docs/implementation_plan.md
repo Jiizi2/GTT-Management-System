@@ -8,11 +8,12 @@ Rujukan utama: `docs/project-review-refactoring-assessment.md`
 
 Status per 2026-06-20:
 
-- Branch integrasi terbaru: `stabilization/backbone-phase-22`.
+- Branch integrasi terbaru: `stabilization/backbone-phase-23`.
 - `master` tetap tidak disentuh; semua perubahan berjalan di branch konservatif dan bisa diputuskan belakangan apakah akan dibuat PR ke `master`.
 - Phase 0 sampai Phase 3 selesai: baseline, bug critical, persistent data contract, dan API contract hardening sudah terintegrasi di branch stabilisasi sebelumnya.
 - Phase 4 selesai untuk scope modularisasi aman: domain frontend sudah dipisah bertahap ke module types, fixtures, status, checklist, visa/completeness, itinerary/schedule, serta backend groups API/payload/mapper sudah dipisah bertahap.
 - Phase 5 selesai untuk scope rasionalisasi awal: ada contract test groups yang menjalankan skenario yang sama terhadap adapter memory dan Prisma mock, `test:unit` backend menjalankan contract test tersebut, dan `qa:full` sekarang memanggil `test:prisma` secara eksplisit.
+- Hardening tambahan disiapkan agar migration drift tidak berubah menjadi error 500 diam-diam: backend `DATA_SOURCE=prisma` melakukan schema readiness check saat startup, dan script `db:status`/`db:deploy:backend` tersedia untuk preflight migration.
 
 Checkpoint terakhir yang sudah diverifikasi:
 
@@ -20,6 +21,7 @@ Checkpoint terakhir yang sudah diverifikasi:
 - `stabilization/backbone-phase-20`: merge `refactor/frontend-itinerary-domain`.
 - `stabilization/backbone-phase-21`: merge `test/groups-memory-prisma-contract`.
 - `stabilization/backbone-phase-22`: merge `docs/backbone-phase-status`.
+- `stabilization/backbone-phase-23`: merge `hardening/prisma-schema-readiness`.
 
 Gate kode terakhir di `stabilization/backbone-phase-21`:
 

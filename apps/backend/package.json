@@ -20,6 +20,7 @@
     "test:vitest:watch": "npm run build && vitest --config vitest.config.mts",
     "test": "npm run test:unit",
     "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:status": "prisma migrate status --schema prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "db:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "db:seed": "prisma db seed --schema prisma/schema.prisma",
