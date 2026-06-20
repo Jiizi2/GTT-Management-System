@@ -109,11 +109,12 @@ DEV_AUTH_SUPERADMIN_PASSWORD="DevSuperAdmin#2026"
 DEV_AUTH_ADMIN_PASSWORD="DevAdmin#2026"
 ```
 
-Lalu generate client, migrate, dan seed:
+Lalu generate client, cek status migration, terapkan migration, dan seed:
 
 ```bash
 npm run db:generate:backend
-npm run db:migrate:backend
+npm run db:status:backend
+npm run db:deploy:backend
 npm run db:seed:backend
 npm run dev:backend
 ```
@@ -157,7 +158,9 @@ npm run dev:backend
 | Script | Keterangan |
 |---|---|
 | `npm run db:generate:backend` | Generate Prisma client |
-| `npm run db:migrate:backend` | Jalankan migrasi (dev) |
+| `npm run db:status:backend` | Cek status migration database backend |
+| `npm run db:deploy:backend` | Terapkan migration yang sudah ada secara deploy-safe |
+| `npm run db:migrate:backend` | Buat/jalankan migrasi saat development schema baru |
 | `npm run db:seed:backend` | Seed data awal |
 | `npm run db:studio:backend` | Buka Prisma Studio |
 

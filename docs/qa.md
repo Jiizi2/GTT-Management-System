@@ -55,6 +55,7 @@ Backend integration memerlukan PostgreSQL lokal. Siapkan:
 ```bash
 docker compose up -d
 npm run db:generate:backend
+npm run db:status:backend
 ```
 
 Pastikan `apps/backend/.env` mengarah ke database lokal. Contoh yang cocok dengan `docker-compose.yml` repo ini:
@@ -68,12 +69,14 @@ DEV_AUTH_SUPERADMIN_PASSWORD="DevSuperAdmin#2026"
 DEV_AUTH_ADMIN_PASSWORD="DevAdmin#2026"
 ```
 
-Jika schema belum siap, jalankan juga:
+Jika database belum punya migration repo terbaru, jalankan deploy migration terlebih dahulu:
 
 ```bash
-npm run db:migrate:backend
+npm run db:deploy:backend
 npm run db:seed:backend
 ```
+
+Catatan: gunakan `db:migrate:backend` hanya saat membuat migration baru di development. Untuk database lokal yang hanya perlu disinkronkan dengan migration repo, gunakan `db:deploy:backend`. Jika `db:status:backend` mendeteksi migration history dari branch lama yang tidak ada di repo, buat database lokal baru atau reconcile history dulu sebelum QA penuh.
 
 ## 4. Catatan Playwright
 
