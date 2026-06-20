@@ -544,15 +544,25 @@ Hentikan rollout dan jangan lanjut phase berikutnya jika terjadi salah satu ini:
 - Ada migration yang tidak punya rollback path jelas.
 - Satu PR mulai menyentuh lebih dari satu phase besar.
 
-## Recommended Immediate Sequence
+## Post-Stabilization Sequence
 
-1. Commit dokumen audit dan plan.
-2. PR 1.1: remove stale `HotelAgreementDraft.groupId/assignedAt` writes.
-3. PR 1.2: fix `InvoiceClient.sortOrder` constraint.
-4. PR 1.3: add parent-child flat hierarchy guard.
-5. PR 2.1: persist `sourceDraftId` on `VisaHotelAgreement`.
-6. PR 3.2: zod response schema for groups and agreement drafts.
-7. Baru mulai status enum dan bus status normalization.
+Status sequence awal:
+
+1. Dokumen audit dan plan sudah committed.
+2. Stale `HotelAgreementDraft.groupId/assignedAt` writes sudah ditutup.
+3. `InvoiceClient.sortOrder` constraint sudah dirilekskan dari unique global.
+4. Parent-child flat hierarchy guard sudah ditambahkan.
+5. `sourceDraftId` pada `VisaHotelAgreement` sudah persisten.
+6. Response contract groups/agreement drafts dan enum mapping frontend sudah diperkuat.
+7. Status lifecycle group dan `busStatus` sudah dinormalisasi pada kontrak database/backend/frontend yang distabilisasi.
+
+Next gate konservatif sebelum keputusan PR ke `master`:
+
+1. Jalankan staging/pre-production rehearsal dengan database hasil clone/backup production, bukan DB lokal drift.
+2. Jalankan `db:status` sebelum `db:deploy`; berhenti jika migration history tidak bersih.
+3. Jalankan `qa:full` terhadap database rehearsal.
+4. Review manual flow bisnis: login, overview, create/edit group, agreement assign/unassign, visa detail, checklist, invoice, user management, dan master data.
+5. Setelah gate di atas lulus, putuskan apakah branch stabilisasi ini dipromosikan sebagai satu PR besar yang terdokumentasi atau dipilah menjadi PR lebih kecil.
 
 ## Final Note
 
