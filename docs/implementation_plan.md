@@ -25,6 +25,17 @@ Checkpoint terakhir yang sudah diverifikasi:
 - `stabilization/backbone-phase-24`: merge `docs/backbone-phase-23-status`.
 - `stabilization/backbone-phase-25`: merge `docs/backbone-phase-24-status`.
 
+Checkpoint lokal/development terbaru di `stabilization/backbone-phase-25`:
+
+- Database PostgreSQL bersih dibuat khusus untuk validasi refactor: `gtt_ops_refactor_20260620_132631`.
+- `apps/backend/.env` lokal yang ignored oleh git sudah diarahkan ke database bersih tersebut untuk `npm run dev:backend` dan `npm run start:backend`.
+- `npm run db:status --workspace backend` dari `.env` lokal menunjukkan 25 migration repo dan schema up to date.
+- `npm run db:deploy --workspace backend` sukses menerapkan 25 migration repo ke database bersih tersebut.
+- `npm run test:integration --workspace backend` sukses terhadap database bersih tersebut, termasuk saat dijalankan ulang tanpa override env setelah `.env` lokal diarahkan ke DB clean.
+- `npm run qa:full` sukses terhadap database bersih tersebut, termasuk `qa:quick`, build backend/frontend, smoke test frontend, `test:api`, `test:prisma`, dan 9 Playwright E2E frontend.
+- `npm run dev:backend` berhasil start dengan TypeScript watcher 0 errors, backend listening di `http://localhost:3001/api`, dan `data source: prisma`.
+- `GET /api/groups?projection=summary` terhadap backend lokal/dev tidak lagi 500; tanpa sesi login response-nya 401 Unauthorized sesuai guard auth.
+
 Gate kode terakhir di `stabilization/backbone-phase-23`:
 
 ```bash
@@ -39,14 +50,14 @@ npm run test:unit --workspace backend
 git diff --check
 ```
 
-Catatan: `npm run test:integration --workspace backend` dan `npm run qa:full` belum dijalankan pada checkpoint ini karena memerlukan database/e2e environment yang lebih lengkap dan migration history yang bersih. Script `qa:full` sudah memastikan Prisma path lewat `test:prisma` sebelum e2e frontend. Checkpoint `stabilization/backbone-phase-22` adalah docs-only dan diverifikasi dengan `git diff --check`; checkpoint `stabilization/backbone-phase-23` menambahkan fail-fast schema readiness agar migration drift terdeteksi saat startup, bukan menjadi 500 di endpoint runtime.
+Catatan: `npm run test:integration --workspace backend` dan `npm run qa:full` sekarang sudah dijalankan pada database lokal/development yang bersih. Script `qa:full` memastikan Prisma path lewat `test:prisma` sebelum E2E frontend. Checkpoint `stabilization/backbone-phase-22` adalah docs-only dan diverifikasi dengan `git diff --check`; checkpoint `stabilization/backbone-phase-23` menambahkan fail-fast schema readiness agar migration drift terdeteksi saat startup, bukan menjadi 500 di endpoint runtime.
 
 Preflight lokal terbaru:
 
 - `npx prisma migrate status --schema prisma/schema.prisma` dari `apps/backend` mendeteksi migration drift pada database `gtt_ops` di `localhost:5432`.
 - Migration repo yang belum diterapkan di DB tersebut: `20260619120000_relax_invoice_client_sort_order`, `20260619133000_add_visa_hotel_agreement_source_draft`, `20260619143000_add_group_lifecycle_status`, `20260619153000_add_visa_setup_bus_status`.
 - DB tersebut juga memiliki migration history dari branch lama yang tidak ada di repo sekarang: `20260618172337_fix_invoice_client_sort_order`, `20260618000000_db_improvements`.
-- Karena itu, integration/QA full harus menunggu database bersih atau hasil reconcile migration history. Jangan gunakan DB drift ini sebagai bukti production-ready.
+- Karena itu, DB drift `gtt_ops` jangan digunakan sebagai bukti production-ready. Untuk validasi lokal/development refactor ini, gunakan database bersih seperti `gtt_ops_refactor_20260620_132631` atau reconcile migration history terlebih dahulu.
 
 ## Tujuan
 
