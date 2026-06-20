@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { GroupTone, Prisma } from "@prisma/client";
+import { GroupLifecycleStatus, GroupTone, Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../../config/app-config";
 import { createStructuredLogger } from "../../logging/create-structured-logger";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -24,9 +24,10 @@ import { createDefaultMemoryGroups } from "../infrastructure/groups.memory-store
 import type {
   ChecklistAssignmentSyncResult,
   FindAllOptions,
+  GroupDetailRecord,
+  GroupListResult,
   MemoryAuditLog,
   MemoryGroupRecord,
-  PaginatedGroupList,
 } from "../groups.service-types";
 import { GroupsCommandService } from "./groups-command.service";
 import { GroupsQueryService } from "./groups-query.service";
@@ -62,15 +63,15 @@ export class GroupsService {
   async findAll(
     query?: string,
     options?: FindAllOptions,
-  ): Promise<unknown[] | PaginatedGroupList<unknown>> {
+  ): Promise<GroupListResult> {
     return this.queryService.findAll(query, options);
   }
 
-  async findOneByIdOrCode(idOrCode: string): Promise<unknown> {
+  async findOneByIdOrCode(idOrCode: string): Promise<GroupDetailRecord> {
     return this.queryService.findOneByIdOrCode(idOrCode);
   }
 
-  async create(payload: CreateGroupDto): Promise<unknown> {
+  async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
     const created = await this.commandService.create(payload);
     await this.writeAuditLog("group.created", "group", created, {
       code: payload.code.trim().toUpperCase(),
@@ -83,7 +84,7 @@ export class GroupsService {
     return created;
   }
 
-  async createIdentity(payload: CreateGroupIdentityDto): Promise<unknown> {
+  async createIdentity(payload: CreateGroupIdentityDto): Promise<GroupDetailRecord> {
     const createPayload = this.buildIdentityCreatePayload(payload);
     const created = await this.commandService.create(createPayload);
     await this.writeAuditLog("group.identity.created", "group", created, {
@@ -97,7 +98,7 @@ export class GroupsService {
     return created;
   }
 
-  async replace(idOrCode: string, payload: CreateGroupDto): Promise<unknown> {
+  async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
     const replaced = await this.commandService.replace(idOrCode, payload);
     await this.writeAuditLog("group.replaced", "group", replaced, {
       idOrCode,
@@ -110,7 +111,7 @@ export class GroupsService {
     return replaced;
   }
 
-  async update(idOrCode: string, payload: UpdateGroupDto): Promise<unknown> {
+  async update(idOrCode: string, payload: UpdateGroupDto): Promise<GroupDetailRecord> {
     const updated = await this.commandService.update(idOrCode, payload);
     await this.writeAuditLog("group.updated", "group", updated, {
       idOrCode,
@@ -147,7 +148,7 @@ export class GroupsService {
   async addItineraryItem(
     idOrCode: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.addItineraryItem(
       idOrCode,
       payload,
@@ -168,7 +169,7 @@ export class GroupsService {
     idOrCode: string,
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.updateItineraryItem(
       idOrCode,
       itemId,
@@ -190,7 +191,7 @@ export class GroupsService {
   async removeItineraryItem(
     idOrCode: string,
     itemId: string,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.removeItineraryItem(
       idOrCode,
       itemId,
@@ -209,7 +210,7 @@ export class GroupsService {
   async addVisaHotelAgreement(
     idOrCode: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.addVisaHotelAgreement(
       idOrCode,
       payload,
@@ -235,7 +236,7 @@ export class GroupsService {
     idOrCode: string,
     hotelId: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.updateVisaHotelAgreement(
       idOrCode,
       hotelId,
@@ -263,7 +264,7 @@ export class GroupsService {
   async removeVisaHotelAgreement(
     idOrCode: string,
     hotelId: string,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.removeVisaHotelAgreement(
       idOrCode,
       hotelId,
@@ -287,7 +288,7 @@ export class GroupsService {
   async upsertPrimaryRaudhahAppointment(
     idOrCode: string,
     payload: UpsertGroupRaudhahDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     const updated = await this.commandService.upsertPrimaryRaudhahAppointment(
       idOrCode,
       payload,
@@ -409,6 +410,7 @@ export class GroupsService {
       code: normalizedCode,
       name: groupName,
       status: "Entry Only",
+      lifecycleStatus: GroupLifecycleStatus.ENTRY_ONLY,
       arrivalDate,
       returnDate,
       tone: GroupTone.ACTIVE,

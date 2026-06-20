@@ -86,7 +86,7 @@ apps/backend/src/
 
 ## Konfigurasi Environment
 
-Semua variabel divalidasi di startup. Lihat `apps/backend/.env.example` untuk daftar lengkap.
+Semua variabel divalidasi di startup. Lihat `apps/backend/.env.example` untuk daftar lengkap. Untuk Docker lokal repo ini, contoh `DATABASE_URL` memakai host port `6543`, sesuai mapping `docker-compose.yml`.
 
 Variabel wajib di production:
 
@@ -225,10 +225,10 @@ File: `apps/backend/prisma/schema.prisma`
 | `ItineraryItem` | N-1 ke Group |
 | `GroupNote` | N-1 ke Group |
 | `GroupAuditLog` | N-1 ke Group (optional) |
-| `VisaSetup` | 1-1 ke Group |
-| `VisaHotelAgreement` | N-1 ke VisaSetup |
+| `VisaSetup` | 1-1 ke Group; menyimpan `busStatus` eksplisit |
+| `VisaHotelAgreement` | N-1 ke VisaSetup; optional relation ke `HotelAgreementDraft` lewat `sourceDraftId` |
 | `RaudhahAppointment` | N-1 ke VisaSetup |
-| `HotelAgreementDraft` | N-1 ke Group (optional) |
+| `HotelAgreementDraft` | Draft hotel agreement; bisa direferensikan oleh `VisaHotelAgreement.sourceDraftId` |
 | `ChecklistAssignment` | N-1 ke Group; optional ke ItineraryItem |
 | `ChecklistDriver` | N-1 ke ChecklistAssignment |
 | `InvoiceClient` | N-1 ke Group (optional) |
@@ -257,7 +257,9 @@ Group juga mendukung relasi self-referential: `Group.parentGroupId` → parent g
 
 ```bash
 npm run db:generate:backend   # generate Prisma client
-npm run db:migrate:backend    # jalankan migrasi
+npm run db:status:backend     # cek status migration database
+npm run db:deploy:backend     # terapkan migration repo secara deploy-safe
+npm run db:migrate:backend    # buat/jalankan migrasi saat development schema baru
 npm run db:seed:backend       # seed data awal
 npm run db:studio:backend     # buka Prisma Studio
 
@@ -266,6 +268,8 @@ $env:SEED_RESET="true"; npm run db:seed:backend
 ```
 
 Catatan:
+- Jalankan `db:status:backend` sebelum `db:deploy:backend` saat memakai `DATA_SOURCE=prisma`, terutama setelah pindah branch.
+- Jika status mendeteksi migration history dari branch lama yang tidak ada di repo, jangan gunakan DB itu sebagai bukti QA; buat DB lokal baru atau reconcile history dulu.
 - `db:seed` ditolak saat `NODE_ENV=production`.
 - Seed membutuhkan env password dev (lihat `.env.example`).
 

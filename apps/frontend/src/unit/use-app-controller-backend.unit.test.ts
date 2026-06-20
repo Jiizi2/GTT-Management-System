@@ -169,7 +169,22 @@ async function testCreateGroupIdentityPostsMinimalWorkspace(): Promise<void> {
   });
 }
 
+async function testFetchGroupsRejectsInvalidBackendShape(): Promise<void> {
+  await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
+    await withMockFetch(
+      async () => new Response(JSON.stringify([{ name: "Missing Code" }]), { status: 200 }),
+      async () => {
+        await assert.rejects(
+          () => fetchGroupsFromBackend(),
+          /Backend fetch failed: invalid backend response/,
+        );
+      },
+    );
+  });
+}
+
 describe("use-app-controller-backend", () => {
   runCase("fetch groups marks completed itinerary as inactive", testFetchGroupsMarksCompletedItineraryAsInactive);
   runCase("create group identity posts minimal workspace", testCreateGroupIdentityPostsMinimalWorkspace);
+  runCase("fetch groups rejects invalid backend shape", testFetchGroupsRejectsInvalidBackendShape);
 });

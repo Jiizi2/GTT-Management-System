@@ -33,6 +33,10 @@ import {
   validateTravelDateRangeOrThrow,
 } from "../domain/groups.shared";
 import {
+  resolveGroupLifecycleStatus,
+  toGroupStatusLabel,
+} from "../domain/groups.lifecycle-status";
+import {
   addItineraryItemInMemory,
   addVisaHotelAgreementInMemory,
   confirmChecklistDriverInMemory,
@@ -54,18 +58,15 @@ import {
 } from "../infrastructure/groups.prisma-write-builders";
 import type {
   ChecklistAssignmentSyncResult,
+  GroupDetailRecord,
   MemoryGroupRecord,
+  PrismaGroupDetailRecord,
 } from "../groups.service-types";
 
-function collectSourceDraftIds(payload: CreateGroupDto): string[] {
-  return [
-    ...new Set(
-      (payload.visaSetup?.hotelAgreements ?? [])
-        .map((agreement) => agreement.sourceDraftId?.trim())
-        .filter((draftId): draftId is string => Boolean(draftId)),
-    ),
-  ];
-}
+type PrismaParentLinkCurrentGroup = {
+  id: string;
+  code: string;
+};
 
 export class GroupsCommandService {
   constructor(
@@ -74,7 +75,7 @@ export class GroupsCommandService {
     private readonly memoryGroups: MemoryGroupRecord[],
   ) {}
 
-  async create(payload: CreateGroupDto): Promise<unknown> {
+  async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
 
@@ -85,7 +86,7 @@ export class GroupsCommandService {
     return createInMemory(this.memoryGroups, payload);
   }
 
-  async replace(idOrCode: string, payload: CreateGroupDto): Promise<unknown> {
+  async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
 
@@ -96,7 +97,7 @@ export class GroupsCommandService {
     return replaceInMemory(this.memoryGroups, idOrCode, payload);
   }
 
-  async update(idOrCode: string, payload: UpdateGroupDto): Promise<unknown> {
+  async update(idOrCode: string, payload: UpdateGroupDto): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.updateWithPrisma(idOrCode, payload);
     }
@@ -116,7 +117,7 @@ export class GroupsCommandService {
   async addItineraryItem(
     idOrCode: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.addItineraryItemWithPrisma(idOrCode, payload);
@@ -129,7 +130,7 @@ export class GroupsCommandService {
     idOrCode: string,
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.updateItineraryItemWithPrisma(idOrCode, itemId, payload);
@@ -146,7 +147,7 @@ export class GroupsCommandService {
   async removeItineraryItem(
     idOrCode: string,
     itemId: string,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     if (this.dataSource === "prisma") {
       return this.removeItineraryItemWithPrisma(idOrCode, itemId);
@@ -158,7 +159,7 @@ export class GroupsCommandService {
   async addVisaHotelAgreement(
     idOrCode: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.addVisaHotelAgreementWithPrisma(idOrCode, payload);
     }
@@ -170,7 +171,7 @@ export class GroupsCommandService {
     idOrCode: string,
     hotelId: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.updateVisaHotelAgreementWithPrisma(
         idOrCode,
@@ -190,7 +191,7 @@ export class GroupsCommandService {
   async removeVisaHotelAgreement(
     idOrCode: string,
     hotelId: string,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.removeVisaHotelAgreementWithPrisma(idOrCode, hotelId);
     }
@@ -205,7 +206,7 @@ export class GroupsCommandService {
   async upsertPrimaryRaudhahAppointment(
     idOrCode: string,
     payload: UpsertGroupRaudhahDto,
-  ): Promise<unknown> {
+  ): Promise<GroupDetailRecord> {
     if (this.dataSource === "prisma") {
       return this.upsertPrimaryRaudhahAppointmentWithPrisma(idOrCode, payload);
     }
@@ -594,7 +595,7 @@ export class GroupsCommandService {
   private async addItineraryItemWithPrisma(
     idOrCode: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const requestedSortOrder = payload.sortOrder;
     const maxAttempts = requestedSortOrder === undefined ? 3 : 1;
@@ -686,7 +687,7 @@ export class GroupsCommandService {
     idOrCode: string,
     itemId: string,
     payload: UpsertGroupItineraryItemDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const existing = await this.prisma.itineraryItem.findFirst({
       where: {
@@ -775,7 +776,7 @@ export class GroupsCommandService {
   private async removeItineraryItemWithPrisma(
     idOrCode: string,
     itemId: string,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const removed = await this.prisma.itineraryItem.deleteMany({
       where: {
@@ -796,7 +797,7 @@ export class GroupsCommandService {
   private async addVisaHotelAgreementWithPrisma(
     idOrCode: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const visaSetup = await this.resolveOrCreatePrismaVisaSetup(group.id);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
@@ -831,6 +832,7 @@ export class GroupsCommandService {
     await this.prisma.visaHotelAgreement.create({
       data: {
         visaSetupId: visaSetup.id,
+        sourceDraftId: payload.sourceDraftId?.trim() || null,
         city: payload.city,
         hotelName: payload.hotelName.trim(),
         agreementNumber: payload.agreementNumber.trim(),
@@ -848,7 +850,7 @@ export class GroupsCommandService {
     idOrCode: string,
     hotelId: string,
     payload: UpsertGroupVisaHotelDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
       where: {
@@ -893,6 +895,7 @@ export class GroupsCommandService {
     await this.prisma.visaHotelAgreement.update({
       where: { id: hotelId },
       data: {
+        sourceDraftId: payload.sourceDraftId?.trim() || null,
         city: payload.city,
         hotelName: payload.hotelName.trim(),
         agreementNumber: payload.agreementNumber.trim(),
@@ -909,7 +912,7 @@ export class GroupsCommandService {
   private async removeVisaHotelAgreementWithPrisma(
     idOrCode: string,
     hotelId: string,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
       where: {
@@ -964,7 +967,7 @@ export class GroupsCommandService {
   private async upsertPrimaryRaudhahAppointmentWithPrisma(
     idOrCode: string,
     payload: UpsertGroupRaudhahDto,
-  ): Promise<unknown> {
+  ): Promise<PrismaGroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
     const visaSetup = await this.resolveOrCreatePrismaVisaSetup(group.id);
     const primary = await this.prisma.raudhahAppointment.findFirst({
@@ -1004,7 +1007,7 @@ export class GroupsCommandService {
     return this.findOneWithPrisma(group.id);
   }
 
-  private async findOneWithPrisma(idOrCode: string) {
+  private async findOneWithPrisma(idOrCode: string): Promise<PrismaGroupDetailRecord> {
     const group = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -1019,31 +1022,22 @@ export class GroupsCommandService {
     return group;
   }
 
-  private async createWithPrisma(payload: CreateGroupDto) {
+  private async createWithPrisma(payload: CreateGroupDto): Promise<PrismaGroupDetailRecord> {
     const normalizedCode = payload.code.trim().toUpperCase();
-    const sourceDraftIds = collectSourceDraftIds(payload);
+    const parentGroupId = await this.validateParentGroupLinkWithPrisma({
+      requestedParentGroupId: payload.parentGroupId,
+    });
+    const normalizedPayload: CreateGroupDto = {
+      ...payload,
+      parentGroupId,
+    };
 
     try {
       return await this.prisma.$transaction(async (tx) => {
         const created = await tx.group.create({
-          data: buildGroupCreateData(payload, normalizedCode),
+          data: buildGroupCreateData(normalizedPayload, normalizedCode),
           select: groupDetailSelection,
         });
-
-        if (sourceDraftIds.length > 0) {
-          await tx.hotelAgreementDraft.updateMany({
-            where: {
-              id: {
-                in: sourceDraftIds,
-              },
-              groupId: null,
-            },
-            data: {
-              groupId: created.id,
-              assignedAt: new Date(),
-            },
-          });
-        }
 
         return created;
       });
@@ -1061,7 +1055,7 @@ export class GroupsCommandService {
     }
   }
 
-  private async replaceWithPrisma(idOrCode: string, payload: CreateGroupDto) {
+  private async replaceWithPrisma(idOrCode: string, payload: CreateGroupDto): Promise<PrismaGroupDetailRecord> {
     const current = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -1098,8 +1092,16 @@ export class GroupsCommandService {
     const legacyItinerarySortOrderById = new Map<string, number>(
       current.itinerary.map((item) => [item.id, item.sortOrder]),
     );
+    const parentGroupId = await this.validateParentGroupLinkWithPrisma({
+      requestedParentGroupId: payload.parentGroupId,
+      currentGroup: current,
+    });
+    const normalizedPayload: CreateGroupDto = {
+      ...payload,
+      parentGroupId,
+    };
     const checklistSortOrderHints = new Map<string, number>();
-    (payload.checklistAssignments ?? []).forEach((assignment) => {
+    (normalizedPayload.checklistAssignments ?? []).forEach((assignment) => {
       const legacyItineraryId = assignment.itineraryItemId?.trim();
       if (!legacyItineraryId) {
         return;
@@ -1159,7 +1161,7 @@ export class GroupsCommandService {
 
       const replaced = await tx.group.update({
         where: { id: current.id },
-        data: buildGroupReplaceData(payload, normalizedCode),
+        data: buildGroupReplaceData(normalizedPayload, normalizedCode),
         select: groupDetailSelection,
       });
 
@@ -1219,7 +1221,7 @@ export class GroupsCommandService {
     });
   }
 
-  private async updateWithPrisma(idOrCode: string, payload: UpdateGroupDto) {
+  private async updateWithPrisma(idOrCode: string, payload: UpdateGroupDto): Promise<PrismaGroupDetailRecord> {
     const current = await this.prisma.group.findFirst({
       where: {
         OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }],
@@ -1229,6 +1231,7 @@ export class GroupsCommandService {
         code: true,
         name: true,
         status: true,
+        lifecycleStatus: true,
         arrivalDate: true,
         returnDate: true,
         packageName: true,
@@ -1257,17 +1260,24 @@ export class GroupsCommandService {
       ? parseIsoDateOnly(payload.returnDate)
       : current.returnDate.toISOString().slice(0, 10);
     validateTravelDateRangeOrThrow(nextArrivalDateIso, nextReturnDateIso);
+    const parentGroupId = await this.validateParentGroupLinkWithPrisma({
+      requestedParentGroupId: payload.parentGroupId,
+      currentGroup: current,
+    });
+    const nextLifecycleStatus = payload.lifecycleStatus ?? (payload.status !== undefined ? resolveGroupLifecycleStatus(payload.status) : undefined);
+    const nextStatus = payload.status?.trim() ?? (payload.lifecycleStatus ? toGroupStatusLabel(payload.lifecycleStatus) : undefined);
 
     return this.prisma.group.update({
       where: { id: current.id },
       data: {
         code: nextCode,
         name: payload.name?.trim(),
-        status: payload.status?.trim(),
+        status: nextStatus,
+        lifecycleStatus: nextLifecycleStatus,
         searchDocument: buildGroupSearchDocument({
           code: nextCode ?? current.code,
           name: payload.name?.trim() ?? current.name,
-          status: payload.status?.trim() ?? current.status,
+          status: nextStatus ?? current.status,
           packageName: payload.packageName?.trim() ?? current.packageName,
         }),
         arrivalDate: payload.arrivalDate
@@ -1281,10 +1291,74 @@ export class GroupsCommandService {
         totalBuses: payload.totalBuses,
         packageName: payload.packageName?.trim(),
         durationDays: payload.durationDays,
-        parentGroupId: payload.parentGroupId !== undefined ? (payload.parentGroupId?.trim() || null) : undefined,
+        parentGroupId,
       },
       select: groupDetailSelection,
     });
+  }
+
+  private async validateParentGroupLinkWithPrisma(input: {
+    requestedParentGroupId?: string | null;
+    currentGroup?: PrismaParentLinkCurrentGroup;
+  }): Promise<string | null | undefined> {
+    if (input.requestedParentGroupId === undefined) {
+      return undefined;
+    }
+
+    const requestedParentGroupId = input.requestedParentGroupId?.trim() ?? "";
+    if (!requestedParentGroupId) {
+      return null;
+    }
+
+    const currentGroup = input.currentGroup;
+    if (
+      currentGroup &&
+      (requestedParentGroupId === currentGroup.id ||
+        requestedParentGroupId.toUpperCase() === currentGroup.code)
+    ) {
+      throw new ConflictException("A group cannot be linked as its own parent.");
+    }
+
+    const parentGroup = await this.prisma.group.findFirst({
+      where: {
+        OR: [
+          { id: requestedParentGroupId },
+          { code: requestedParentGroupId.toUpperCase() },
+        ],
+      },
+      select: {
+        id: true,
+        code: true,
+        parentGroupId: true,
+      },
+    });
+
+    if (!parentGroup) {
+      throw new NotFoundException(
+        `Parent group '${requestedParentGroupId}' not found.`,
+      );
+    }
+
+    if (parentGroup.parentGroupId) {
+      throw new ConflictException(
+        `Group '${parentGroup.code}' is a child group and cannot be used as parent.`,
+      );
+    }
+
+    if (currentGroup) {
+      const childCount = await this.prisma.group.count({
+        where: {
+          parentGroupId: currentGroup.id,
+        },
+      });
+      if (childCount > 0) {
+        throw new ConflictException(
+          `Group '${currentGroup.code}' already has child groups and cannot become a child group.`,
+        );
+      }
+    }
+
+    return parentGroup.id;
   }
 
   private async removeWithPrisma(idOrCode: string): Promise<void> {

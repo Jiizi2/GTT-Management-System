@@ -4,7 +4,9 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupLifecycleStatus,
   GroupTone,
+  VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -140,6 +142,9 @@ export class GroupVisaHotelAgreementResponseDto {
   @ApiProperty({ example: "clhotelagreementid123" })
   id!: string;
 
+  @ApiPropertyOptional({ example: "cldraftagreementid123" })
+  sourceDraftId?: string | null;
+
   @ApiProperty({ enum: AgreementCity, example: AgreementCity.MAKKAH })
   city!: AgreementCity;
 
@@ -191,6 +196,13 @@ export class GroupVisaSetupResponseDto {
 
   @ApiProperty({ example: "Nusuk Premium" })
   syarikah!: string;
+
+  @ApiPropertyOptional({
+    enum: VisaBusStatus,
+    example: VisaBusStatus.VISA_ONLY,
+    nullable: true,
+  })
+  busStatus?: VisaBusStatus | null;
 
   @ApiProperty({
     enum: VisaPaymentStatus,
@@ -278,6 +290,9 @@ export class GroupSummaryResponseDto {
 
   @ApiProperty({ example: "Active" })
   status!: string;
+
+  @ApiProperty({ enum: GroupLifecycleStatus, example: GroupLifecycleStatus.ACTIVE })
+  lifecycleStatus!: GroupLifecycleStatus;
 
   @ApiProperty({ enum: GroupTone, example: GroupTone.ACTIVE })
   tone!: GroupTone;

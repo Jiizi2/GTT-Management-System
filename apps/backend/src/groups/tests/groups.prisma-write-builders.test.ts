@@ -4,8 +4,10 @@ import {
   AgreementCity,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
+  GroupLifecycleStatus,
   GroupTone,
   Prisma,
+  VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -83,9 +85,11 @@ function testTrimAndDefaultMappings(): void {
     ],
     visaSetup: {
       syarikah: " Nusuk ",
+      busStatus: VisaBusStatus.VISA_PLUS,
       hotelAgreements: [
         {
           city: AgreementCity.MAKKAH,
+          sourceDraftId: " draft-builder-1 ",
           hotelName: " Makkah Hotel ",
           agreementNumber: " AG-101 ",
           pax: 45,
@@ -122,6 +126,7 @@ function testTrimAndDefaultMappings(): void {
 
   assert.equal(createDataAny.name, "Builder Test Group");
   assert.equal(createDataAny.status, "Active");
+  assert.equal(createDataAny.lifecycleStatus, GroupLifecycleStatus.ACTIVE);
   assert.equal(createDataAny.packageName, "Standard Gold");
   assert.equal(
     createDataAny.searchDocument,
@@ -140,9 +145,11 @@ function testTrimAndDefaultMappings(): void {
   const visaSetup = createDataAny.visaSetup.create;
   assert.equal(visaSetup.visaStatus, VisaStatus.DRAFT);
   assert.equal(visaSetup.issuedDate, null);
+  assert.equal(visaSetup.busStatus, VisaBusStatus.VISA_PLUS);
   assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.UNPAID);
   assert.equal((visaSetup.outstandingAmount as Prisma.Decimal).toString(), "0");
   assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MAKKAH);
+  assert.equal(visaSetup.hotelAgreements.create[0].sourceDraftId, "draft-builder-1");
   assert.equal(visaSetup.hotelAgreements.create[0].status, AgreementApprovalStatus.WAITING);
   assert.equal(visaSetup.raudhahAppointments.create[0].status, GroupRaudhahStatus.FREE);
   assert.equal(visaSetup.hotelAgreements.create[0].hotelName, "Makkah Hotel");
@@ -180,6 +187,8 @@ function testItineraryTitleFallbackWithoutExplicitTitle(): void {
 
 function testExplicitStatusesAreRespected(): void {
   const payload = createPayload({
+    status: "Entry Only",
+    lifecycleStatus: GroupLifecycleStatus.ENTRY_ONLY,
     tone: GroupTone.INACTIVE,
     visaSetup: {
       visaStatus: VisaStatus.ISSUED,
@@ -230,6 +239,8 @@ function testExplicitStatusesAreRespected(): void {
   const createDataAny = createData as any;
   const visaSetup = createDataAny.visaSetup.create;
 
+  assert.equal(createDataAny.status, "Entry Only");
+  assert.equal(createDataAny.lifecycleStatus, GroupLifecycleStatus.ENTRY_ONLY);
   assert.equal(createDataAny.tone, GroupTone.INACTIVE);
   assert.equal(visaSetup.visaStatus, VisaStatus.ISSUED);
   assert.equal((visaSetup.issuedDate as Date).toISOString().slice(0, 10), "2026-04-14");

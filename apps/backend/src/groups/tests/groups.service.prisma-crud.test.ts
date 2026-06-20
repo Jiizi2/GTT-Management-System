@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
-import { AgreementCity, Prisma } from "@prisma/client";
+import { AgreementCity, GroupLifecycleStatus, Prisma } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
@@ -10,6 +10,7 @@ type PrismaGroupRecord = {
   code: string;
   name?: string;
   status?: string;
+  packageName?: string;
   arrivalDate: Date;
   returnDate: Date;
 };
@@ -93,7 +94,7 @@ async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
 async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
   {
     let createPayload: Record<string, unknown> | null = null;
-    const updateManyPayload: { current: Record<string, unknown> | null } = { current: null };
+    let hotelDraftUpdateManyCalls = 0;
     const tx = {
       group: {
         create: async (args: Record<string, unknown>) => {
@@ -105,8 +106,8 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
         },
       },
       hotelAgreementDraft: {
-        updateMany: async (args: Record<string, unknown>) => {
-          updateManyPayload.current = args;
+        updateMany: async () => {
+          hotelDraftUpdateManyCalls += 1;
           return { count: 1 };
         },
       },
@@ -143,7 +144,13 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
       assert.equal(created.code, "GRP-CREATE");
       assert.ok(createPayload);
       const data = (createPayload as {
-        data: { code?: string; name?: string; packageName?: string; searchDocument?: string };
+        data: {
+          code?: string;
+          name?: string;
+          packageName?: string;
+          searchDocument?: string;
+          visaSetup?: { create?: { hotelAgreements?: { create?: Array<{ sourceDraftId?: string | null }> } } };
+        };
       }).data;
       assert.equal(data.code, "GRP-CREATE");
       assert.equal(data.name, "Group Create");
@@ -152,29 +159,88 @@ async function testPrismaCreateSuccessAndConflictGuard(): Promise<void> {
         data.searchDocument,
         "grp create grpcreate group create groupcreate active premium package premiumpackage",
       );
-      assert.ok(updateManyPayload.current);
-      const updateManyWhere = updateManyPayload.current.where as Record<string, unknown>;
-      const updateManyData = updateManyPayload.current.data as Record<string, unknown>;
-      assert.deepEqual(updateManyWhere, {
-        id: {
-          in: ["draft-makkah-1"],
+      assert.equal(data.visaSetup?.create?.hotelAgreements?.create?.[0]?.sourceDraftId, "draft-makkah-1");
+      assert.equal(hotelDraftUpdateManyCalls, 0);
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let createPayload: Record<string, unknown> | null = null;
+    const tx = {
+      group: {
+        create: async (args: Record<string, unknown>) => {
+          createPayload = args;
+          return {
+            id: "grp-child",
+            code: "GRP-CHILD",
+          };
         },
-        groupId: null,
-      });
-      assert.equal(updateManyData.groupId, "grp-1");
-      assert.equal(updateManyData.assignedAt instanceof Date, true);
-      assert.deepEqual(updateManyPayload.current, {
-        where: {
-          id: {
-            in: ["draft-makkah-1"],
-          },
-          groupId: null,
+      },
+    };
+    const prismaMock = {
+      group: {
+        findFirst: async () => ({
+          id: "parent-id-1",
+          code: "GRP-PARENT",
+          parentGroupId: null,
+        }),
+      },
+      $transaction: async (callback: (transactionClient: typeof tx) => Promise<unknown>) => callback(tx),
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      const created = (await service.create(
+        createGroupPayload({
+          code: "grp-child",
+          parentGroupId: "GRP-PARENT",
+        }),
+      )) as { code?: string };
+
+      assert.equal(created.code, "GRP-CHILD");
+      assert.ok(createPayload);
+      const data = (createPayload as { data: { parentGroupId?: string | null } }).data;
+      assert.equal(data.parentGroupId, "parent-id-1");
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let transactionCalls = 0;
+    const prismaMock = {
+      group: {
+        findFirst: async () => ({
+          id: "grp-child-parent",
+          code: "GRP-CHILD-PARENT",
+          parentGroupId: "grp-grandparent",
+        }),
+      },
+      $transaction: async () => {
+        transactionCalls += 1;
+        throw new Error("grandchild create should be rejected before transaction");
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await assert.rejects(
+        () =>
+          service.create(
+            createGroupPayload({
+              code: "GRP-GRANDCHILD",
+              parentGroupId: "GRP-CHILD-PARENT",
+            }),
+          ),
+        (error: unknown) => {
+          assert.equal(error instanceof ConflictException, true);
+          assert.match((error as Error).message, /cannot be used as parent/i);
+          return true;
         },
-        data: {
-          groupId: "grp-1",
-          assignedAt: updateManyData.assignedAt,
-        },
-      });
+      );
+      assert.equal(transactionCalls, 0);
     } finally {
       restore();
     }
@@ -495,6 +561,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           code?: string;
           name?: string;
           status?: string;
+          lifecycleStatus?: GroupLifecycleStatus;
           searchDocument?: string;
           arrivalDate?: Date;
           returnDate?: Date;
@@ -506,6 +573,7 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       assert.equal(data.code, "GRP-NEW");
       assert.equal(data.name, "Updated Group");
       assert.equal(data.status, "Active");
+      assert.equal(data.lifecycleStatus, GroupLifecycleStatus.ACTIVE);
       assert.equal(data.packageName, "Premium");
       assert.equal(
         data.searchDocument,
@@ -514,6 +582,54 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
       assert.equal(data.durationDays, 10);
       assert.equal(data.arrivalDate?.toISOString().slice(0, 10), "2026-04-11");
       assert.equal(data.returnDate?.toISOString().slice(0, 10), "2026-04-19");
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let updatedPayload: Record<string, unknown> | null = null;
+    const currentGroup: PrismaGroupRecord = {
+      id: "grp-1",
+      code: "GRP-OLD",
+      name: "Old Group",
+      status: "Active",
+      packageName: "Pending Package",
+      arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
+      returnDate: new Date("2026-04-18T00:00:00.000Z"),
+    };
+    const prismaMock = {
+      group: {
+        findFirst: createGroupFindFirstMock({
+          selectLookup: () => currentGroup,
+        }),
+        update: async (args: Record<string, unknown>) => {
+          updatedPayload = args;
+          return {
+            id: "grp-1",
+            code: "GRP-OLD",
+          };
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await service.update("GRP-OLD", {
+        lifecycleStatus: GroupLifecycleStatus.COMPLETED,
+      });
+
+      assert.ok(updatedPayload);
+      const data = (updatedPayload as {
+        data: {
+          status?: string;
+          lifecycleStatus?: GroupLifecycleStatus;
+          searchDocument?: string;
+        };
+      }).data;
+      assert.equal(data.status, "Completed");
+      assert.equal(data.lifecycleStatus, GroupLifecycleStatus.COMPLETED);
+      assert.equal(data.searchDocument, "grp old grpold old group oldgroup completed pending package pendingpackage");
     } finally {
       restore();
     }
@@ -548,6 +664,58 @@ async function testPrismaUpdateSuccessAndGuards(): Promise<void> {
           return true;
         },
       );
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let updateCalls = 0;
+    const currentGroup: PrismaGroupRecord = {
+      id: "grp-parent",
+      code: "GRP-PARENT",
+      name: "Parent Group",
+      status: "Active",
+      arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
+      returnDate: new Date("2026-04-18T00:00:00.000Z"),
+    };
+    const prismaMock = {
+      group: {
+        findFirst: async (args: { where?: { OR?: Array<{ id?: string; code?: string }> } }) => {
+          const lookupValues = args.where?.OR ?? [];
+          if (lookupValues.some((item) => item.id === "GRP-PARENT" || item.code === "GRP-PARENT")) {
+            return currentGroup;
+          }
+
+          return {
+            id: "grp-other-parent",
+            code: "GRP-OTHER-PARENT",
+            parentGroupId: null,
+          };
+        },
+        findUnique: async () => null,
+        count: async () => 1,
+        update: async () => {
+          updateCalls += 1;
+          throw new Error("group with children should not become a child");
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await assert.rejects(
+        () =>
+          service.update("GRP-PARENT", {
+            parentGroupId: "GRP-OTHER-PARENT",
+          }),
+        (error: unknown) => {
+          assert.equal(error instanceof ConflictException, true);
+          assert.match((error as Error).message, /already has child groups/i);
+          return true;
+        },
+      );
+      assert.equal(updateCalls, 0);
     } finally {
       restore();
     }

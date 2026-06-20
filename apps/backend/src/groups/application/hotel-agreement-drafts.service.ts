@@ -181,6 +181,26 @@ function doesHotelSnapshotMatchDraftIgnoringPax(
   );
 }
 
+function buildPrismaDraftAgreementMatchers(
+  draft: Pick<
+    PrismaHotelAgreementDraftRecord,
+    "id" | "agreementNumber" | "city" | "hotelName" | "stayStart" | "stayEnd"
+  >,
+): Prisma.VisaHotelAgreementWhereInput[] {
+  return [
+    {
+      sourceDraftId: draft.id,
+    },
+    {
+      agreementNumber: draft.agreementNumber,
+      city: draft.city,
+      hotelName: draft.hotelName,
+      stayStart: draft.stayStart,
+      stayEnd: draft.stayEnd,
+    },
+  ];
+}
+
 @Injectable()
 export class HotelAgreementDraftsService {
   private readonly dataSource: "memory" | "prisma";
@@ -199,8 +219,7 @@ export class HotelAgreementDraftsService {
   ) {
     const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
       where: {
-        agreementNumber: draft.agreementNumber,
-        city: draft.city,
+        OR: buildPrismaDraftAgreementMatchers(draft),
       },
       include: {
         visaSetup: {
@@ -502,8 +521,7 @@ export class HotelAgreementDraftsService {
           visaSetup: {
             groupId: targetGroup.id,
           },
-          agreementNumber: draft.agreementNumber,
-          city: draft.city,
+          OR: buildPrismaDraftAgreementMatchers(draft),
         },
       });
       if (targetGroupAgreement) {
@@ -643,8 +661,7 @@ export class HotelAgreementDraftsService {
               visaSetup: {
                 groupId: targetGroup.id,
               },
-              agreementNumber: draft.agreementNumber,
-              city: draft.city,
+              OR: buildPrismaDraftAgreementMatchers(draft),
             },
             select: {
               id: true,
@@ -661,8 +678,7 @@ export class HotelAgreementDraftsService {
       } else {
         const allAssigned = await this.prisma.visaHotelAgreement.findMany({
           where: {
-            agreementNumber: draft.agreementNumber,
-            city: draft.city,
+            OR: buildPrismaDraftAgreementMatchers(draft),
           },
           include: {
             visaSetup: {
@@ -694,8 +710,7 @@ export class HotelAgreementDraftsService {
 
       const nextAssigned = await this.prisma.visaHotelAgreement.findMany({
         where: {
-          agreementNumber: draft.agreementNumber,
-          city: draft.city,
+          OR: buildPrismaDraftAgreementMatchers(draft),
         },
       });
       const nextTotal = nextAssigned.reduce((sum, h) => sum + h.pax, 0);
@@ -840,24 +855,60 @@ export class HotelAgreementDraftsService {
     const where: Prisma.HotelAgreementDraftWhereInput = {};
 
     if (status === "assigned") {
-      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({ select: { agreementNumber: true, city: true } });
-      const assignedPairs = Array.from(new Set(assignedAgreements.map(a => `${a.city}:${a.agreementNumber}`)));
-      if (assignedPairs.length > 0) {
-        where.OR = assignedPairs.map(p => {
-          const [c, n] = p.split(":");
-          return { city: c as any, agreementNumber: n };
-        });
+      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
+        select: {
+          sourceDraftId: true,
+          agreementNumber: true,
+          city: true,
+          hotelName: true,
+          stayStart: true,
+          stayEnd: true,
+        },
+      });
+      const assignedDraftIds = assignedAgreements
+        .map((agreement) => agreement.sourceDraftId)
+        .filter((draftId): draftId is string => Boolean(draftId));
+      const assignedFilters: Prisma.HotelAgreementDraftWhereInput[] = [
+        ...(assignedDraftIds.length > 0 ? [{ id: { in: [...new Set(assignedDraftIds)] } }] : []),
+        ...assignedAgreements.map((agreement) => ({
+          agreementNumber: agreement.agreementNumber,
+          city: agreement.city,
+          hotelName: agreement.hotelName,
+          stayStart: agreement.stayStart,
+          stayEnd: agreement.stayEnd,
+        })),
+      ];
+      if (assignedFilters.length > 0) {
+        where.OR = assignedFilters;
       } else {
         where.id = "no-match"; // force empty result
       }
     } else if (status === "unassigned") {
-      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({ select: { agreementNumber: true, city: true } });
-      const assignedPairs = Array.from(new Set(assignedAgreements.map(a => `${a.city}:${a.agreementNumber}`)));
-      if (assignedPairs.length > 0) {
-        where.NOT = assignedPairs.map(p => {
-          const [c, n] = p.split(":");
-          return { city: c as any, agreementNumber: n };
-        });
+      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
+        select: {
+          sourceDraftId: true,
+          agreementNumber: true,
+          city: true,
+          hotelName: true,
+          stayStart: true,
+          stayEnd: true,
+        },
+      });
+      const assignedDraftIds = assignedAgreements
+        .map((agreement) => agreement.sourceDraftId)
+        .filter((draftId): draftId is string => Boolean(draftId));
+      const assignedFilters: Prisma.HotelAgreementDraftWhereInput[] = [
+        ...(assignedDraftIds.length > 0 ? [{ id: { in: [...new Set(assignedDraftIds)] } }] : []),
+        ...assignedAgreements.map((agreement) => ({
+          agreementNumber: agreement.agreementNumber,
+          city: agreement.city,
+          hotelName: agreement.hotelName,
+          stayStart: agreement.stayStart,
+          stayEnd: agreement.stayEnd,
+        })),
+      ];
+      if (assignedFilters.length > 0) {
+        where.NOT = { OR: assignedFilters };
       }
     }
 
@@ -916,9 +967,13 @@ export class HotelAgreementDraftsService {
     return drafts.map((draft) => {
       const matchingAgreements = assignedAgreements.filter(
         (a) =>
-          a.agreementNumber.trim().toUpperCase() ===
+          a.sourceDraftId === draft.id ||
+          (a.agreementNumber.trim().toUpperCase() ===
             draft.agreementNumber.trim().toUpperCase() &&
-          a.city === draft.city,
+            a.city === draft.city &&
+            a.hotelName.trim().toUpperCase() === draft.hotelName.trim().toUpperCase() &&
+            toIsoDateOnly(a.stayStart) === toIsoDateOnly(draft.stayStart) &&
+            toIsoDateOnly(a.stayEnd) === toIsoDateOnly(draft.stayEnd)),
       );
       const totalAssignedPax = matchingAgreements.reduce((sum, h) => sum + h.pax, 0);
       const remainingPax = Math.max(0, draft.pax - totalAssignedPax);

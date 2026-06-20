@@ -4,7 +4,12 @@ import {
   GroupRaudhahStatus,
   GroupTone,
 } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { CreateGroupDto } from "./dto/create-group.dto";
+import type {
+  groupDetailSelection,
+  groupSummarySelection,
+} from "./infrastructure/groups.prisma-include";
 
 export type MemoryItineraryItem = Omit<
   NonNullable<CreateGroupDto["itinerary"]>[number],
@@ -70,6 +75,23 @@ export type MemoryGroupRecord = Omit<
   updatedAt: string;
 };
 
+export type MemoryGroupSummaryRecord = Omit<
+  MemoryGroupRecord,
+  "musyrif" | "timeline" | "checklistAssignments"
+>;
+
+export type PrismaGroupSummaryRecord = Prisma.GroupGetPayload<{
+  select: typeof groupSummarySelection;
+}>;
+
+export type PrismaGroupDetailRecord = Prisma.GroupGetPayload<{
+  select: typeof groupDetailSelection;
+}>;
+
+export type GroupSummaryRecord = PrismaGroupSummaryRecord | MemoryGroupSummaryRecord;
+export type GroupDetailRecord = PrismaGroupDetailRecord | MemoryGroupRecord;
+export type GroupRecord = GroupSummaryRecord | GroupDetailRecord;
+
 export type ChecklistAssignmentSyncResult = {
   id: string;
   groupCode: string;
@@ -117,5 +139,9 @@ export type PaginatedGroupList<T> = {
   page: number;
   pageSize: number;
 };
+
+export type GroupListResult<T extends GroupRecord = GroupRecord> =
+  | T[]
+  | PaginatedGroupList<T>;
 
 export const DAY_IN_MS = 24 * 60 * 60 * 1000;

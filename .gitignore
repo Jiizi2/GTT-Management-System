@@ -27,6 +27,7 @@ pnpm-debug.log*
 .env.*
 apps/*/.env
 apps/*/.env.*
+!apps/*/.env.example
 
 # Prisma local SQLite database
 apps/backend/prisma/dev.db

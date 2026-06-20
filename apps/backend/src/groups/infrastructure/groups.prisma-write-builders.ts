@@ -9,6 +9,7 @@ import {
   VisaStatus,
 } from "@prisma/client";
 import { CreateGroupDto } from "../dto/create-group.dto";
+import { resolveGroupLifecycleStatus } from "../domain/groups.lifecycle-status";
 import { resolveItineraryTitle } from "../domain/groups-itinerary-title";
 import { buildGroupSearchDocument } from "../domain/groups.search-document";
 
@@ -117,12 +118,14 @@ function buildVisaSetupCreate(visaSetup: CreateGroupDto["visaSetup"]) {
       visaStatus: visaSetup.visaStatus ?? VisaStatus.DRAFT,
       issuedDate: visaSetup.issuedDate ? toUtcMidnight(visaSetup.issuedDate) : null,
       syarikah: visaSetup.syarikah.trim(),
+      busStatus: visaSetup.busStatus ?? null,
       paymentStatus: visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
       outstandingAmount: new Prisma.Decimal(visaSetup.outstandingAmount ?? 0),
       hotelAgreements:
         visaSetup.hotelAgreements && visaSetup.hotelAgreements.length > 0
           ? {
               create: visaSetup.hotelAgreements.map((hotel) => ({
+                sourceDraftId: hotel.sourceDraftId?.trim() || null,
                 city: hotel.city ?? AgreementCity.MAKKAH,
                 hotelName: hotel.hotelName.trim(),
                 agreementNumber: hotel.agreementNumber.trim(),
@@ -188,10 +191,12 @@ function buildGroupWriteData(
   normalizedCode: string,
   options: BuildGroupWriteDataOptions,
 ) {
+  const lifecycleStatus = payload.lifecycleStatus ?? resolveGroupLifecycleStatus(payload.status);
   return {
     code: normalizedCode,
     name: payload.name.trim(),
     status: payload.status.trim(),
+    lifecycleStatus,
     searchDocument: buildGroupSearchDocument({
       code: normalizedCode,
       name: payload.name,

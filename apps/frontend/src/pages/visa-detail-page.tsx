@@ -700,6 +700,10 @@ export function VisaTrackingDetailScreen({
     return allVisaRows.find((r) => r.groupCode === activeGroupCode) ?? initialRow;
   }, [allVisaRows, activeGroupCode, initialRow]);
 
+  useEffect(() => {
+    setActiveGroupCode(initialRow.groupCode);
+  }, [initialRow.groupCode]);
+
   // Find family groups for tabs
   const familyGroups = useMemo(() => {
     const currentGroup = groups.find((item) => item.code === activeRow.groupCode) ?? null;
@@ -716,45 +720,8 @@ export function VisaTrackingDetailScreen({
     return [parent, ...children];
   }, [groups, activeRow.groupCode]);
 
-  // Merged row for family groups
-  const mergedFamilyRow = useMemo(() => {
-    if (familyGroups.length <= 1) {
-      return activeRow;
-    }
-    
-    const parent = familyGroups[0];
-    const parentRow = allVisaRows.find(r => r.groupCode === parent.code) ?? activeRow;
-    
-    // Combine pax
-    const totalPax = familyGroups.reduce((sum, g) => sum + g.pax, 0);
-
-    // Combine hotels and tag with ownerGroupCode
-    const makkahHotels: GroupAgreementHotel[] = [];
-    const madinahHotels: GroupAgreementHotel[] = [];
-    
-    for (const g of familyGroups) {
-      const gRow = allVisaRows.find(r => r.groupCode === g.code);
-      const gData = groups.find(r => r.code === g.code);
-      if (gRow && gData) {
-        const mHotels = gData.visaSetup?.makkahHotels.map(h => ({ ...h, ownerGroupCode: g.code })) || [];
-        const madHotels = gData.visaSetup?.madinahHotels.map(h => ({ ...h, ownerGroupCode: g.code })) || [];
-        makkahHotels.push(...mHotels);
-        madinahHotels.push(...madHotels);
-      }
-    }
-    
-    return {
-      ...parentRow,
-      pax: totalPax,
-      makkahVerified: makkahHotels.reduce((sum, h) => sum + h.pax, 0),
-      madinahVerified: madinahHotels.reduce((sum, h) => sum + h.pax, 0),
-      makkahHotels,
-      madinahHotels,
-    };
-  }, [familyGroups, activeRow, allVisaRows, groups]);
-
-  // Shadow row prop with mergedFamilyRow
-  const row = mergedFamilyRow;
+  const operationalGroup = familyGroups[0] ?? groups.find((item) => item.code === activeRow.groupCode) ?? null;
+  const row = activeRow;
 
 
   const queryClient = useQueryClient();
@@ -808,7 +775,7 @@ export function VisaTrackingDetailScreen({
     onClose: () => setDeleteAgreementDraft(null),
   });
 
-  const group = groups.find((item) => item.code === row.groupCode) ?? null;
+  const group = groups.find((item) => item.code === activeGroupCode) ?? groups.find((item) => item.code === row.groupCode) ?? null;
   const groupCompleteness = group ? resolveGroupCompleteness(group) : null;
   const agreementIssues =
     groupCompleteness?.issues.filter(
@@ -964,6 +931,7 @@ export function VisaTrackingDetailScreen({
 
     if (mode === "add") {
       return {
+        sourceDraftId: undefined,
         hotelName: "",
         agreementNumber: "",
         pax: totalPax.toString(),
@@ -974,6 +942,7 @@ export function VisaTrackingDetailScreen({
     }
 
     return {
+      sourceDraftId: currentHotel?.sourceDraftId?.trim() || undefined,
       hotelName: currentHotel?.hotelName?.trim() || "",
       agreementNumber: currentHotel?.agreementNumber?.trim() || "",
       pax: currentHotel?.pax?.toString() || totalPax.toString(),
@@ -987,6 +956,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const buildHotelDraftFromAgreement = (agreement: GroupAgreementHotel): VisaHotelEditFormState => ({
+    sourceDraftId: agreement.sourceDraftId?.trim() || undefined,
     hotelName: agreement.hotelName.trim(),
     agreementNumber: agreement.agreementNumber.trim(),
     pax: agreement.pax.toString(),
@@ -1191,7 +1161,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const saveHotel = (hotel: VisaHotelEditFormState) => {
-    const targetGroupCode = hotelDraftOwnerGroupCode ?? activeRow.groupCode;
+    const targetGroupCode = hotelDraftOwnerGroupCode ?? activeGroupCode;
     onUpdateVisaHotel(
       targetGroupCode,
       hotelCityDraft,
@@ -1207,7 +1177,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const saveAddHotelInline = (city: "makkah" | "madinah", hotel: VisaHotelEditFormState) => {
-    onUpdateVisaHotel(activeRow.groupCode, city, hotel);
+    onUpdateVisaHotel(activeGroupCode, city, hotel);
     setAddingHotelCity(null);
   };
 
@@ -1226,7 +1196,7 @@ export function VisaTrackingDetailScreen({
     try {
       await assignAgreementDraftInBackend({
         draftId: draft.id,
-        groupCode: activeRow.groupCode,
+        groupCode: activeGroupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1235,7 +1205,7 @@ export function VisaTrackingDetailScreen({
       setAddingHotelCity(null);
       setDraftAssignFeedback({
         tone: "success",
-        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${activeRow.groupCode}.`,
+        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${activeGroupCode}.`,
       });
     } catch (error: unknown) {
       setDraftAssignFeedback({
@@ -1259,7 +1229,7 @@ export function VisaTrackingDetailScreen({
     }
 
     if (!deleteAgreementDraft.draft) {
-      const targetGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? activeRow.groupCode;
+      const targetGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? activeGroupCode;
       onDeleteVisaHotel(targetGroupCode, deleteAgreementDraft.city, deleteAgreementDraft.agreement.id);
       setDeleteAgreementDraft(null);
       return;
@@ -1270,7 +1240,7 @@ export function VisaTrackingDetailScreen({
     try {
       await unassignAgreementDraftInBackend({
         draftId: deleteAgreementDraft.draft.id,
-        groupCode: deleteAgreementDraft.agreement.ownerGroupCode ?? activeRow.groupCode,
+        groupCode: deleteAgreementDraft.agreement.ownerGroupCode ?? activeGroupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1312,7 +1282,7 @@ export function VisaTrackingDetailScreen({
   };
 
   const handleCopyWhatsapp = async () => {
-    const text = generateWhatsappCopyText(group ?? undefined, familyGroups);
+    const text = generateWhatsappCopyText(operationalGroup ?? group ?? undefined, familyGroups);
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -1428,7 +1398,7 @@ export function VisaTrackingDetailScreen({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-primary">Visa Detail</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              {familyGroups.length > 1 ? familyGroups.map(g => g.code).join(" - ") : row.groupCode}
+              {row.groupCode}
             </h1>
             {familyGroups.length > 1 && (
               <span className={`inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600 ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>

@@ -48,6 +48,7 @@ export const groupSummarySelection = {
   code: true,
   name: true,
   status: true,
+  lifecycleStatus: true,
   tone: true,
   arrivalDate: true,
   returnDate: true,
@@ -71,11 +72,13 @@ export const groupSummarySelection = {
       visaStatus: true,
       issuedDate: true,
       syarikah: true,
+      busStatus: true,
       paymentStatus: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
           id: true,
+          sourceDraftId: true,
           city: true,
           hotelName: true,
           agreementNumber: true,
@@ -94,6 +97,7 @@ export const groupDetailSelection = {
   code: true,
   name: true,
   status: true,
+  lifecycleStatus: true,
   tone: true,
   arrivalDate: true,
   returnDate: true,
@@ -136,11 +140,13 @@ export const groupDetailSelection = {
       visaStatus: true,
       issuedDate: true,
       syarikah: true,
+      busStatus: true,
       paymentStatus: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
           id: true,
+          sourceDraftId: true,
           city: true,
           hotelName: true,
           agreementNumber: true,

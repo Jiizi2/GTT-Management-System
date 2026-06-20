@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { PrismaService } from "./prisma.service";
 
 type AsyncVoid = () => Promise<void>;
+type AsyncQuery = (query: string, ...values: unknown[]) => Promise<unknown[]>;
 
 async function withEnv<T>(
   overrides: Record<string, string | undefined>,
@@ -34,14 +35,26 @@ function createServiceMock() {
   const state = {
     connectCalls: 0,
     disconnectCalls: 0,
+    schemaCheckCalls: 0,
+    schemaCheckResult: [] as unknown[],
   };
 
   const service = Object.create(PrismaService.prototype) as PrismaService;
-  (service as PrismaService & { $connect: AsyncVoid }).$connect = async () => {
+  const serviceMock = service as unknown as {
+    $connect: AsyncVoid;
+    $disconnect: AsyncVoid;
+    $queryRawUnsafe: AsyncQuery;
+  };
+
+  serviceMock.$connect = async () => {
     state.connectCalls += 1;
   };
-  (service as PrismaService & { $disconnect: AsyncVoid }).$disconnect = async () => {
+  serviceMock.$disconnect = async () => {
     state.disconnectCalls += 1;
+  };
+  serviceMock.$queryRawUnsafe = async () => {
+    state.schemaCheckCalls += 1;
+    return state.schemaCheckResult;
   };
 
   return { service, state };
@@ -57,12 +70,14 @@ async function testOnModuleInitSkipsConnectForNonPrismaDataSource(): Promise<voi
     const { service, state } = createServiceMock();
     await service.onModuleInit();
     assert.equal(state.connectCalls, 0);
+    assert.equal(state.schemaCheckCalls, 0);
   });
 
   await withEnv({ DATA_SOURCE: "memory" }, async () => {
     const { service, state } = createServiceMock();
     await service.onModuleInit();
     assert.equal(state.connectCalls, 0);
+    assert.equal(state.schemaCheckCalls, 0);
   });
 }
 
@@ -71,6 +86,26 @@ async function testOnModuleInitConnectsForPrismaDataSource(): Promise<void> {
     const { service, state } = createServiceMock();
     await service.onModuleInit();
     assert.equal(state.connectCalls, 1);
+    assert.equal(state.schemaCheckCalls, 1);
+  });
+}
+
+async function testOnModuleInitFailsWhenRequiredSchemaIsMissing(): Promise<void> {
+  await withEnv({ DATA_SOURCE: "prisma" }, async () => {
+    const { service, state } = createServiceMock();
+    state.schemaCheckResult = [
+      {
+        table_name: "Group",
+        column_name: "lifecycleStatus",
+      },
+    ];
+
+    await assert.rejects(
+      () => service.onModuleInit(),
+      /Prisma database schema is not ready.*Group\.lifecycleStatus.*db:deploy/i,
+    );
+    assert.equal(state.connectCalls, 1);
+    assert.equal(state.schemaCheckCalls, 1);
   });
 }
 
@@ -99,6 +134,7 @@ async function testOnModuleDestroyDisconnectsForPrismaDataSource(): Promise<void
 async function main(): Promise<void> {
   await runCase("prisma service onModuleInit skips non-prisma datasource", testOnModuleInitSkipsConnectForNonPrismaDataSource);
   await runCase("prisma service onModuleInit connects for prisma datasource", testOnModuleInitConnectsForPrismaDataSource);
+  await runCase("prisma service onModuleInit fails when required schema is missing", testOnModuleInitFailsWhenRequiredSchemaIsMissing);
   await runCase("prisma service onModuleDestroy skips non-prisma datasource", testOnModuleDestroySkipsDisconnectForNonPrismaDataSource);
   await runCase("prisma service onModuleDestroy disconnects for prisma datasource", testOnModuleDestroyDisconnectsForPrismaDataSource);
 }

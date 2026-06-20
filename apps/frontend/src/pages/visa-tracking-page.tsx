@@ -214,7 +214,11 @@ type VisaRowGroup = {
   followerRows: VisaTrackingRow[];
 };
 
-const desktopTableGridTemplate = "0.76fr 1.2fr 0.64fr 1.1fr 1.1fr 0.72fr 0.72fr 0.62fr 0.66fr";
+const desktopTableGridTemplate = "minmax(0, 0.9fr) minmax(0, 1.12fr) minmax(0, 0.64fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.72fr) minmax(0, 0.72fr) minmax(0, 0.62fr) minmax(0, 0.66fr)";
+
+function getVisaRowGroupKey(rowGroup: VisaRowGroup): string {
+  return rowGroup.mainRow.id || rowGroup.mainRow.groupCode;
+}
 
 export function VisaTrackingScreen({
   groups,
@@ -232,9 +236,9 @@ export function VisaTrackingScreen({
   const [activeFilter, setActiveFilter] = useState<VisaFilterId>("all");
   const [issuedMonthFilter, setIssuedMonthFilter] = useState(() => currentIssuedMonthKey);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedRowGroupKeys, setExpandedRowGroupKeys] = useState<Set<string>>(() => new Set());
 
   const visaRows = useMemo(() => buildVisaTrackingRowsFromGroups(groups), [groups]);
-  const visaRowsByCode = useMemo(() => new Map(visaRows.map((row) => [row.groupCode, row] as const)), [visaRows]);
   const groupByCode = useMemo(() => new Map(groups.map((group) => [group.code, group] as const)), [groups]);
   const durationByGroupCode = useMemo(
     () => new Map(groups.map((group) => [group.code, group.durationDays] as const)),
@@ -462,7 +466,19 @@ export function VisaTrackingScreen({
       });
   };
 
-  const renderAgreementCell = (row: VisaTrackingRow, city: "makkah" | "madinah", isFollower = false, view: "mobile" | "desktop" = "desktop") => {
+  const toggleRowGroup = (rowGroupKey: string) => {
+    setExpandedRowGroupKeys((current) => {
+      const next = new Set(current);
+      if (next.has(rowGroupKey)) {
+        next.delete(rowGroupKey);
+      } else {
+        next.add(rowGroupKey);
+      }
+      return next;
+    });
+  };
+
+  const renderAgreementCell = (row: VisaTrackingRow, city: "makkah" | "madinah", view: "mobile" | "desktop" = "desktop") => {
     const group = groupByCode.get(row.groupCode);
     const agreements = getGroupAgreementHotelsByCity(group, city);
     const hasAgreement = agreements.length > 0;
@@ -481,9 +497,8 @@ export function VisaTrackingScreen({
     const badgeTextSize = isMobile ? "text-[10px]" : "text-[11px]";
 
     return (
-      <div key={row.groupCode} className={`space-y-0.5 ${isFollower ? "mt-2 pt-2 border-t border-slate-200/50" : ""}`}>
+      <div key={row.groupCode} className="space-y-0.5">
         <div className="flex items-center gap-1.5">
-          {isFollower && <span className="text-slate-400 text-xs font-bold">↳</span>}
           <strong className={`break-all ${agreementNumberTextSize} font-semibold leading-tight text-slate-800`}>
             {agreementNumber}
           </strong>
@@ -523,10 +538,19 @@ export function VisaTrackingScreen({
     );
   };
 
-  const renderMobileCardSingle = (row: VisaTrackingRow, isFollower = false) => {
+  const renderMobileCardSingle = (
+    row: VisaTrackingRow,
+    options: {
+      hasFollowers?: boolean;
+      followerCount?: number;
+      isExpanded?: boolean;
+      onToggle?: () => void;
+    } = {},
+  ) => {
     const group = groupByCode.get(row.groupCode);
     const visaTypeLabel = resolveVisaTypeLabel(group);
-    
+    const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
+
     const raudhahEntries = resolveRaudhahEntries(row, group);
     const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
     const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
@@ -537,13 +561,26 @@ export function VisaTrackingScreen({
         className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-surface-container-lowest transition-all"
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold text-slate-900">
-                {row.groupCode}
-              </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {hasFollowers ? (
+                <button
+                  type="button"
+                  className={`group inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1 text-left text-sm font-bold text-primary transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${isExpanded ? "border-primary/45 bg-primary/20 shadow-sm ring-1 ring-primary/15" : "border-primary/25 bg-primary/10 hover:border-primary/40 hover:bg-primary/15"}`}
+                  onClick={onToggle}
+                  aria-expanded={isExpanded}
+                  aria-controls={`visa-mobile-linked-${row.id}`}
+                  title={`${isExpanded ? "Hide" : "Show"} ${followerCount} child group${followerCount === 1 ? "" : "s"}`}
+                >
+                  <span className="min-w-0 break-words text-slate-900">{row.groupCode}</span>
+                </button>
+              ) : (
+                <p className="break-words text-sm font-semibold text-slate-900">
+                  {row.groupCode}
+                </p>
+              )}
             </div>
-            <p className="mt-1 text-sm font-medium text-slate-700">{row.groupName}</p>
+            <p className="mt-1 break-words text-sm font-medium leading-snug text-slate-700">{row.groupName}</p>
           </div>
 
           <div className="flex flex-col gap-1 items-end shrink-0">
@@ -558,14 +595,14 @@ export function VisaTrackingScreen({
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
               Makkah Agreement
             </p>
-            {renderAgreementCell(row, "makkah", false, "mobile")}
+            {renderAgreementCell(row, "makkah", "mobile")}
           </div>
 
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
               Madinah Agreement
             </p>
-            {renderAgreementCell(row, "madinah", false, "mobile")}
+            {renderAgreementCell(row, "madinah", "mobile")}
           </div>
 
           <div className="rounded-xl bg-slate-50 p-3">
@@ -644,17 +681,38 @@ export function VisaTrackingScreen({
 
   const renderMobileCard = (rowGroup: VisaRowGroup) => {
     const { mainRow, followerRows } = rowGroup;
+    const rowGroupKey = getVisaRowGroupKey(rowGroup);
+    const hasFollowers = followerRows.length > 0;
+    const isExpanded = expandedRowGroupKeys.has(rowGroupKey);
     return (
       <div key={mainRow.id} className="space-y-3">
-        {renderMobileCardSingle(mainRow, false)}
-        {followerRows.map(f => renderMobileCardSingle(f, true))}
+        {renderMobileCardSingle(mainRow, {
+          hasFollowers,
+          followerCount: followerRows.length,
+          isExpanded,
+          onToggle: hasFollowers ? () => toggleRowGroup(rowGroupKey) : undefined,
+        })}
+        {hasFollowers && isExpanded ? (
+          <div id={`visa-mobile-linked-${mainRow.id}`} className="space-y-3">
+            {followerRows.map((followerRow) => renderMobileCardSingle(followerRow))}
+          </div>
+        ) : null}
       </div>
     );
   };
 
-  const renderDesktopRowSingle = (row: VisaTrackingRow, isFollower = false) => {
+  const renderDesktopRowSingle = (
+    row: VisaTrackingRow,
+    options: {
+      hasFollowers?: boolean;
+      followerCount?: number;
+      isExpanded?: boolean;
+      onToggle?: () => void;
+    } = {},
+  ) => {
     const group = groupByCode.get(row.groupCode);
     const visaTypeLabel = resolveVisaTypeLabel(group);
+    const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
     
     const raudhahEntries = resolveRaudhahEntries(row, group);
     const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
@@ -663,32 +721,45 @@ export function VisaTrackingScreen({
     return (
       <article
         key={row.id}
-        className="grid items-center gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-slate-50/30"
+        className="grid items-start gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-slate-50/30"
         style={{ gridTemplateColumns: desktopTableGridTemplate }}
       >
-        <div className="flex items-center gap-1.5 font-semibold text-slate-800 py-1">
-          <span>{row.groupCode}</span>
+        <div className="flex min-w-0 items-start gap-1.5 py-1 font-semibold text-slate-800">
+          {hasFollowers ? (
+            <button
+              type="button"
+              className={`group inline-flex w-full min-w-0 flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1 text-left font-bold text-primary transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${isExpanded ? "border-primary/45 bg-primary/20 shadow-sm ring-1 ring-primary/15" : "border-primary/25 bg-primary/10 hover:border-primary/40 hover:bg-primary/15"}`}
+              onClick={onToggle}
+              aria-expanded={isExpanded}
+              aria-controls={`visa-desktop-linked-${row.id}`}
+              title={`${isExpanded ? "Hide" : "Show"} ${followerCount} child group${followerCount === 1 ? "" : "s"}`}
+            >
+              <span className="min-w-0 break-words text-slate-800">{row.groupCode}</span>
+            </button>
+          ) : (
+            <span className="min-w-0 break-words">{row.groupCode}</span>
+          )}
         </div>
 
-        <div className="min-w-0 py-1 font-medium text-slate-700 truncate">
+        <div className="min-w-0 break-words py-1 font-medium leading-snug text-slate-700">
           {row.groupName}
         </div>
 
-        <div className="flex items-center py-1">
-          <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-bold leading-none text-slate-700 w-fit">
+        <div className="flex min-w-0 items-start py-1">
+          <span className="inline-flex max-w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-bold leading-tight text-slate-700">
             {row.pax} Pax
           </span>
         </div>
 
-        <div className="space-y-0.5 py-1">
-          {renderAgreementCell(row, "makkah", false, "desktop")}
+        <div className="min-w-0 space-y-0.5 py-1">
+          {renderAgreementCell(row, "makkah", "desktop")}
         </div>
 
-        <div className="space-y-0.5 py-1">
-          {renderAgreementCell(row, "madinah", false, "desktop")}
+        <div className="min-w-0 space-y-0.5 py-1">
+          {renderAgreementCell(row, "madinah", "desktop")}
         </div>
 
-        <div className="space-y-0.5 justify-self-center text-center py-1">
+        <div className="min-w-0 space-y-0.5 justify-self-center py-1 text-center">
           {raudhahEntries.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-1">
               {visibleRaudhahEntries.map((entry) => (
@@ -716,7 +787,7 @@ export function VisaTrackingScreen({
           )}
         </div>
 
-        <div className="justify-self-center flex flex-col gap-1 py-1">
+        <div className="flex min-w-0 flex-col gap-1 justify-self-center py-1">
           <span
             className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none ${getVisaStatusClasses(
               row.visaStatus,
@@ -727,7 +798,7 @@ export function VisaTrackingScreen({
           </span>
         </div>
 
-        <div className="flex flex-col items-start gap-1 py-1">
+        <div className="flex min-w-0 flex-col items-start gap-1 py-1">
           <span
             className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none w-fit ${getVisaTypeClasses(
               visaTypeLabel,
@@ -738,7 +809,7 @@ export function VisaTrackingScreen({
           </span>
         </div>
 
-        <div className="flex items-center py-1">
+        <div className="flex min-w-0 items-start py-1">
           <button
             type="button"
             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
@@ -758,10 +829,22 @@ export function VisaTrackingScreen({
 
   const renderDesktopRow = (rowGroup: VisaRowGroup) => {
     const { mainRow, followerRows } = rowGroup;
+    const rowGroupKey = getVisaRowGroupKey(rowGroup);
+    const hasFollowers = followerRows.length > 0;
+    const isExpanded = expandedRowGroupKeys.has(rowGroupKey);
     return (
       <div key={mainRow.id} className="divide-y divide-slate-100/50">
-        {renderDesktopRowSingle(mainRow, false)}
-        {followerRows.map(f => renderDesktopRowSingle(f, true))}
+        {renderDesktopRowSingle(mainRow, {
+          hasFollowers,
+          followerCount: followerRows.length,
+          isExpanded,
+          onToggle: hasFollowers ? () => toggleRowGroup(rowGroupKey) : undefined,
+        })}
+        {hasFollowers && isExpanded ? (
+          <div id={`visa-desktop-linked-${mainRow.id}`} className="divide-y divide-slate-100/50">
+            {followerRows.map((followerRow) => renderDesktopRowSingle(followerRow))}
+          </div>
+        ) : null}
       </div>
     );
   };

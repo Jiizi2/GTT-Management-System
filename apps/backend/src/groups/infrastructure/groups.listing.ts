@@ -5,18 +5,14 @@ import type {
   GroupListFilter,
   GroupResponseProjection,
   MemoryGroupRecord,
+  MemoryGroupSummaryRecord,
   PaginatedGroupList,
 } from "../groups.service-types";
-
-type MemoryGroupSummary = Omit<
-  MemoryGroupRecord,
-  "musyrif" | "timeline" | "checklistAssignments"
->;
 
 export function projectMemoryGroupRecord(
   group: MemoryGroupRecord,
   projection: GroupResponseProjection,
-): MemoryGroupRecord | MemoryGroupSummary {
+): MemoryGroupRecord | MemoryGroupSummaryRecord {
   if (projection === "detail") {
     return group;
   }

@@ -12,6 +12,14 @@ enum GroupTone {
   INACTIVE
 }
 
+enum GroupLifecycleStatus {
+  ENTRY_ONLY
+  ACTIVE
+  INACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
 enum VisaStatus {
   DRAFT
   PENDING
@@ -22,6 +30,11 @@ enum VisaPaymentStatus {
   PAID
   UNPAID
   PARTIAL
+}
+
+enum VisaBusStatus {
+  VISA_ONLY
+  VISA_PLUS
 }
 
 enum AgreementApprovalStatus {
@@ -122,6 +135,7 @@ model Group {
   code               String                @unique
   name               String
   status             String
+  lifecycleStatus    GroupLifecycleStatus  @default(ACTIVE)
   searchDocument     String                @default("")
   tone               GroupTone             @default(ACTIVE)
   arrivalDate        DateTime
@@ -147,6 +161,7 @@ model Group {
   childGroups        Group[]               @relation("GroupToGroup")
 
   @@index([createdAt])
+  @@index([lifecycleStatus])
 }
 
 model GroupAuditLog {
@@ -174,7 +189,7 @@ model InvoiceClient {
   group       Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   invoices    Invoice[]
 
-  @@unique([sortOrder])
+  @@index([sortOrder])
   @@index([name])
 }
 
@@ -293,6 +308,7 @@ model VisaSetup {
   visaStatus          VisaStatus           @default(DRAFT)
   issuedDate          DateTime?
   syarikah            String
+  busStatus           VisaBusStatus?
   paymentStatus       VisaPaymentStatus    @default(UNPAID)
   outstandingAmount   Decimal              @default(0) @db.Decimal(12, 2)
   createdAt           DateTime             @default(now())
@@ -305,6 +321,7 @@ model VisaSetup {
 model VisaHotelAgreement {
   id              String                  @id @default(cuid())
   visaSetupId     String
+  sourceDraftId   String?
   city            AgreementCity
   hotelName       String
   agreementNumber String
@@ -315,8 +332,10 @@ model VisaHotelAgreement {
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
   visaSetup       VisaSetup               @relation(fields: [visaSetupId], references: [id], onDelete: Cascade)
+  sourceDraft     HotelAgreementDraft?    @relation(fields: [sourceDraftId], references: [id], onDelete: SetNull)
 
   @@index([visaSetupId, city, stayStart])
+  @@index([sourceDraftId])
 }
 
 model HotelAgreementDraft {
@@ -332,6 +351,7 @@ model HotelAgreementDraft {
   notes           String?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
+  linkedHotelAgreements VisaHotelAgreement[]
 
   @@index([agreementNumber])
   @@index([city, stayStart])

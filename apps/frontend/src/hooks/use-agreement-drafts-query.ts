@@ -1,30 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import type { AgreementApprovalStatus, HotelAgreementDraft, HotelAgreementDraftFormState } from "../shared/app-domain";
+import type { HotelAgreementDraft, HotelAgreementDraftFormState } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
+import {
+  mapAgreementStatusToBackend,
+  mapBackendAgreementStatus,
+} from "../shared/backend-enums";
 import { agreementDraftQueryKeys } from "../shared/query-keys";
+import {
+  parseBackendAgreementDraftRecord,
+  parseBackendAgreementDraftRecordArray,
+  type BackendHotelAgreementDraftRecord,
+} from "./agreement-drafts-contract";
 
 export type AgreementDraftStatusFilter = "all" | "assigned" | "unassigned";
-
-type BackendHotelAgreementDraftRecord = {
-  id?: string;
-  city?: string;
-  agentName?: string | null;
-  hotelName?: string;
-  agreementNumber?: string;
-  pax?: number;
-  remainingPax?: number;
-  assignedGroups?: Array<{ groupCode: string; pax: number }>;
-  status?: string;
-  stayStart?: string | Date;
-  stayEnd?: string | Date;
-  notes?: string | null;
-  groupCode?: string | null;
-  assignmentStatus?: string;
-  assignedAt?: string | Date | null;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-};
 
 function readString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value.trim() || fallback : fallback;
@@ -58,27 +47,6 @@ function toIsoDateTime(value: unknown): string {
   }
 
   return readString(value);
-}
-
-function mapBackendAgreementStatus(value: string | undefined): AgreementApprovalStatus {
-  const upper = value?.trim().toUpperCase();
-  if (upper === "APPROVED") {
-    return "Approved";
-  }
-  if (upper === "REJECTED") {
-    return "Rejected";
-  }
-  return "Waiting for Approval";
-}
-
-function mapAgreementStatusToBackend(status: AgreementApprovalStatus): "WAITING" | "APPROVED" | "REJECTED" {
-  if (status === "Approved") {
-    return "APPROVED";
-  }
-  if (status === "Rejected") {
-    return "REJECTED";
-  }
-  return "WAITING";
 }
 
 function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreementDraft | null {
@@ -164,12 +132,8 @@ export async function fetchAgreementDraftsFromBackend({
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Draft fetch failed"));
   }
 
-  if (!Array.isArray(payload)) {
-    throw new Error("Draft fetch failed: response is not an array.");
-  }
-
-  return payload
-    .map((item) => mapBackendDraft(item as BackendHotelAgreementDraftRecord))
+  return parseBackendAgreementDraftRecordArray(payload, "Draft fetch failed")
+    .map((item) => mapBackendDraft(item))
     .filter((item): item is HotelAgreementDraft => item !== null);
 }
 
@@ -193,7 +157,7 @@ export async function saveAgreementDraftInBackend({
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Draft save failed"));
   }
 
-  const mappedDraft = mapBackendDraft(payload as BackendHotelAgreementDraftRecord);
+  const mappedDraft = mapBackendDraft(parseBackendAgreementDraftRecord(payload, "Draft save failed"));
   if (!mappedDraft) {
     throw new Error("Draft save failed: response is not a draft record.");
   }
@@ -238,7 +202,7 @@ export async function assignAgreementDraftInBackend({
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Draft assign failed"));
   }
 
-  const mappedDraft = mapBackendDraft(payload as BackendHotelAgreementDraftRecord);
+  const mappedDraft = mapBackendDraft(parseBackendAgreementDraftRecord(payload, "Draft assign failed"));
   if (!mappedDraft) {
     throw new Error("Draft assign failed: response is not a draft record.");
   }
@@ -265,7 +229,7 @@ export async function unassignAgreementDraftInBackend({
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Draft unassign failed"));
   }
 
-  const mappedDraft = mapBackendDraft(payload as BackendHotelAgreementDraftRecord);
+  const mappedDraft = mapBackendDraft(parseBackendAgreementDraftRecord(payload, "Draft unassign failed"));
   if (!mappedDraft) {
     throw new Error("Draft unassign failed: response is not a draft record.");
   }
