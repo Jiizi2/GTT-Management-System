@@ -100,6 +100,35 @@ Lihat log database lokal:
 docker compose logs -f postgres
 ```
 
+## Cek Aman Sebelum Update App
+
+Sebelum menjalankan build/update aplikasi yang memakai `DATA_SOURCE=prisma`, cek status migration lebih dulu:
+
+```bash
+npm run db:status:backend
+```
+
+Jika output menunjukkan migration dari database tidak ada di repo, berhenti dulu dan audit migration history. Jangan lanjutkan update app sebelum status migration jelas.
+
+Setelah status aman, terapkan migration dengan command deploy-safe:
+
+```bash
+npm run db:deploy:backend
+```
+
+Untuk Docker production, command yang setara adalah:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm backend npm run db:status
+docker compose -f docker-compose.prod.yml run --rm backend npm run db:deploy
+```
+
+Catatan:
+
+- `db:status` hanya mengecek status dan aman dijalankan berulang.
+- `db:deploy` menerapkan migration yang belum masuk; gunakan ini untuk environment production-like.
+- Backend sekarang akan gagal start dengan pesan jelas jika schema Prisma belum punya kolom wajib seperti `Group.lifecycleStatus`, `VisaHotelAgreement.sourceDraftId`, atau `VisaSetup.busStatus`.
+
 Build stack production:
 
 ```bash

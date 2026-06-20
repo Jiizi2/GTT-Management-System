@@ -37,6 +37,8 @@
     "qa:quick": "npm run verify && npm run test:smoke && npm run test:api",
     "qa:full": "npm run qa:quick && npm run test:prisma && npm run test:e2e:frontend",
     "db:generate:backend": "npm run db:generate --workspace backend",
+    "db:status:backend": "npm run db:status --workspace backend",
+    "db:deploy:backend": "npm run db:deploy --workspace backend",
     "db:migrate:backend": "npm run db:migrate --workspace backend",
     "db:seed:backend": "npm run db:seed --workspace backend",
     "db:studio:backend": "npm run db:studio --workspace backend"
