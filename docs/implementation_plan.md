@@ -8,7 +8,7 @@ Rujukan utama: `docs/project-review-refactoring-assessment.md`
 
 Status per 2026-06-20:
 
-- Branch integrasi terbaru: `stabilization/backbone-phase-23`.
+- Branch integrasi terbaru: `stabilization/backbone-phase-25`.
 - `master` tetap tidak disentuh; semua perubahan berjalan di branch konservatif dan bisa diputuskan belakangan apakah akan dibuat PR ke `master`.
 - Phase 0 sampai Phase 3 selesai: baseline, bug critical, persistent data contract, dan API contract hardening sudah terintegrasi di branch stabilisasi sebelumnya.
 - Phase 4 selesai untuk scope modularisasi aman: domain frontend sudah dipisah bertahap ke module types, fixtures, status, checklist, visa/completeness, itinerary/schedule, serta backend groups API/payload/mapper sudah dipisah bertahap.
@@ -22,6 +22,8 @@ Checkpoint terakhir yang sudah diverifikasi:
 - `stabilization/backbone-phase-21`: merge `test/groups-memory-prisma-contract`.
 - `stabilization/backbone-phase-22`: merge `docs/backbone-phase-status`.
 - `stabilization/backbone-phase-23`: merge `hardening/prisma-schema-readiness`.
+- `stabilization/backbone-phase-24`: merge `docs/backbone-phase-23-status`.
+- `stabilization/backbone-phase-25`: merge `docs/backbone-phase-24-status`.
 
 Gate kode terakhir di `stabilization/backbone-phase-23`:
 
