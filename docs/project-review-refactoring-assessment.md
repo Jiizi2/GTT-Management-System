@@ -4,6 +4,22 @@ Tanggal audit: 2026-06-19
 Branch audit: `docs/backbone-audit-plan`
 Basis kode: branch baru dari `master` dengan tambahan `docs/backbone-audit-report.md` dan `docs/implementation_plan.md`.
 
+
+## Stabilization Update - 2026-06-20
+
+Assessment di bawah ini adalah baseline audit awal sebelum eksekusi refactor bertahap. Status implementasi terbaru dicatat di `docs/implementation_plan.md` dan branch `stabilization/backbone-phase-25`.
+
+Ringkasan status setelah stabilisasi:
+
+- Phase 0 sampai Phase 5 selesai untuk scope backbone yang disepakati: bug critical, persistent data contract, API contract hardening, modularisasi aman, dan rationalisasi awal memory mode.
+- Kontrak database penting sudah diperkuat: `InvoiceClient.sortOrder` tidak lagi unique global, `VisaHotelAgreement.sourceDraftId` persisten, `Group.lifecycleStatus` tersedia, dan `VisaSetup.busStatus` eksplisit.
+- Guard backend untuk parent-child flat hierarchy sudah ditambahkan dan diuji.
+- Frontend sudah memakai kontrak response groups/agreement drafts dan enum mapping terpusat untuk area yang distabilisasi.
+- Backend Prisma startup sekarang fail-fast jika schema belum punya kolom wajib, sehingga migration drift tidak berubah menjadi error 500 diam-diam di endpoint runtime.
+- Local/development sudah diverifikasi dengan database PostgreSQL bersih `gtt_ops_refactor_20260620_132631`, `npm run qa:full`, `npm run dev:backend`, dan `npm run dev:frontend`.
+
+Dengan status ini, temuan baseline yang menyebut `sourceDraftId` belum persisten, parent-child belum diguard, bus status masih notes-only, atau `InvoiceClient.sortOrder` masih unique global harus dibaca sebagai historical finding, bukan kondisi branch stabilisasi terbaru. Sisa pekerjaan realistis sebelum keputusan PR ke `master` adalah staging/pre-production rehearsal, review manual flow bisnis, dan keputusan apakah perubahan stabilisasi ini akan dipromosikan atau dipilah menjadi PR lebih kecil.
+
 ## Scope dan Metode
 
 Audit ini membaca dokumentasi project, schema Prisma, service backend, DTO, controller, hooks frontend, domain frontend, dan alur utama group, visa, agreement draft, checklist, invoice, master data, auth, serta deployment/QA.
