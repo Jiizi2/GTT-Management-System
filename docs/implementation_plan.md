@@ -34,7 +34,8 @@ Checkpoint lokal/development terbaru di `stabilization/backbone-phase-25`:
 - `npm run test:integration --workspace backend` sukses terhadap database bersih tersebut, termasuk saat dijalankan ulang tanpa override env setelah `.env` lokal diarahkan ke DB clean.
 - `npm run qa:full` sukses terhadap database bersih tersebut, termasuk `qa:quick`, build backend/frontend, smoke test frontend, `test:api`, `test:prisma`, dan 9 Playwright E2E frontend.
 - `npm run dev:backend` berhasil start dengan TypeScript watcher 0 errors, backend listening di `http://localhost:3001/api`, dan `data source: prisma`.
-- `GET /api/groups?projection=summary` terhadap backend lokal/dev tidak lagi 500; tanpa sesi login response-nya 401 Unauthorized sesuai guard auth.
+- `npm run dev:frontend` berhasil start di `http://localhost:4173` dan proxy `/api` mengarah ke `http://127.0.0.1:3001`.
+- Halaman frontend dev `GET /` memberi 200, dan `GET /api/groups?projection=summary` lewat frontend proxy tidak lagi 500/502; tanpa sesi login response-nya 401 Unauthorized sesuai guard auth.
 
 Gate kode terakhir di `stabilization/backbone-phase-23`:
 
