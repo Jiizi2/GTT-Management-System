@@ -516,6 +516,19 @@ export function removeFromMemory(
     throw new NotFoundException(`Group '${idOrCode}' not found.`);
   }
 
+  const target = memoryGroups[targetIndex];
+  const hasChildGroups = memoryGroups.some(
+    (group) =>
+      group.parentGroupId &&
+      (group.parentGroupId === target.id ||
+        group.parentGroupId.toUpperCase() === target.code),
+  );
+  if (hasChildGroups) {
+    throw new ConflictException(
+      `Group '${target.code}' still has child groups and cannot be deleted. Unlink child groups first.`,
+    );
+  }
+
   memoryGroups.splice(targetIndex, 1);
 }
 

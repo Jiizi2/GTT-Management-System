@@ -806,6 +806,7 @@ async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
           deletedGroupId = args.where.id;
           return {};
         },
+        count: async () => 0,
       },
       groupAuditLog: {
         create: async (args: Record<string, unknown>) => {
@@ -831,6 +832,46 @@ async function testPrismaRemoveSuccessAndNotFoundGuards(): Promise<void> {
       assert.equal(auditData.groupId, undefined);
       assert.equal(auditData.groupCode, "GRP-REMOVE");
       assert.equal(auditData.action, "group.deleted");
+    } finally {
+      restore();
+    }
+  }
+
+  {
+    let deleteCalls = 0;
+    const existingGroup: PrismaGroupRecord = {
+      id: "grp-parent",
+      code: "GRP-PARENT",
+      name: "Parent Group",
+      arrivalDate: new Date("2026-04-10T00:00:00.000Z"),
+      returnDate: new Date("2026-04-18T00:00:00.000Z"),
+      status: "Active",
+    };
+    const prismaMock = {
+      group: {
+        findFirst: createGroupFindFirstMock({
+          includeLookup: () => existingGroup,
+          selectLookup: () => existingGroup,
+        }),
+        count: async () => 1,
+        delete: async () => {
+          deleteCalls += 1;
+          throw new Error("parent with children should not be deleted");
+        },
+      },
+    } as unknown as PrismaService;
+
+    const { service, restore } = createPrismaGroupsService(prismaMock);
+    try {
+      await assert.rejects(
+        () => service.remove("GRP-PARENT"),
+        (error: unknown) => {
+          assert.equal(error instanceof ConflictException, true);
+          assert.match((error as Error).message, /still has child groups/i);
+          return true;
+        },
+      );
+      assert.equal(deleteCalls, 0);
     } finally {
       restore();
     }

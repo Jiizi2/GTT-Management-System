@@ -401,12 +401,14 @@ export function GroupDetail({
   onBack,
   onDeleteGroup,
   onSaveGroup,
+  onPatchGroup,
 }: {
   group: GroupData;
   groups?: GroupData[];
   onBack: () => void;
   onDeleteGroup: (groupCode: string) => void;
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
+  onPatchGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
 }) {
   const [searchParams] = useSearchParams();
   const familyGroups = useMemo(() => {
@@ -422,6 +424,16 @@ export function GroupDetail({
     );
     return [parent, ...children];
   }, [groups, group]);
+  const childGroupCount = useMemo(
+    () =>
+      groups.filter(
+        (candidate) =>
+          candidate.parentGroupId &&
+          (candidate.parentGroupId === group.id || candidate.parentGroupId === group.code) &&
+          candidate.code !== group.code,
+      ).length,
+    [groups, group],
+  );
   const totalPax = useMemo(() => {
     return familyGroups.reduce((acc, g) => acc + g.pax, 0);
   }, [familyGroups]);
@@ -447,6 +459,17 @@ export function GroupDetail({
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
   const [unlinkingGroup, setUnlinkingGroup] = useState<GroupData | null>(null);
+
+  useEffect(() => {
+    setItineraryItems(sortItineraryByNearestDate(group.itinerary));
+    setNoteItems((currentNotes) =>
+      createNoteItems(group.notes, group.code).map((note) => ({
+        ...note,
+        pinned: currentNotes.find((currentNote) => currentNote.text === note.text)?.pinned ?? note.pinned,
+      })),
+    );
+    setMusyrifProfile(group.musyrif);
+  }, [group.code, group.itinerary, group.musyrif, group.notes]);
 
   const isEditModalOpen = editingIndex !== null && editScheduleForm !== null;
   const deletingItem = deletingIndex !== null ? (itineraryItems[deletingIndex] ?? null) : null;
@@ -741,19 +764,7 @@ export function GroupDetail({
   );
   const shouldShowCreateItineraryAction = completeness.issues.some((issue) => issue.key === "missing-itinerary");
 
-  const persistGroupSnapshot = ({
-    nextItinerary = itineraryItems,
-    nextNoteItems = noteItems,
-    nextMusyrif = musyrifProfile,
-    nextGroupName = group.name,
-    nextGroupCode = group.code,
-    nextPax = group.pax,
-    nextTotalBuses = group.totalBuses,
-    nextArrivalDate = group.arrivalDate,
-    nextReturnDate = group.returnDate,
-    nextDurationDays = group.durationDays,
-    nextParentGroupId = group.parentGroupId,
-  }: {
+  type GroupSnapshotInput = {
     nextItinerary?: ItineraryItem[];
     nextNoteItems?: NoteItem[];
     nextMusyrif?: Musyrif;
@@ -765,9 +776,23 @@ export function GroupDetail({
     nextReturnDate?: string;
     nextDurationDays?: number;
     nextParentGroupId?: string | null;
-  }): { ok: true } | { ok: false; message: string } => {
+  };
+
+  const buildGroupSnapshot = ({
+    nextItinerary = itineraryItems,
+    nextNoteItems = noteItems,
+    nextMusyrif = musyrifProfile,
+    nextGroupName = group.name,
+    nextGroupCode = group.code,
+    nextPax = group.pax,
+    nextTotalBuses = group.totalBuses,
+    nextArrivalDate = group.arrivalDate,
+    nextReturnDate = group.returnDate,
+    nextDurationDays = group.durationDays,
+    nextParentGroupId = group.parentGroupId,
+  }: GroupSnapshotInput): GroupData => {
     const normalizedItinerary = sortItineraryByNearestDate(nextItinerary);
-    const nextGroup: GroupData = {
+    return {
       ...group,
       code: nextGroupCode.trim().toUpperCase(),
       name: nextGroupName.trim(),
@@ -782,7 +807,16 @@ export function GroupDetail({
       notes: nextNoteItems.map((item) => item.text),
       musyrif: nextMusyrif,
     };
+  };
+
+  const persistGroupSnapshot = (input: GroupSnapshotInput): { ok: true } | { ok: false; message: string } => {
+    const nextGroup = buildGroupSnapshot(input);
     return onSaveGroup(nextGroup, group.code);
+  };
+
+  const patchGroupSnapshot = (input: GroupSnapshotInput): { ok: true } | { ok: false; message: string } => {
+    const nextGroup = buildGroupSnapshot(input);
+    return onPatchGroup(nextGroup, group.code);
   };
 
   const handleScheduleFieldChange = <Key extends keyof ScheduleFormState>(
@@ -1032,7 +1066,7 @@ export function GroupDetail({
       return { ok: true };
     }
 
-    const result = persistGroupSnapshot({
+    const result = patchGroupSnapshot({
       nextGroupCode,
       nextGroupName,
       nextPax: normalizedNextPax,
@@ -1060,7 +1094,7 @@ export function GroupDetail({
 
   const handleConfirmUnlink = () => {
     if (unlinkingGroup) {
-      onSaveGroup({ ...unlinkingGroup, parentGroupId: null }, unlinkingGroup.code);
+      onPatchGroup({ ...unlinkingGroup, parentGroupId: null }, unlinkingGroup.code);
       setUnlinkingGroup(null);
     }
   };
@@ -1893,6 +1927,7 @@ export function GroupDetail({
             <LazyDeleteGroupModal
               groupCode={group.code}
               groupName={group.name}
+              childGroupCount={childGroupCount}
               onClose={handleCloseDeleteGroupModal}
               onConfirm={handleConfirmDeleteGroup}
             />

@@ -144,6 +144,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleSaveInputGroup: groupRecordsState.handleSaveInputGroup,
     handleSaveGroupIdentity: groupRecordsState.handleSaveGroupIdentity,
     handleSaveGroupDetail: groupRecordsState.handleSaveGroupDetail,
+    handlePatchGroupDetail: groupRecordsState.handlePatchGroupDetail,
     handleSaveVisaGroupDetail: groupRecordsState.handleSaveVisaGroupDetail,
     dismissSyncFeedback,
     handleQueryChange: setQuery,

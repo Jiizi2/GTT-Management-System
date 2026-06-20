@@ -392,6 +392,9 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
   };
 
   const backendTone = mapBackendToneToFrontend(group.tone, group.status);
+  // `lifecycleStatus` is the stored backend workflow state. The frontend
+  // `tone` is the current operational state and can become inactive once all
+  // itinerary dates have passed.
   const resolvedTone = resolveCurrentGroupTone(backendTone, sortedItinerary);
   const lifecycleStatusLabel = mapBackendLifecycleStatusToLabel(group.lifecycleStatus);
   const resolvedStatus =

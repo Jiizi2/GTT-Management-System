@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe } from "vitest";
-import { createGroupIdentityInBackend, fetchGroupsFromBackend } from "../hooks/use-app-controller-backend.js";
+import { createGroupIdentityInBackend, fetchGroupsFromBackend, updateGroupInBackend } from "../hooks/use-app-controller-backend.js";
 import { formatScheduleDate, getLocalIsoDateWithOffset } from "../shared/app-domain.js";
+import type { GroupData } from "../shared/app-domain.js";
 import { runCase } from "../test/run-case.js";
 
 type FetchFn = typeof fetch;
@@ -63,6 +64,7 @@ async function testFetchGroupsMarksCompletedItineraryAsInactive(): Promise<void>
               code: "9017001003",
               name: "Draft Visa Missing Hotel Group",
               status: "Active",
+              lifecycleStatus: "ACTIVE",
               tone: "ACTIVE",
               pax: 30,
               packageName: "Umrah Regular",
@@ -108,6 +110,7 @@ async function testFetchGroupsMarksCompletedItineraryAsInactive(): Promise<void>
 
         assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/groups?projection=detail");
         assert.equal(groups.length, 1);
+        assert.equal(groups[0]?.lifecycleStatus, "ACTIVE");
         assert.equal(groups[0]?.tone, "inactive");
         assert.equal(groups[0]?.status, "In Active");
       },
@@ -183,8 +186,64 @@ async function testFetchGroupsRejectsInvalidBackendShape(): Promise<void> {
   });
 }
 
+async function testUpdateGroupUsesPatchPayload(): Promise<void> {
+  const group: GroupData = {
+    code: " new-code ",
+    name: " Updated Group ",
+    status: "Active",
+    tone: "active",
+    pax: 28,
+    totalBuses: 1,
+    packageName: "Regular",
+    durationDays: 8,
+    arrivalDate: "2099-02-01",
+    returnDate: "2099-02-08",
+    parentGroupId: null,
+    timeline: [{ date: "01 Feb", title: "Arrival" }],
+    itinerary: [
+      {
+        date: "01 Feb",
+        year: "2099",
+        category: "Arrival",
+        title: "Arrival JED Airport",
+        meta: "08:00 | JED Airport -> Makkah Hotel",
+        icon: "flight_land",
+        isoDate: "2099-02-01",
+        time: "08:00",
+      },
+    ],
+    notes: ["Do not send through PATCH"],
+    musyrif: {
+      name: "Ust Update",
+      phone: "08123456789",
+      avatar: "https://example.com/avatar.png",
+    },
+  };
+
+  await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
+    await withMockFetch(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      async (calls) => {
+        await updateGroupInBackend("OLD-CODE", group);
+
+        assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/groups/OLD-CODE");
+        assert.equal(calls[0].init?.method, "PATCH");
+        const body = JSON.parse(String(calls[0].init?.body)) as Record<string, unknown>;
+        assert.equal(body.code, "NEW-CODE");
+        assert.equal(body.name, "Updated Group");
+        assert.equal(body.tone, "ACTIVE");
+        assert.equal(body.parentGroupId, null);
+        assert.equal("itinerary" in body, false);
+        assert.equal("notes" in body, false);
+        assert.equal("musyrif" in body, false);
+      },
+    );
+  });
+}
+
 describe("use-app-controller-backend", () => {
   runCase("fetch groups marks completed itinerary as inactive", testFetchGroupsMarksCompletedItineraryAsInactive);
   runCase("create group identity posts minimal workspace", testCreateGroupIdentityPostsMinimalWorkspace);
+  runCase("update group uses PATCH payload without nested detail", testUpdateGroupUsesPatchPayload);
   runCase("fetch groups rejects invalid backend shape", testFetchGroupsRejectsInvalidBackendShape);
 });
