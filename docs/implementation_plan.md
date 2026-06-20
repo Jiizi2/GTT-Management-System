@@ -4,6 +4,37 @@ Tanggal: 2026-06-19
 Branch kerja dokumen: `docs/backbone-audit-plan`
 Rujukan utama: `docs/project-review-refactoring-assessment.md`
 
+## Execution Status
+
+Status per 2026-06-20:
+
+- Branch integrasi terbaru: `stabilization/backbone-phase-22`.
+- `master` tetap tidak disentuh; semua perubahan berjalan di branch konservatif dan bisa diputuskan belakangan apakah akan dibuat PR ke `master`.
+- Phase 0 sampai Phase 3 selesai: baseline, bug critical, persistent data contract, dan API contract hardening sudah terintegrasi di branch stabilisasi sebelumnya.
+- Phase 4 selesai untuk scope modularisasi aman: domain frontend sudah dipisah bertahap ke module types, fixtures, status, checklist, visa/completeness, itinerary/schedule, serta backend groups API/payload/mapper sudah dipisah bertahap.
+- Phase 5 selesai untuk scope rasionalisasi awal: ada contract test groups yang menjalankan skenario yang sama terhadap adapter memory dan Prisma mock, `test:unit` backend menjalankan contract test tersebut, dan `qa:full` sekarang memanggil `test:prisma` secara eksplisit.
+
+Checkpoint terakhir yang sudah diverifikasi:
+
+- `stabilization/backbone-phase-19`: merge `refactor/frontend-group-visa-domain`.
+- `stabilization/backbone-phase-20`: merge `refactor/frontend-itinerary-domain`.
+- `stabilization/backbone-phase-21`: merge `test/groups-memory-prisma-contract`.
+- `stabilization/backbone-phase-22`: merge `docs/backbone-phase-status`.
+
+Gate kode terakhir di `stabilization/backbone-phase-21`:
+
+```bash
+npm run db:generate --workspace backend
+npm run check --workspace backend
+npm run check --workspace frontend
+npm run test:unit --workspace frontend
+npm run test:smoke --workspace frontend
+npm run test:unit --workspace backend
+git diff --check
+```
+
+Catatan: `npm run test:integration --workspace backend` dan `npm run qa:full` belum dijalankan pada checkpoint ini karena memerlukan database/e2e environment yang lebih lengkap. Script `qa:full` sudah memastikan Prisma path lewat `test:prisma` sebelum e2e frontend. Checkpoint `stabilization/backbone-phase-22` adalah docs-only dan diverifikasi dengan `git diff --check`.
+
 ## Tujuan
 
 Menjalankan perbaikan backbone project secara bertahap tanpa mengulang kegagalan refactor besar sebelumnya. Fokus utama plan ini adalah menjaga stabilitas production, memperjelas kontrak database-backend-frontend, dan membuat setiap perubahan mudah diverifikasi serta mudah di-rollback.
