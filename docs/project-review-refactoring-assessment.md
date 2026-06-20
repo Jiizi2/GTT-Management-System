@@ -17,8 +17,9 @@ Ringkasan status setelah stabilisasi:
 - Frontend sudah memakai kontrak response groups/agreement drafts dan enum mapping terpusat untuk area yang distabilisasi.
 - Backend Prisma startup sekarang fail-fast jika schema belum punya kolom wajib, sehingga migration drift tidak berubah menjadi error 500 diam-diam di endpoint runtime.
 - Local/development sudah diverifikasi dengan database PostgreSQL bersih `gtt_ops_refactor_20260620_132631`, `npm run qa:full`, `npm run dev:backend`, dan `npm run dev:frontend`.
+- Rehearsal dengan clone DB VPS sudah selesai: `db:status` aman tanpa drift, `db:deploy` berhasil, `qa:full` berhasil, dan manual review flow bisnis sudah selesai.
 
-Dengan status ini, temuan baseline yang menyebut `sourceDraftId` belum persisten, parent-child belum diguard, bus status masih notes-only, atau `InvoiceClient.sortOrder` masih unique global harus dibaca sebagai historical finding, bukan kondisi branch stabilisasi terbaru. Sisa pekerjaan realistis sebelum keputusan PR ke `master` adalah staging/pre-production rehearsal, review manual flow bisnis, dan keputusan apakah perubahan stabilisasi ini akan dipromosikan atau dipilah menjadi PR lebih kecil.
+Dengan status ini, temuan baseline yang menyebut `sourceDraftId` belum persisten, parent-child belum diguard, bus status masih notes-only, atau `InvoiceClient.sortOrder` masih unique global harus dibaca sebagai historical finding, bukan kondisi branch stabilisasi terbaru. Sisa pekerjaan realistis sebelum keputusan PR ke `master` adalah keputusan apakah perubahan stabilisasi ini akan dipromosikan sebagai satu PR besar atau dipilah menjadi PR lebih kecil.
 
 ## Scope dan Metode
 
