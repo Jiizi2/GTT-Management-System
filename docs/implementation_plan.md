@@ -23,19 +23,28 @@ Checkpoint terakhir yang sudah diverifikasi:
 - `stabilization/backbone-phase-22`: merge `docs/backbone-phase-status`.
 - `stabilization/backbone-phase-23`: merge `hardening/prisma-schema-readiness`.
 
-Gate kode terakhir di `stabilization/backbone-phase-21`:
+Gate kode terakhir di `stabilization/backbone-phase-23`:
 
 ```bash
 npm run db:generate --workspace backend
 npm run check --workspace backend
 npm run check --workspace frontend
+npm run build --workspace backend
+node apps/backend/dist/prisma/prisma.service.test.js
 npm run test:unit --workspace frontend
 npm run test:smoke --workspace frontend
 npm run test:unit --workspace backend
 git diff --check
 ```
 
-Catatan: `npm run test:integration --workspace backend` dan `npm run qa:full` belum dijalankan pada checkpoint ini karena memerlukan database/e2e environment yang lebih lengkap. Script `qa:full` sudah memastikan Prisma path lewat `test:prisma` sebelum e2e frontend. Checkpoint `stabilization/backbone-phase-22` adalah docs-only dan diverifikasi dengan `git diff --check`.
+Catatan: `npm run test:integration --workspace backend` dan `npm run qa:full` belum dijalankan pada checkpoint ini karena memerlukan database/e2e environment yang lebih lengkap dan migration history yang bersih. Script `qa:full` sudah memastikan Prisma path lewat `test:prisma` sebelum e2e frontend. Checkpoint `stabilization/backbone-phase-22` adalah docs-only dan diverifikasi dengan `git diff --check`; checkpoint `stabilization/backbone-phase-23` menambahkan fail-fast schema readiness agar migration drift terdeteksi saat startup, bukan menjadi 500 di endpoint runtime.
+
+Preflight lokal terbaru:
+
+- `npx prisma migrate status --schema prisma/schema.prisma` dari `apps/backend` mendeteksi migration drift pada database `gtt_ops` di `localhost:5432`.
+- Migration repo yang belum diterapkan di DB tersebut: `20260619120000_relax_invoice_client_sort_order`, `20260619133000_add_visa_hotel_agreement_source_draft`, `20260619143000_add_group_lifecycle_status`, `20260619153000_add_visa_setup_bus_status`.
+- DB tersebut juga memiliki migration history dari branch lama yang tidak ada di repo sekarang: `20260618172337_fix_invoice_client_sort_order`, `20260618000000_db_improvements`.
+- Karena itu, integration/QA full harus menunggu database bersih atau hasil reconcile migration history. Jangan gunakan DB drift ini sebagai bukti production-ready.
 
 ## Tujuan
 
