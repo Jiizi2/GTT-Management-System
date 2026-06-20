@@ -29,6 +29,12 @@ import {
 } from "./checklist-domain";
 
 import {
+  buildVisaTrackingRowsFromGroups as buildVisaTrackingRowsFromGroupsDomain,
+  getStayPeriods as getStayPeriodsDomain,
+  resolveGroupCompleteness as resolveGroupCompletenessDomain,
+} from "./group-visa-domain";
+
+import {
   createBaseGroupsFixture,
   overviewDummySeeds,
 } from "./app-domain-fixtures";
@@ -1354,6 +1360,7 @@ export function getChecklistDayLabel(tripDate: string): string {
 export function formatChecklistCopyDate(tripDate: string): string {
   return formatChecklistCopyDateDomain(tripDate);
 }
+
 export function getItineraryIsoDate(item: ItineraryItem): string {
   return item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
 }
@@ -1390,316 +1397,23 @@ function resolveItineraryBoundaryIsoDates(itinerary: ItineraryItem[]): {
   };
 }
 
-function collectGroupAgreementHotels(group: GroupData): GroupAgreementHotel[] {
-  return [...getGroupAgreementHotelsByCity(group, "makkah"), ...getGroupAgreementHotelsByCity(group, "madinah")];
-}
-
-function resolveAgreementDateBounds(group: GroupData): {
-  earliestAgreementIsoDate: string | null;
-  latestAgreementIsoDate: string | null;
-} {
-  const dates = collectGroupAgreementHotels(group)
-    .flatMap((hotel) => [hotel.stayStartIso, hotel.stayEndIso])
-    .map((value) => value.trim())
-    .filter(isIsoDateValue)
-    .sort();
-
-  return {
-    earliestAgreementIsoDate: dates[0] ?? null,
-    latestAgreementIsoDate: dates.at(-1) ?? null,
-  };
-}
-
 export function getStayPeriods(hotels: GroupAgreementHotel[]): Array<{ startIso: string; endIso: string }> {
-  const parsed = hotels
-    .map((h) => {
-      const startIso = h.stayStartIso.trim();
-      const endIso = h.stayEndIso.trim();
-      if (!isIsoDateValue(startIso) || !isIsoDateValue(endIso)) {
-        return null;
-      }
-      return { startIso, endIso, startMs: Date.parse(startIso), endMs: Date.parse(endIso) };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-    .sort((a, b) => a.startMs - b.startMs);
-
-  if (parsed.length === 0) {
-    return [];
-  }
-
-  const merged: Array<{ startIso: string; endIso: string; startMs: number; endMs: number }> = [];
-  let current = { ...parsed[0] };
-
-  for (let i = 1; i < parsed.length; i++) {
-    const next = parsed[i];
-    if (next.startMs <= current.endMs) {
-      if (next.endMs > current.endMs) {
-        current.endIso = next.endIso;
-        current.endMs = next.endMs;
-      }
-    } else {
-      merged.push(current);
-      current = { ...next };
-    }
-  }
-  merged.push(current);
-
-  return merged.map((m) => ({ startIso: m.startIso, endIso: m.endIso }));
-}
-
-function getDistinctNightTimes(hotels: GroupAgreementHotel[]): number[] {
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-  const nights = new Set<number>();
-
-  for (const hotel of hotels) {
-    const startIso = hotel.stayStartIso.trim();
-    const endIso = hotel.stayEndIso.trim();
-    if (!isIsoDateValue(startIso) || !isIsoDateValue(endIso)) {
-      continue;
-    }
-    const startMs = Date.parse(startIso);
-    const endMs = Date.parse(endIso);
-    
-    // Iterate over each night
-    for (let currentMs = startMs; currentMs < endMs; currentMs += ONE_DAY_MS) {
-      nights.add(currentMs);
-    }
-  }
-
-  return Array.from(nights).sort((a, b) => a - b);
-}
-
-function hasAgreementPaxMismatch(group: GroupData): boolean {
-  const makkahHotels = getGroupAgreementHotelsByCity(group, "makkah");
-  const madinahHotels = getGroupAgreementHotelsByCity(group, "madinah");
-  const groupPax = Math.max(1, group.pax);
-
-  if (makkahHotels.length > 0 && calculateVerifiedPaxFn(makkahHotels, groupPax) < groupPax) {
-    return true;
-  }
-  
-  if (madinahHotels.length > 0 && calculateVerifiedPaxFn(madinahHotels, groupPax) < groupPax) {
-    return true;
-  }
-
-  return false;
-}
-
-function calculateVerifiedPaxFn(hotels: GroupAgreementHotel[], groupPax: number): number {
-  if (hotels.length === 0) {
-    return 0;
-  }
-  
-  const nightTimes = getDistinctNightTimes(hotels);
-  if (nightTimes.length === 0) {
-    return 0;
-  }
-
-  let minSum = Infinity;
-
-  for (const nightMs of nightTimes) {
-    const nightHotels = hotels.filter((h) => {
-      const hStart = h.stayStartIso.trim();
-      const hEnd = h.stayEndIso.trim();
-      if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
-        return false;
-      }
-      const startMs = Date.parse(hStart);
-      const endMs = Date.parse(hEnd);
-      // Included if nightMs is within [startMs, endMs)
-      return nightMs >= startMs && nightMs < endMs;
-    });
-
-    const sum = nightHotels.reduce((total, h) => total + Math.max(0, h.pax || 0), 0);
-    if (sum < minSum) {
-      minSum = sum;
-    }
-  }
-
-  return Math.min(groupPax, minSum);
+  return getStayPeriodsDomain(hotels);
 }
 
 export function resolveGroupCompleteness(group: GroupData): GroupCompletenessSummary {
-  const issues: GroupCompletenessIssue[] = [];
-  const hasIdentity = Boolean(group.code.trim() && group.name.trim() && group.pax > 0);
-  const makkahAgreements = getGroupAgreementHotelsByCity(group, "makkah");
-  const madinahAgreements = getGroupAgreementHotelsByCity(group, "madinah");
-  const hasMakkahAgreement = makkahAgreements.length > 0;
-  const hasMadinahAgreement = madinahAgreements.length > 0;
-  const hasAnyAgreement = hasMakkahAgreement || hasMadinahAgreement;
-  const hasItinerary = group.itinerary.length > 0;
-  const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary);
-  const { earliestAgreementIsoDate, latestAgreementIsoDate } = resolveAgreementDateBounds(group);
-
-  if (!hasIdentity) {
-    issues.push({
-      key: "missing-identity",
-      severity: "error",
-      label: "Identity",
-      message: "Group identity belum lengkap.",
-    });
-  }
-
-  if (!hasAnyAgreement) {
-    issues.push({
-      key: "missing-agreement",
-      severity: "warning",
-      label: "Agreement",
-      message: "Agreement hotel belum tersambung.",
-    });
-  } else {
-    if (!hasMakkahAgreement) {
-      issues.push({
-        key: "missing-makkah-agreement",
-        severity: "warning",
-        label: "Makkah",
-        message: "Agreement Makkah belum tersambung.",
-      });
-    }
-
-    if (!hasMadinahAgreement) {
-      issues.push({
-        key: "missing-madinah-agreement",
-        severity: "warning",
-        label: "Madinah",
-        message: "Agreement Madinah belum tersambung.",
-      });
-    }
-  }
-
-  if (!hasItinerary) {
-    issues.push({
-      key: "missing-itinerary",
-      severity: "warning",
-      label: "Itinerary",
-      message: "Itinerary belum dibuat atau belum dihubungkan.",
-    });
-  }
-
-  if (hasAgreementPaxMismatch(group)) {
-    issues.push({
-      key: "pax-mismatch",
-      severity: "warning",
-      label: "Pax",
-      message: "Pax agreement berbeda dengan pax group.",
-    });
-  }
-
-
-  const allHotels = collectGroupAgreementHotels(group);
-  const periods = getStayPeriods(allHotels);
-  const isContinuous = periods.length === 1;
-  const coversItinerary =
-    isContinuous && periods[0].startIso === earliestIsoDate && periods[0].endIso === latestIsoDate;
-
-  if (hasAnyAgreement && !isContinuous) {
-    issues.push({
-      key: "date-mismatch",
-      severity: "warning",
-      label: "Dates",
-      message: "Terdapat tanggal kosong (gap) antar agreement hotel.",
-    });
-  } else if (
-    hasAnyAgreement &&
-    hasItinerary &&
-    earliestIsoDate &&
-    latestIsoDate &&
-    !coversItinerary
-  ) {
-    issues.push({
-      key: "date-mismatch",
-      severity: "warning",
-      label: "Dates",
-      message: "Tanggal agreement belum selaras dengan batas itinerary.",
-    });
-  }
-
-  const hasError = issues.some((issue) => issue.severity === "error");
-  const state: GroupCompletenessState = issues.length === 0 ? "ready" : hasError ? "action-required" : "incomplete";
-  const primaryMessage = issues[0]?.message ?? "Group sudah punya identity, agreement, dan itinerary yang tersambung.";
-
-  return {
-    state,
-    isReadyForOperations: state === "ready",
-    issues,
-    primaryMessage,
-    badgeLabel: state === "ready" ? "Ready" : state === "action-required" ? "Action Required" : "Incomplete",
-  };
+  return resolveGroupCompletenessDomain(group, {
+    getItineraryIsoDate,
+    parseTimeForInput,
+  });
 }
 
 export function buildVisaTrackingRowsFromGroups(groups: GroupData[]): VisaTrackingRow[] {
-  return groups.map((group, index) => {
-    const visaSetup = group.visaSetup;
-    const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary);
-    const configuredArrivalIso = group.arrivalDate?.trim() ?? "";
-    const configuredReturnIso = group.returnDate?.trim() ?? "";
-    const groupArrivalIso = isIsoDateValue(configuredArrivalIso) ? configuredArrivalIso : "";
-    const groupReturnIso = isIsoDateValue(configuredReturnIso) ? configuredReturnIso : "";
-    const fallbackDeparture = getLocalIsoDateWithOffset(index % 4);
-    const itineraryDepartureIso = groupArrivalIso || earliestIsoDate || fallbackDeparture;
-    const resolvedReturnIso = groupReturnIso || latestIsoDate || "";
-    const itineraryReturnIso =
-      resolvedReturnIso && resolvedReturnIso >= itineraryDepartureIso
-        ? resolvedReturnIso
-        : shiftIsoDate(itineraryDepartureIso, Math.max(6, group.durationDays - 1));
-    const customAgreementDateRange = resolveVisaAgreementDateRange(
-      { departureIso: itineraryDepartureIso, returnIso: itineraryReturnIso },
-      group.durationDays,
-      group,
-    );
-    const departureIso = customAgreementDateRange.makkahStartIso;
-    const returnIso = customAgreementDateRange.madinahEndIso;
-
-    const visaStatus: VisaStatus = visaSetup?.visaStatus ?? "Draft";
-    const paymentStatus: VisaPaymentStatus = visaSetup?.paymentStatus ?? "Unpaid";
-    const configuredIssuedDate = visaSetup?.issuedDate?.trim() ?? "";
-    const issuedDateIso =
-      visaStatus === "Issued" ? (isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : departureIso) : "";
-
-    const pax = Math.max(1, group.pax);
-    const verifiedMakkahPax = calculateVerifiedPaxFn(getGroupAgreementHotelsByCity(group, "makkah"), pax);
-    const verifiedMadinahPax = calculateVerifiedPaxFn(getGroupAgreementHotelsByCity(group, "madinah"), pax);
-    const verifiedPax = Math.min(verifiedMakkahPax, verifiedMadinahPax);
-    const makkahVerified = verifiedMakkahPax;
-    const madinahVerified = verifiedMadinahPax;
-
-    const validRaudhahAppointments = resolveValidRaudhahAppointments(group);
-    const firstRaudhah =
-      validRaudhahAppointments.find((appointment) => appointment.status !== "Free") ?? validRaudhahAppointments[0];
-    const raudhahTone: VisaRaudhahTone =
-      !firstRaudhah || firstRaudhah.status === "Free" ? "muted" : firstRaudhah.status === "Before" ? "warn" : "good";
-    const raudhahLabel =
-      !firstRaudhah || firstRaudhah.status === "Free"
-        ? "Not Set"
-        : `${formatVisaShortDate(firstRaudhah.dateIso)} ${firstRaudhah.status}`;
-    const raudhahHint =
-      !firstRaudhah || firstRaudhah.status === "Free"
-        ? "Appointment pending"
-        : firstRaudhah.status === "Before"
-          ? "Before 13:00"
-          : "After 13:00";
-
-    const outstandingAmount = paymentStatus === "Unpaid" ? pax * 280 : paymentStatus === "Partial" ? pax * 120 : 0;
-
-    return {
-      id: `${group.code}-visa-${index}`,
-      groupCode: group.code,
-      groupName: group.name,
-      pax,
-      packageName: group.packageName,
-      issuedDateIso,
-      departureIso,
-      returnIso,
-      visaStatus,
-      paymentStatus,
-      raudhahLabel,
-      raudhahHint,
-      raudhahTone,
-      makkahVerified,
-      madinahVerified,
-      outstandingAmount,
-      parentGroupId: group.parentGroupId,
-    };
+  return buildVisaTrackingRowsFromGroupsDomain(groups, {
+    getItineraryIsoDate,
+    parseTimeForInput,
+    getLocalIsoDateWithOffset,
+    resolveValidRaudhahAppointments,
   });
 }
 
@@ -1721,6 +1435,7 @@ export function buildChecklistItemsFromGroups(groups: GroupData[]): ChecklistIte
     formatRouteSummary,
   });
 }
+
 export function scrollToTop(): void {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
