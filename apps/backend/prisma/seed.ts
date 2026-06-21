@@ -1156,20 +1156,31 @@ async function seedInvoiceClients({ resetDataFirst }: { resetDataFirst: boolean 
   for (const client of defaultClients) {
     const groupId = client.groupCode ? requireGroupId(client.groupCode, groupIdByCode) : null;
 
-    await prisma.invoiceClient.upsert({
+    const existing = await prisma.invoiceClient.findFirst({
       where: {
         sortOrder: client.sortOrder,
       },
-      update: {
-        name: client.name,
-        groupId,
-      },
-      create: {
-        name: client.name,
-        sortOrder: client.sortOrder,
-        groupId,
-      },
     });
+
+    if (existing) {
+      await prisma.invoiceClient.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          name: client.name,
+          groupId,
+        },
+      });
+    } else {
+      await prisma.invoiceClient.create({
+        data: {
+          name: client.name,
+          sortOrder: client.sortOrder,
+          groupId,
+        },
+      });
+    }
   }
 
   console.log("Seeded invoice clients: 01. Yassir, 02. Haris, 03. JSA, 04. Umrah Corporate");
