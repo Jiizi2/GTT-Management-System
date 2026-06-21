@@ -394,7 +394,6 @@ export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPa
       syarikah: resolvedSyarikah,
       busStatus: mapBusStatusToBackend(group.visaSetup.busStatus),
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
-      outstandingAmount: 0,
       hotelAgreements: [
         ...group.visaSetup.makkahHotels.map((hotel) => ({
           city: "MAKKAH" as const,

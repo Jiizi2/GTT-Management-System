@@ -319,12 +319,6 @@ export class CreateVisaSetupDto {
   @IsEnum(VisaPaymentStatus)
   paymentStatus?: VisaPaymentStatus;
 
-  @ApiPropertyOptional({ example: 1500, minimum: 0 })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  outstandingAmount?: number;
-
   @ApiPropertyOptional({
     type: () => CreateVisaHotelAgreementDto,
     isArray: true,

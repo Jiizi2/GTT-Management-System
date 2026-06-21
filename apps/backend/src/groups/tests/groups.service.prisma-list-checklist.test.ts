@@ -280,14 +280,23 @@ async function testPrismaFindAllWhereAndPaginationBranches(): Promise<void> {
       };
       assert.equal(where.AND.length, 1);
       const missingHotelCondition = where.AND[0];
+      assert.equal(missingHotelCondition.OR.length, 3);
       assert.equal(missingHotelCondition.OR[0].visaSetup.is, null);
       assert.deepEqual(
         (
           missingHotelCondition.OR[1].visaSetup.is as {
-            hotelAgreements: { none: Record<string, never> };
+            hotelAgreements: { none: { city: string } };
           }
         ).hotelAgreements.none,
-        {},
+        { city: "MAKKAH" },
+      );
+      assert.deepEqual(
+        (
+          missingHotelCondition.OR[2].visaSetup.is as {
+            hotelAgreements: { none: { city: string } };
+          }
+        ).hotelAgreements.none,
+        { city: "MADINAH" },
       );
     } finally {
       restore();

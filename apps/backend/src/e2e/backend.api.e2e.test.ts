@@ -254,7 +254,6 @@ function buildScenarioGroupPayload(args: {
     issuedDate?: string;
     syarikah: string;
     paymentStatus: "PAID" | "UNPAID" | "PARTIAL";
-    outstandingAmount: number;
     hotelAgreements?: Array<{
       city: "MAKKAH" | "MADINAH";
       hotelName: string;
@@ -835,7 +834,6 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
           issuedDate: addUtcDays(todayIso, -1),
           syarikah: "Provider Alpha",
           paymentStatus: "PAID",
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: "MAKKAH",
@@ -895,7 +893,6 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
           visaStatus: "PENDING",
           syarikah: "Provider Beta",
           paymentStatus: "PARTIAL",
-          outstandingAmount: 1200,
           hotelAgreements: [],
           raudhahAppointments: [{ date: dates.raudhahCriticalIso, status: "BEFORE" }],
         },
@@ -932,7 +929,6 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
           issuedDate: todayIso,
           syarikah: "Provider Delta",
           paymentStatus: "UNPAID",
-          outstandingAmount: 900,
           hotelAgreements: [
             {
               city: "MAKKAH",
@@ -966,7 +962,6 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
           issuedDate: todayIso,
           syarikah: "Provider Epsilon",
           paymentStatus: "PAID",
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: "MAKKAH",
@@ -1000,7 +995,6 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
           issuedDate: todayIso,
           syarikah: "Provider Zeta",
           paymentStatus: "PAID",
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: "MAKKAH",
@@ -1034,7 +1028,6 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
           issuedDate: todayIso,
           syarikah: "Provider Omega",
           paymentStatus: "PAID",
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: "MAKKAH",
@@ -1157,7 +1150,13 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       .filter((code) => code.length > 0);
     assertSameCodeSet(
       missingHotelCodes,
-      [groupCodes.inactivePending, groupCodes.activeDraft],
+      [
+        groupCodes.inactivePending,
+        groupCodes.activeDraft,
+        groupCodes.activeUnpaid,
+        groupCodes.arrivalDeparture,
+        groupCodes.arrivalOnly,
+      ],
       "Unexpected missing-hotel group set.",
     );
 

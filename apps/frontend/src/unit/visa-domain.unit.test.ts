@@ -93,7 +93,6 @@ function createVisaRow(overrides: Partial<VisaTrackingRow> = {}): VisaTrackingRo
     raudhahTone: "muted",
     makkahVerified: 40,
     madinahVerified: 40,
-    outstandingAmount: 0,
     ...overrides,
   };
 }

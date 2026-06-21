@@ -119,7 +119,16 @@ function matchesMemoryFilter(item: MemoryGroupRecord, filter: GroupListFilter, a
   }
 
   if (filter === "missing-hotel") {
-    return !item.visaSetup || item.visaSetup.hotelAgreements.length === 0;
+    if (!item.visaSetup) {
+      return true;
+    }
+    const makkahPax = item.visaSetup.hotelAgreements
+      .filter((h) => h.city === "MAKKAH")
+      .reduce((sum, h) => sum + h.pax, 0);
+    const madinahPax = item.visaSetup.hotelAgreements
+      .filter((h) => h.city === "MADINAH")
+      .reduce((sum, h) => sum + h.pax, 0);
+    return makkahPax < item.pax || madinahPax < item.pax;
   }
 
   return item.visaSetup?.paymentStatus !== VisaPaymentStatus.PAID;
@@ -178,7 +187,20 @@ export function buildGroupWhere(query?: string, rawFilter?: string, activeOnly =
           visaSetup: {
             is: {
               hotelAgreements: {
-                none: {},
+                none: {
+                  city: "MAKKAH",
+                },
+              },
+            },
+          },
+        },
+        {
+          visaSetup: {
+            is: {
+              hotelAgreements: {
+                none: {
+                  city: "MADINAH",
+                },
               },
             },
           },

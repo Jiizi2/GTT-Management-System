@@ -78,7 +78,6 @@ async function testSearchFilterPagination(): Promise<void> {
           visaStatus: VisaStatus.ISSUED,
           syarikah: "Alpha Provider",
           paymentStatus: VisaPaymentStatus.PAID,
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: AgreementCity.MAKKAH,
@@ -88,6 +87,15 @@ async function testSearchFilterPagination(): Promise<void> {
               status: AgreementApprovalStatus.APPROVED,
               stayStart: "2026-04-02",
               stayEnd: "2026-04-03",
+            },
+            {
+              city: AgreementCity.MADINAH,
+              hotelName: "Madinah Tower",
+              agreementNumber: "N-101",
+              pax: 40,
+              status: AgreementApprovalStatus.APPROVED,
+              stayStart: "2026-04-03",
+              stayEnd: "2026-04-05",
             },
           ],
           raudhahAppointments: [],
@@ -102,7 +110,6 @@ async function testSearchFilterPagination(): Promise<void> {
           visaStatus: VisaStatus.DRAFT,
           syarikah: "Beta Provider",
           paymentStatus: VisaPaymentStatus.UNPAID,
-          outstandingAmount: 1200,
           hotelAgreements: [],
           raudhahAppointments: [],
         },
@@ -120,11 +127,11 @@ async function testSearchFilterPagination(): Promise<void> {
         name: "Inactive Archive",
         status: "Inactive",
         tone: GroupTone.INACTIVE,
+        pax: 18,
         visaSetup: {
           visaStatus: VisaStatus.ISSUED,
           syarikah: "Gamma Provider",
           paymentStatus: VisaPaymentStatus.PAID,
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: AgreementCity.MAKKAH,
@@ -134,6 +141,15 @@ async function testSearchFilterPagination(): Promise<void> {
               status: AgreementApprovalStatus.APPROVED,
               stayStart: "2026-04-06",
               stayEnd: "2026-04-08",
+            },
+            {
+              city: AgreementCity.MADINAH,
+              hotelName: "Archive Hotel Madinah",
+              agreementNumber: "N-104",
+              pax: 18,
+              status: AgreementApprovalStatus.APPROVED,
+              stayStart: "2026-04-08",
+              stayEnd: "2026-04-10",
             },
           ],
           raudhahAppointments: [],
@@ -523,7 +539,6 @@ async function testVisaAgreementRules(): Promise<void> {
           visaStatus: VisaStatus.DRAFT,
           syarikah: "Provider Test",
           paymentStatus: VisaPaymentStatus.UNPAID,
-          outstandingAmount: 0,
           hotelAgreements: [
             {
               city: AgreementCity.MADINAH,

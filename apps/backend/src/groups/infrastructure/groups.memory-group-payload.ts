@@ -125,7 +125,6 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
           issuedDate: payload.visaSetup.issuedDate?.trim() || undefined,
           syarikah: payload.visaSetup.syarikah.trim(),
           paymentStatus: payload.visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
-          outstandingAmount: payload.visaSetup.outstandingAmount ?? 0,
           hotelAgreements: (payload.visaSetup.hotelAgreements ?? []).map((hotel) => ({
             id: randomUUID(),
             city: hotel.city ?? AgreementCity.MAKKAH,

@@ -96,7 +96,6 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
       issuedDate: " 2026-04-01 ",
       syarikah: " Provider Test ",
       paymentStatus: VisaPaymentStatus.PARTIAL,
-      outstandingAmount: 1500,
       hotelAgreements: [
         {
           city: AgreementCity.MAKKAH,

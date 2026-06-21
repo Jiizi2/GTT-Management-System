@@ -310,7 +310,6 @@ export type VisaTrackingRow = {
   raudhahTone: VisaRaudhahTone;
   makkahVerified: number;
   madinahVerified: number;
-  outstandingAmount: number;
   parentGroupId?: string | null;
 };
 

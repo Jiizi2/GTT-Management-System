@@ -346,8 +346,6 @@ export function buildVisaTrackingRowsFromGroups(
           ? "Before 13:00"
           : "After 13:00";
 
-    const outstandingAmount = paymentStatus === "Unpaid" ? pax * 280 : paymentStatus === "Partial" ? pax * 120 : 0;
-
     return {
       id: `${group.code}-visa-${index}`,
       groupCode: group.code,
@@ -364,7 +362,6 @@ export function buildVisaTrackingRowsFromGroups(
       raudhahTone,
       makkahVerified,
       madinahVerified,
-      outstandingAmount,
       parentGroupId: group.parentGroupId,
     };
   });

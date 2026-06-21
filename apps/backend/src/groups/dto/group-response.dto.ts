@@ -210,9 +210,6 @@ export class GroupVisaSetupResponseDto {
   })
   paymentStatus!: VisaPaymentStatus;
 
-  @ApiProperty({ example: 1500 })
-  outstandingAmount!: number;
-
   @ApiProperty({ type: () => GroupVisaHotelAgreementResponseDto, isArray: true })
   hotelAgreements!: GroupVisaHotelAgreementResponseDto[];
 

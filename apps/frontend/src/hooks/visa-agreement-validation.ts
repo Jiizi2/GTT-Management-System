@@ -74,6 +74,30 @@ function getCityAgreementContinuityError(
 }
 
 export function getVisaAgreementValidationError(visaSetup: GroupVisaSetup): string | null {
+  const allHotels = [
+    ...visaSetup.makkahHotels.map((h) => ({ ...h, city: "Makkah" as const })),
+    ...visaSetup.madinahHotels.map((h) => ({ ...h, city: "Madinah" as const })),
+  ];
+
+  const sortedHotels = allHotels.sort((left, right) => {
+    const dateDiff = left.stayStartIso.localeCompare(right.stayStartIso);
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+    return left.stayEndIso.localeCompare(right.stayEndIso);
+  });
+
+  for (let index = 1; index < sortedHotels.length; index += 1) {
+    const previous = sortedHotels[index - 1];
+    const current = sortedHotels[index];
+    const previousEndMs = parseIsoDateToUtcMiddayMs(previous.stayEndIso);
+    const currentStartMs = parseIsoDateToUtcMiddayMs(current.stayStartIso);
+
+    if (previousEndMs !== null && currentStartMs !== null && currentStartMs < previousEndMs) {
+      return `Stay periods tumpang tindih antara hotel di ${previous.city} (${previous.stayStartIso} s/d ${previous.stayEndIso}) dan ${current.city} (${current.stayStartIso} s/d ${current.stayEndIso}).`;
+    }
+  }
+
   const totalHotels = visaSetup.makkahHotels.length + visaSetup.madinahHotels.length;
   if (totalHotels > 0 && visaSetup.makkahHotels.length === 0) {
     return "Agreement Makkah wajib diisi minimal 1 hotel.";

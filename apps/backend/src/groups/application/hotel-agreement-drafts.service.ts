@@ -486,8 +486,7 @@ export class HotelAgreementDraftsService {
       // Calculate already assigned pax
       const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
         where: {
-          agreementNumber: draft.agreementNumber,
-          city: draft.city,
+          OR: buildPrismaDraftAgreementMatchers(draft),
         },
       });
       const totalAssignedPax = assignedAgreements.reduce((sum, h) => sum + h.pax, 0);
