@@ -148,13 +148,20 @@ export function validateHotelAgreementRules(
     return;
   }
 
-  const shouldRequireMakkah = options.requireMakkah ?? true;
-  const makkahHotels = hotelAgreements.filter(
-    (agreement) => agreement.city === AgreementCity.MAKKAH,
+  const validatedAndSorted = validateAndSortHotelAgreementDateSegments(
+    hotelAgreements,
   );
-  if (shouldRequireMakkah && makkahHotels.length === 0) {
-    // Soft rules: Do not throw BadRequestException if Makkah agreement is missing.
-    // The frontend will handle displaying warnings to the user.
+
+  for (let index = 1; index < validatedAndSorted.length; index += 1) {
+    const previous = validatedAndSorted[index - 1];
+    const current = validatedAndSorted[index];
+    if (current.stayStartMs < previous.stayEndMs) {
+      const prevCity = toAgreementCityLabel(previous.city);
+      const currCity = toAgreementCityLabel(current.city);
+      throw new BadRequestException(
+        `Stay periods tumpang tindih antara hotel di ${prevCity} (${previous.stayStart} s/d ${previous.stayEnd}) dan ${currCity} (${current.stayStart} s/d ${current.stayEnd}).`,
+      );
+    }
   }
 
   validateHotelAgreementContinuity(hotelAgreements);

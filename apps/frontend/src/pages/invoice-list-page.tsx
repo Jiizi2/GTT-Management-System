@@ -24,10 +24,11 @@ import {
   mapMasterDataToInvoiceStatusOptions,
   mapMasterDataToSelectOptions,
   mergeInvoiceClientsWithMasterData,
-  openInvoiceExportWindow,
   resolveDateRangeLabel,
   shiftMonthKey,
   viewInvoicePdfFromRow,
+  resolveInvoiceDisplayTotals,
+  formatCurrencyLabel,
   type InvoiceClientOption,
   type InvoiceRow,
   type InvoiceWorkspaceInitialData,
@@ -63,19 +64,7 @@ function InvoiceWorkspaceFallback() {
   );
 }
 
-function createFollowUpInvoiceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
-  const initialData = createInvoiceWorkspaceInitialData(row);
 
-  return {
-    ...initialData,
-    id: `follow-up-${row.id}`,
-    sourceInvoiceNumber: row.invoiceNumber,
-    issuedDateIso: Domain.getLocalIsoDateWithOffset(0),
-    dueDateIso: Domain.getLocalIsoDateWithOffset(7),
-    downPaymentIdr: 0,
-    status: "Pending",
-  };
-}
 
 export function InvoiceScreen({
   groups,
@@ -87,7 +76,7 @@ export function InvoiceScreen({
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending" | "overdue" | "cancelled">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled">("all");
   const [dueMonthFilter, setDueMonthFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
@@ -196,18 +185,19 @@ export function InvoiceScreen({
   const rangeStart = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
   const rangeEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, pageStartIndex + paginatedRows.length);
 
-  const totalRevenue = filteredRows.reduce((total, row) => total + row.amount, 0);
+  const totalRevenue = filteredRows.filter((row) => row.status !== "Cancelled").reduce((total, row) => total + row.amount, 0);
   const paidCount = filteredRows.filter((row) => row.status === "Paid").length;
+  const partiallyPaidCount = filteredRows.filter((row) => row.status === "Partially Paid").length;
   const pendingCount = filteredRows.filter((row) => row.status === "Pending").length;
   const overdueCount = filteredRows.filter((row) => row.status === "Overdue").length;
   const cancelledCount = filteredRows.filter((row) => row.status === "Cancelled").length;
   const currentMonthKey = Domain.formatLocalIsoDate(new Date()).slice(0, 7);
   const previousMonthKey = shiftMonthKey(currentMonthKey, -1);
   const currentMonthRevenue = invoiceRows
-    .filter((row) => row.monthKey === currentMonthKey)
+    .filter((row) => row.monthKey === currentMonthKey && row.status !== "Cancelled")
     .reduce((total, row) => total + row.amount, 0);
   const previousMonthRevenue = invoiceRows
-    .filter((row) => row.monthKey === previousMonthKey)
+    .filter((row) => row.monthKey === previousMonthKey && row.status !== "Cancelled")
     .reduce((total, row) => total + row.amount, 0);
   const monthlyGrowth =
     previousMonthRevenue > 0
@@ -229,27 +219,21 @@ export function InvoiceScreen({
   const overdueSummaryBadgeClassName = isDarkMode
     ? "inline-flex items-center gap-1 rounded-lg border border-tertiary/35 bg-tertiary/16 px-3 py-1 text-xs font-bold leading-none text-tertiary"
     : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
+  const partiallyPaidSummaryBadgeClassName = isDarkMode
+    ? "inline-flex items-center gap-1 rounded-lg border border-sky-500/35 bg-sky-500/16 px-3 py-1 text-xs font-bold leading-none text-sky-400"
+    : "inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold leading-none text-sky-700";
 
   const handleViewPdf = (row: InvoiceRow) => {
-    const printableWindow = openInvoiceExportWindow();
-    if (!printableWindow) {
-      setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
-      return;
-    }
-
-    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow })
+    setActionFeedback("Menyiapkan PDF...");
+    void viewInvoicePdfFromRow({ row, groups })
       .then((exported) => {
-        if (!exported) {
-          if (!printableWindow.closed) {
-            printableWindow.close();
-          }
-          setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+        if (exported) {
+          setActionFeedback("");
+        } else {
+          setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
         }
       })
       .catch(() => {
-        if (!printableWindow.closed) {
-          printableWindow.close();
-        }
         setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
       });
   };
@@ -265,20 +249,6 @@ export function InvoiceScreen({
     setWorkspaceMode("edit");
   };
 
-  const handleCreateFollowUpInvoice = (row: InvoiceRow) => {
-    if (!isInvoiceBackendAvailable) {
-      setActionFeedback("Backend invoice/database belum terhubung. Invoice lanjutan dinonaktifkan.");
-      return;
-    }
-
-    if (row.status !== "Paid") {
-      return;
-    }
-
-    setEditingInvoice(null);
-    setDraftSourceInvoice(createFollowUpInvoiceInitialData(row));
-    setWorkspaceMode("create");
-  };
 
   useEffect(() => {
     if (!actionFeedback) {
@@ -338,9 +308,7 @@ export function InvoiceScreen({
             setActionFeedback(
               action === "draft"
                 ? `Draft invoice ${invoice.invoiceNumber} saved to database.`
-                : draftSourceInvoice?.sourceInvoiceNumber
-                  ? `Invoice lanjutan ${invoice.invoiceNumber} dibuat dari ${draftSourceInvoice.sourceInvoiceNumber}.`
-                  : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
+                : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
             );
             setQuery("");
             setStatusFilter("all");
@@ -494,11 +462,12 @@ export function InvoiceScreen({
                 className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium text-on-surface-variant"
                 value={statusFilter}
                 onChange={(event) =>
-                  setStatusFilter(event.target.value as "all" | "paid" | "pending" | "overdue" | "cancelled")
+                  setStatusFilter(event.target.value as "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled")
                 }
               >
                 <option value="all">All Statuses</option>
                 <option value="paid">Paid</option>
+                <option value="partially-paid">Partially Paid</option>
                 <option value="pending">Pending</option>
                 <option value="overdue">Overdue</option>
                 <option value="cancelled">Cancelled</option>
@@ -530,6 +499,12 @@ export function InvoiceScreen({
                 task_alt
               </span>
               <span>Paid {paidCount}</span>
+            </span>
+            <span className={partiallyPaidSummaryBadgeClassName}>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                payments
+              </span>
+              <span>Partially Paid {partiallyPaidCount}</span>
             </span>
             <span className={pendingSummaryBadgeClassName}>
               <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -646,7 +621,21 @@ export function InvoiceScreen({
                     <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">
                       Amount
                     </p>
-                    <p className="mt-1 font-extrabold text-on-surface">{formatIdr(row.amount)}</p>
+                    {(() => {
+                      const displayTotals = resolveInvoiceDisplayTotals(row);
+                      return (
+                        <>
+                          <p className="mt-1 font-extrabold text-on-surface">
+                            {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
+                          </p>
+                          {displayTotals.downPayment > 0 && (
+                            <p className="text-[9px] text-on-surface-variant font-semibold mt-0.5">
+                              Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -680,24 +669,7 @@ export function InvoiceScreen({
                       picture_as_pdf
                     </span>
                   </button>
-                  {row.status === "Paid" ? (
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`Create follow-up invoice for ${row.invoiceNumber}`}
-                      onClick={() => handleCreateFollowUpInvoice(row)}
-                      disabled={!isInvoiceBackendAvailable}
-                      title={
-                        isInvoiceBackendAvailable
-                          ? "Invoice Lanjutan"
-                          : "Backend invoice/database belum terhubung, invoice lanjutan dinonaktifkan."
-                      }
-                    >
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">
-                        add_circle
-                      </span>
-                    </button>
-                  ) : null}
+
                   <button
                     type="button"
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
@@ -780,7 +752,19 @@ export function InvoiceScreen({
                       </div>
 
                       <div>
-                        <p className="font-display text-[0.95rem] font-bold text-on-surface">{formatIdr(row.amount)}</p>
+                        {(() => {
+                          const displayTotals = resolveInvoiceDisplayTotals(row);
+                          return (
+                            <>
+                              <p className="font-display text-[0.95rem] font-bold text-on-surface">{formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}</p>
+                              {displayTotals.downPayment > 0 && (
+                                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
+                                  Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       <div>
@@ -795,24 +779,7 @@ export function InvoiceScreen({
                       </div>
 
                       <div className="flex items-center justify-end gap-1">
-                        {row.status === "Paid" ? (
-                          <button
-                            type="button"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            title={
-                              isInvoiceBackendAvailable
-                                ? "Invoice Lanjutan"
-                                : "Backend invoice/database belum terhubung, invoice lanjutan dinonaktifkan."
-                            }
-                            aria-label={`Create follow-up invoice for ${row.invoiceNumber}`}
-                            onClick={() => handleCreateFollowUpInvoice(row)}
-                            disabled={!isInvoiceBackendAvailable}
-                          >
-                            <span className="material-symbols-outlined text-base" aria-hidden="true">
-                              add_circle
-                            </span>
-                          </button>
-                        ) : null}
+
                         <button
                           type="button"
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"

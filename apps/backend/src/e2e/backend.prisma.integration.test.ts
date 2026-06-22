@@ -289,7 +289,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
     assert.equal(createdInvoice.clientName, testClientName);
     assert.equal(createdInvoice.amount, 600000);
     assert.equal(createdInvoice.downPaymentIdr, 250000);
-    assert.equal(createdInvoice.status, "Pending");
+    assert.equal(createdInvoice.status, "Partially Paid");
     assert.equal(createdInvoice.items?.length, 1);
     assert.equal(createdInvoice.items?.[0]?.description, "Primary Package");
     createdInvoiceId = createdInvoice.id ?? "";

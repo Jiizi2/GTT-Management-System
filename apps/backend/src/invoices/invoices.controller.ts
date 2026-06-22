@@ -23,7 +23,9 @@ import {
   ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
 } from "@nestjs/swagger";
+import { Roles } from "../auth/auth.roles";
 import { ApiErrorResponseDto } from "../http/api-error-response.dto";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import {
@@ -76,6 +78,7 @@ export class InvoicesController {
   }
 
   @Post()
+  @Roles("super-admin", "admin")
   @ApiOperation({
     summary: "Buat invoice",
     description: "Membuat invoice baru dan, bila perlu, client invoice baru.",
@@ -85,6 +88,7 @@ export class InvoicesController {
     type: InvoiceListItemResponseDto,
   })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiConflictResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
   create(@Body() payload: CreateInvoiceDto) {
@@ -92,6 +96,7 @@ export class InvoicesController {
   }
 
   @Patch(":id")
+  @Roles("super-admin", "admin")
   @ApiOperation({
     summary: "Update invoice",
     description: "Memperbarui invoice yang sudah ada.",
@@ -102,6 +107,7 @@ export class InvoicesController {
     type: InvoiceListItemResponseDto,
   })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
   update(@Param("id") id: string, @Body() payload: UpdateInvoiceDto) {
     return this.invoicesService.update(id, payload);

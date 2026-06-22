@@ -3,14 +3,18 @@ import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from
 
 export type InvoiceStatus = BackendInvoiceRow["status"];
 export type InvoiceRow = BackendInvoiceRow;
-export type InvoiceClientOption = BackendInvoiceClient;
+export type InvoiceClientOption = BackendInvoiceClient & {
+  metadata?: Record<string, any>;
+};
 
 const MASTER_DATA_INVOICE_CLIENT_ID_PREFIX = "__invoice_client_master_data__:";
 
 export type SelectOption = {
   value: string;
   label: string;
+  metadata?: Record<string, any>;
 };
+
 
 export type InvoiceStatusOption = {
   value: InvoiceStatus;
@@ -30,6 +34,8 @@ export type InvoiceWorkspaceInitialData = {
   amount: number;
   downPaymentIdr: number;
   status: InvoiceStatus;
+  recipientName?: string;
+  notes?: string;
   items: Array<
     BackendInvoiceItem & {
       id: string;
@@ -50,6 +56,7 @@ export const defaultIssuingOfficeOptions: SelectOption[] = [
 
 export const defaultInvoiceStatusOptions: InvoiceStatusOption[] = [
   { value: "Pending", label: "Pending" },
+  { value: "Partially Paid", label: "Partially Paid" },
   { value: "Paid", label: "Paid" },
   { value: "Overdue", label: "Overdue" },
   { value: "Cancelled", label: "Cancelled" },
@@ -133,6 +140,12 @@ export function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): st
       : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
+  if (status === "Partially Paid") {
+    return isDarkMode
+      ? "border-sky-500/35 bg-sky-500/16 text-sky-400"
+      : "border-sky-200 bg-sky-100 text-sky-800";
+  }
+
   if (status === "Pending") {
     return isDarkMode
       ? "border-secondary/35 bg-secondary/16 text-secondary"
@@ -151,6 +164,10 @@ export function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean
     return isDarkMode ? "bg-primary/18 text-primary" : "bg-emerald-100 text-emerald-700";
   }
 
+  if (status === "Partially Paid") {
+    return isDarkMode ? "bg-sky-500/18 text-sky-400" : "bg-sky-100 text-sky-700";
+  }
+
   if (status === "Pending") {
     return isDarkMode ? "bg-secondary/18 text-secondary" : "bg-amber-100 text-amber-700";
   }
@@ -158,13 +175,17 @@ export function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean
   return isDarkMode ? "bg-tertiary/18 text-tertiary" : "bg-rose-100 text-rose-700";
 }
 
-export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "pending" | "overdue" | "cancelled" {
+export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled" {
   if (status === "Cancelled") {
     return "cancelled";
   }
 
   if (status === "Paid") {
     return "paid";
+  }
+
+  if (status === "Partially Paid") {
+    return "partially-paid";
   }
 
   if (status === "Pending") {
@@ -175,7 +196,7 @@ export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "pending
 }
 
 export function getInvoiceStatusDisplayLabel(status: InvoiceStatus): string {
-  return status === "Paid" ? "Paid / Lunas" : status;
+  return status === "Paid" ? "Paid / Lunas" : status === "Partially Paid" ? "Partially Paid / DP" : status;
 }
 
 export function resolveDateRangeLabel(rows: InvoiceRow[]): string {
@@ -190,13 +211,14 @@ export function resolveDateRangeLabel(rows: InvoiceRow[]): string {
 }
 
 export function mapMasterDataToSelectOptions(
-  options: Array<{ value: string; label: string; isActive: boolean }>,
+  options: Array<{ value: string; label: string; isActive: boolean; metadata?: any }>,
 ): SelectOption[] {
   return options
     .filter((option) => option.isActive)
     .map((option) => ({
       value: option.value.trim(),
       label: option.label.trim() || option.value.trim(),
+      metadata: option.metadata,
     }))
     .filter((option) => option.value.length > 0);
 }
@@ -204,7 +226,7 @@ export function mapMasterDataToSelectOptions(
 export function mapMasterDataToInvoiceStatusOptions(
   options: Array<{ value: string; label: string; isActive: boolean }>,
 ): InvoiceStatusOption[] {
-  const allowedStatuses = new Set<InvoiceStatus>(["Pending", "Paid", "Overdue", "Cancelled"]);
+  const allowedStatuses = new Set<InvoiceStatus>(["Pending", "Partially Paid", "Paid", "Overdue", "Cancelled"]);
   return mapMasterDataToSelectOptions(options)
     .filter((option): option is { value: InvoiceStatus; label: string } =>
       allowedStatuses.has(option.value as InvoiceStatus),
@@ -229,7 +251,7 @@ export function mapMasterDataToClientSuggestions(options: Array<{ label: string;
 
 export function mergeInvoiceClientsWithMasterData(
   clients: ReadonlyArray<InvoiceClientOption>,
-  options: ReadonlyArray<{ value: string; label: string; sortOrder: number; isActive: boolean }>,
+  options: ReadonlyArray<{ value: string; label: string; sortOrder: number; isActive: boolean; metadata?: Record<string, any> }>,
 ): InvoiceClientOption[] {
   const normalizedNames = new Set(clients.map((client) => normalizeClientName(client.name)));
   const backendClients = [...clients].sort((left, right) => {
@@ -271,6 +293,7 @@ export function mergeInvoiceClientsWithMasterData(
       name: option.label,
       sortOrder: backendClients.length + index + 1,
       label: option.label,
+      metadata: option.metadata,
     }));
 
   return [...backendClients, ...masterDataOnlyClients];
@@ -306,10 +329,7 @@ export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number, re
   return Math.max(0, Math.round(downPaymentIdr)) > 0 ? "Sisa Tagihan" : "Tagihan";
 }
 
-export function openInvoiceExportWindow(): Window | null {
-  const isCompactViewport = typeof window !== "undefined" && window.innerWidth < 768;
-  return isCompactViewport ? window.open("", "_blank") : window.open("", "_blank", "width=1180,height=860");
-}
+// openInvoiceExportWindow removed because popups are no longer used for printing
 
 export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
   const items: Array<BackendInvoiceItem & { id: string }> = Array.isArray(row.items)
@@ -336,18 +356,150 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     amount: Math.max(0, Math.round(row.amount)),
     downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
     status: row.status,
+    recipientName: row.recipientName ?? "",
+    notes: row.notes ?? "",
     items,
+  };
+}
+
+export function resolveExchangeRatesFromItems(
+  items: Array<{ currency: string; totalPrice: number; totalPriceIdr: number }>,
+  fallbackUsd = 15_845,
+  fallbackSar = 4_225,
+): { usdToIdr: number; sarToIdr: number } {
+  let usdToIdr = 0;
+  let sarToIdr = 0;
+
+  const usdItem = items.find((item) => item.currency === "USD" && item.totalPrice > 0);
+  if (usdItem) {
+    usdToIdr = usdItem.totalPriceIdr / usdItem.totalPrice;
+  }
+
+  const sarItem = items.find((item) => item.currency === "SAR" && item.totalPrice > 0);
+  if (sarItem) {
+    sarToIdr = sarItem.totalPriceIdr / sarItem.totalPrice;
+  }
+
+  if (usdToIdr > 0 && sarToIdr === 0) {
+    sarToIdr = usdToIdr / 3.75;
+  } else if (sarToIdr > 0 && usdToIdr === 0) {
+    usdToIdr = sarToIdr * 3.75;
+  }
+
+  if (usdToIdr === 0) usdToIdr = fallbackUsd;
+  if (sarToIdr === 0) sarToIdr = fallbackSar;
+
+  return {
+    usdToIdr: Math.round(usdToIdr),
+    sarToIdr: Math.round(sarToIdr),
+  };
+}
+
+export function resolveExchangeRatesFromRow(row: Pick<InvoiceRow, "notes" | "items">): { usdToIdr: number; sarToIdr: number } {
+  const notesRaw = row.notes ?? "";
+  let usdToIdr = 0;
+  let sarToIdr = 0;
+
+  const ratesMatch = notesRaw.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/);
+  if (ratesMatch) {
+    usdToIdr = Number.parseInt(ratesMatch[1], 10);
+    sarToIdr = Number.parseInt(ratesMatch[2], 10);
+  }
+
+  if (usdToIdr <= 0 || sarToIdr <= 0) {
+    const items = row.items || [];
+    const itemRates = resolveExchangeRatesFromItems(items);
+    if (usdToIdr <= 0) usdToIdr = itemRates.usdToIdr;
+    if (sarToIdr <= 0) sarToIdr = itemRates.sarToIdr;
+  }
+
+  return { usdToIdr, sarToIdr };
+}
+
+export function formatCurrencyLabel(value: number, currency: string): string {
+  if (currency === "IDR") {
+    return formatIdr(value);
+  }
+  const rounded = Math.max(0, Math.round(value));
+  return `${currency} ${new Intl.NumberFormat("en-US").format(rounded)}`;
+}
+
+export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
+  currency: string;
+  subtotal: number;
+  downPayment: number;
+  remainingBalance: number;
+  usdToIdr: number;
+  sarToIdr: number;
+} {
+  const notesRaw = row.notes ?? "";
+  let keepValasCurrency: "IDR" | "USD" | "SAR" = "IDR";
+  if (notesRaw.includes("[KeepValasTotal:USD]")) keepValasCurrency = "USD";
+  else if (notesRaw.includes("[KeepValasTotal:SAR]")) keepValasCurrency = "SAR";
+  else if (notesRaw.includes("[KeepValasTotal]")) {
+    const valas = row.items?.find((item) => item.currency !== "IDR")?.currency;
+    keepValasCurrency = valas || "IDR";
+  }
+
+  const rates = resolveExchangeRatesFromRow(row);
+  const amountIdr = Math.max(0, Math.round(row.amount));
+  const dpIdr = resolveInvoiceDownPaymentIdr(row);
+
+  if (keepValasCurrency === "IDR") {
+    return {
+      currency: "IDR",
+      subtotal: amountIdr,
+      downPayment: dpIdr,
+      remainingBalance: resolveInvoiceRemainingBalanceIdr(amountIdr, dpIdr),
+      usdToIdr: rates.usdToIdr,
+      sarToIdr: rates.sarToIdr,
+    };
+  }
+
+  const rate = keepValasCurrency === "USD" ? rates.usdToIdr : rates.sarToIdr;
+  if (rate <= 0) {
+    return {
+      currency: "IDR",
+      subtotal: amountIdr,
+      downPayment: dpIdr,
+      remainingBalance: resolveInvoiceRemainingBalanceIdr(amountIdr, dpIdr),
+      usdToIdr: rates.usdToIdr,
+      sarToIdr: rates.sarToIdr,
+    };
+  }
+
+  const items = row.items || [];
+  let targetSubtotal = 0;
+  if (items.length > 0) {
+    targetSubtotal = items.reduce((sum, item) => {
+      if (item.currency === keepValasCurrency) {
+        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
+      }
+      return sum + Math.max(0, Math.ceil(item.totalPriceIdr / rate));
+    }, 0);
+  } else {
+    targetSubtotal = Math.ceil(amountIdr / rate);
+  }
+
+  const targetDp = Math.ceil(dpIdr / rate);
+  const targetRemaining = Math.max(0, targetSubtotal - targetDp);
+
+  return {
+    currency: keepValasCurrency,
+    subtotal: targetSubtotal,
+    downPayment: targetDp,
+    remainingBalance: targetRemaining,
+    usdToIdr: rates.usdToIdr,
+    sarToIdr: rates.sarToIdr,
   };
 }
 
 export async function viewInvoicePdfFromRow({
   row,
   groups,
-  printWindow,
 }: {
   row: InvoiceRow;
   groups: GroupData[];
-  printWindow?: Window | null;
 }): Promise<boolean> {
   const linkedGroup = row.groupCode
     ? (groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null)
@@ -368,7 +520,7 @@ export async function viewInvoicePdfFromRow({
             totalPriceIdr: row.amount,
           },
         ];
-  const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
+  const totals = resolveInvoiceDisplayTotals(row);
   const { exportInvoicePdf } = await import("./invoice-export");
 
   return await exportInvoicePdf(
@@ -381,17 +533,18 @@ export async function viewInvoicePdfFromRow({
       clientName: row.clientName,
       clientCode: row.groupCode ?? row.clientLabel,
       address: row.clientLabel,
+      recipientName: row.recipientName,
       bankAccountLabel: resolveBankAccountLabel("bsi"),
-      notes: row.groupCode ? `Linked group: ${row.groupCode}` : "",
-      usdToIdr: 15_845,
-      sarToIdr: 4_225,
-      subtotalIdr: row.amount,
-      taxIdr: 0,
-      totalPayableIdr: row.amount,
-      downPaymentIdr,
-      remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
+      notes: row.notes ?? "",
+      usdToIdr: totals.usdToIdr,
+      sarToIdr: totals.sarToIdr,
+      currency: totals.currency as any,
+      subtotal: totals.subtotal,
+      tax: 0,
+      totalPayable: totals.subtotal,
+      downPayment: totals.downPayment,
+      remainingBalance: totals.remainingBalance,
       items: printableItems,
-    },
-    { printWindow },
+    }
   );
 }

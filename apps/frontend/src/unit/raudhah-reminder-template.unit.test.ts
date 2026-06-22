@@ -34,7 +34,7 @@ function testBuildRaudhahReminderTemplateUsesRequestedFormat(): void {
       "902023711 → Ikhwan 9 Pax | Akhwat 10 pax",
       "",
       "🕌 Jadwal Raudhah Agent:",
-      "* 9 - 15 → Free",
+      "* 9 & 15 → Free",
       "* 8 → After",
       "* 16 → Before (sebelum dzuhur)",
     ].join("\n"),

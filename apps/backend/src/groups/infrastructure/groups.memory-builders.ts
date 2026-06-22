@@ -95,7 +95,6 @@ export function ensureMemoryVisaSetup(group: MemoryGroupRecord): MemoryVisaSetup
       issuedDate: undefined,
       syarikah: "Not assigned",
       paymentStatus: VisaPaymentStatus.UNPAID,
-      outstandingAmount: 0,
       hotelAgreements: [],
       raudhahAppointments: [],
     };

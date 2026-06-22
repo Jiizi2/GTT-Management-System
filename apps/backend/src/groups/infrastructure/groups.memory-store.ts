@@ -248,7 +248,6 @@ export function createDefaultMemoryGroups(): MemoryGroupRecord[] {
         visaStatus: VisaStatus.PENDING,
         syarikah: "Daleel Maalem",
         paymentStatus: VisaPaymentStatus.PARTIAL,
-        outstandingAmount: 1500,
         hotelAgreements: [
           {
             id: randomUUID(),

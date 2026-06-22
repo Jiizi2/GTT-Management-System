@@ -58,11 +58,17 @@ export class InvoiceListItemResponseDto {
   @ApiProperty({ example: 500000, minimum: 0 })
   downPaymentIdr!: number;
 
-  @ApiProperty({ enum: ["Paid", "Pending", "Overdue", "Cancelled"], example: "Pending" })
-  status!: "Paid" | "Pending" | "Overdue" | "Cancelled";
+  @ApiProperty({ enum: ["Paid", "Pending", "Overdue", "Cancelled", "Partially Paid"], example: "Pending" })
+  status!: "Paid" | "Pending" | "Overdue" | "Cancelled" | "Partially Paid";
 
   @ApiProperty({ example: "2026-04" })
   monthKey!: string;
+
+  @ApiPropertyOptional({ example: "PT Ghaniya Tour Travel" })
+  recipientName?: string;
+
+  @ApiPropertyOptional({ example: "Catatan tambahan invoice..." })
+  notes?: string;
 
   @ApiPropertyOptional({
     description: "Daftar item invoice yang tersimpan.",

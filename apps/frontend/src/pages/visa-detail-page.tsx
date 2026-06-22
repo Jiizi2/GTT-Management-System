@@ -37,6 +37,7 @@ const {
   resolveTotalBusCount,
   resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
+  filterAgreementDrafts,
 } = Domain;
 
 const LazyDeleteGroupModal = lazy(async () => ({
@@ -810,33 +811,23 @@ export function VisaTrackingDetailScreen({
     [madinahAgreements, makkahAgreements],
   );
   const availableAgreementDraftsByCity = useMemo(() => {
-    const availableDrafts: Record<"makkah" | "madinah", HotelAgreementDraft[]> = {
-      makkah: [],
-      madinah: [],
-    };
-
-    for (const draft of agreementDraftsQuery.data ?? []) {
-      if (draft.assignmentStatus === "Assigned") {
-        continue;
-      }
-
-      const draftKey = `${draft.city}:${draft.agreementNumber.trim().toUpperCase()}`;
-      if (connectedAgreementKeys.has(draftKey)) {
-        continue;
-      }
-
-      availableDrafts[draft.city].push(draft);
-    }
-
-    return {
-      makkah: availableDrafts.makkah.sort((left, right) =>
-        `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
-      ),
-      madinah: availableDrafts.madinah.sort((left, right) =>
-        `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
-      ),
-    };
-  }, [agreementDraftsQuery.data, connectedAgreementKeys]);
+    return filterAgreementDrafts(agreementDraftsQuery.data ?? [], {
+      groupArrivalDate: group?.arrivalDate,
+      groupReturnDate: group?.returnDate,
+      rowDepartureIso: row.departureIso,
+      rowReturnIso: row.returnIso,
+      totalPax,
+      connectedAgreementKeys,
+    });
+  }, [
+    agreementDraftsQuery.data,
+    connectedAgreementKeys,
+    group?.arrivalDate,
+    group?.returnDate,
+    row.departureIso,
+    row.returnIso,
+    totalPax,
+  ]);
   const assignedDraftByAgreementId = useMemo(() => {
     const drafts = agreementDraftsQuery.data ?? [];
     const draftByAgreementId = new Map<string, HotelAgreementDraft>();

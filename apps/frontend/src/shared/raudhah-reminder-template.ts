@@ -151,10 +151,10 @@ function buildRaudhahAgentScheduleLines(appointments: ReminderAppointment[]): st
       }
 
       if (status === "Before") {
-        return `* ${days.join(" - ")} → ${status} (sebelum dzuhur)`;
+        return `* ${joinWithAmpersand(days.map(String))} → ${status} (sebelum dzuhur)`;
       }
 
-      return `* ${days.join(" - ")} → ${status}`;
+      return `* ${joinWithAmpersand(days.map(String))} → ${status}`;
     })
     .filter((line): line is string => line !== null);
 

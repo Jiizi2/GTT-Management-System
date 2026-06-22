@@ -555,7 +555,6 @@ export class GroupsCommandService {
         visaStatus: VisaStatus.DRAFT,
         syarikah: "Not assigned",
         paymentStatus: VisaPaymentStatus.UNPAID,
-        outstandingAmount: new Prisma.Decimal(0),
       },
       select: {
         id: true,

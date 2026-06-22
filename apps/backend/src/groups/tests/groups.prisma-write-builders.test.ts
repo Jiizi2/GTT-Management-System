@@ -147,7 +147,6 @@ function testTrimAndDefaultMappings(): void {
   assert.equal(visaSetup.issuedDate, null);
   assert.equal(visaSetup.busStatus, VisaBusStatus.VISA_PLUS);
   assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.UNPAID);
-  assert.equal((visaSetup.outstandingAmount as Prisma.Decimal).toString(), "0");
   assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MAKKAH);
   assert.equal(visaSetup.hotelAgreements.create[0].sourceDraftId, "draft-builder-1");
   assert.equal(visaSetup.hotelAgreements.create[0].status, AgreementApprovalStatus.WAITING);
@@ -195,7 +194,6 @@ function testExplicitStatusesAreRespected(): void {
       issuedDate: "2026-04-14",
       syarikah: "Provider",
       paymentStatus: VisaPaymentStatus.PAID,
-      outstandingAmount: 150,
       hotelAgreements: [
         {
           city: AgreementCity.MADINAH,
@@ -245,7 +243,6 @@ function testExplicitStatusesAreRespected(): void {
   assert.equal(visaSetup.visaStatus, VisaStatus.ISSUED);
   assert.equal((visaSetup.issuedDate as Date).toISOString().slice(0, 10), "2026-04-14");
   assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.PAID);
-  assert.equal((visaSetup.outstandingAmount as Prisma.Decimal).toString(), "150");
   assert.equal(visaSetup.hotelAgreements.create[0].status, AgreementApprovalStatus.APPROVED);
   assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MADINAH);
   assert.equal(visaSetup.raudhahAppointments.create[0].status, GroupRaudhahStatus.BEFORE);

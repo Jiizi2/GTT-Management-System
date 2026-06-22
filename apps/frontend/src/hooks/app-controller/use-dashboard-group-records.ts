@@ -604,7 +604,8 @@ export function useDashboardGroupRecords({
         const next = updater(current);
         groupRecordsRef.current = next;
         groupRecordsProjectionRef.current = requestedProjection;
-        queryClient.setQueryData(groupQueryKeys.list(requestedProjection, shouldUseRemoteOverviewActiveOnly), next);
+        queryClient.setQueryData(groupQueryKeys.list("detail", shouldUseRemoteOverviewActiveOnly), next);
+        queryClient.setQueryData(groupQueryKeys.list("summary", shouldUseRemoteOverviewActiveOnly), next);
         return next;
       });
       void queryClient.invalidateQueries({ queryKey: groupQueryKeys.searchRoot });

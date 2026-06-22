@@ -14,8 +14,13 @@ import { createStructuredLogger } from "../logging/create-structured-logger";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
+import {
+  toIsoDateOnly,
+  toUtcMidnightDate as createUtcDateFromIso,
+  isIsoDateOnly,
+} from "../utils/date-helpers";
 
-type InvoiceStatusLabel = "Paid" | "Pending" | "Overdue" | "Cancelled";
+type InvoiceStatusLabel = "Paid" | "Pending" | "Overdue" | "Cancelled" | "Partially Paid";
 type InvoiceLineItemCurrency = "IDR" | "USD" | "SAR";
 
 type InvoiceLineItem = {
@@ -51,6 +56,8 @@ type InvoiceListItem = {
   downPaymentIdr: number;
   status: InvoiceStatusLabel;
   monthKey: string;
+  recipientName?: string;
+  notes?: string;
   items?: InvoiceLineItem[];
 };
 
@@ -74,6 +81,7 @@ type MemoryInvoice = {
   downPaymentIdr: number;
   status: InvoiceStatus;
   notes?: string;
+  recipientName?: string;
   items?: InvoiceLineItem[];
 };
 
@@ -92,6 +100,7 @@ const invoiceSummarySelect = {
   status: true,
   notes: true,
   items: true,
+  recipientName: true,
   client: {
     select: {
       name: true,
@@ -122,18 +131,6 @@ type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & 
 type PrismaInvoiceDownPaymentRow = {
   downPaymentIdr: Prisma.Decimal | number | null;
 };
-
-function toIsoDateOnly(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
-function createUtcDateFromIso(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00.000Z`);
-}
-
-function isIsoDateOnly(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
 
 function normalizeIsoDate(input: string, fieldName: "issuedDate" | "dueDate"): string {
   const trimmed = input.trim();
@@ -194,6 +191,10 @@ function toStatusLabel(status: InvoiceStatus): InvoiceStatusLabel {
     return "Overdue";
   }
 
+  if (status === InvoiceStatus.PARTIALLY_PAID) {
+    return "Partially Paid";
+  }
+
   return "Pending";
 }
 
@@ -201,9 +202,21 @@ function resolveMonthKey(isoDate: string): string {
   return isIsoDateOnly(isoDate) ? isoDate.slice(0, 7) : "unknown";
 }
 
-function resolveEffectiveStatus(status: InvoiceStatus, dueDateIso: string): InvoiceStatus {
+function resolveEffectiveStatus(
+  status: InvoiceStatus,
+  dueDateIso: string,
+  amount: number,
+  downPaymentIdr: number,
+): InvoiceStatus {
   if (status === InvoiceStatus.CANCELLED) {
     return InvoiceStatus.CANCELLED;
+  }
+
+  const sanitizedAmount = Math.max(0, Math.round(amount));
+  const sanitizedDownPayment = Math.max(0, Math.round(downPaymentIdr));
+
+  if (sanitizedAmount > 0 && sanitizedDownPayment >= sanitizedAmount) {
+    return InvoiceStatus.PAID;
   }
 
   if (status === InvoiceStatus.PAID) {
@@ -219,15 +232,19 @@ function resolveEffectiveStatus(status: InvoiceStatus, dueDateIso: string): Invo
     return InvoiceStatus.OVERDUE;
   }
 
+  if (sanitizedDownPayment > 0 && sanitizedDownPayment < sanitizedAmount) {
+    return InvoiceStatus.PARTIALLY_PAID;
+  }
+
+  if (status === InvoiceStatus.PARTIALLY_PAID) {
+    return InvoiceStatus.PARTIALLY_PAID;
+  }
+
   return InvoiceStatus.PENDING;
 }
 
 function normalizeAmountByStatus(amount: number, status: InvoiceStatus): number {
   const sanitizedAmount = Math.max(0, Math.round(amount));
-  if (status === InvoiceStatus.CANCELLED) {
-    return 0;
-  }
-
   return sanitizedAmount;
 }
 
@@ -421,6 +438,8 @@ export class InvoicesService implements OnModuleInit {
   private readonly memoryInvoices: MemoryInvoice[] = [];
   private prismaInvoiceDownPaymentColumnState: boolean | null = null;
   private prismaInvoiceDownPaymentColumnInitPromise: Promise<boolean> | null = null;
+  private prismaInvoiceRecipientNameColumnState: boolean | null = null;
+  private prismaInvoiceRecipientNameColumnInitPromise: Promise<boolean> | null = null;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -435,6 +454,7 @@ export class InvoicesService implements OnModuleInit {
     }
 
     await this.ensurePrismaInvoiceDownPaymentColumn();
+    await this.ensurePrismaInvoiceRecipientNameColumn();
   }
 
   async listClients(): Promise<InvoiceClientListItem[]> {
@@ -619,6 +639,16 @@ export class InvoicesService implements OnModuleInit {
   }
 
   private findAllFromMemory(): InvoiceListItem[] {
+    const todayIso = toIsoDateOnly(new Date());
+    this.memoryInvoices.forEach((inv) => {
+      if (
+        (inv.status === InvoiceStatus.PENDING || inv.status === InvoiceStatus.PARTIALLY_PAID) &&
+        inv.dueDateIso < todayIso
+      ) {
+        inv.status = InvoiceStatus.OVERDUE;
+      }
+    });
+
     return [...this.memoryInvoices]
       .sort((left, right) => {
         const dueDateDiff = right.dueDateIso.localeCompare(left.dueDateIso);
@@ -646,13 +676,16 @@ export class InvoicesService implements OnModuleInit {
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
     const existingInvoiceNumbers = this.memoryInvoices.map((entry) => entry.invoiceNumber);
     const invoiceNumber = buildInvoiceNumber(invoiceYear, this.resolveNextSerial(existingInvoiceNumbers));
-    const effectiveStatus = resolveEffectiveStatus(payload.status ?? InvoiceStatus.PENDING, dueDateIso);
-    const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
-    const normalizedItems = normalizeInvoiceLineItems(payload.items);
-    const roundedAmount = normalizeAmountByStatus(
-      resolveInvoiceAmountFromItems(payload.amount, normalizedItems),
-      effectiveStatus,
+    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
+    const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
+    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const effectiveStatus = resolveEffectiveStatus(
+      payload.status ?? InvoiceStatus.PENDING,
+      dueDateIso,
+      roundedAmount,
+      payload.downPaymentIdr ?? 0,
     );
+    const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
 
     const createdInvoice: MemoryInvoice = {
       id: randomUUID(),
@@ -666,6 +699,7 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: normalizeDownPaymentByAmount(roundedAmount, payload.downPaymentIdr ?? 0),
       status: effectiveStatus,
       notes: getTrimmedString(payload.notes) || undefined,
+      recipientName: getTrimmedString(payload.recipientName) || undefined,
       items: normalizedItems.length > 0 ? normalizedItems : undefined,
     };
 
@@ -717,15 +751,20 @@ export class InvoicesService implements OnModuleInit {
     const dueDateIso = payload.dueDate
       ? normalizeIsoDate(payload.dueDate, "dueDate")
       : currentInvoice.dueDateIso;
-    const effectiveStatus = resolveEffectiveStatus(payload.status ?? currentInvoice.status, dueDateIso);
     const baseAmount = payload.amount !== undefined ? payload.amount : currentInvoice.amount;
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : undefined;
     const resolvedAmount =
       payload.items !== undefined ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems) : baseAmount;
-    const roundedAmount = normalizeAmountByStatus(resolvedAmount, effectiveStatus);
+    const roundedAmount = Math.max(0, Math.round(resolvedAmount));
     const nextDownPaymentIdr = normalizeDownPaymentByAmount(
       roundedAmount,
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : currentInvoice.downPaymentIdr,
+    );
+    const effectiveStatus = resolveEffectiveStatus(
+      payload.status ?? currentInvoice.status,
+      dueDateIso,
+      roundedAmount,
+      nextDownPaymentIdr,
     );
 
     let nextGroupCode = currentInvoice.groupCode;
@@ -746,6 +785,8 @@ export class InvoicesService implements OnModuleInit {
 
     const nextNotes =
       payload.notes !== undefined ? payload.notes.trim() || undefined : currentInvoice.notes;
+    const nextRecipientName =
+      payload.recipientName !== undefined ? payload.recipientName.trim() || undefined : currentInvoice.recipientName;
 
     const updatedInvoice: MemoryInvoice = {
       ...currentInvoice,
@@ -758,6 +799,7 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: nextDownPaymentIdr,
       status: effectiveStatus,
       notes: nextNotes,
+      recipientName: nextRecipientName,
       items: normalizedItems !== undefined ? (normalizedItems.length > 0 ? normalizedItems : undefined) : currentInvoice.items,
     };
 
@@ -769,10 +811,13 @@ export class InvoicesService implements OnModuleInit {
     invoice: MemoryInvoice,
     client: MemoryInvoiceClient,
   ): InvoiceListItem {
-    const effectiveStatus = resolveEffectiveStatus(invoice.status, invoice.dueDateIso);
-    const roundedAmount = normalizeAmountByStatus(
-      resolveStoredInvoiceAmount(invoice.amount, invoice.items),
-      effectiveStatus,
+    const baseAmount = resolveStoredInvoiceAmount(invoice.amount, invoice.items);
+    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const effectiveStatus = resolveEffectiveStatus(
+      invoice.status,
+      invoice.dueDateIso,
+      roundedAmount,
+      invoice.downPaymentIdr,
     );
     return {
       id: invoice.id,
@@ -789,6 +834,8 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, invoice.downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(invoice.dueDateIso),
+      recipientName: invoice.recipientName,
+      notes: invoice.notes,
       items: invoice.items?.length ? invoice.items : undefined,
     };
   }
@@ -886,6 +933,76 @@ export class InvoicesService implements OnModuleInit {
     }
   }
 
+  private async ensurePrismaInvoiceRecipientNameColumn(): Promise<boolean> {
+    if (this.dataSource !== "prisma") {
+      return false;
+    }
+
+    if (this.prismaInvoiceRecipientNameColumnState !== null) {
+      return this.prismaInvoiceRecipientNameColumnState;
+    }
+
+    if (this.prismaInvoiceRecipientNameColumnInitPromise) {
+      return this.prismaInvoiceRecipientNameColumnInitPromise;
+    }
+
+    if (typeof this.prisma.$queryRaw !== "function" || typeof this.prisma.$executeRaw !== "function") {
+      this.prismaInvoiceRecipientNameColumnState = false;
+      return false;
+    }
+
+    this.prismaInvoiceRecipientNameColumnInitPromise = (async () => {
+      try {
+        const existingRows = await this.prisma.$queryRaw<Array<{ exists: number }>>`
+          SELECT 1 AS "exists"
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'Invoice'
+            AND column_name = 'recipientName'
+          LIMIT 1
+        `;
+
+        if (existingRows.length > 0) {
+          return true;
+        }
+
+        await this.prisma.$executeRaw`
+          ALTER TABLE "Invoice"
+          ADD COLUMN IF NOT EXISTS "recipientName" TEXT
+        `;
+
+        const verifiedRows = await this.prisma.$queryRaw<Array<{ exists: number }>>`
+          SELECT 1 AS "exists"
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'Invoice'
+            AND column_name = 'recipientName'
+          LIMIT 1
+        `;
+
+        return verifiedRows.length > 0;
+      } catch (error: unknown) {
+        this.logger.warn(
+          {
+            action: "invoice.recipient-name-column.ensure-failed",
+            dataSource: this.dataSource,
+            error,
+          },
+          "Invoice recipient name column is not ready yet.",
+        );
+        return false;
+      }
+    })();
+
+    try {
+      const available = await this.prismaInvoiceRecipientNameColumnInitPromise;
+      this.prismaInvoiceRecipientNameColumnState = available;
+      return available;
+    } finally {
+      this.prismaInvoiceRecipientNameColumnInitPromise = null;
+    }
+  }
+
   private resolvePrismaInvoiceInlineDownPayment(
     invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment,
   ): number | undefined {
@@ -898,6 +1015,23 @@ export class InvoicesService implements OnModuleInit {
 
   private async findAllWithPrisma(): Promise<InvoiceListItem[]> {
     const canReadInlineDownPayment = await this.ensurePrismaInvoiceDownPaymentColumn();
+
+    // Lazy sync overdue invoices in the database
+    const todayUtc = createUtcDateFromIso(toIsoDateOnly(new Date()));
+    await this.prisma.invoice.updateMany({
+      where: {
+        status: {
+          in: [InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID],
+        },
+        dueDate: {
+          lt: todayUtc,
+        },
+      },
+      data: {
+        status: InvoiceStatus.OVERDUE,
+      },
+    });
+
     const invoices = (await this.prisma.invoice.findMany({
       select: canReadInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
@@ -936,10 +1070,13 @@ export class InvoicesService implements OnModuleInit {
       resolvedGroupId = matchedGroup.id;
     }
 
-    const effectiveStatus = resolveEffectiveStatus(payload.status ?? InvoiceStatus.PENDING, dueDateIso);
-    const roundedAmount = normalizeAmountByStatus(
-      resolveInvoiceAmountFromItems(payload.amount, normalizedItems),
-      effectiveStatus,
+    const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
+    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const effectiveStatus = resolveEffectiveStatus(
+      payload.status ?? InvoiceStatus.PENDING,
+      dueDateIso,
+      roundedAmount,
+      payload.downPaymentIdr ?? 0,
     );
     const normalizedDownPaymentIdr = normalizeDownPaymentByAmount(
       roundedAmount,
@@ -963,6 +1100,7 @@ export class InvoicesService implements OnModuleInit {
               amount: roundedAmount,
               status: effectiveStatus,
               notes: getTrimmedString(payload.notes) || null,
+              recipientName: getTrimmedString(payload.recipientName) || null,
               items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
             },
             select: invoiceSummarySelect,
@@ -1021,6 +1159,7 @@ export class InvoicesService implements OnModuleInit {
         status: true,
         notes: true,
         items: true,
+        recipientName: true,
       },
     });
 
@@ -1070,16 +1209,21 @@ export class InvoicesService implements OnModuleInit {
     const dueDateIso = payload.dueDate
       ? normalizeIsoDate(payload.dueDate, "dueDate")
       : toIsoDateOnly(existingInvoice.dueDate);
-    const effectiveStatus = resolveEffectiveStatus(payload.status ?? existingInvoice.status, dueDateIso);
     const baseAmount =
       payload.amount !== undefined ? payload.amount : toNumberAmount(existingInvoice.amount);
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
     const resolvedAmount =
       payload.items !== undefined ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems) : baseAmount;
-    const roundedAmount = normalizeAmountByStatus(resolvedAmount, effectiveStatus);
+    const roundedAmount = Math.max(0, Math.round(resolvedAmount));
     const normalizedDownPaymentIdr = normalizeDownPaymentByAmount(
       roundedAmount,
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : existingDownPaymentIdr,
+    );
+    const effectiveStatus = resolveEffectiveStatus(
+      payload.status ?? existingInvoice.status,
+      dueDateIso,
+      roundedAmount,
+      normalizedDownPaymentIdr,
     );
 
     let resolvedGroupId: string | null = existingInvoice.groupId;
@@ -1121,6 +1265,7 @@ export class InvoicesService implements OnModuleInit {
           amount: roundedAmount,
           status: effectiveStatus,
           notes: payload.notes !== undefined ? payload.notes.trim() || null : existingInvoice.notes,
+          recipientName: payload.recipientName !== undefined ? payload.recipientName.trim() || null : existingInvoice.recipientName,
           ...(payload.items !== undefined
             ? {
                 items:
@@ -1220,11 +1365,14 @@ export class InvoicesService implements OnModuleInit {
   ): InvoiceListItem {
     const dueDateIso = toIsoDateOnly(invoice.dueDate);
     const issuedDateIso = toIsoDateOnly(invoice.issuedDate);
-    const effectiveStatus = resolveEffectiveStatus(invoice.status, dueDateIso);
     const items = parseStoredInvoiceLineItems(invoice.items);
-    const roundedAmount = normalizeAmountByStatus(
-      resolveStoredInvoiceAmount(toNumberAmount(invoice.amount), items),
-      effectiveStatus,
+    const baseAmount = resolveStoredInvoiceAmount(toNumberAmount(invoice.amount), items);
+    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const effectiveStatus = resolveEffectiveStatus(
+      invoice.status,
+      dueDateIso,
+      roundedAmount,
+      downPaymentIdr,
     );
 
     return {
@@ -1242,6 +1390,8 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
+      recipientName: invoice.recipientName ?? undefined,
+      notes: invoice.notes ?? undefined,
       items,
     };
   }

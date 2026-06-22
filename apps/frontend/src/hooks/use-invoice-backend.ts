@@ -1,4 +1,4 @@
-export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled";
+export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled" | "Partially Paid";
 export type BackendDataSource = "memory" | "prisma";
 
 import { fetchBackendParsed } from "../shared/api-client";
@@ -37,6 +37,8 @@ export type BackendInvoiceRow = {
   downPaymentIdr: number;
   status: BackendInvoiceStatus;
   monthKey: string;
+  recipientName?: string;
+  notes?: string;
   items?: BackendInvoiceItem[];
 };
 
@@ -50,6 +52,7 @@ export type CreateBackendInvoicePayload = {
   downPaymentIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
+  recipientName?: string;
   items?: BackendInvoiceItem[];
 };
 
@@ -63,6 +66,7 @@ export type UpdateBackendInvoicePayload = {
   downPaymentIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
+  recipientName?: string;
   items?: BackendInvoiceItem[];
 };
 
@@ -90,6 +94,8 @@ type BackendInvoiceRecord = {
   downPaymentIdr?: unknown;
   status?: unknown;
   monthKey?: unknown;
+  recipientName?: unknown;
+  notes?: unknown;
   items?: unknown;
 };
 
@@ -259,6 +265,8 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
     downPaymentIdr,
     status,
     monthKey: readString(record.monthKey, monthKeyFromDueDate),
+    recipientName: readOptionalString(record.recipientName),
+    notes: readOptionalString(record.notes),
     items: Array.isArray(record.items)
       ? (record.items
           .map((item) => mapBackendInvoiceItem(item as BackendInvoiceItemRecord))
@@ -364,6 +372,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
         payload.downPaymentIdr !== undefined ? Math.max(0, Math.round(payload.downPaymentIdr)) : undefined,
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
+      recipientName: payload.recipientName?.trim() || undefined,
       items: normalizeBackendInvoiceItems(payload.items),
     }),
   });
@@ -418,6 +427,9 @@ export async function updateInvoiceInBackend(
   }
   if (payload.notes !== undefined) {
     requestBody.notes = payload.notes.trim();
+  }
+  if (payload.recipientName !== undefined) {
+    requestBody.recipientName = payload.recipientName.trim();
   }
   if (payload.items !== undefined) {
     requestBody.items = normalizeBackendInvoiceItems(payload.items);

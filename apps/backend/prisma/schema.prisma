@@ -62,6 +62,7 @@ enum ChecklistAssignmentStatus {
 
 enum InvoiceStatus {
   PAID
+  PARTIALLY_PAID
   PENDING
   OVERDUE
   CANCELLED
@@ -205,6 +206,7 @@ model Invoice {
   status        InvoiceStatus @default(PENDING)
   notes         String?
   items         Json?
+  recipientName String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   client        InvoiceClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
@@ -310,7 +312,6 @@ model VisaSetup {
   syarikah            String
   busStatus           VisaBusStatus?
   paymentStatus       VisaPaymentStatus    @default(UNPAID)
-  outstandingAmount   Decimal              @default(0) @db.Decimal(12, 2)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   group               Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
