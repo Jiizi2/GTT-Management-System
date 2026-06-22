@@ -16,7 +16,7 @@ import type {
 } from "../dto/hotel-agreement-draft.dto";
 import type { UpsertGroupVisaHotelDto } from "../dto/group-operations.dto";
 import { GroupsService } from "./groups.service";
-import { toIsoDateOnly, toUtcMidnightDate } from "../../utils/date-helpers";
+import { toIsoDateOnly, toUtcMidnightDate, isIsoDateOnly } from "../../utils/date-helpers";
 
 type DraftStatusFilter = "assigned" | "unassigned";
 
@@ -151,8 +151,6 @@ function doesHotelSnapshotMatchDraftIgnoringPax(
     | "city"
     | "hotelName"
     | "agreementNumber"
-    | "stayStart"
-    | "stayEnd"
   >,
 ): boolean {
   if (readText(hotel.sourceDraftId) === draft.id) {
@@ -164,16 +162,14 @@ function doesHotelSnapshotMatchDraftIgnoringPax(
     readText(hotel.agreementNumber).toUpperCase() ===
       draft.agreementNumber.trim().toUpperCase() &&
     readText(hotel.hotelName).toUpperCase() ===
-      draft.hotelName.trim().toUpperCase() &&
-    toIsoDateOnly(readText(hotel.stayStart)) === toIsoDateOnly(draft.stayStart) &&
-    toIsoDateOnly(readText(hotel.stayEnd)) === toIsoDateOnly(draft.stayEnd)
+      draft.hotelName.trim().toUpperCase()
   );
 }
 
 function buildPrismaDraftAgreementMatchers(
   draft: Pick<
     PrismaHotelAgreementDraftRecord,
-    "id" | "agreementNumber" | "city" | "hotelName" | "stayStart" | "stayEnd"
+    "id" | "agreementNumber" | "city" | "hotelName"
   >,
 ): Prisma.VisaHotelAgreementWhereInput[] {
   return [
@@ -184,10 +180,74 @@ function buildPrismaDraftAgreementMatchers(
       agreementNumber: draft.agreementNumber,
       city: draft.city,
       hotelName: draft.hotelName,
-      stayStart: draft.stayStart,
-      stayEnd: draft.stayEnd,
     },
   ];
+}
+
+function getStayNights(startIso: string, endIso: string): string[] {
+  const nights: string[] = [];
+  const startMs = Date.parse(startIso);
+  const endMs = Date.parse(endIso);
+  if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+    return [];
+  }
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  for (let currentMs = startMs; currentMs < endMs; currentMs += oneDayMs) {
+    nights.push(new Date(currentMs).toISOString().slice(0, 10));
+  }
+  return nights;
+}
+
+function calculateAllocatedStayDates(
+  group: { arrivalDate: Date | string | null | undefined; returnDate: Date | string | null | undefined },
+  draft: { stayStart: Date | string; stayEnd: Date | string },
+  existingAgreements: Array<{ stayStart: Date | string; stayEnd: Date | string }>
+): { stayStart: string; stayEnd: string } {
+  const groupStart = group.arrivalDate ? toIsoDateOnly(group.arrivalDate) : "";
+  const groupEnd = group.returnDate ? toIsoDateOnly(group.returnDate) : "";
+  const draftStart = toIsoDateOnly(draft.stayStart);
+  const draftEnd = toIsoDateOnly(draft.stayEnd);
+
+  if (!isIsoDateOnly(groupStart) || !isIsoDateOnly(groupEnd)) {
+    return { stayStart: draftStart, stayEnd: draftEnd };
+  }
+
+  const groupNights = getStayNights(groupStart, groupEnd);
+  const draftNights = getStayNights(draftStart, draftEnd);
+
+  const coveredNights = new Set<string>();
+  for (const agreement of existingAgreements) {
+    const aggStart = toIsoDateOnly(agreement.stayStart);
+    const aggEnd = toIsoDateOnly(agreement.stayEnd);
+    if (isIsoDateOnly(aggStart) && isIsoDateOnly(aggEnd)) {
+      const aggNights = getStayNights(aggStart, aggEnd);
+      for (const night of aggNights) {
+        coveredNights.add(night);
+      }
+    }
+  }
+
+  const overlappingNights = groupNights.filter(
+    (night) => !coveredNights.has(night) && draftNights.includes(night)
+  );
+
+  if (overlappingNights.length === 0) {
+    const intersection = groupNights.filter((night) => draftNights.includes(night));
+    if (intersection.length > 0) {
+      const sorted = intersection.sort();
+      const lastNight = sorted[sorted.length - 1];
+      const nextDay = new Date(Date.parse(lastNight) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      return { stayStart: sorted[0], stayEnd: nextDay };
+    }
+    return { stayStart: draftStart, stayEnd: draftEnd };
+  }
+
+  const sortedNights = overlappingNights.sort();
+  const stayStart = sortedNights[0];
+  const lastNight = sortedNights[sortedNights.length - 1];
+  const stayEnd = new Date(Date.parse(lastNight) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  return { stayStart, stayEnd };
 }
 
 @Injectable()
@@ -223,11 +283,27 @@ export class HotelAgreementDraftsService {
       },
     });
 
-    const totalAssignedPax = assignedAgreements.reduce((sum, h) => sum + h.pax, 0);
-    const remainingPax = Math.max(0, draft.pax - totalAssignedPax);
+    const draftNights = getStayNights(toIsoDateOnly(draft.stayStart), toIsoDateOnly(draft.stayEnd));
+    let maxOccupied = 0;
+    for (const night of draftNights) {
+      const occupiedOnNight = assignedAgreements
+        .filter((a) => {
+          const aStart = toIsoDateOnly(a.stayStart);
+          const aEnd = toIsoDateOnly(a.stayEnd);
+          return night >= aStart && night < aEnd;
+        })
+        .reduce((sum, a) => sum + a.pax, 0);
+      if (occupiedOnNight > maxOccupied) {
+        maxOccupied = occupiedOnNight;
+      }
+    }
+
+    const remainingPax = Math.max(0, draft.pax - maxOccupied);
     const assignedGroups = assignedAgreements.map((a) => ({
       groupCode: a.visaSetup.group?.code ?? "",
       pax: a.pax,
+      stayStart: toIsoDateOnly(a.stayStart),
+      stayEnd: toIsoDateOnly(a.stayEnd),
     })).filter((g) => g.groupCode !== "");
 
     return { remainingPax, assignedGroups };
@@ -237,8 +313,7 @@ export class HotelAgreementDraftsService {
     draft: Pick<MemoryHotelAgreementDraft, "agreementNumber" | "city" | "pax" | "hotelName" | "stayStart" | "stayEnd" | "id">
   ) {
     const groups = (await this.groupsService.findAll()) as GroupWithVisaHotelAgreements[];
-    let totalAssignedPax = 0;
-    const assignedGroups: Array<{ groupCode: string; pax: number }> = [];
+    const assignedAgreements: Array<{ groupCode: string; pax: number; stayStart: string; stayEnd: string }> = [];
 
     for (const g of groups) {
       const code = (g as any).code;
@@ -247,13 +322,35 @@ export class HotelAgreementDraftsService {
       for (const h of agreements) {
         if (doesHotelSnapshotMatchDraftIgnoringPax(h, draft)) {
           const pax = readNumber(h.pax) ?? 0;
-          totalAssignedPax += pax;
-          assignedGroups.push({ groupCode: code, pax });
+          assignedAgreements.push({
+            groupCode: code,
+            pax,
+            stayStart: toIsoDateOnly(readText(h.stayStart)),
+            stayEnd: toIsoDateOnly(readText(h.stayEnd)),
+          });
         }
       }
     }
 
-    const remainingPax = Math.max(0, draft.pax - totalAssignedPax);
+    const draftNights = getStayNights(toIsoDateOnly(draft.stayStart), toIsoDateOnly(draft.stayEnd));
+    let maxOccupied = 0;
+    for (const night of draftNights) {
+      const occupiedOnNight = assignedAgreements
+        .filter((a) => night >= a.stayStart && night < a.stayEnd)
+        .reduce((sum, a) => sum + a.pax, 0);
+      if (occupiedOnNight > maxOccupied) {
+        maxOccupied = occupiedOnNight;
+      }
+    }
+
+    const remainingPax = Math.max(0, draft.pax - maxOccupied);
+    const assignedGroups = assignedAgreements.map((a) => ({
+      groupCode: a.groupCode,
+      pax: a.pax,
+      stayStart: a.stayStart,
+      stayEnd: a.stayEnd,
+    }));
+
     return { remainingPax, assignedGroups };
   }
 
@@ -472,21 +569,6 @@ export class HotelAgreementDraftsService {
         );
       }
 
-      // Calculate already assigned pax
-      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
-        where: {
-          OR: buildPrismaDraftAgreementMatchers(draft),
-        },
-      });
-      const totalAssignedPax = assignedAgreements.reduce((sum, h) => sum + h.pax, 0);
-      const remainingCapacity = draft.pax - totalAssignedPax;
-
-      if (remainingCapacity <= 0) {
-        throw new ConflictException(
-          `Hotel agreement draft '${draftId}' is already fully assigned (capacity: ${draft.pax} pax).`,
-        );
-      }
-
       const targetGroup = await this.prisma.group.findFirst({
         where: {
           OR: [{ id: normalizedGroupCode }, { code: normalizedGroupCode }],
@@ -495,11 +577,61 @@ export class HotelAgreementDraftsService {
           id: true,
           code: true,
           pax: true,
+          arrivalDate: true,
+          returnDate: true,
+          visaSetup: {
+            select: {
+              hotelAgreements: {
+                select: {
+                  id: true,
+                  city: true,
+                  stayStart: true,
+                  stayEnd: true,
+                },
+              },
+            },
+          },
         },
       });
       if (!targetGroup) {
         throw new NotFoundException(
           `Group '${normalizedGroupCode}' not found.`,
+        );
+      }
+
+      const customStart = payload.stayStart ? toIsoDateOnly(payload.stayStart) : undefined;
+      const customEnd = payload.stayEnd ? toIsoDateOnly(payload.stayEnd) : undefined;
+
+      const existingAgreements = targetGroup.visaSetup?.hotelAgreements ?? [];
+      const allocatedStay = (customStart && customEnd)
+        ? { stayStart: customStart, stayEnd: customEnd }
+        : calculateAllocatedStayDates(targetGroup, draft, existingAgreements);
+
+      const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
+        where: {
+          OR: buildPrismaDraftAgreementMatchers(draft),
+        },
+      });
+
+      const allocatedNights = getStayNights(allocatedStay.stayStart, allocatedStay.stayEnd);
+      let minRemaining = draft.pax;
+      for (const night of allocatedNights) {
+        const occupiedOnNight = assignedAgreements
+          .filter((a) => {
+            const aStart = toIsoDateOnly(a.stayStart);
+            const aEnd = toIsoDateOnly(a.stayEnd);
+            return night >= aStart && night < aEnd;
+          })
+          .reduce((sum, a) => sum + a.pax, 0);
+        const remainingOnNight = Math.max(0, draft.pax - occupiedOnNight);
+        if (remainingOnNight < minRemaining) {
+          minRemaining = remainingOnNight;
+        }
+      }
+
+      if (minRemaining <= 0) {
+        throw new ConflictException(
+          `Hotel agreement draft '${draftId}' is already fully assigned (capacity: ${draft.pax} pax) or has no remaining capacity for the required period (${allocatedStay.stayStart} s/d ${allocatedStay.stayEnd}).`,
         );
       }
 
@@ -518,19 +650,19 @@ export class HotelAgreementDraftsService {
         );
       }
 
-      const paxToAssign = Math.min(targetGroup.pax, remainingCapacity);
+      const paxToAssign = Math.min(targetGroup.pax, minRemaining);
 
       const groupHotelPayload = {
         ...this.toGroupHotelPayload(draft, draft.id),
         pax: paxToAssign,
+        stayStart: allocatedStay.stayStart,
+        stayEnd: allocatedStay.stayEnd,
       };
 
       await this.groupsService.addVisaHotelAgreement(
         targetGroup.code,
         groupHotelPayload,
       );
-
-      const nextRemaining = remainingCapacity - paxToAssign;
 
       const assigned = await this.prisma.hotelAgreementDraft.findUnique({
         where: { id: draft.id }
@@ -540,8 +672,8 @@ export class HotelAgreementDraftsService {
         throw new NotFoundException(`Draft not found after assignment.`);
       }
 
-      const { assignedGroups } = await this.getPrismaDraftRemainingAndGroups(assigned);
-      return this.mapPrismaDraft(assigned, nextRemaining, assignedGroups);
+      const { remainingPax: updatedRemainingPax, assignedGroups } = await this.getPrismaDraftRemainingAndGroups(assigned);
+      return this.mapPrismaDraft(assigned, updatedRemainingPax, assignedGroups);
     }
 
     const draft = this.resolveMemoryDraft(draftId);
@@ -561,31 +693,61 @@ export class HotelAgreementDraftsService {
       );
     }
 
-    // Calculate already assigned pax in memory
-    const groups = (await this.groupsService.findAll()) as GroupWithVisaHotelAgreements[];
-    let totalAssignedPax = 0;
-    for (const g of groups) {
-      const agreements = g.visaSetup?.hotelAgreements ?? [];
-      for (const h of agreements) {
-        if (doesHotelSnapshotMatchDraftIgnoringPax(h, draft)) {
-          totalAssignedPax += readNumber(h.pax) ?? 0;
-        }
-      }
-    }
-    const remainingCapacity = draft.pax - totalAssignedPax;
-
-    if (remainingCapacity <= 0) {
-      throw new ConflictException(
-        `Hotel agreement draft '${draftId}' is already fully assigned (capacity: ${draft.pax} pax).`,
-      );
-    }
-
     const targetGroup = (await this.groupsService.findOneByIdOrCode(
       normalizedGroupCode,
-    )) as { id: string; code: string; pax: number; visaSetup?: { hotelAgreements?: GroupHotelAgreementSnapshot[] } } | null;
+    )) as { id: string; code: string; pax: number; arrivalDate?: string; returnDate?: string; visaSetup?: { hotelAgreements?: GroupHotelAgreementSnapshot[] } } | null;
     if (!targetGroup) {
       throw new NotFoundException(
         `Group '${normalizedGroupCode}' not found.`,
+      );
+    }
+
+    const customStart = payload.stayStart ? toIsoDateOnly(payload.stayStart) : undefined;
+    const customEnd = payload.stayEnd ? toIsoDateOnly(payload.stayEnd) : undefined;
+
+    const existingAgreements = targetGroup.visaSetup?.hotelAgreements ?? [];
+    const allocatedStay = (customStart && customEnd)
+      ? { stayStart: customStart, stayEnd: customEnd }
+      : calculateAllocatedStayDates(
+          { arrivalDate: targetGroup.arrivalDate, returnDate: targetGroup.returnDate },
+          draft,
+          existingAgreements.map((a: any) => ({ stayStart: readText(a.stayStart), stayEnd: readText(a.stayEnd) }))
+        );
+
+    const groups = (await this.groupsService.findAll()) as GroupWithVisaHotelAgreements[];
+    const assignedAgreements: Array<{ groupCode: string; pax: number; stayStart: string; stayEnd: string }> = [];
+    for (const g of groups) {
+      const code = (g as any).code;
+      if (!code) continue;
+      const agreements = g.visaSetup?.hotelAgreements ?? [];
+      for (const h of agreements) {
+        if (doesHotelSnapshotMatchDraftIgnoringPax(h, draft)) {
+          const pax = readNumber(h.pax) ?? 0;
+          assignedAgreements.push({
+            groupCode: code,
+            pax,
+            stayStart: toIsoDateOnly(readText(h.stayStart)),
+            stayEnd: toIsoDateOnly(readText(h.stayEnd)),
+          });
+        }
+      }
+    }
+
+    const allocatedNights = getStayNights(allocatedStay.stayStart, allocatedStay.stayEnd);
+    let minRemaining = draft.pax;
+    for (const night of allocatedNights) {
+      const occupiedOnNight = assignedAgreements
+        .filter((a) => night >= a.stayStart && night < a.stayEnd)
+        .reduce((sum, a) => sum + a.pax, 0);
+      const remainingOnNight = Math.max(0, draft.pax - occupiedOnNight);
+      if (remainingOnNight < minRemaining) {
+        minRemaining = remainingOnNight;
+      }
+    }
+
+    if (minRemaining <= 0) {
+      throw new ConflictException(
+        `Hotel agreement draft '${draftId}' is already fully assigned (capacity: ${draft.pax} pax) or has no remaining capacity for the required period (${allocatedStay.stayStart} s/d ${allocatedStay.stayEnd}).`,
       );
     }
 
@@ -600,11 +762,13 @@ export class HotelAgreementDraftsService {
       );
     }
 
-    const paxToAssign = Math.min(targetGroup.pax, remainingCapacity);
+    const paxToAssign = Math.min(targetGroup.pax, minRemaining);
 
     const groupHotelPayload = {
       ...this.toGroupHotelPayload(draft, draft.id),
       pax: paxToAssign,
+      stayStart: allocatedStay.stayStart,
+      stayEnd: allocatedStay.stayEnd,
     };
 
     await this.groupsService.addVisaHotelAgreement(
@@ -612,11 +776,10 @@ export class HotelAgreementDraftsService {
       groupHotelPayload,
     );
 
-    const nextRemaining = remainingCapacity - paxToAssign;
     draft.updatedAt = new Date().toISOString();
 
-    const { assignedGroups } = await this.getMemoryDraftRemainingAndGroups(draft);
-    return this.mapMemoryDraft(draft, nextRemaining, assignedGroups);
+    const { remainingPax: updatedRemainingPax, assignedGroups } = await this.getMemoryDraftRemainingAndGroups(draft);
+    return this.mapMemoryDraft(draft, updatedRemainingPax, assignedGroups);
   }
 
   async unassign(draftId: string, groupCode?: string): Promise<unknown> {
@@ -959,15 +1122,28 @@ export class HotelAgreementDraftsService {
           (a.agreementNumber.trim().toUpperCase() ===
             draft.agreementNumber.trim().toUpperCase() &&
             a.city === draft.city &&
-            a.hotelName.trim().toUpperCase() === draft.hotelName.trim().toUpperCase() &&
-            toIsoDateOnly(a.stayStart) === toIsoDateOnly(draft.stayStart) &&
-            toIsoDateOnly(a.stayEnd) === toIsoDateOnly(draft.stayEnd)),
+            a.hotelName.trim().toUpperCase() === draft.hotelName.trim().toUpperCase()),
       );
-      const totalAssignedPax = matchingAgreements.reduce((sum, h) => sum + h.pax, 0);
-      const remainingPax = Math.max(0, draft.pax - totalAssignedPax);
+      const draftNights = getStayNights(toIsoDateOnly(draft.stayStart), toIsoDateOnly(draft.stayEnd));
+      let maxOccupied = 0;
+      for (const night of draftNights) {
+        const occupiedOnNight = matchingAgreements
+          .filter((a) => {
+            const aStart = toIsoDateOnly(a.stayStart);
+            const aEnd = toIsoDateOnly(a.stayEnd);
+            return night >= aStart && night < aEnd;
+          })
+          .reduce((sum, a) => sum + a.pax, 0);
+        if (occupiedOnNight > maxOccupied) {
+          maxOccupied = occupiedOnNight;
+        }
+      }
+      const remainingPax = Math.max(0, draft.pax - maxOccupied);
       const assignedGroups = matchingAgreements.map((a) => ({
         groupCode: a.visaSetup.group?.code ?? "",
         pax: a.pax,
+        stayStart: toIsoDateOnly(a.stayStart),
+        stayEnd: toIsoDateOnly(a.stayEnd),
       })).filter((g) => g.groupCode !== "");
 
       return this.mapPrismaDraft(draft, remainingPax, assignedGroups);

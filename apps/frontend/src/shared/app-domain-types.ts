@@ -272,7 +272,7 @@ export type HotelAgreementDraft = {
   agreementNumber: string;
   pax: number;
   remainingPax?: number;
-  assignedGroups?: Array<{ groupCode: string; pax: number }>;
+  assignedGroups?: Array<{ groupCode: string; pax: number; stayStartIso?: string; stayEndIso?: string }>;
   status: AgreementApprovalStatus;
   stayStartIso: string;
   stayEndIso: string;

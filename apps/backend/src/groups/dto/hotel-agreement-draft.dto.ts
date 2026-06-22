@@ -66,6 +66,16 @@ export class AssignHotelAgreementDraftDto {
   @IsString()
   @IsNotEmpty()
   groupCode!: string;
+
+  @ApiPropertyOptional({ example: "2026-06-10" })
+  @IsOptional()
+  @IsDateString()
+  stayStart?: string;
+
+  @ApiPropertyOptional({ example: "2026-06-15" })
+  @IsOptional()
+  @IsDateString()
+  stayEnd?: string;
 }
 
 export class HotelAgreementDraftResponseDto {

@@ -76,6 +76,8 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
       ? record.assignedGroups.map((g) => ({
           groupCode: readString(g.groupCode),
           pax: Math.max(0, readNumber(g.pax, 0)),
+          stayStartIso: toIsoDate(g.stayStart ?? g.stayStartIso),
+          stayEndIso: toIsoDate(g.stayEnd ?? g.stayEndIso),
         }))
       : [],
     status: mapBackendAgreementStatus(record.status),
@@ -181,9 +183,13 @@ export async function deleteAgreementDraftInBackend(draftId: string): Promise<vo
 export async function assignAgreementDraftInBackend({
   draftId,
   groupCode,
+  stayStartIso,
+  stayEndIso,
 }: {
   draftId: string;
   groupCode: string;
+  stayStartIso?: string;
+  stayEndIso?: string;
 }): Promise<HotelAgreementDraft> {
   const { response, payload, responseText } = await fetchBackendParsed(
     `/visa/agreement-drafts/${encodeURIComponent(draftId)}/assign`,
@@ -194,6 +200,8 @@ export async function assignAgreementDraftInBackend({
       },
       body: JSON.stringify({
         groupCode: groupCode.trim().toUpperCase(),
+        stayStart: stayStartIso ? stayStartIso.trim() : undefined,
+        stayEnd: stayEndIso ? stayEndIso.trim() : undefined,
       }),
     },
   );
