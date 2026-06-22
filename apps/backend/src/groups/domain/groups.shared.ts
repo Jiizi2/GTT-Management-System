@@ -1,32 +1,26 @@
 import { BadRequestException } from "@nestjs/common";
 import { ChecklistAssignmentStatus } from "@prisma/client";
 import type { ChecklistAssignmentSyncResult } from "../groups.service-types";
+import {
+  toIsoDateOnly,
+  parseIsoDateOnly as pureParseIsoDateOnly,
+  toUtcMidnightDate,
+} from "../../utils/date-helpers";
 
-export function toIsoDateOnly(value: Date): string {
-  return value.toISOString().slice(0, 10);
+export { toIsoDateOnly, toUtcMidnightDate };
+
+export function parseIsoDateOnly(value: string): string {
+  try {
+    return pureParseIsoDateOnly(value);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new BadRequestException(message);
+  }
 }
 
 export function toShortDateLabel(value: Date): string {
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${value.getUTCDate()} ${monthNames[value.getUTCMonth()]}`;
-}
-
-export function parseIsoDateOnly(value: string): string {
-  const trimmed = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  const parsedDate = new Date(trimmed);
-  if (Number.isNaN(parsedDate.getTime())) {
-    throw new BadRequestException(`Invalid ISO date value '${value}'.`);
-  }
-
-  return parsedDate.toISOString().slice(0, 10);
-}
-
-export function toUtcMidnightDate(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00.000Z`);
 }
 
 export function validateTravelDateRangeOrThrow(arrivalDateIso: string, returnDateIso: string): void {

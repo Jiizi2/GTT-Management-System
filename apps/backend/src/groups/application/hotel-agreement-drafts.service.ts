@@ -16,6 +16,7 @@ import type {
 } from "../dto/hotel-agreement-draft.dto";
 import type { UpsertGroupVisaHotelDto } from "../dto/group-operations.dto";
 import { GroupsService } from "./groups.service";
+import { toIsoDateOnly, toUtcMidnightDate } from "../../utils/date-helpers";
 
 type DraftStatusFilter = "assigned" | "unassigned";
 
@@ -80,14 +81,6 @@ type GroupWithVisaHotelAgreements = {
   };
 };
 
-function toIsoDateOnly(value: Date | string): string {
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-
-  return value.trim().slice(0, 10);
-}
-
 function toIsoDateTime(
   value: Date | string | null | undefined,
 ): string | undefined {
@@ -109,10 +102,6 @@ function normalizeStatusFilter(
   return normalizedStatus === "assigned" || normalizedStatus === "unassigned"
     ? normalizedStatus
     : undefined;
-}
-
-function toUtcMidnightDate(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00.000Z`);
 }
 
 function readText(value: unknown): string {

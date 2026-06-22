@@ -50,6 +50,7 @@ export const defaultIssuingOfficeOptions: SelectOption[] = [
 
 export const defaultInvoiceStatusOptions: InvoiceStatusOption[] = [
   { value: "Pending", label: "Pending" },
+  { value: "Partially Paid", label: "Partially Paid" },
   { value: "Paid", label: "Paid" },
   { value: "Overdue", label: "Overdue" },
   { value: "Cancelled", label: "Cancelled" },
@@ -133,6 +134,12 @@ export function getStatusClasses(status: InvoiceStatus, isDarkMode: boolean): st
       : "border-emerald-200 bg-emerald-100 text-emerald-800";
   }
 
+  if (status === "Partially Paid") {
+    return isDarkMode
+      ? "border-sky-500/35 bg-sky-500/16 text-sky-400"
+      : "border-sky-200 bg-sky-100 text-sky-800";
+  }
+
   if (status === "Pending") {
     return isDarkMode
       ? "border-secondary/35 bg-secondary/16 text-secondary"
@@ -151,6 +158,10 @@ export function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean
     return isDarkMode ? "bg-primary/18 text-primary" : "bg-emerald-100 text-emerald-700";
   }
 
+  if (status === "Partially Paid") {
+    return isDarkMode ? "bg-sky-500/18 text-sky-400" : "bg-sky-100 text-sky-700";
+  }
+
   if (status === "Pending") {
     return isDarkMode ? "bg-secondary/18 text-secondary" : "bg-amber-100 text-amber-700";
   }
@@ -158,13 +169,17 @@ export function getAvatarToneByStatus(status: InvoiceStatus, isDarkMode: boolean
   return isDarkMode ? "bg-tertiary/18 text-tertiary" : "bg-rose-100 text-rose-700";
 }
 
-export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "pending" | "overdue" | "cancelled" {
+export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled" {
   if (status === "Cancelled") {
     return "cancelled";
   }
 
   if (status === "Paid") {
     return "paid";
+  }
+
+  if (status === "Partially Paid") {
+    return "partially-paid";
   }
 
   if (status === "Pending") {
@@ -175,7 +190,7 @@ export function getStatusValue(status: InvoiceStatus): "all" | "paid" | "pending
 }
 
 export function getInvoiceStatusDisplayLabel(status: InvoiceStatus): string {
-  return status === "Paid" ? "Paid / Lunas" : status;
+  return status === "Paid" ? "Paid / Lunas" : status === "Partially Paid" ? "Partially Paid / DP" : status;
 }
 
 export function resolveDateRangeLabel(rows: InvoiceRow[]): string {
@@ -204,7 +219,7 @@ export function mapMasterDataToSelectOptions(
 export function mapMasterDataToInvoiceStatusOptions(
   options: Array<{ value: string; label: string; isActive: boolean }>,
 ): InvoiceStatusOption[] {
-  const allowedStatuses = new Set<InvoiceStatus>(["Pending", "Paid", "Overdue", "Cancelled"]);
+  const allowedStatuses = new Set<InvoiceStatus>(["Pending", "Partially Paid", "Paid", "Overdue", "Cancelled"]);
   return mapMasterDataToSelectOptions(options)
     .filter((option): option is { value: InvoiceStatus; label: string } =>
       allowedStatuses.has(option.value as InvoiceStatus),
@@ -306,10 +321,7 @@ export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number, re
   return Math.max(0, Math.round(downPaymentIdr)) > 0 ? "Sisa Tagihan" : "Tagihan";
 }
 
-export function openInvoiceExportWindow(): Window | null {
-  const isCompactViewport = typeof window !== "undefined" && window.innerWidth < 768;
-  return isCompactViewport ? window.open("", "_blank") : window.open("", "_blank", "width=1180,height=860");
-}
+// openInvoiceExportWindow removed because popups are no longer used for printing
 
 export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
   const items: Array<BackendInvoiceItem & { id: string }> = Array.isArray(row.items)
@@ -340,14 +352,33 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
   };
 }
 
+export function resolveExchangeRatesFromItems(
+  items: Array<{ currency: string; totalPrice: number; totalPriceIdr: number }>,
+  fallbackUsd = 15_845,
+  fallbackSar = 4_225,
+): { usdToIdr: number; sarToIdr: number } {
+  let usdToIdr = fallbackUsd;
+  let sarToIdr = fallbackSar;
+
+  const usdItem = items.find((item) => item.currency === "USD" && item.totalPrice > 0);
+  if (usdItem) {
+    usdToIdr = usdItem.totalPriceIdr / usdItem.totalPrice;
+  }
+
+  const sarItem = items.find((item) => item.currency === "SAR" && item.totalPrice > 0);
+  if (sarItem) {
+    sarToIdr = sarItem.totalPriceIdr / sarItem.totalPrice;
+  }
+
+  return { usdToIdr, sarToIdr };
+}
+
 export async function viewInvoicePdfFromRow({
   row,
   groups,
-  printWindow,
 }: {
   row: InvoiceRow;
   groups: GroupData[];
-  printWindow?: Window | null;
 }): Promise<boolean> {
   const linkedGroup = row.groupCode
     ? (groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null)
@@ -370,6 +401,7 @@ export async function viewInvoicePdfFromRow({
         ];
   const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
   const { exportInvoicePdf } = await import("./invoice-export");
+  const rates = resolveExchangeRatesFromItems(printableItems, 15_845, 4_225);
 
   return await exportInvoicePdf(
     {
@@ -383,15 +415,14 @@ export async function viewInvoicePdfFromRow({
       address: row.clientLabel,
       bankAccountLabel: resolveBankAccountLabel("bsi"),
       notes: row.groupCode ? `Linked group: ${row.groupCode}` : "",
-      usdToIdr: 15_845,
-      sarToIdr: 4_225,
+      usdToIdr: rates.usdToIdr,
+      sarToIdr: rates.sarToIdr,
       subtotalIdr: row.amount,
       taxIdr: 0,
       totalPayableIdr: row.amount,
       downPaymentIdr,
       remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
       items: printableItems,
-    },
-    { printWindow },
+    }
   );
 }

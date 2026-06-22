@@ -62,6 +62,7 @@ enum ChecklistAssignmentStatus {
 
 enum InvoiceStatus {
   PAID
+  PARTIALLY_PAID
   PENDING
   OVERDUE
   CANCELLED

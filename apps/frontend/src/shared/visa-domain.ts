@@ -1,4 +1,5 @@
 import type { GroupAgreementHotel, GroupData, VisaTrackingRow } from "./app-domain.js";
+import type { HotelAgreementDraft } from "./app-domain-types.js";
 
 function formatLocalIsoDate(date: Date): string {
   const year = date.getFullYear();
@@ -78,7 +79,8 @@ export function buildVisaAgreementNumber(groupCode: string, city: "makkah" | "ma
     .slice(-6)
     .padStart(6, "0");
   const citySuffix = city === "makkah" ? "65865716" : "77824519";
-  return `2026${digits}${citySuffix}`;
+  const yearPrefix = new Date().getFullYear().toString();
+  return `${yearPrefix}${digits}${citySuffix}`;
 }
 
 export function isIsoDateValue(value: string): boolean {
@@ -365,4 +367,64 @@ export function generateWhatsappCopyText(
 
   return lines.join("\n");
 }
+
+export function filterAgreementDrafts(
+  drafts: HotelAgreementDraft[],
+  params: {
+    groupArrivalDate?: string;
+    groupReturnDate?: string;
+    rowDepartureIso?: string;
+    rowReturnIso?: string;
+    totalPax: number;
+    connectedAgreementKeys: Set<string>;
+  },
+): { makkah: HotelAgreementDraft[]; madinah: HotelAgreementDraft[] } {
+  const availableDrafts: Record<"makkah" | "madinah", HotelAgreementDraft[]> = {
+    makkah: [],
+    madinah: [],
+  };
+
+  const groupArrival = (params.groupArrivalDate ?? "").trim() || (params.rowDepartureIso ?? "").trim();
+  const groupReturn = (params.groupReturnDate ?? "").trim() || (params.rowReturnIso ?? "").trim();
+
+  for (const draft of drafts) {
+    if (draft.assignmentStatus === "Assigned") {
+      continue;
+    }
+
+    const draftKey = `${draft.city}:${draft.agreementNumber.trim().toUpperCase()}`;
+    if (params.connectedAgreementKeys.has(draftKey)) {
+      continue;
+    }
+
+    // 1. Group Travel Period Filtering (Option A: Fully Contained)
+    if (isIsoDateValue(groupArrival) && isIsoDateValue(groupReturn)) {
+      const draftStart = (draft.stayStartIso ?? "").trim();
+      const draftEnd = (draft.stayEndIso ?? "").trim();
+      if (isIsoDateValue(draftStart) && isIsoDateValue(draftEnd)) {
+        if (draftStart < groupArrival || draftEnd > groupReturn) {
+          continue;
+        }
+      }
+    }
+
+    // 2. Pax Sufficiency Filtering
+    const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+    if (availablePax < params.totalPax) {
+      continue;
+    }
+
+    availableDrafts[draft.city].push(draft);
+  }
+
+  return {
+    makkah: availableDrafts.makkah.sort((left, right) =>
+      `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
+    ),
+    madinah: availableDrafts.madinah.sort((left, right) =>
+      `${left.stayStartIso}-${left.hotelName}`.localeCompare(`${right.stayStartIso}-${right.hotelName}`),
+    ),
+  };
+}
+
 

@@ -12,7 +12,9 @@ import {
   resolveVisaAgreementNumber,
   resolveVisaProvider,
   shiftIsoDate,
+  filterAgreementDrafts,
 } from "./visa-domain.js";
+
 
 import {
   getStatusByTone,
@@ -207,6 +209,7 @@ export {
   resolveVisaAgreementNumber,
   resolveVisaProvider,
   shiftIsoDate,
+  filterAgreementDrafts,
 };
 export {
   buildItineraryItemFromEditForm,

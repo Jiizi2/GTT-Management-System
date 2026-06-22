@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe } from "vitest";
-import type { GroupAgreementHotel, GroupData, VisaTrackingRow } from "../shared/app-domain.js";
+import type { GroupAgreementHotel, GroupData, VisaTrackingRow, HotelAgreementDraft } from "../shared/app-domain.js";
 import {
   buildVisaAgreementNumber,
   formatVisaDateWithYear,
@@ -15,6 +15,7 @@ import {
   resolveVisaAgreementNumber,
   resolveVisaProvider,
   shiftIsoDate,
+  filterAgreementDrafts,
 } from "../shared/visa-domain.js";
 import { runCase } from "../test/run-case.js";
 
@@ -118,8 +119,9 @@ function testShiftAndDateFormatters(): void {
 }
 
 function testAgreementNumberIsoValidationAndCityHotelSelection(): void {
-  assert.equal(buildVisaAgreementNumber("AB-123", "makkah"), "202600012365865716");
-  assert.equal(buildVisaAgreementNumber("9017001001", "madinah"), "202600100177824519");
+  const currentYear = new Date().getFullYear().toString();
+  assert.equal(buildVisaAgreementNumber("AB-123", "makkah"), `${currentYear}00012365865716`);
+  assert.equal(buildVisaAgreementNumber("9017001001", "madinah"), `${currentYear}00100177824519`);
 
   assert.equal(isIsoDateValue("2026-04-10"), true);
   assert.equal(isIsoDateValue("2026-4-10"), false);
@@ -356,6 +358,104 @@ function testGenerateWhatsappCopyText(): void {
   assert.equal(emptyText.includes("🏨 *BRN MADINAH*\n*[HOTEL MADINAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
 }
 
+function testFilterAgreementDrafts(): void {
+  const drafts: HotelAgreementDraft[] = [
+    {
+      id: "d1",
+      city: "makkah",
+      agentName: "Agent A",
+      hotelName: "Swissotel",
+      agreementNumber: "AG-1",
+      pax: 50,
+      remainingPax: 50,
+      status: "Approved",
+      stayStartIso: "2026-06-24",
+      stayEndIso: "2026-07-02",
+      notes: "",
+      assignmentStatus: "Unassigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    },
+    {
+      id: "d2",
+      city: "makkah",
+      agentName: "Agent B",
+      hotelName: "Hilton",
+      agreementNumber: "AG-2",
+      pax: 50,
+      remainingPax: 30, // capacity too low for 45 pax
+      status: "Approved",
+      stayStartIso: "2026-06-24",
+      stayEndIso: "2026-07-02",
+      notes: "",
+      assignmentStatus: "Partially Assigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    },
+    {
+      id: "d3",
+      city: "makkah",
+      agentName: "Agent C",
+      hotelName: "Fairmont",
+      agreementNumber: "AG-3",
+      pax: 50,
+      remainingPax: 50,
+      status: "Approved",
+      stayStartIso: "2026-06-20", // starts too early
+      stayEndIso: "2026-07-02",
+      notes: "",
+      assignmentStatus: "Unassigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    },
+    {
+      id: "d4",
+      city: "makkah",
+      agentName: "Agent D",
+      hotelName: "Pullman",
+      agreementNumber: "AG-4",
+      pax: 50,
+      remainingPax: 50,
+      status: "Approved",
+      stayStartIso: "2026-06-24",
+      stayEndIso: "2026-07-05", // ends too late
+      notes: "",
+      assignmentStatus: "Unassigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    },
+    {
+      id: "d5",
+      city: "madinah",
+      agentName: "Agent E",
+      hotelName: "Oberoi",
+      agreementNumber: "AG-5",
+      pax: 50,
+      remainingPax: 50,
+      status: "Approved",
+      stayStartIso: "2026-06-25", // fits perfectly inside 2026-06-24 to 2026-07-02
+      stayEndIso: "2026-07-01",
+      notes: "",
+      assignmentStatus: "Unassigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    },
+  ];
+
+  const result = filterAgreementDrafts(drafts, {
+    groupArrivalDate: "2026-06-24",
+    groupReturnDate: "2026-07-02",
+    totalPax: 45,
+    connectedAgreementKeys: new Set(),
+  });
+
+  assert.equal(result.makkah.length, 1);
+  assert.equal(result.makkah[0].id, "d1");
+
+  assert.equal(result.madinah.length, 1);
+  assert.equal(result.madinah[0].id, "d5");
+}
+
 describe("visa-domain", () => {
   runCase("shift and formatter behavior", testShiftAndDateFormatters);
   runCase("agreement number and city helpers", testAgreementNumberIsoValidationAndCityHotelSelection);
@@ -365,4 +465,6 @@ describe("visa-domain", () => {
   );
   runCase("provider and action requirement helpers", testProviderAndActionRequirementHelpers);
   runCase("generate whatsapp copy text template", testGenerateWhatsappCopyText);
+  runCase("filter agreement drafts in Add Hotel modal", testFilterAgreementDrafts);
 });
+

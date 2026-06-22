@@ -24,7 +24,6 @@ import {
   mapMasterDataToInvoiceStatusOptions,
   mapMasterDataToSelectOptions,
   mergeInvoiceClientsWithMasterData,
-  openInvoiceExportWindow,
   resolveDateRangeLabel,
   shiftMonthKey,
   viewInvoicePdfFromRow,
@@ -87,7 +86,7 @@ export function InvoiceScreen({
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending" | "overdue" | "cancelled">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled">("all");
   const [dueMonthFilter, setDueMonthFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
@@ -196,18 +195,19 @@ export function InvoiceScreen({
   const rangeStart = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
   const rangeEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, pageStartIndex + paginatedRows.length);
 
-  const totalRevenue = filteredRows.reduce((total, row) => total + row.amount, 0);
+  const totalRevenue = filteredRows.filter((row) => row.status !== "Cancelled").reduce((total, row) => total + row.amount, 0);
   const paidCount = filteredRows.filter((row) => row.status === "Paid").length;
+  const partiallyPaidCount = filteredRows.filter((row) => row.status === "Partially Paid").length;
   const pendingCount = filteredRows.filter((row) => row.status === "Pending").length;
   const overdueCount = filteredRows.filter((row) => row.status === "Overdue").length;
   const cancelledCount = filteredRows.filter((row) => row.status === "Cancelled").length;
   const currentMonthKey = Domain.formatLocalIsoDate(new Date()).slice(0, 7);
   const previousMonthKey = shiftMonthKey(currentMonthKey, -1);
   const currentMonthRevenue = invoiceRows
-    .filter((row) => row.monthKey === currentMonthKey)
+    .filter((row) => row.monthKey === currentMonthKey && row.status !== "Cancelled")
     .reduce((total, row) => total + row.amount, 0);
   const previousMonthRevenue = invoiceRows
-    .filter((row) => row.monthKey === previousMonthKey)
+    .filter((row) => row.monthKey === previousMonthKey && row.status !== "Cancelled")
     .reduce((total, row) => total + row.amount, 0);
   const monthlyGrowth =
     previousMonthRevenue > 0
@@ -229,27 +229,21 @@ export function InvoiceScreen({
   const overdueSummaryBadgeClassName = isDarkMode
     ? "inline-flex items-center gap-1 rounded-lg border border-tertiary/35 bg-tertiary/16 px-3 py-1 text-xs font-bold leading-none text-tertiary"
     : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
+  const partiallyPaidSummaryBadgeClassName = isDarkMode
+    ? "inline-flex items-center gap-1 rounded-lg border border-sky-500/35 bg-sky-500/16 px-3 py-1 text-xs font-bold leading-none text-sky-400"
+    : "inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold leading-none text-sky-700";
 
   const handleViewPdf = (row: InvoiceRow) => {
-    const printableWindow = openInvoiceExportWindow();
-    if (!printableWindow) {
-      setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
-      return;
-    }
-
-    void viewInvoicePdfFromRow({ row, groups, printWindow: printableWindow })
+    setActionFeedback("Menyiapkan PDF...");
+    void viewInvoicePdfFromRow({ row, groups })
       .then((exported) => {
-        if (!exported) {
-          if (!printableWindow.closed) {
-            printableWindow.close();
-          }
-          setActionFeedback("Popup PDF diblokir browser. Izinkan pop-up lalu coba lagi.");
+        if (exported) {
+          setActionFeedback("");
+        } else {
+          setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
         }
       })
       .catch(() => {
-        if (!printableWindow.closed) {
-          printableWindow.close();
-        }
         setActionFeedback("Gagal menyiapkan PDF invoice. Coba lagi.");
       });
   };
@@ -494,11 +488,12 @@ export function InvoiceScreen({
                 className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium text-on-surface-variant"
                 value={statusFilter}
                 onChange={(event) =>
-                  setStatusFilter(event.target.value as "all" | "paid" | "pending" | "overdue" | "cancelled")
+                  setStatusFilter(event.target.value as "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled")
                 }
               >
                 <option value="all">All Statuses</option>
                 <option value="paid">Paid</option>
+                <option value="partially-paid">Partially Paid</option>
                 <option value="pending">Pending</option>
                 <option value="overdue">Overdue</option>
                 <option value="cancelled">Cancelled</option>
@@ -530,6 +525,12 @@ export function InvoiceScreen({
                 task_alt
               </span>
               <span>Paid {paidCount}</span>
+            </span>
+            <span className={partiallyPaidSummaryBadgeClassName}>
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                payments
+              </span>
+              <span>Partially Paid {partiallyPaidCount}</span>
             </span>
             <span className={pendingSummaryBadgeClassName}>
               <span className="material-symbols-outlined text-sm" aria-hidden="true">

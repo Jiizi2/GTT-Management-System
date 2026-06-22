@@ -172,7 +172,7 @@ async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<voi
     });
     assert.equal(createdCancelled.clientLabel, "05. Another Manual Client");
     assert.equal(createdCancelled.status, "Cancelled");
-    assert.equal(createdCancelled.amount, 0);
+    assert.equal(createdCancelled.amount, 999_999);
 
     const clients = await service.listClients();
     assert.equal(clients.length, 5);
@@ -343,7 +343,7 @@ async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void
       notes: "Cancelled by operator",
     });
     assert.equal(cancelled.status, "Cancelled");
-    assert.equal(cancelled.amount, 0);
+    assert.equal(cancelled.amount, 2_500_000);
     assert.equal(cancelled.groupCode, "GRP-001");
 
     const switched = await service.update(created.id, {
@@ -456,6 +456,7 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
       ],
     },
     invoice: {
+      updateMany: async () => ({ count: 0 }),
       findMany: async () => [
         {
           id: "inv-1",
@@ -514,12 +515,12 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
 
     const invoices = await service.findAll();
     assert.equal(invoices.length, 2);
-    assert.equal(invoices[0].status, "Pending");
+    assert.equal(invoices[0].status, "Partially Paid");
     assert.equal(invoices[0].clientInitials, "AC");
     assert.equal(invoices[0].items?.length, 1);
     assert.equal(invoices[0].downPaymentIdr, 50_000);
     assert.equal(invoices[1].status, "Cancelled");
-    assert.equal(invoices[1].amount, 0);
+    assert.equal(invoices[1].amount, 900_000);
     assert.equal(invoices[1].items, undefined);
   } finally {
     restore();
@@ -573,6 +574,7 @@ async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> 
       findMany: async () => [],
     },
     invoice: {
+      updateMany: async () => ({ count: 0 }),
       findMany: async () => [
         {
           id: "inv-inline",

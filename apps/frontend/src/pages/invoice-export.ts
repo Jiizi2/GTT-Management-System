@@ -1,4 +1,4 @@
-﻿import { escapeHtml } from "../shared/app-domain";
+import { escapeHtml } from "../shared/app-domain";
 
 export type InvoiceExportCurrency = "IDR" | "USD" | "SAR";
 
@@ -183,15 +183,7 @@ function resolveBillToName(payload: InvoiceExportPayload): string {
   return cleanedName || withoutNumericLabel || normalizedClientName;
 }
 
-function resolvePrintableWindow(options: InvoiceExportWindowOptions): Window | null {
-  const reusableWindow = options.printWindow;
-  if (reusableWindow && !reusableWindow.closed) {
-    return reusableWindow;
-  }
-
-  const isCompactViewport = window.innerWidth < 768;
-  return isCompactViewport ? window.open("", "_blank") : window.open("", "_blank", "width=1180,height=860");
-}
+// resolvePrintableWindow removed because export now uses hidden iframe printing
 
 function waitForTimeout(timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -314,16 +306,20 @@ function waitForImages(printableWindow: Window): Promise<void> {
   ).then(() => undefined);
 }
 
-async function finalizePrintWindow(printableWindow: Window): Promise<void> {
+async function finalizePrintWindow(printableWindow: Window, iframe: HTMLIFrameElement): Promise<void> {
   let printTriggered = false;
   const triggerPrint = () => {
-    if (printTriggered || printableWindow.closed) {
+    if (printTriggered) {
       return;
     }
 
     printTriggered = true;
-    printableWindow.focus();
-    printableWindow.print();
+    try {
+      printableWindow.focus();
+      printableWindow.print();
+    } catch (e) {
+      console.error("Print triggered an error:", e);
+    }
   };
 
   const waitForResources = Promise.allSettled([
@@ -335,26 +331,37 @@ async function finalizePrintWindow(printableWindow: Window): Promise<void> {
 
   await Promise.race([waitForResources, waitForTimeout(PRINT_FALLBACK_TIMEOUT_MS)]);
 
-  if (printableWindow.closed) {
-    return;
-  }
-
-  window.setTimeout(triggerPrint, PRINT_TRIGGER_DELAY_MS);
+  window.setTimeout(() => {
+    triggerPrint();
+    // Schedule clean up of the print iframe after user completes/cancels print dialog
+    window.setTimeout(() => {
+      try {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      } catch {
+        // ignore
+      }
+    }, 15000);
+  }, PRINT_TRIGGER_DELAY_MS);
 }
 
 export async function exportInvoicePdf(
   payload: InvoiceExportPayload,
-  options: InvoiceExportWindowOptions = {},
+  _options: InvoiceExportWindowOptions = {},
 ): Promise<boolean> {
-  const printableWindow = resolvePrintableWindow(options);
+  const iframe = window.document.createElement("iframe");
+  iframe.name = `invoice_print_${Date.now()}`;
+  iframe.style.position = "absolute";
+  iframe.style.width = "0px";
+  iframe.style.height = "0px";
+  iframe.style.border = "none";
+  iframe.style.visibility = "hidden";
+  window.document.body.appendChild(iframe);
+
+  const printableWindow = iframe.contentWindow;
   if (!printableWindow) {
     return false;
-  }
-
-  try {
-    printableWindow.opener = null;
-  } catch {
-    // Some browsers expose a restricted window handle when opener is unavailable.
   }
 
   const logoUrl = new URL("/logo-ghaniya-travel-polos.png", window.location.origin).toString();
@@ -368,6 +375,18 @@ export async function exportInvoicePdf(
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
   const billToName = resolveBillToName(payload);
+
+  let stampHtml = "";
+  const normalizedStatus = statusLabel.trim().toLowerCase();
+  if (isPaidInvoice || normalizedStatus.includes("paid") || normalizedStatus.includes("lunas")) {
+    stampHtml = '<div class="invoice-stamp stamp-lunas mb-5"><span>LUNAS</span></div>';
+  } else if (normalizedStatus.includes("partially") || normalizedStatus.includes("dp")) {
+    stampHtml = '<div class="invoice-stamp stamp-dp mb-5"><span>PARTIAL / DP</span></div>';
+  } else if (normalizedStatus.includes("cancelled") || normalizedStatus.includes("batal")) {
+    stampHtml = '<div class="invoice-stamp stamp-batal mb-5"><span>BATAL</span></div>';
+  } else if (normalizedStatus.includes("overdue") || normalizedStatus.includes("tempo")) {
+    stampHtml = '<div class="invoice-stamp stamp-overdue mb-5"><span>JATUH TEMPO</span></div>';
+  }
 
   const rowsHtml = payload.items
     .map((item, index) => {
@@ -446,52 +465,86 @@ export async function exportInvoicePdf(
             image-rendering: high-quality;
         }
         .print-container {
-            width: 210mm;
-            min-width: 210mm;
+            width: 100%;
             max-width: 210mm;
-            height: 297mm;
             min-height: 297mm;
-            max-height: 297mm;
-            margin: 0;
+            margin: 0 auto;
             padding: 0;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
             position: relative;
             background: #ffffff;
-            page-break-after: avoid;
-            break-after: avoid;
+            overflow: visible;
         }
-        .invoice-paid-stamp {
+        .invoice-stamp {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             position: relative;
             min-width: 36mm;
             min-height: 14mm;
-            border: 2.5px solid #047857;
-            background: rgba(236, 253, 245, 0.5);
-            color: #047857 !important;
             border-radius: 7px;
             padding: 3mm 5mm;
-            font-size: 1.75rem;
+            font-size: 1.5rem;
             font-weight: 900;
             line-height: 1;
             text-transform: uppercase;
             transform: rotate(-6deg);
-            box-shadow: inset 0 0 0 3px rgba(4, 120, 87, 0.16), 0 4px 10px rgba(4, 120, 87, 0.12);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
         }
-        .invoice-paid-stamp::before {
+        .invoice-stamp::before {
             content: "";
             position: absolute;
             inset: 3px;
-            border: 1px solid rgba(4, 120, 87, 0.7);
             border-radius: 4px;
         }
-        .invoice-paid-stamp span {
-            position: relative;
-            z-index: 1;
+        .stamp-lunas {
+            border: 2.5px solid #047857;
+            background: rgba(236, 253, 245, 0.6);
             color: #047857 !important;
+            box-shadow: inset 0 0 0 3px rgba(4, 120, 87, 0.16);
+        }
+        .stamp-lunas::before {
+            border: 1px solid rgba(4, 120, 87, 0.7);
+        }
+        .stamp-lunas span {
+            color: #047857 !important;
+        }
+        .stamp-dp {
+            border: 2.5px solid #0284c7;
+            background: rgba(240, 249, 255, 0.6);
+            color: #0284c7 !important;
+            box-shadow: inset 0 0 0 3px rgba(2, 132, 199, 0.16);
+        }
+        .stamp-dp::before {
+            border: 1px solid rgba(2, 132, 199, 0.7);
+        }
+        .stamp-dp span {
+            color: #0284c7 !important;
+        }
+        .stamp-batal {
+            border: 2.5px solid #e11d48;
+            background: rgba(255, 241, 242, 0.6);
+            color: #e11d48 !important;
+            box-shadow: inset 0 0 0 3px rgba(225, 29, 72, 0.16);
+        }
+        .stamp-batal::before {
+            border: 1px solid rgba(225, 29, 72, 0.7);
+        }
+        .stamp-batal span {
+            color: #e11d48 !important;
+        }
+        .stamp-overdue {
+            border: 2.5px solid #ea580c;
+            background: rgba(255, 247, 237, 0.6);
+            color: #ea580c !important;
+            box-shadow: inset 0 0 0 3px rgba(234, 88, 12, 0.16);
+        }
+        .stamp-overdue::before {
+            border: 1px solid rgba(234, 88, 12, 0.7);
+        }
+        .stamp-overdue span {
+            color: #ea580c !important;
         }
         .invoice-paid-total {
             border-color: #059669 !important;
@@ -553,6 +606,8 @@ export async function exportInvoicePdf(
                 padding: 0 !important;
                 overflow: visible !important;
                 box-shadow: none !important;
+                display: flex !important;
+                flex-direction: column !important;
             }
             header {
                 background-color: var(--invoice-black) !important;
@@ -574,17 +629,53 @@ export async function exportInvoicePdf(
                 border-top: 2px solid var(--invoice-gold) !important;
                 box-shadow: none !important;
             }
-            .invoice-paid-stamp,
-            .invoice-paid-total {
-                border-color: #059669 !important;
-                background: #ecfdf5 !important;
+            .invoice-stamp {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .stamp-lunas {
+                border-color: #047857 !important;
+                background-color: rgba(236, 253, 245, 0.6) !important;
                 color: #047857 !important;
             }
-            .invoice-paid-stamp::before {
+            .stamp-lunas::before {
                 border-color: rgba(4, 120, 87, 0.7) !important;
             }
-            .invoice-paid-stamp * {
+            .stamp-lunas span {
                 color: #047857 !important;
+            }
+            .stamp-dp {
+                border-color: #0284c7 !important;
+                background-color: rgba(240, 249, 255, 0.6) !important;
+                color: #0284c7 !important;
+            }
+            .stamp-dp::before {
+                border-color: rgba(2, 132, 199, 0.7) !important;
+            }
+            .stamp-dp span {
+                color: #0284c7 !important;
+            }
+            .stamp-batal {
+                border-color: #e11d48 !important;
+                background-color: rgba(255, 241, 242, 0.6) !important;
+                color: #e11d48 !important;
+            }
+            .stamp-batal::before {
+                border-color: rgba(225, 29, 72, 0.7) !important;
+            }
+            .stamp-batal span {
+                color: #e11d48 !important;
+            }
+            .stamp-overdue {
+                border-color: #ea580c !important;
+                background-color: rgba(255, 247, 237, 0.6) !important;
+                color: #ea580c !important;
+            }
+            .stamp-overdue::before {
+                border-color: rgba(234, 88, 12, 0.7) !important;
+            }
+            .stamp-overdue span {
+                color: #ea580c !important;
             }
             .invoice-total-due-label {
                 color: var(--invoice-gold) !important;
@@ -803,7 +894,7 @@ export async function exportInvoicePdf(
 <section class="invoice-block invoice-overview-block px-10 py-6 grid grid-cols-12 gap-5 items-start">
 <div class="col-span-7">
 <h1 class="invoice-main-title font-headline text-5xl font-extrabold text-luxury-black tracking-tighter mb-4">INVOICE</h1>
-${isPaidInvoice ? '<div class="invoice-paid-stamp mb-5"><span>LUNAS</span></div>' : ""}
+${stampHtml}
 <div class="space-y-1">
 <h2 class="invoice-bill-to-name text-lg font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
 </div>
@@ -924,18 +1015,23 @@ ${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 t
   printableWindow.document.write(printableHtml);
   printableWindow.document.close();
 
-  void finalizePrintWindow(printableWindow).catch(() => {
-    if (printableWindow.closed) {
-      return;
-    }
-
+  void finalizePrintWindow(printableWindow, iframe).catch(() => {
     window.setTimeout(() => {
-      if (printableWindow.closed) {
-        return;
+      try {
+        printableWindow.focus();
+        printableWindow.print();
+      } catch {
+        // ignore
       }
-
-      printableWindow.focus();
-      printableWindow.print();
+      window.setTimeout(() => {
+        try {
+          if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+          }
+        } catch {
+          // ignore
+        }
+      }, 15000);
     }, PRINT_TRIGGER_DELAY_MS);
   });
 

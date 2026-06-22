@@ -515,7 +515,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
     const scheduleDate = formatChecklistCopyDate(checklistItem.tripDate);
     const scheduleTime = formatScheduleTime(checklistItem.scheduledTime || "");
-    const tripLabel = checklistItem.activity?.trim() || "-";
+    const isTransfer = checklistItem.activity?.trim().toLowerCase().startsWith("transfer");
+    const tripLabel = isTransfer && checklistItem.trip
+      ? checklistItem.trip
+      : checklistItem.activity?.trim() || "-";
     const scheduleDetails = checklistItem.transferByTrain
       ? `${scheduleDate} | TRAIN ${formatScheduleTime(checklistItem.trainDepartureTime)} | STATION PICKUP ${formatScheduleTime(checklistItem.stationPickupTime)}`
       : checklistItem.hotelPickupRequestTime
@@ -571,7 +574,10 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
     const scheduleDate = formatChecklistCopyDate(checklistItem.tripDate);
     const scheduleTime = formatScheduleTime(checklistItem.scheduledTime || "");
-    const tripLabel = checklistItem.activity?.trim() || "-";
+    const isTransfer = checklistItem.activity?.trim().toLowerCase().startsWith("transfer");
+    const tripLabel = isTransfer && checklistItem.trip
+      ? checklistItem.trip
+      : checklistItem.activity?.trim() || "-";
     const scheduleDetails = checklistItem.transferByTrain
       ? `${scheduleDate} | TRAIN ${formatScheduleTime(checklistItem.trainDepartureTime)} | STATION PICKUP ${formatScheduleTime(checklistItem.stationPickupTime)}`
       : checklistItem.hotelPickupRequestTime

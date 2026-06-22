@@ -1,4 +1,4 @@
-export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled";
+export type BackendInvoiceStatus = "Paid" | "Pending" | "Overdue" | "Cancelled" | "Partially Paid";
 export type BackendDataSource = "memory" | "prisma";
 
 import { fetchBackendParsed } from "../shared/api-client";
