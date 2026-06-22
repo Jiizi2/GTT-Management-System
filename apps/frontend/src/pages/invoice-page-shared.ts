@@ -3,14 +3,18 @@ import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from
 
 export type InvoiceStatus = BackendInvoiceRow["status"];
 export type InvoiceRow = BackendInvoiceRow;
-export type InvoiceClientOption = BackendInvoiceClient;
+export type InvoiceClientOption = BackendInvoiceClient & {
+  metadata?: Record<string, any>;
+};
 
 const MASTER_DATA_INVOICE_CLIENT_ID_PREFIX = "__invoice_client_master_data__:";
 
 export type SelectOption = {
   value: string;
   label: string;
+  metadata?: Record<string, any>;
 };
+
 
 export type InvoiceStatusOption = {
   value: InvoiceStatus;
@@ -30,6 +34,8 @@ export type InvoiceWorkspaceInitialData = {
   amount: number;
   downPaymentIdr: number;
   status: InvoiceStatus;
+  recipientName?: string;
+  notes?: string;
   items: Array<
     BackendInvoiceItem & {
       id: string;
@@ -205,13 +211,14 @@ export function resolveDateRangeLabel(rows: InvoiceRow[]): string {
 }
 
 export function mapMasterDataToSelectOptions(
-  options: Array<{ value: string; label: string; isActive: boolean }>,
+  options: Array<{ value: string; label: string; isActive: boolean; metadata?: any }>,
 ): SelectOption[] {
   return options
     .filter((option) => option.isActive)
     .map((option) => ({
       value: option.value.trim(),
       label: option.label.trim() || option.value.trim(),
+      metadata: option.metadata,
     }))
     .filter((option) => option.value.length > 0);
 }
@@ -244,7 +251,7 @@ export function mapMasterDataToClientSuggestions(options: Array<{ label: string;
 
 export function mergeInvoiceClientsWithMasterData(
   clients: ReadonlyArray<InvoiceClientOption>,
-  options: ReadonlyArray<{ value: string; label: string; sortOrder: number; isActive: boolean }>,
+  options: ReadonlyArray<{ value: string; label: string; sortOrder: number; isActive: boolean; metadata?: Record<string, any> }>,
 ): InvoiceClientOption[] {
   const normalizedNames = new Set(clients.map((client) => normalizeClientName(client.name)));
   const backendClients = [...clients].sort((left, right) => {
@@ -286,6 +293,7 @@ export function mergeInvoiceClientsWithMasterData(
       name: option.label,
       sortOrder: backendClients.length + index + 1,
       label: option.label,
+      metadata: option.metadata,
     }));
 
   return [...backendClients, ...masterDataOnlyClients];
@@ -348,6 +356,8 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     amount: Math.max(0, Math.round(row.amount)),
     downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
     status: row.status,
+    recipientName: row.recipientName ?? "",
+    notes: row.notes ?? "",
     items,
   };
 }
@@ -357,8 +367,8 @@ export function resolveExchangeRatesFromItems(
   fallbackUsd = 15_845,
   fallbackSar = 4_225,
 ): { usdToIdr: number; sarToIdr: number } {
-  let usdToIdr = fallbackUsd;
-  let sarToIdr = fallbackSar;
+  let usdToIdr = 0;
+  let sarToIdr = 0;
 
   const usdItem = items.find((item) => item.currency === "USD" && item.totalPrice > 0);
   if (usdItem) {
@@ -370,7 +380,118 @@ export function resolveExchangeRatesFromItems(
     sarToIdr = sarItem.totalPriceIdr / sarItem.totalPrice;
   }
 
+  if (usdToIdr > 0 && sarToIdr === 0) {
+    sarToIdr = usdToIdr / 3.75;
+  } else if (sarToIdr > 0 && usdToIdr === 0) {
+    usdToIdr = sarToIdr * 3.75;
+  }
+
+  if (usdToIdr === 0) usdToIdr = fallbackUsd;
+  if (sarToIdr === 0) sarToIdr = fallbackSar;
+
+  return {
+    usdToIdr: Math.round(usdToIdr),
+    sarToIdr: Math.round(sarToIdr),
+  };
+}
+
+export function resolveExchangeRatesFromRow(row: Pick<InvoiceRow, "notes" | "items">): { usdToIdr: number; sarToIdr: number } {
+  const notesRaw = row.notes ?? "";
+  let usdToIdr = 0;
+  let sarToIdr = 0;
+
+  const ratesMatch = notesRaw.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/);
+  if (ratesMatch) {
+    usdToIdr = Number.parseInt(ratesMatch[1], 10);
+    sarToIdr = Number.parseInt(ratesMatch[2], 10);
+  }
+
+  if (usdToIdr <= 0 || sarToIdr <= 0) {
+    const items = row.items || [];
+    const itemRates = resolveExchangeRatesFromItems(items);
+    if (usdToIdr <= 0) usdToIdr = itemRates.usdToIdr;
+    if (sarToIdr <= 0) sarToIdr = itemRates.sarToIdr;
+  }
+
   return { usdToIdr, sarToIdr };
+}
+
+export function formatCurrencyLabel(value: number, currency: string): string {
+  if (currency === "IDR") {
+    return formatIdr(value);
+  }
+  const rounded = Math.max(0, Math.round(value));
+  return `${currency} ${new Intl.NumberFormat("en-US").format(rounded)}`;
+}
+
+export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
+  currency: string;
+  subtotal: number;
+  downPayment: number;
+  remainingBalance: number;
+  usdToIdr: number;
+  sarToIdr: number;
+} {
+  const notesRaw = row.notes ?? "";
+  let keepValasCurrency: "IDR" | "USD" | "SAR" = "IDR";
+  if (notesRaw.includes("[KeepValasTotal:USD]")) keepValasCurrency = "USD";
+  else if (notesRaw.includes("[KeepValasTotal:SAR]")) keepValasCurrency = "SAR";
+  else if (notesRaw.includes("[KeepValasTotal]")) {
+    const valas = row.items?.find((item) => item.currency !== "IDR")?.currency;
+    keepValasCurrency = valas || "IDR";
+  }
+
+  const rates = resolveExchangeRatesFromRow(row);
+  const amountIdr = Math.max(0, Math.round(row.amount));
+  const dpIdr = resolveInvoiceDownPaymentIdr(row);
+
+  if (keepValasCurrency === "IDR") {
+    return {
+      currency: "IDR",
+      subtotal: amountIdr,
+      downPayment: dpIdr,
+      remainingBalance: resolveInvoiceRemainingBalanceIdr(amountIdr, dpIdr),
+      usdToIdr: rates.usdToIdr,
+      sarToIdr: rates.sarToIdr,
+    };
+  }
+
+  const rate = keepValasCurrency === "USD" ? rates.usdToIdr : rates.sarToIdr;
+  if (rate <= 0) {
+    return {
+      currency: "IDR",
+      subtotal: amountIdr,
+      downPayment: dpIdr,
+      remainingBalance: resolveInvoiceRemainingBalanceIdr(amountIdr, dpIdr),
+      usdToIdr: rates.usdToIdr,
+      sarToIdr: rates.sarToIdr,
+    };
+  }
+
+  const items = row.items || [];
+  let targetSubtotal = 0;
+  if (items.length > 0) {
+    targetSubtotal = items.reduce((sum, item) => {
+      if (item.currency === keepValasCurrency) {
+        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
+      }
+      return sum + Math.max(0, Math.ceil(item.totalPriceIdr / rate));
+    }, 0);
+  } else {
+    targetSubtotal = Math.ceil(amountIdr / rate);
+  }
+
+  const targetDp = Math.ceil(dpIdr / rate);
+  const targetRemaining = Math.max(0, targetSubtotal - targetDp);
+
+  return {
+    currency: keepValasCurrency,
+    subtotal: targetSubtotal,
+    downPayment: targetDp,
+    remainingBalance: targetRemaining,
+    usdToIdr: rates.usdToIdr,
+    sarToIdr: rates.sarToIdr,
+  };
 }
 
 export async function viewInvoicePdfFromRow({
@@ -399,9 +520,8 @@ export async function viewInvoicePdfFromRow({
             totalPriceIdr: row.amount,
           },
         ];
-  const downPaymentIdr = resolveInvoiceDownPaymentIdr(row);
+  const totals = resolveInvoiceDisplayTotals(row);
   const { exportInvoicePdf } = await import("./invoice-export");
-  const rates = resolveExchangeRatesFromItems(printableItems, 15_845, 4_225);
 
   return await exportInvoicePdf(
     {
@@ -413,15 +533,17 @@ export async function viewInvoicePdfFromRow({
       clientName: row.clientName,
       clientCode: row.groupCode ?? row.clientLabel,
       address: row.clientLabel,
+      recipientName: row.recipientName,
       bankAccountLabel: resolveBankAccountLabel("bsi"),
-      notes: row.groupCode ? `Linked group: ${row.groupCode}` : "",
-      usdToIdr: rates.usdToIdr,
-      sarToIdr: rates.sarToIdr,
-      subtotalIdr: row.amount,
-      taxIdr: 0,
-      totalPayableIdr: row.amount,
-      downPaymentIdr,
-      remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(row.amount, downPaymentIdr),
+      notes: row.notes ?? "",
+      usdToIdr: totals.usdToIdr,
+      sarToIdr: totals.sarToIdr,
+      currency: totals.currency as any,
+      subtotal: totals.subtotal,
+      tax: 0,
+      totalPayable: totals.subtotal,
+      downPayment: totals.downPayment,
+      remainingBalance: totals.remainingBalance,
       items: printableItems,
     }
   );

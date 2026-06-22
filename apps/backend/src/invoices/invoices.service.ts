@@ -56,6 +56,8 @@ type InvoiceListItem = {
   downPaymentIdr: number;
   status: InvoiceStatusLabel;
   monthKey: string;
+  recipientName?: string;
+  notes?: string;
   items?: InvoiceLineItem[];
 };
 
@@ -79,6 +81,7 @@ type MemoryInvoice = {
   downPaymentIdr: number;
   status: InvoiceStatus;
   notes?: string;
+  recipientName?: string;
   items?: InvoiceLineItem[];
 };
 
@@ -97,6 +100,7 @@ const invoiceSummarySelect = {
   status: true,
   notes: true,
   items: true,
+  recipientName: true,
   client: {
     select: {
       name: true,
@@ -434,6 +438,8 @@ export class InvoicesService implements OnModuleInit {
   private readonly memoryInvoices: MemoryInvoice[] = [];
   private prismaInvoiceDownPaymentColumnState: boolean | null = null;
   private prismaInvoiceDownPaymentColumnInitPromise: Promise<boolean> | null = null;
+  private prismaInvoiceRecipientNameColumnState: boolean | null = null;
+  private prismaInvoiceRecipientNameColumnInitPromise: Promise<boolean> | null = null;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -448,6 +454,7 @@ export class InvoicesService implements OnModuleInit {
     }
 
     await this.ensurePrismaInvoiceDownPaymentColumn();
+    await this.ensurePrismaInvoiceRecipientNameColumn();
   }
 
   async listClients(): Promise<InvoiceClientListItem[]> {
@@ -692,6 +699,7 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: normalizeDownPaymentByAmount(roundedAmount, payload.downPaymentIdr ?? 0),
       status: effectiveStatus,
       notes: getTrimmedString(payload.notes) || undefined,
+      recipientName: getTrimmedString(payload.recipientName) || undefined,
       items: normalizedItems.length > 0 ? normalizedItems : undefined,
     };
 
@@ -777,6 +785,8 @@ export class InvoicesService implements OnModuleInit {
 
     const nextNotes =
       payload.notes !== undefined ? payload.notes.trim() || undefined : currentInvoice.notes;
+    const nextRecipientName =
+      payload.recipientName !== undefined ? payload.recipientName.trim() || undefined : currentInvoice.recipientName;
 
     const updatedInvoice: MemoryInvoice = {
       ...currentInvoice,
@@ -789,6 +799,7 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: nextDownPaymentIdr,
       status: effectiveStatus,
       notes: nextNotes,
+      recipientName: nextRecipientName,
       items: normalizedItems !== undefined ? (normalizedItems.length > 0 ? normalizedItems : undefined) : currentInvoice.items,
     };
 
@@ -823,6 +834,8 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, invoice.downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(invoice.dueDateIso),
+      recipientName: invoice.recipientName,
+      notes: invoice.notes,
       items: invoice.items?.length ? invoice.items : undefined,
     };
   }
@@ -917,6 +930,76 @@ export class InvoicesService implements OnModuleInit {
       return available;
     } finally {
       this.prismaInvoiceDownPaymentColumnInitPromise = null;
+    }
+  }
+
+  private async ensurePrismaInvoiceRecipientNameColumn(): Promise<boolean> {
+    if (this.dataSource !== "prisma") {
+      return false;
+    }
+
+    if (this.prismaInvoiceRecipientNameColumnState !== null) {
+      return this.prismaInvoiceRecipientNameColumnState;
+    }
+
+    if (this.prismaInvoiceRecipientNameColumnInitPromise) {
+      return this.prismaInvoiceRecipientNameColumnInitPromise;
+    }
+
+    if (typeof this.prisma.$queryRaw !== "function" || typeof this.prisma.$executeRaw !== "function") {
+      this.prismaInvoiceRecipientNameColumnState = false;
+      return false;
+    }
+
+    this.prismaInvoiceRecipientNameColumnInitPromise = (async () => {
+      try {
+        const existingRows = await this.prisma.$queryRaw<Array<{ exists: number }>>`
+          SELECT 1 AS "exists"
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'Invoice'
+            AND column_name = 'recipientName'
+          LIMIT 1
+        `;
+
+        if (existingRows.length > 0) {
+          return true;
+        }
+
+        await this.prisma.$executeRaw`
+          ALTER TABLE "Invoice"
+          ADD COLUMN IF NOT EXISTS "recipientName" TEXT
+        `;
+
+        const verifiedRows = await this.prisma.$queryRaw<Array<{ exists: number }>>`
+          SELECT 1 AS "exists"
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'Invoice'
+            AND column_name = 'recipientName'
+          LIMIT 1
+        `;
+
+        return verifiedRows.length > 0;
+      } catch (error: unknown) {
+        this.logger.warn(
+          {
+            action: "invoice.recipient-name-column.ensure-failed",
+            dataSource: this.dataSource,
+            error,
+          },
+          "Invoice recipient name column is not ready yet.",
+        );
+        return false;
+      }
+    })();
+
+    try {
+      const available = await this.prismaInvoiceRecipientNameColumnInitPromise;
+      this.prismaInvoiceRecipientNameColumnState = available;
+      return available;
+    } finally {
+      this.prismaInvoiceRecipientNameColumnInitPromise = null;
     }
   }
 
@@ -1017,6 +1100,7 @@ export class InvoicesService implements OnModuleInit {
               amount: roundedAmount,
               status: effectiveStatus,
               notes: getTrimmedString(payload.notes) || null,
+              recipientName: getTrimmedString(payload.recipientName) || null,
               items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
             },
             select: invoiceSummarySelect,
@@ -1075,6 +1159,7 @@ export class InvoicesService implements OnModuleInit {
         status: true,
         notes: true,
         items: true,
+        recipientName: true,
       },
     });
 
@@ -1180,6 +1265,7 @@ export class InvoicesService implements OnModuleInit {
           amount: roundedAmount,
           status: effectiveStatus,
           notes: payload.notes !== undefined ? payload.notes.trim() || null : existingInvoice.notes,
+          recipientName: payload.recipientName !== undefined ? payload.recipientName.trim() || null : existingInvoice.recipientName,
           ...(payload.items !== undefined
             ? {
                 items:
@@ -1304,6 +1390,8 @@ export class InvoicesService implements OnModuleInit {
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
+      recipientName: invoice.recipientName ?? undefined,
+      notes: invoice.notes ?? undefined,
       items,
     };
   }

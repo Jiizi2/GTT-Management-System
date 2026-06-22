@@ -27,6 +27,8 @@ import {
   resolveDateRangeLabel,
   shiftMonthKey,
   viewInvoicePdfFromRow,
+  resolveInvoiceDisplayTotals,
+  formatCurrencyLabel,
   type InvoiceClientOption,
   type InvoiceRow,
   type InvoiceWorkspaceInitialData,
@@ -62,19 +64,7 @@ function InvoiceWorkspaceFallback() {
   );
 }
 
-function createFollowUpInvoiceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
-  const initialData = createInvoiceWorkspaceInitialData(row);
 
-  return {
-    ...initialData,
-    id: `follow-up-${row.id}`,
-    sourceInvoiceNumber: row.invoiceNumber,
-    issuedDateIso: Domain.getLocalIsoDateWithOffset(0),
-    dueDateIso: Domain.getLocalIsoDateWithOffset(7),
-    downPaymentIdr: 0,
-    status: "Pending",
-  };
-}
 
 export function InvoiceScreen({
   groups,
@@ -259,20 +249,6 @@ export function InvoiceScreen({
     setWorkspaceMode("edit");
   };
 
-  const handleCreateFollowUpInvoice = (row: InvoiceRow) => {
-    if (!isInvoiceBackendAvailable) {
-      setActionFeedback("Backend invoice/database belum terhubung. Invoice lanjutan dinonaktifkan.");
-      return;
-    }
-
-    if (row.status !== "Paid") {
-      return;
-    }
-
-    setEditingInvoice(null);
-    setDraftSourceInvoice(createFollowUpInvoiceInitialData(row));
-    setWorkspaceMode("create");
-  };
 
   useEffect(() => {
     if (!actionFeedback) {
@@ -332,9 +308,7 @@ export function InvoiceScreen({
             setActionFeedback(
               action === "draft"
                 ? `Draft invoice ${invoice.invoiceNumber} saved to database.`
-                : draftSourceInvoice?.sourceInvoiceNumber
-                  ? `Invoice lanjutan ${invoice.invoiceNumber} dibuat dari ${draftSourceInvoice.sourceInvoiceNumber}.`
-                  : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
+                : `Invoice ${invoice.invoiceNumber} generated and saved to database.`,
             );
             setQuery("");
             setStatusFilter("all");
@@ -647,7 +621,21 @@ export function InvoiceScreen({
                     <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">
                       Amount
                     </p>
-                    <p className="mt-1 font-extrabold text-on-surface">{formatIdr(row.amount)}</p>
+                    {(() => {
+                      const displayTotals = resolveInvoiceDisplayTotals(row);
+                      return (
+                        <>
+                          <p className="mt-1 font-extrabold text-on-surface">
+                            {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
+                          </p>
+                          {displayTotals.downPayment > 0 && (
+                            <p className="text-[9px] text-on-surface-variant font-semibold mt-0.5">
+                              Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -681,24 +669,7 @@ export function InvoiceScreen({
                       picture_as_pdf
                     </span>
                   </button>
-                  {row.status === "Paid" ? (
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`Create follow-up invoice for ${row.invoiceNumber}`}
-                      onClick={() => handleCreateFollowUpInvoice(row)}
-                      disabled={!isInvoiceBackendAvailable}
-                      title={
-                        isInvoiceBackendAvailable
-                          ? "Invoice Lanjutan"
-                          : "Backend invoice/database belum terhubung, invoice lanjutan dinonaktifkan."
-                      }
-                    >
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">
-                        add_circle
-                      </span>
-                    </button>
-                  ) : null}
+
                   <button
                     type="button"
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
@@ -781,7 +752,19 @@ export function InvoiceScreen({
                       </div>
 
                       <div>
-                        <p className="font-display text-[0.95rem] font-bold text-on-surface">{formatIdr(row.amount)}</p>
+                        {(() => {
+                          const displayTotals = resolveInvoiceDisplayTotals(row);
+                          return (
+                            <>
+                              <p className="font-display text-[0.95rem] font-bold text-on-surface">{formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}</p>
+                              {displayTotals.downPayment > 0 && (
+                                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
+                                  Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       <div>
@@ -796,24 +779,7 @@ export function InvoiceScreen({
                       </div>
 
                       <div className="flex items-center justify-end gap-1">
-                        {row.status === "Paid" ? (
-                          <button
-                            type="button"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            title={
-                              isInvoiceBackendAvailable
-                                ? "Invoice Lanjutan"
-                                : "Backend invoice/database belum terhubung, invoice lanjutan dinonaktifkan."
-                            }
-                            aria-label={`Create follow-up invoice for ${row.invoiceNumber}`}
-                            onClick={() => handleCreateFollowUpInvoice(row)}
-                            disabled={!isInvoiceBackendAvailable}
-                          >
-                            <span className="material-symbols-outlined text-base" aria-hidden="true">
-                              add_circle
-                            </span>
-                          </button>
-                        ) : null}
+
                         <button
                           type="button"
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"

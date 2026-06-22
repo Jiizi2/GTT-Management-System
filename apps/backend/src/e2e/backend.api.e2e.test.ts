@@ -626,7 +626,7 @@ async function testBackendApiFlow(): Promise<void> {
       status?: string;
     };
     assert.equal(updatedInvoice.dueDateIso, updateInvoiceDueIso, `Unexpected update response: ${updateInvoiceResponse.text}`);
-    assert.equal(updatedInvoice.amount, 0, `Unexpected update response: ${updateInvoiceResponse.text}`);
+    assert.equal(updatedInvoice.amount, 15100000, `Unexpected update response: ${updateInvoiceResponse.text}`);
     assert.equal(updatedInvoice.status, "Cancelled", `Unexpected update response: ${updateInvoiceResponse.text}`);
 
     const deleteInvoiceResponse = await requestJson(
@@ -1303,7 +1303,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     });
     assert.equal(pendingInvoiceResponse.status, 201, `Create pending invoice failed: ${pendingInvoiceResponse.text}`);
     const pendingInvoice = pendingInvoiceResponse.json as InvoiceRecord;
-    assert.equal(pendingInvoice.status, "Pending");
+    assert.equal(pendingInvoice.status, "Partially Paid");
     assert.equal(pendingInvoice.downPaymentIdr, 1_500_000);
 
     const overdueInvoiceResponse = await postJson("/api/invoices", {
@@ -1348,8 +1348,8 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     );
     const cancelledInvoice = cancelledInvoiceResponse.json as InvoiceRecord;
     assert.equal(cancelledInvoice.status, "Cancelled");
-    assert.equal(cancelledInvoice.amount, 0);
-    assert.equal(cancelledInvoice.downPaymentIdr, 0);
+    assert.equal(cancelledInvoice.amount, 990_000);
+    assert.equal(cancelledInvoice.downPaymentIdr, 120_000);
 
     const invalidClientInvoiceResponse = await postJson("/api/invoices", {
       clientId: "unknown-client-id",
@@ -1372,8 +1372,8 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       status: "CANCELLED",
     });
     assert.equal(cancelledUpdateResponse.status, 200, `Update cancelled invoice failed: ${cancelledUpdateResponse.text}`);
-    assert.equal((cancelledUpdateResponse.json as InvoiceRecord).amount, 0);
-    assert.equal((cancelledUpdateResponse.json as InvoiceRecord).downPaymentIdr, 0);
+    assert.equal((cancelledUpdateResponse.json as InvoiceRecord).amount, 123_456);
+    assert.equal((cancelledUpdateResponse.json as InvoiceRecord).downPaymentIdr, 50_000);
 
     const invoiceDeleteBlockedResponse = await requestJson(
       server.baseUrl,
@@ -1387,7 +1387,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       "Invoice list payload should be array.",
     );
     const statusSet = new Set(allInvoices.map((invoice) => invoice.status));
-    assert.equal(statusSet.has("Pending"), true);
+    assert.equal(statusSet.has("Partially Paid"), true);
     assert.equal(statusSet.has("Overdue"), true);
     assert.equal(statusSet.has("Paid"), true);
     assert.equal(statusSet.has("Cancelled"), true);

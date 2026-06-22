@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+import { Controller, type FieldErrors, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as z from "zod/v4";
@@ -30,6 +30,8 @@ import {
   resolveInvoiceDownPaymentIdr,
   resolveInvoiceOutstandingBalanceLabel,
   resolveInvoiceRemainingBalanceIdr,
+  resolveExchangeRatesFromItems,
+  resolveExchangeRatesFromRow,
 } from "./invoice-page-shared";
 
 const INVOICE_PAGE_SIZE = 8;
@@ -37,7 +39,9 @@ const MANUAL_CLIENT_OPTION_ID = "__invoice_client_other__";
 
 type InvoiceStatus = BackendInvoiceRow["status"];
 type InvoiceRow = BackendInvoiceRow;
-type InvoiceClientOption = BackendInvoiceClient;
+type InvoiceClientOption = BackendInvoiceClient & {
+  metadata?: Record<string, any>;
+};
 
 type DueMonthOption = {
   value: string;
@@ -47,6 +51,7 @@ type DueMonthOption = {
 type SelectOption = {
   value: string;
   label: string;
+  metadata?: Record<string, any>;
 };
 
 type InvoiceStatusOption = {
@@ -73,6 +78,8 @@ type InvoiceWorkspaceInitialData = {
   amount: number;
   downPaymentIdr: number;
   status: InvoiceStatus;
+  recipientName?: string;
+  notes?: string;
   items: InvoiceDraftItem[];
 };
 
@@ -115,6 +122,7 @@ const invoiceWorkspaceFormSchema = z
     manualClientName: z.string(),
     selectedGroupCode: z.string(),
     address: z.string(),
+    recipientName: z.string().optional(),
     bankAccount: z.string(),
     downPaymentIdr: z.number().min(0),
     notes: z.string(),
@@ -344,6 +352,25 @@ function calculateSubtotalIdr(args: { items: InvoiceDraftItem[]; usdToIdr: numbe
   }, 0);
 }
 
+function calculateSubtotalInCurrency(items: InvoiceDraftItem[], targetCurrency: string, usdToIdr: number, sarToIdr: number): number {
+  if (targetCurrency === "IDR") {
+    return items.reduce((sum, item) => {
+      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
+      return sum + Math.max(0, Math.round(nextTotals.totalPriceIdr));
+    }, 0);
+  } else {
+    const rate = targetCurrency === "USD" ? usdToIdr : sarToIdr;
+    if (rate <= 0) return 0;
+    return items.reduce((sum, item) => {
+      if (item.currency === targetCurrency) {
+        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
+      }
+      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
+      return sum + Math.max(0, Math.ceil(nextTotals.totalPriceIdr / rate));
+    }, 0);
+  }
+}
+
 function createEmptyDraftItems(): InvoiceDraftItem[] {
   return [
     {
@@ -465,19 +492,6 @@ function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceIni
   };
 }
 
-function createFollowUpInvoiceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
-  const initialData = createInvoiceWorkspaceInitialData(row);
-
-  return {
-    ...initialData,
-    id: `follow-up-${row.id}`,
-    sourceInvoiceNumber: row.invoiceNumber,
-    issuedDateIso: Domain.getLocalIsoDateWithOffset(0),
-    dueDateIso: Domain.getLocalIsoDateWithOffset(7),
-    downPaymentIdr: 0,
-    status: "Pending",
-  };
-}
 
 function resolveInvoiceWorkspaceValidationMessage(errors: FieldErrors<InvoiceWorkspaceFormValues>): string | null {
   const candidateMessages = [
@@ -572,7 +586,22 @@ export function CreateInvoiceWorkspace({
   const updateInvoiceMutation = useUpdateInvoiceMutation();
   const isEditMode = mode === "edit";
   const resolvedInitialInvoice = initialInvoice ?? null;
-  const sourceInvoiceNumber = !isEditMode ? resolvedInitialInvoice?.sourceInvoiceNumber : undefined;
+  const initialRates = useMemo(() => {
+    return resolveExchangeRatesFromRow(resolvedInitialInvoice || { notes: "", items: [] });
+  }, [resolvedInitialInvoice]);
+  const [usdToIdr, setUsdToIdr] = useState(() => initialRates.usdToIdr);
+  const [sarToIdr, setSarToIdr] = useState(() => initialRates.sarToIdr);
+  const [keepValasCurrency, setKeepValasCurrency] = useState<"IDR" | "USD" | "SAR">(() => {
+    const notesRaw = resolvedInitialInvoice?.notes ?? "";
+    if (notesRaw.includes("[KeepValasTotal:USD]")) return "USD";
+    if (notesRaw.includes("[KeepValasTotal:SAR]")) return "SAR";
+    if (notesRaw.includes("[KeepValasTotal]")) {
+      const valas = resolvedInitialInvoice?.items.find((item) => item.currency !== "IDR")?.currency;
+      return valas || "IDR";
+    }
+    return "IDR";
+  });
+
   const initialClientId = resolvedInitialInvoice?.clientId ?? "";
   const resolvedInitialClientName = resolvedInitialInvoice?.clientName.trim() ?? "";
   const hasResolvedInitialClient = initialClientId ? clients.some((client) => client.id === initialClientId) : false;
@@ -605,9 +634,32 @@ export function CreateInvoiceWorkspace({
       manualClientName: hasResolvedInitialManualClient ? resolvedInitialClientName : "",
       selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
       address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
+      recipientName: resolvedInitialInvoice?.recipientName ?? "",
       bankAccount: isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "",
-      downPaymentIdr: resolvedInitialInvoice?.downPaymentIdr ?? 0,
-      notes: sourceInvoiceNumber ? `Invoice lanjutan dari ${sourceInvoiceNumber}.` : "",
+      downPaymentIdr: (() => {
+        if (!resolvedInitialInvoice) return 0;
+        const notesRaw = resolvedInitialInvoice.notes ?? "";
+        let initialKeepValasCurrency: "IDR" | "USD" | "SAR" = "IDR";
+        if (notesRaw.includes("[KeepValasTotal:USD]")) initialKeepValasCurrency = "USD";
+        else if (notesRaw.includes("[KeepValasTotal:SAR]")) initialKeepValasCurrency = "SAR";
+        else if (notesRaw.includes("[KeepValasTotal]")) {
+          initialKeepValasCurrency = resolvedInitialInvoice.items.find((item) => item.currency !== "IDR")?.currency || "IDR";
+        }
+        if (initialKeepValasCurrency !== "IDR") {
+          const rateVal = initialKeepValasCurrency === "USD" ? initialRates.usdToIdr : initialRates.sarToIdr;
+          if (rateVal > 0) {
+            return Math.ceil(resolvedInitialInvoice.downPaymentIdr / rateVal);
+          }
+        }
+        return resolvedInitialInvoice.downPaymentIdr;
+      })(),
+      notes: resolvedInitialInvoice?.notes
+        ? resolvedInitialInvoice.notes
+            .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
+            .replace(/\[KeepValasTotal\]/g, "")
+            .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
+            .trim()
+        : "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
     },
   });
@@ -619,7 +671,7 @@ export function CreateInvoiceWorkspace({
   const address = watch("address");
   const bankAccount = watch("bankAccount");
   const downPaymentIdr = watch("downPaymentIdr");
-  const items = watch("items");
+  const items = useWatch({ control, name: "items" }) || [];
   const {
     fields: itemFields,
     append: appendItem,
@@ -642,8 +694,6 @@ export function CreateInvoiceWorkspace({
     () => buildNextInvoiceNumber(existingInvoiceNumbers, extractYearFromIsoDate(dueDateIso)),
     [existingInvoiceNumbers, dueDateIso],
   );
-  const [usdToIdr, setUsdToIdr] = useState(15_845);
-  const [sarToIdr, setSarToIdr] = useState(4_225);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -737,6 +787,21 @@ export function CreateInvoiceWorkspace({
   }, [isEditMode, bankAccount, bankDisbursementOptions, setValue]);
 
   useEffect(() => {
+    if (!selectedClientId || selectedClientId === MANUAL_CLIENT_OPTION_ID) {
+      return;
+    }
+
+    const matchedClient = clients.find((client) => client.id === selectedClientId);
+    if (matchedClient) {
+      const metadata = (matchedClient as any).metadata;
+      const defaultRecipient = metadata?.penerima || "";
+      if (defaultRecipient) {
+        setValue("recipientName", defaultRecipient, { shouldDirty: true });
+      }
+    }
+  }, [selectedClientId, clients, setValue]);
+
+  useEffect(() => {
     if (!saveFeedback) {
       return undefined;
     }
@@ -790,13 +855,53 @@ export function CreateInvoiceWorkspace({
     });
   }, [items, usdToIdr, sarToIdr, setValue]);
 
-  const subtotalIdr = useMemo(() => calculateSubtotalIdr({ items, usdToIdr, sarToIdr }), [items, usdToIdr, sarToIdr]);
+  const uniqueValasCurrencies = useMemo(() => {
+    const valas = new Set<"USD" | "SAR">();
+    items.forEach((item) => {
+      if (item.currency === "USD" || item.currency === "SAR") {
+        valas.add(item.currency);
+      }
+    });
+    return Array.from(valas);
+  }, [items]);
+
+  const valasCurrency = uniqueValasCurrencies[0] || "IDR";
+
+  const invoiceCurrency = keepValasCurrency;
+
+  const handleKeepValasCurrencyChange = (nextCurrency: "IDR" | "USD" | "SAR") => {
+    const prevCurrency = keepValasCurrency;
+    setKeepValasCurrency(nextCurrency);
+
+    const prevRate = prevCurrency === "USD" ? usdToIdr : prevCurrency === "SAR" ? sarToIdr : 1;
+    const nextRate = nextCurrency === "USD" ? usdToIdr : nextCurrency === "SAR" ? sarToIdr : 1;
+
+    const dpInIdr = prevRate > 0 ? downPaymentIdr * prevRate : downPaymentIdr;
+    const convertedDp = nextRate > 0 ? dpInIdr / nextRate : 0;
+    const finalDp = nextCurrency !== "IDR" ? Math.ceil(convertedDp) : Math.round(convertedDp);
+
+    setValue("downPaymentIdr", finalDp, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  };
+
+  useEffect(() => {
+    if (keepValasCurrency !== "IDR" && !uniqueValasCurrencies.includes(keepValasCurrency as any)) {
+      handleKeepValasCurrencyChange("IDR");
+    }
+  }, [uniqueValasCurrencies, keepValasCurrency]);
+
+  const subtotal = useMemo(() => {
+    return calculateSubtotalInCurrency(items, invoiceCurrency, usdToIdr, sarToIdr);
+  }, [items, invoiceCurrency, usdToIdr, sarToIdr]);
+
   const taxAmount = 0;
-  const totalPayable = subtotalIdr + taxAmount;
-  const normalizedDownPaymentIdr = Math.min(totalPayable, Math.max(0, Math.round(downPaymentIdr)));
+  const totalPayable = subtotal + taxAmount;
+  const normalizedDownPayment = Math.min(totalPayable, Math.max(0, Math.round(downPaymentIdr)));
   const downPaymentCoveragePercent =
-    totalPayable > 0 ? Math.min(100, Math.round((normalizedDownPaymentIdr / totalPayable) * 100)) : 0;
-  const remainingBalanceIdr = resolveInvoiceRemainingBalanceIdr(totalPayable, normalizedDownPaymentIdr);
+    totalPayable > 0 ? Math.min(100, Math.round((normalizedDownPayment / totalPayable) * 100)) : 0;
+  const remainingBalance = resolveInvoiceRemainingBalanceIdr(totalPayable, normalizedDownPayment);
 
   useEffect(() => {
     if (downPaymentIdr <= totalPayable) {
@@ -808,6 +913,29 @@ export function CreateInvoiceWorkspace({
       shouldValidate: false,
     });
   }, [downPaymentIdr, totalPayable, setValue]);
+
+  // Automatically adjust downPaymentIdr based on invoiceStatus changes to prevent DB override mismatch
+  useEffect(() => {
+    if (invoiceStatus === "Paid") {
+      if (downPaymentIdr !== totalPayable) {
+        setValue("downPaymentIdr", totalPayable, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+    } else if (
+      invoiceStatus === "Pending" ||
+      invoiceStatus === "Overdue" ||
+      invoiceStatus === "Cancelled"
+    ) {
+      if (downPaymentIdr !== 0) {
+        setValue("downPaymentIdr", 0, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+    }
+  }, [invoiceStatus, totalPayable, setValue]);
 
   const addItemRow = () => {
     const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
@@ -880,6 +1008,14 @@ export function CreateInvoiceWorkspace({
     const linkedGroupCode = values.selectedGroupCode.trim() || (clientSelection.selectedClient?.groupCode ?? "");
 
     clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
+    const payloadDownPaymentIdr = keepValasCurrency !== "IDR"
+      ? Math.max(0, Math.round(normalizedDownPayment * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
+      : normalizedDownPayment;
+    const payloadAmount = keepValasCurrency !== "IDR"
+      ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
+      : totalPayable;
+    const payloadNotes = `${values.notes.trim()}${keepValasCurrency !== "IDR" ? `\n[KeepValasTotal:${keepValasCurrency}]` : ""}\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+
     setIsSavingDraft(true);
     try {
       const savedInvoice = await createInvoiceMutation.mutateAsync({
@@ -888,10 +1024,11 @@ export function CreateInvoiceWorkspace({
         groupCode: linkedGroupCode || undefined,
         issuedDateIso: values.issueDateIso,
         dueDateIso: values.dueDateIso,
-        amount: totalPayable,
-        downPaymentIdr: normalizedDownPaymentIdr,
+        amount: payloadAmount,
+        downPaymentIdr: payloadDownPaymentIdr,
         status: values.invoiceStatus ? (values.invoiceStatus as InvoiceStatus) : "Pending",
-        notes: values.notes,
+        notes: payloadNotes,
+        recipientName: values.recipientName || undefined,
         items: printableItems,
       });
 
@@ -962,6 +1099,14 @@ export function CreateInvoiceWorkspace({
     const printableItems = buildPrintableInvoiceItems(normalizedItems, usdToIdr, sarToIdr);
 
     const linkedGroupCode = values.selectedGroupCode.trim() || (clientSelection.selectedClient?.groupCode ?? "");
+    const payloadDownPaymentIdr = keepValasCurrency !== "IDR"
+      ? Math.max(0, Math.round(normalizedDownPayment * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
+      : normalizedDownPayment;
+    const payloadAmount = keepValasCurrency !== "IDR"
+      ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
+      : totalPayable;
+    const payloadNotes = `${values.notes.trim()}${keepValasCurrency !== "IDR" ? `\n[KeepValasTotal:${keepValasCurrency}]` : ""}\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+
     setIsSubmitting(true);
     try {
       const savedInvoice =
@@ -974,10 +1119,11 @@ export function CreateInvoiceWorkspace({
                 groupCode: linkedGroupCode || undefined,
                 issuedDateIso: values.issueDateIso,
                 dueDateIso: values.dueDateIso,
-                amount: totalPayable,
-                downPaymentIdr: normalizedDownPaymentIdr,
+                amount: payloadAmount,
+                downPaymentIdr: payloadDownPaymentIdr,
                 status: values.invoiceStatus as InvoiceStatus,
-                notes: values.notes,
+                notes: payloadNotes,
+                recipientName: values.recipientName || undefined,
                 items: printableItems,
               },
             })
@@ -987,41 +1133,13 @@ export function CreateInvoiceWorkspace({
               groupCode: linkedGroupCode || undefined,
               issuedDateIso: values.issueDateIso,
               dueDateIso: values.dueDateIso,
-              amount: totalPayable,
-              downPaymentIdr: normalizedDownPaymentIdr,
+              amount: payloadAmount,
+              downPaymentIdr: payloadDownPaymentIdr,
               status: values.invoiceStatus as InvoiceStatus,
-              notes: values.notes,
+              notes: payloadNotes,
+              recipientName: values.recipientName || undefined,
               items: printableItems,
             });
-
-      const { exportInvoicePdf } = await import("./invoice-export");
-      const exported = await exportInvoicePdf(
-        {
-          invoiceNumber: savedInvoice.invoiceNumber,
-          issueDateIso: values.issueDateIso,
-          dueDateIso: values.dueDateIso,
-          statusLabel: getInvoiceStatusDisplayLabel(values.invoiceStatus as InvoiceStatus),
-          issuingOffice: values.issuingOffice,
-          clientName: savedInvoice.clientName,
-          clientCode: linkedGroupCode || savedInvoice.groupCode || savedInvoice.clientLabel,
-          address: values.address.trim(),
-          bankAccountLabel: resolveBankAccountLabel(values.bankAccount, bankDisbursementOptions),
-          notes: values.notes.trim(),
-          usdToIdr,
-          sarToIdr,
-          subtotalIdr,
-          taxIdr: taxAmount,
-          totalPayableIdr: totalPayable,
-          downPaymentIdr: savedInvoice.downPaymentIdr,
-          remainingBalanceIdr: resolveInvoiceRemainingBalanceIdr(savedInvoice.amount, savedInvoice.downPaymentIdr),
-          items: printableItems,
-        }
-      );
-
-      if (!exported) {
-        window.alert("Gagal menyiapkan PDF invoice. Coba lagi.");
-      }
-
       if (isEditMode) {
         onUpdate(savedInvoice);
       } else {
@@ -1088,20 +1206,7 @@ export function CreateInvoiceWorkspace({
           </section>
         ) : null}
 
-        {sourceInvoiceNumber ? (
-          <section
-            className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800"
-            role="status"
-            aria-live="polite"
-          >
-            <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
-              task_alt
-            </span>
-            <p className="text-xs font-semibold leading-relaxed">
-              Invoice lanjutan dari <strong>{sourceInvoiceNumber}</strong>. Client, group, dan item sudah diprefill.
-            </p>
-          </section>
-        ) : null}
+
 
         <div className="serene-form-section">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1422,6 +1527,18 @@ export function CreateInvoiceWorkspace({
                     {...register("address")}
                   />
                 </label>
+
+                <label className="space-y-1">
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
+                    Nama Penerima / U.p.
+                  </span>
+                  <input
+                    type="text"
+                    className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
+                    placeholder="Nama PIC penerima invoice..."
+                    {...register("recipientName")}
+                  />
+                </label>
               </div>
             </article>
           </div>
@@ -1509,8 +1626,8 @@ export function CreateInvoiceWorkspace({
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <SereneSelect
-                              className="serene-select h-auto min-w-[72px] border-none bg-transparent p-0 text-xs font-bold text-on-surface shadow-none"
-                              value={item.currency}
+                              className="serene-select h-8 min-w-[76px] rounded-lg bg-surface-container-low text-xs font-bold text-on-surface shadow-none border-none py-1 px-2"
+                              value={item.currency || "IDR"}
                               onChange={(event) =>
                                 updateItemRow(index, {
                                   ...item,
@@ -1606,7 +1723,7 @@ export function CreateInvoiceWorkspace({
 
               <article className="serene-form-section">
                 <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/70">
-                  Live Exchange Rates
+                  Exchange Rates
                 </h3>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="space-y-1">
@@ -1615,9 +1732,12 @@ export function CreateInvoiceWorkspace({
                     </span>
                     <input
                       type="text"
-                      className="h-9 w-full rounded-lg border border-outline-variant/35 bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
+                      className="h-10 w-full rounded-lg border border-outline-variant/35 bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
                       value={formatNumberInput(usdToIdr)}
-                      onChange={(event) => setUsdToIdr(Math.max(1, parseNumberInput(event.target.value)))}
+                      onChange={(event) => {
+                        const val = Math.max(0, parseNumberInput(event.target.value));
+                        setUsdToIdr(val);
+                      }}
                     />
                   </label>
                   <label className="space-y-1">
@@ -1626,9 +1746,12 @@ export function CreateInvoiceWorkspace({
                     </span>
                     <input
                       type="text"
-                      className="h-9 w-full rounded-lg border border-outline-variant/35 bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
+                      className="h-10 w-full rounded-lg border border-outline-variant/35 bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
                       value={formatNumberInput(sarToIdr)}
-                      onChange={(event) => setSarToIdr(Math.max(1, parseNumberInput(event.target.value)))}
+                      onChange={(event) => {
+                        const val = Math.max(0, parseNumberInput(event.target.value));
+                        setSarToIdr(val);
+                      }}
                     />
                   </label>
                 </div>
@@ -1679,19 +1802,47 @@ export function CreateInvoiceWorkspace({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-on-surface-variant">Subtotal</span>
-                <strong className="text-xs text-on-surface">{formatNumberInput(subtotalIdr)}</strong>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
+                  <strong className="text-xs text-on-surface">{formatNumberInput(subtotal)}</strong>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-on-surface-variant">Tax (0%)</span>
                 <strong className="text-xs text-on-surface">{formatNumberInput(taxAmount)}</strong>
               </div>
+
+              {uniqueValasCurrencies.length > 0 ? (
+                <div className="rounded-xl border border-primary/10 bg-primary/5 p-3 space-y-2">
+                  <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-primary">
+                    Mata Uang Tagihan Akhir
+                  </span>
+                  <SereneSelect
+                    className="serene-select h-8 w-full rounded-lg bg-white/70 text-xs font-bold text-on-surface shadow-none border border-primary/15 py-1 px-2"
+                    value={keepValasCurrency}
+                    onChange={(event) => handleKeepValasCurrencyChange(event.target.value as any)}
+                  >
+                    <option value="IDR">Rupiah (IDR)</option>
+                    {uniqueValasCurrencies.includes("USD") && (
+                      <option value="USD">Dollar (USD)</option>
+                    )}
+                    {uniqueValasCurrencies.includes("SAR") && (
+                      <option value="SAR">Riyal (SAR)</option>
+                    )}
+                  </SereneSelect>
+                  <p className="text-[10px] leading-snug text-on-surface-variant/75">
+                    Menentukan mata uang sisa tagihan & DP yang dicetak pada PDF invoice.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="h-px bg-outline-variant/25" />
               <div className="pt-1">
                 <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/65">
                   Yang harus dibayarkan
                 </span>
                 <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-xs font-bold text-primary">IDR</span>
+                  <span className="text-xs font-bold text-primary">{invoiceCurrency}</span>
                   <span className="font-display text-xl font-extrabold tracking-tight text-primary">
                     {formatNumberInput(totalPayable)}
                   </span>
@@ -1712,18 +1863,18 @@ export function CreateInvoiceWorkspace({
                   </div>
                   <span
                     className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
-                      normalizedDownPaymentIdr > 0
+                      normalizedDownPayment > 0
                         ? "border-amber-200 bg-white text-amber-800"
                         : "border-outline-variant/30 bg-white text-on-surface-variant/60"
                     }`}
                   >
-                    {normalizedDownPaymentIdr > 0 ? `${downPaymentCoveragePercent}%` : "Opsional"}
+                    {normalizedDownPayment > 0 ? `${downPaymentCoveragePercent}%` : "Opsional"}
                   </span>
                 </div>
 
                 <label className="mt-2 block space-y-1.5">
                   <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700/80">IDR</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700/80">{invoiceCurrency}</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1748,25 +1899,26 @@ export function CreateInvoiceWorkspace({
                 </div>
 
                 <p className="mt-1.5 text-[10px] font-medium text-amber-700">
-                  {normalizedDownPaymentIdr > 0
+                  {normalizedDownPayment > 0
                     ? `DP menutup ${downPaymentCoveragePercent}% dari total tagihan.`
                     : "DP belum diisi, jadi total pembayaran masih utuh."}
                 </p>
               </div>
               <div
                 className={`flex items-center justify-between rounded-xl border px-3 py-2 ${
-                  remainingBalanceIdr <= 0
+                  remainingBalance <= 0
                     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                     : "border-primary/10 bg-primary/5"
                 }`}
               >
                 <span className="text-xs font-medium text-on-surface-variant">
-                  {resolveInvoiceOutstandingBalanceLabel(normalizedDownPaymentIdr, remainingBalanceIdr)}
+                  {resolveInvoiceOutstandingBalanceLabel(normalizedDownPayment, remainingBalance)}
                 </span>
                 <strong
-                  className={`text-xs font-bold ${remainingBalanceIdr <= 0 ? "text-emerald-700" : "text-primary"}`}
+                  className={`text-xs font-bold ${remainingBalance <= 0 ? "text-emerald-700" : "text-primary"}`}
                 >
-                  {formatNumberInput(remainingBalanceIdr)}
+                  <span className="mr-1 text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
+                  {formatNumberInput(remainingBalance)}
                 </strong>
               </div>
             </div>

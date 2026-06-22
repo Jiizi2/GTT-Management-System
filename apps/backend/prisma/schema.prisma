@@ -206,6 +206,7 @@ model Invoice {
   status        InvoiceStatus @default(PENDING)
   notes         String?
   items         Json?
+  recipientName String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   client        InvoiceClient @relation(fields: [clientId], references: [id], onDelete: Restrict)

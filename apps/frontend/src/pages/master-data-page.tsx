@@ -57,9 +57,10 @@ const CATEGORY_FORM_CONFIG: Record<MasterDataCategoryKey, CategoryFormConfig> = 
     labelPlaceholder: "contoh: BCA (IDR) - 035 123 4455",
     descriptionLabel: "Catatan Rekening",
     descriptionPlaceholder: "contoh: khusus transaksi USD",
-    metadataLabel: "Metadata",
-    metadataPlaceholder: "",
-    showMetadata: false,
+    metadataLabel: "Metadata JSON (Nama Penerima Transfer)",
+    metadataPlaceholder: '{\n  "penerima": "PT Ghaniya Tour Travel"\n}',
+    metadataHint: "Masukkan JSON dengan key 'penerima' untuk nama pemilik rekening / penerima transfer.",
+    showMetadata: true,
   },
   "invoice-client-name": {
     valueLabel: "Client Key",
@@ -69,9 +70,10 @@ const CATEGORY_FORM_CONFIG: Record<MasterDataCategoryKey, CategoryFormConfig> = 
     labelPlaceholder: "contoh: Umrah Corporate",
     descriptionLabel: "Catatan Client",
     descriptionPlaceholder: "contoh: client prioritas",
-    metadataLabel: "Metadata",
-    metadataPlaceholder: "",
-    showMetadata: false,
+    metadataLabel: "Metadata JSON (Nama Penerima / PIC Default)",
+    metadataPlaceholder: '{\n  "penerima": "Bpk. Ahmad"\n}',
+    metadataHint: "Masukkan JSON dengan key 'penerima' untuk nama PIC default penerima invoice.",
+    showMetadata: true,
   },
   "invoice-issuing-office": {
     valueLabel: "Office Key",
@@ -198,6 +200,7 @@ function getStatusButtonClassName(isActive: boolean, isDarkMode: boolean): strin
 }
 
 function MasterDataOptionForm({
+  categoryKey,
   config,
   initialValues,
   resetToken,
@@ -206,6 +209,7 @@ function MasterDataOptionForm({
   onSubmit,
   onCancel,
 }: {
+  categoryKey: string;
   config: CategoryFormConfig;
   initialValues: MasterDataOptionFormValues;
   resetToken: number | string;
@@ -218,11 +222,51 @@ function MasterDataOptionForm({
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<MasterDataOptionFormValues>({
     resolver: zodResolver(masterDataOptionFormSchema),
     defaultValues: initialValues,
   });
+
+  const [bankName, setBankName] = useState("");
+  const [bankAccountNum, setBankAccountNum] = useState("");
+  const [bankBeneficiary, setBankBeneficiary] = useState("");
+
+  useEffect(() => {
+    if (categoryKey === "bank-disbursement") {
+      const labelValue = initialValues.label || "";
+      const chunks = labelValue.split(" - ").map((s) => s.trim()).filter(Boolean);
+      if (chunks.length >= 2) {
+        setBankName(chunks[0]);
+        setBankAccountNum(chunks.slice(1).join(" - "));
+      } else {
+        setBankName(labelValue);
+        setBankAccountNum("");
+      }
+
+      try {
+        const meta = parseMetadataJson(initialValues.metadataJson);
+        setBankBeneficiary(typeof meta?.penerima === "string" ? meta.penerima : "");
+      } catch {
+        setBankBeneficiary("");
+      }
+    }
+  }, [initialValues, resetToken, categoryKey]);
+
+  useEffect(() => {
+    if (categoryKey === "bank-disbursement") {
+      const combinedLabel = `${bankName.trim()} - ${bankAccountNum.trim()}`;
+      setValue("label", combinedLabel);
+
+      const metaObj = {
+        bankName: bankName.trim(),
+        accountNumber: bankAccountNum.trim(),
+        penerima: bankBeneficiary.trim(),
+      };
+      setValue("metadataJson", JSON.stringify(metaObj, null, 2));
+    }
+  }, [bankName, bankAccountNum, bankBeneficiary, setValue, categoryKey]);
 
   useEffect(() => {
     reset(initialValues);
@@ -238,14 +282,59 @@ function MasterDataOptionForm({
           <input className="serene-input" {...register("value")} placeholder={config.valuePlaceholder} />
         </label>
 
-        <label className="grid gap-1">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-            {config.labelLabel}
-          </span>
-          <input className="serene-input" {...register("label")} placeholder={config.labelPlaceholder} />
-          {errors.label ? <p className="text-xs font-semibold text-error">{errors.label.message}</p> : null}
-        </label>
+        {categoryKey === "bank-disbursement" ? null : (
+          <label className="grid gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+              {config.labelLabel}
+            </span>
+            <input className="serene-input" {...register("label")} placeholder={config.labelPlaceholder} />
+            {errors.label ? <p className="text-xs font-semibold text-error">{errors.label.message}</p> : null}
+          </label>
+        )}
       </div>
+
+      {categoryKey === "bank-disbursement" && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="grid gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+              Nama Bank
+            </span>
+            <input
+              className="serene-input"
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              placeholder="contoh: BCA"
+              required
+            />
+          </label>
+
+          <label className="grid gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+              Nomor Rekening
+            </span>
+            <input
+              className="serene-input"
+              value={bankAccountNum}
+              onChange={(e) => setBankAccountNum(e.target.value)}
+              placeholder="contoh: 035 123 4455"
+              required
+            />
+          </label>
+
+          <label className="grid gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+              Atas Nama Pemilik Rekening
+            </span>
+            <input
+              className="serene-input"
+              value={bankBeneficiary}
+              onChange={(e) => setBankBeneficiary(e.target.value)}
+              placeholder="contoh: PT Ghaniya Tour Travel"
+              required
+            />
+          </label>
+        </div>
+      )}
 
       {config.valueHint ? (
         <p className="rounded-md border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
@@ -262,7 +351,7 @@ function MasterDataOptionForm({
 
       <p className="text-xs text-on-surface-variant">Urutan tampil ditentukan otomatis oleh sistem.</p>
 
-      {config.showMetadata ? (
+      {config.showMetadata && categoryKey !== "bank-disbursement" ? (
         <label className="grid gap-1">
           <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
             {config.metadataLabel}
@@ -588,6 +677,7 @@ export function MasterDataScreen() {
           {isCreateOpen && activeCategoryFormConfig ? (
             <div className="mx-4 mt-4 sm:mx-5">
               <MasterDataOptionForm
+                categoryKey={activeCategoryKey ?? ""}
                 config={activeCategoryFormConfig}
                 initialValues={EMPTY_FORM}
                 resetToken={`${activeCategoryKey ?? "none"}-${createFormResetToken}`}
@@ -725,6 +815,7 @@ export function MasterDataScreen() {
 
               <div className="mt-3">
                 <MasterDataOptionForm
+                  categoryKey={activeCategoryKey ?? ""}
                   config={activeCategoryFormConfig}
                   initialValues={editingInitialValues}
                   resetToken={editingOptionId}

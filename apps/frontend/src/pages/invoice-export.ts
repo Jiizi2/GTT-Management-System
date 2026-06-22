@@ -20,15 +20,18 @@ export type InvoiceExportPayload = {
   clientName: string;
   clientCode: string;
   address: string;
+  recipientName?: string;
+  bankAccountRecipient?: string;
   bankAccountLabel: string;
   notes: string;
   usdToIdr: number;
   sarToIdr: number;
-  subtotalIdr: number;
-  taxIdr: number;
-  totalPayableIdr: number;
-  downPaymentIdr: number;
-  remainingBalanceIdr: number;
+  currency: InvoiceExportCurrency;
+  subtotal: number;
+  tax: number;
+  totalPayable: number;
+  downPayment: number;
+  remainingBalance: number;
   items: InvoiceExportLineItem[];
 };
 
@@ -41,9 +44,11 @@ const PRINT_FALLBACK_TIMEOUT_MS = 4_500;
 const RESOURCE_WAIT_TIMEOUT_MS = 2_500;
 
 const companyProfile = {
-  brandName: "Ghaniya Tour and Travel",
+  brandName: "PT.Ghaniya Zilia Rahman",
   directorName: "Husein Ghanim",
   directorTitle: "Director",
+  izinPpiu: "SK NO U.419 TAHUN 2021",
+  alamat: "Graha Al Badegel Jl. Hajjah Tutty Alawiyah No.7, RT.2/RW.5, Kalibata, Kec. Pancoran, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta",
 };
 
 function formatNumber(value: number): string {
@@ -88,11 +93,11 @@ function resolvePaymentStatusLabel(payload: InvoiceExportPayload): string {
     return explicitStatusLabel;
   }
 
-  if (payload.remainingBalanceIdr <= 0) {
+  if (payload.remainingBalance <= 0) {
     return "Paid";
   }
 
-  if (payload.downPaymentIdr > 0) {
+  if (payload.downPayment > 0) {
     return "Partial Payment";
   }
 
@@ -100,19 +105,18 @@ function resolvePaymentStatusLabel(payload: InvoiceExportPayload): string {
 }
 
 function resolveTaxPercentage(payload: InvoiceExportPayload): number {
-  if (payload.subtotalIdr <= 0) {
+  if (payload.subtotal <= 0) {
     return 0;
   }
 
-  return Math.max(0, Math.round((payload.taxIdr / payload.subtotalIdr) * 100));
+  return Math.max(0, Math.round((payload.tax / payload.subtotal) * 100));
 }
 
 function resolveOutstandingBalanceLabel(payload: InvoiceExportPayload): string {
-  if (payload.remainingBalanceIdr <= 0) {
+  if (payload.remainingBalance <= 0) {
     return "Lunas";
   }
-
-  return payload.downPaymentIdr > 0 ? "Sisa Tagihan" : "Tagihan";
+  return payload.downPayment > 0 ? "Sisa Tagihan" : "Tagihan";
 }
 
 function isPaidStatusLabel(statusLabel: string, remainingBalanceIdr: number): boolean {
@@ -346,6 +350,7 @@ async function finalizePrintWindow(printableWindow: Window, iframe: HTMLIFrameEl
   }, PRINT_TRIGGER_DELAY_MS);
 }
 
+
 export async function exportInvoicePdf(
   payload: InvoiceExportPayload,
   _options: InvoiceExportWindowOptions = {},
@@ -370,55 +375,119 @@ export async function exportInvoicePdf(
   const appCssUrl = new URL("/index.css", window.location.origin).toString();
   const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const statusLabel = resolvePaymentStatusLabel(payload);
-  const isPaidInvoice = isPaidStatusLabel(statusLabel, payload.remainingBalanceIdr);
+  const isPaidInvoice = isPaidStatusLabel(statusLabel, payload.remainingBalance);
   const printableStatusLabel = isPaidInvoice ? "Lunas" : statusLabel;
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
   const billToName = resolveBillToName(payload);
+  const beneficiaryName = payload.bankAccountRecipient?.trim() || companyProfile.brandName;
 
-  let stampHtml = "";
+  const valasCurrency = payload.currency || "IDR";
+  const isRupiahOnly = payload.items.every((item) => isIdrCurrency(item.currency));
+  const isSingleCurrencyBilling = valasCurrency !== "IDR" || isRupiahOnly;
+
+  let statusBadgeHtml = "";
   const normalizedStatus = statusLabel.trim().toLowerCase();
   if (isPaidInvoice || normalizedStatus.includes("paid") || normalizedStatus.includes("lunas")) {
-    stampHtml = '<div class="invoice-stamp stamp-lunas mb-5"><span>LUNAS</span></div>';
+    statusBadgeHtml = `<span class="status-badge badge-lunas">Lunas</span>`;
   } else if (normalizedStatus.includes("partially") || normalizedStatus.includes("dp")) {
-    stampHtml = '<div class="invoice-stamp stamp-dp mb-5"><span>PARTIAL / DP</span></div>';
+    statusBadgeHtml = `<span class="status-badge badge-dp">Partial Payment</span>`;
   } else if (normalizedStatus.includes("cancelled") || normalizedStatus.includes("batal")) {
-    stampHtml = '<div class="invoice-stamp stamp-batal mb-5"><span>BATAL</span></div>';
+    statusBadgeHtml = `<span class="status-badge badge-batal">Batal</span>`;
   } else if (normalizedStatus.includes("overdue") || normalizedStatus.includes("tempo")) {
-    stampHtml = '<div class="invoice-stamp stamp-overdue mb-5"><span>JATUH TEMPO</span></div>';
+    statusBadgeHtml = `<span class="status-badge badge-overdue">Jatuh Tempo</span>`;
+  } else {
+    statusBadgeHtml = `<span class="status-badge badge-awaiting">${escapeHtml(printableStatusLabel)}</span>`;
   }
+
+  const rate = valasCurrency === "USD" ? payload.usdToIdr : payload.sarToIdr;
 
   const rowsHtml = payload.items
     .map((item, index) => {
-      const totalPriceLabel =
-        isIdrCurrency(item.currency) || item.totalPriceIdr === item.totalPrice
-          ? "-"
-          : formatCurrency(item.totalPrice, item.currency);
-      return `
-<tr class="invoice-line-row group hover:bg-stone-50 transition-colors">
-<td class="py-4 px-4 text-luxury-black font-semibold text-sm">${String(index + 1).padStart(2, "0")}</td>
-<td class="py-4 px-4">
-<div class="invoice-row-description font-bold text-luxury-black">${escapeHtml(item.description)}</div>
+      if (isSingleCurrencyBilling) {
+        let unitPriceValas = item.unitPrice;
+        let totalPriceValas = item.totalPrice;
+        
+        if (item.currency !== valasCurrency) {
+          const itemRate = item.currency === "USD" ? payload.usdToIdr : item.currency === "SAR" ? payload.sarToIdr : 1;
+          const itemPriceIdr = item.totalPriceIdr;
+          if (valasCurrency === "IDR") {
+            unitPriceValas = item.unitPrice * itemRate;
+            totalPriceValas = itemPriceIdr;
+          } else {
+            totalPriceValas = rate > 0 ? Math.ceil(itemPriceIdr / rate) : 0;
+            unitPriceValas = item.pax > 0 ? Math.ceil(totalPriceValas / item.pax) : 0;
+          }
+        }
+
+        return `
+<tr class="invoice-line-row">
+<td class="invoice-cell-no">${String(index + 1).padStart(2, "0")}</td>
+<td class="invoice-cell-desc">
+<div class="invoice-row-description">${escapeHtml(item.description)}</div>
 </td>
-<td class="py-4 px-4 text-left font-bold text-sm text-luxury-black">${escapeHtml(formatNumber(item.pax))}</td>
-<td class="py-4 px-4 text-left font-manrope text-sm font-bold text-luxury-black">${escapeHtml(formatCurrency(item.unitPrice, item.currency))}</td>
-<td class="py-4 px-4 text-left font-bold font-manrope text-luxury-black">${escapeHtml(totalPriceLabel)}</td>
-<td class="py-4 px-4 text-left font-bold font-manrope text-luxury-black">${escapeHtml(formatIdr(item.totalPriceIdr))}</td>
-<td class="py-4 px-4 text-center text-stone-400 font-semibold text-sm">-</td>
+<td class="invoice-cell-pax">${escapeHtml(formatNumber(item.pax))}</td>
+<td class="invoice-cell-price">${escapeHtml(formatCurrency(unitPriceValas, valasCurrency))}</td>
+<td class="invoice-cell-total">${escapeHtml(formatCurrency(totalPriceValas, valasCurrency))}</td>
 </tr>`;
+      } else {
+        const totalPriceLabel = formatCurrency(item.totalPrice, item.currency);
+        const kursLabel = isIdrCurrency(item.currency)
+          ? "-"
+          : `IDR ${formatRate(item.currency === "USD" ? payload.usdToIdr : payload.sarToIdr)}`;
+        return `
+<tr class="invoice-line-row">
+<td class="invoice-cell-no">${String(index + 1).padStart(2, "0")}</td>
+<td class="invoice-cell-desc">
+<div class="invoice-row-description">${escapeHtml(item.description)}</div>
+</td>
+<td class="invoice-cell-pax">${escapeHtml(formatNumber(item.pax))}</td>
+<td class="invoice-cell-price">${escapeHtml(formatCurrency(item.unitPrice, item.currency))}</td>
+<td class="invoice-cell-kurs">${escapeHtml(kursLabel)}</td>
+<td class="invoice-cell-total">${escapeHtml(totalPriceLabel)}</td>
+<td class="invoice-cell-total-idr">${escapeHtml(formatIdr(item.totalPriceIdr))}</td>
+</tr>`;
+      }
     })
     .join("");
 
-  const notesHtml = payload.notes.trim()
-    ? escapeHtml(payload.notes).replace(/\n/g, "<br/>")
-    : "Thank you for choosing Ghaniya Tour and Travel for your spiritual pilgrimage. We look forward to serving your group.";
+  const cleanNotes = payload.notes
+    .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
+    .replace(/\[KeepValasTotal\]/g, "")
+    .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
+    .trim();
+
+  const notesHtml = cleanNotes
+    ? escapeHtml(cleanNotes).replace(/\n/g, "<br/>")
+    : "Thank you for choosing Ghaniya Tour & Travel for your spiritual pilgrimage. We look forward to serving your group.";
+
+  const displaySubtotal = formatCurrency(payload.subtotal, valasCurrency);
+  const displayTotalPayable = formatCurrency(payload.totalPayable, valasCurrency);
+  const displayDownPayment = formatCurrency(payload.downPayment, valasCurrency);
+  const displayRemainingBalance = formatCurrency(payload.remainingBalance, valasCurrency);
+
+  const columnStyles = isSingleCurrencyBilling ? `
+            .invoice-table th:nth-child(1), .invoice-table td:nth-child(1) { width: 6%; }
+            .invoice-table th:nth-child(2), .invoice-table td:nth-child(2) { width: 50%; }
+            .invoice-table th:nth-child(3), .invoice-table td:nth-child(3) { width: 12%; }
+            .invoice-table th:nth-child(4), .invoice-table td:nth-child(4) { width: 16%; }
+            .invoice-table th:nth-child(5), .invoice-table td:nth-child(5) { width: 16%; }
+  ` : `
+            .invoice-table th:nth-child(1), .invoice-table td:nth-child(1) { width: 5%; }
+            .invoice-table th:nth-child(2), .invoice-table td:nth-child(2) { width: 30%; }
+            .invoice-table th:nth-child(3), .invoice-table td:nth-child(3) { width: 10%; }
+            .invoice-table th:nth-child(4), .invoice-table td:nth-child(4) { width: 14%; }
+            .invoice-table th:nth-child(5), .invoice-table td:nth-child(5) { width: 11%; }
+            .invoice-table th:nth-child(6), .invoice-table td:nth-child(6) { width: 15%; }
+            .invoice-table th:nth-child(7), .invoice-table td:nth-child(7) { width: 15%; }
+  `;
 
   const printableHtml = `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <meta content="light only" name="color-scheme"/>
-<title>Invoice - Ghaniya Tour and Travel</title>
+<title>Invoice - Ghaniya Tour & Travel</title>
 <link as="style" href="${escapeHtml(fontsCssUrl)}" rel="preload"/>
 <link as="style" href="${escapeHtml(appCssUrl)}" rel="preload"/>
 <link as="image" href="${escapeHtml(logoUrl)}" rel="preload"/>
@@ -428,14 +497,15 @@ export async function exportInvoicePdf(
 <link href="${escapeHtml(appCssUrl)}" rel="stylesheet"/>
 <style>
         :root {
-            --invoice-ink: #111111;
-            --invoice-gold: #D4AF37;
-            --invoice-gold-soft: rgba(212, 175, 55, 0.72);
-            --invoice-black: #1A1A1A;
+            --invoice-ink: #1a1a1a;
+            --invoice-gold: #b8860b;
+            --invoice-gold-soft: rgba(184, 134, 11, 0.5);
+            --invoice-gold-light: #faf8f2;
+            --invoice-border: #e2e8f0;
+            --invoice-gray-muted: #718096;
         }
         .print-container,
         .print-container * {
-            color: var(--invoice-ink);
             box-sizing: border-box;
         }
         @page {
@@ -455,10 +525,9 @@ export async function exportInvoicePdf(
         }
         body {
             color: var(--invoice-ink);
-            display: block;
+            font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
             text-rendering: geometricPrecision;
-            -webkit-font-smoothing: subpixel-antialiased;
-            font-smooth: always;
+            -webkit-font-smoothing: antialiased;
         }
         img {
             image-rendering: -webkit-optimize-contrast;
@@ -476,80 +545,462 @@ export async function exportInvoicePdf(
             background: #ffffff;
             overflow: visible;
         }
-        .invoice-stamp {
-            display: inline-flex;
+        
+        /* Header / Kop Surat Styles */
+        .invoice-header {
+            width: 100%;
+            background-color: #ffffff !important;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
+            padding: 24px 40px !important;
+            border-bottom: 3px double var(--invoice-gold) !important;
             position: relative;
-            min-width: 36mm;
-            min-height: 14mm;
-            border-radius: 7px;
-            padding: 3mm 5mm;
-            font-size: 1.5rem;
-            font-weight: 900;
-            line-height: 1;
-            text-transform: uppercase;
-            transform: rotate(-6deg);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            z-index: 10;
         }
-        .invoice-stamp::before {
+        .invoice-header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .invoice-header-logo {
+            height: 76px;
+            width: auto;
+            object-fit: contain;
+        }
+        .invoice-header-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .invoice-header-title {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            font-size: 19px !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #111111 !important;
+            margin: 0 !important;
+            line-height: 1.2;
+        }
+        .invoice-header-sub {
+            font-family: 'Manrope', 'Inter', sans-serif;
+            font-size: 11.5px !important;
+            font-weight: 700 !important;
+            color: var(--invoice-gold) !important;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-top: 4px !important;
+            margin-bottom: 2px !important;
+        }
+        .invoice-header-address {
+            font-size: 9.5px !important;
+            line-height: 1.4 !important;
+            color: var(--invoice-gray-muted) !important;
+            margin: 0 !important;
+            max-width: 430px;
+        }
+        .invoice-header-right {
+            text-align: right;
+        }
+        .invoice-header-doc-label {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            font-size: 20px !important;
+            font-weight: 900 !important;
+            letter-spacing: 0.15em;
+            color: var(--invoice-gold) !important;
+            text-transform: uppercase;
+        }
+
+        /* Overview / Metadata Styles */
+        .invoice-overview {
+            padding: 24px 40px !important;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        .invoice-bill-to {
+            flex: 1;
+            max-width: 60%;
+        }
+        .invoice-bill-to-title {
+            font-size: 11.5px !important;
+            font-weight: 800 !important;
+            color: var(--invoice-gold) !important;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 6px !important;
+        }
+        .invoice-bill-to-name {
+            font-size: 19px !important;
+            font-weight: 800 !important;
+            color: #111111 !important;
+            text-transform: uppercase;
+            margin: 0 0 4px 0 !important;
+            line-height: 1.2;
+        }
+        .invoice-bill-to-recipient {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #4a5568 !important;
+            margin: 4px 0 !important;
+        }
+        .invoice-bill-to-address {
+            font-size: 13px !important;
+            line-height: 1.4 !important;
+            color: var(--invoice-gray-muted) !important;
+            margin: 4px 0 0 0 !important;
+        }
+        
+        .invoice-meta-container {
+            width: 300px;
+            background-color: var(--invoice-gold-light) !important;
+            border: 1px solid rgba(184, 134, 11, 0.15) !important;
+            border-top: 4px solid var(--invoice-gold) !important;
+            border-radius: 6px;
+            padding: 20px 24px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .invoice-meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 7px 0 !important;
+            font-size: 12.5px !important;
+        }
+        .invoice-meta-row:not(:last-child) {
+            border-bottom: 1px solid rgba(184, 134, 11, 0.12) !important;
+        }
+        .invoice-meta-label {
+            color: var(--invoice-gray-muted) !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9.5px !important;
+            letter-spacing: 0.08em;
+        }
+        .invoice-meta-value {
+            color: #111111 !important;
+            font-weight: 700;
+        }
+        .invoice-meta-value.invoice-num-highlight {
+            font-size: 14.5px !important;
+            font-weight: 800 !important;
+            color: #111111 !important;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 10.5px !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 1;
+        }
+        .badge-lunas {
+            background-color: #ecfdf5 !important;
+            color: #047857 !important;
+            border: 1px solid #a7f3d0;
+        }
+        .badge-dp {
+            background-color: #f0f9ff !important;
+            color: #0369a1 !important;
+            border: 1px solid #bae6fd;
+        }
+        .badge-batal {
+            background-color: #fef2f2 !important;
+            color: #b91c1c !important;
+            border: 1px solid #fecaca;
+        }
+        .badge-overdue {
+            background-color: #fff7ed !important;
+            color: #c2410c !important;
+            border: 1px solid #ffedd5;
+        }
+        .badge-awaiting {
+            background-color: #fef3c7 !important;
+            color: #92400e !important;
+            border: 1px solid #fde68a;
+        }
+
+        /* Table Styles (Main Focus) */
+        .invoice-table-section {
+            padding: 8px 40px 16px 40px !important;
+            flex-grow: 1;
+        }
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        .invoice-table th {
+            background-color: var(--invoice-gold-light) !important;
+            color: #111111 !important;
+            font-size: 11.5px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 12px 14px !important;
+            border-top: 1px solid var(--invoice-gold-soft) !important;
+            border-bottom: 2px solid var(--invoice-gold) !important;
+        }
+        .invoice-table td {
+            font-size: 13px !important;
+            color: #2d3748 !important;
+            padding: 12px 14px !important;
+            border-bottom: 1px solid var(--invoice-border) !important;
+            vertical-align: top;
+        }
+        .invoice-table tr:hover {
+            background-color: #fcfbf9 !important;
+        }
+        .invoice-cell-no {
+            text-align: center !important;
+            font-weight: 600;
+            color: var(--invoice-gray-muted) !important;
+        }
+        .invoice-row-description {
+            font-size: 13.5px !important;
+            font-weight: 700 !important;
+            color: #111111 !important;
+            line-height: 1.3;
+        }
+        .invoice-cell-pax {
+            text-align: center !important;
+            font-weight: 700;
+            color: #111111 !important;
+        }
+        .invoice-cell-price {
+            text-align: right !important;
+            font-weight: 600;
+            white-space: nowrap !important;
+        }
+        .invoice-cell-total {
+            text-align: right !important;
+            font-weight: 700;
+            color: #111111 !important;
+            white-space: nowrap !important;
+        }
+        .invoice-cell-total-idr {
+            text-align: right !important;
+            font-weight: 700;
+            color: #111111 !important;
+            white-space: nowrap !important;
+        }
+        .invoice-cell-kurs {
+            text-align: right !important;
+            font-weight: 600;
+            color: var(--invoice-gray-muted) !important;
+            white-space: nowrap !important;
+        }
+
+        /* Payment Summary & Subtotal Styles */
+        .invoice-summary-section {
+            padding: 16px 40px !important;
+            background-color: #fafaf9 !important;
+            border-top: 1px solid var(--invoice-border) !important;
+            border-bottom: 1px solid var(--invoice-border) !important;
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+        }
+        .invoice-summary-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .invoice-summary-right {
+            width: 320px;
+        }
+        
+        .invoice-bank-card, .invoice-rate-card {
+            background: #ffffff !important;
+            border: 1px solid var(--invoice-border) !important;
+            border-radius: 4px;
+            padding: 14px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.01);
+        }
+        .invoice-section-title {
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            color: var(--invoice-gold) !important;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 8px !important;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .bank-details {
+            font-size: 13px !important;
+            line-height: 1.5;
+            color: #4a5568 !important;
+        }
+        .bank-details strong {
+            color: #111111 !important;
+        }
+        
+        .invoice-subtotal-card {
+            background: #ffffff !important;
+            border: 1px solid var(--invoice-border) !important;
+            border-top: 3px solid var(--invoice-gold) !important;
+            border-radius: 4px;
+            padding: 20px !important;
+        }
+        .subtotal-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px !important;
+            padding: 4px 0;
+            color: #4a5568 !important;
+        }
+        .subtotal-row strong {
+            white-space: nowrap !important;
+        }
+        .subtotal-row.grand-total {
+            border-top: 1px solid var(--invoice-border) !important;
+            margin-top: 8px !important;
+            padding-top: 12px !important;
+            font-size: 15px !important;
+            font-weight: 800 !important;
+            color: #111111 !important;
+        }
+        .grand-total-label {
+            color: var(--invoice-gold) !important;
+            text-transform: uppercase;
+            font-size: 11px !important;
+            letter-spacing: 0.1em;
+        }
+        .grand-total-value {
+            font-size: 21px !important;
+            color: #111111 !important;
+            font-family: 'Manrope', sans-serif;
+            font-weight: 800;
+            white-space: nowrap !important;
+        }
+        
+        /* Notes and Signature Styles */
+        .invoice-bottom-section {
+            padding: 24px 40px !important;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 40px;
+        }
+        .invoice-notes {
+            flex: 1;
+        }
+        .invoice-notes-title {
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            color: var(--invoice-gold) !important;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 6px !important;
+        }
+        .invoice-notes-text {
+            font-size: 12.5px !important;
+            line-height: 1.5;
+            color: var(--invoice-gray-muted) !important;
+            margin: 0 !important;
+        }
+        
+        .invoice-signature-block {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .signature-container {
+            position: relative;
+            width: 160px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 6px;
+            border-bottom: 2px solid var(--invoice-gold);
+        }
+        .signature-img {
+            height: 55px;
+            width: auto;
+            object-fit: contain;
+            position: relative;
+            z-index: 10;
+        }
+        .stamp-img {
+            height: 75px;
+            width: auto;
+            object-fit: contain;
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            opacity: 0.8;
+            transform: rotate(-10deg);
+            z-index: 20;
+            pointer-events: none;
+        }
+        .signature-name {
+            font-size: 13px !important;
+            font-weight: 800 !important;
+            color: #111111 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 4px 0 2px 0 !important;
+        }
+        .signature-title {
+            font-size: 11px !important;
+            font-weight: 700;
+            color: var(--invoice-gold) !important;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 0 !important;
+        }
+        
+        /* Footer Styles */
+        .invoice-footer {
+            width: 100%;
+            background-color: var(--invoice-gold-light) !important;
+            border-top: 1px solid var(--invoice-gold-soft) !important;
+            padding: 12px 40px !important;
+            text-align: center;
+            margin-top: auto;
+        }
+        .invoice-footer-text {
+            font-size: 11px !important;
+            font-weight: 600;
+            color: var(--invoice-gold) !important;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+
+        .rub-el-hizb-pattern {
+            position: relative;
+            isolation: isolate;
+            background: #ffffff;
+        }
+        .rub-el-hizb-pattern::before {
             content: "";
             position: absolute;
-            inset: 3px;
-            border-radius: 4px;
+            inset: 0;
+            background-image: url("${escapeHtml(logoUrl)}");
+            background-repeat: repeat;
+            background-position: 0 0;
+            background-size: 170px auto;
+            opacity: 0.028;
+            pointer-events: none;
+            z-index: 0;
         }
-        .stamp-lunas {
-            border: 2.5px solid #047857;
-            background: rgba(236, 253, 245, 0.6);
-            color: #047857 !important;
-            box-shadow: inset 0 0 0 3px rgba(4, 120, 87, 0.16);
+        .rub-el-hizb-pattern > * {
+            position: relative;
+            z-index: 1;
         }
-        .stamp-lunas::before {
-            border: 1px solid rgba(4, 120, 87, 0.7);
-        }
-        .stamp-lunas span {
-            color: #047857 !important;
-        }
-        .stamp-dp {
-            border: 2.5px solid #0284c7;
-            background: rgba(240, 249, 255, 0.6);
-            color: #0284c7 !important;
-            box-shadow: inset 0 0 0 3px rgba(2, 132, 199, 0.16);
-        }
-        .stamp-dp::before {
-            border: 1px solid rgba(2, 132, 199, 0.7);
-        }
-        .stamp-dp span {
-            color: #0284c7 !important;
-        }
-        .stamp-batal {
-            border: 2.5px solid #e11d48;
-            background: rgba(255, 241, 242, 0.6);
-            color: #e11d48 !important;
-            box-shadow: inset 0 0 0 3px rgba(225, 29, 72, 0.16);
-        }
-        .stamp-batal::before {
-            border: 1px solid rgba(225, 29, 72, 0.7);
-        }
-        .stamp-batal span {
-            color: #e11d48 !important;
-        }
-        .stamp-overdue {
-            border: 2.5px solid #ea580c;
-            background: rgba(255, 247, 237, 0.6);
-            color: #ea580c !important;
-            box-shadow: inset 0 0 0 3px rgba(234, 88, 12, 0.16);
-        }
-        .stamp-overdue::before {
-            border: 1px solid rgba(234, 88, 12, 0.7);
-        }
-        .stamp-overdue span {
-            color: #ea580c !important;
-        }
-        .invoice-paid-total {
-            border-color: #059669 !important;
-            background: #ecfdf5 !important;
-        }
+
         @media screen {
             html,
             body {
@@ -559,7 +1010,7 @@ export async function exportInvoicePdf(
                 background: #f3f4f6;
             }
             body {
-                padding: 12px;
+                padding: 24px;
                 display: flex;
                 justify-content: center;
                 align-items: flex-start;
@@ -570,7 +1021,9 @@ export async function exportInvoicePdf(
                 min-height: 297mm;
                 max-height: none;
                 overflow: visible;
-                box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                border-radius: 8px;
+                border: 1px solid #e2e8f0;
             }
         }
         @media screen and (max-width: 767px) {
@@ -609,199 +1062,70 @@ export async function exportInvoicePdf(
                 display: flex !important;
                 flex-direction: column !important;
             }
-            header {
-                background-color: var(--invoice-black) !important;
+            .invoice-header {
+                padding: 20px 30px !important;
+                border-bottom: 3px double var(--invoice-gold) !important;
+            }
+            .invoice-overview {
+                padding: 20px 30px !important;
+            }
+            .invoice-table-section {
+                padding: 0 30px 10px 30px !important;
+            }
+            .invoice-summary-section {
+                padding: 12px 30px !important;
+            }
+            .invoice-bottom-section {
+                padding: 20px 30px !important;
+            }
+            .invoice-footer {
+                padding: 10px 30px !important;
+            }
+            
+            .invoice-header-title { font-size: 19px !important; }
+            .invoice-header-sub { font-size: 11.5px !important; }
+            .invoice-header-address { font-size: 9.5px !important; }
+            .invoice-bill-to-name { font-size: 19px !important; }
+            .invoice-bill-to-recipient { font-size: 13px !important; }
+            .invoice-bill-to-address { font-size: 13px !important; }
+            .invoice-meta-container { width: 310px !important; }
+            .invoice-meta-row { font-size: 13.5px !important; }
+            .invoice-meta-label { font-size: 10px !important; }
+            .invoice-meta-value { font-size: 13.5px !important; }
+            .invoice-meta-value.invoice-num-highlight { font-size: 16px !important; }
+            .status-badge { font-size: 11.5px !important; }
+            .invoice-section-title { font-size: 11px !important; }
+            .bank-details { font-size: 13px !important; }
+            .subtotal-row { font-size: 13px !important; }
+            .grand-total-label { font-size: 11px !important; }
+            .grand-total-value { font-size: 21px !important; }
+            .invoice-notes-text { font-size: 12.5px !important; }
+            .signature-name { font-size: 13px !important; }
+            .signature-title { font-size: 11px !important; }
+            
+            .invoice-table th {
+                font-size: 11.5px !important;
+                padding: 12px 14px !important;
+                background-color: var(--invoice-gold-light) !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .invoice-header-brand {
-                color: var(--invoice-gold) !important;
-            }
-            .invoice-header-subtitle {
-                color: var(--invoice-gold) !important;
-            }
-            .invoice-header-doc-label {
-                color: var(--invoice-gold-soft) !important;
-            }
-            .invoice-total-due-row {
-                background: transparent !important;
-                color: var(--invoice-ink) !important;
-                border-top: 2px solid var(--invoice-gold) !important;
-                box-shadow: none !important;
-            }
-            .invoice-stamp {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .stamp-lunas {
-                border-color: #047857 !important;
-                background-color: rgba(236, 253, 245, 0.6) !important;
-                color: #047857 !important;
-            }
-            .stamp-lunas::before {
-                border-color: rgba(4, 120, 87, 0.7) !important;
-            }
-            .stamp-lunas span {
-                color: #047857 !important;
-            }
-            .stamp-dp {
-                border-color: #0284c7 !important;
-                background-color: rgba(240, 249, 255, 0.6) !important;
-                color: #0284c7 !important;
-            }
-            .stamp-dp::before {
-                border-color: rgba(2, 132, 199, 0.7) !important;
-            }
-            .stamp-dp span {
-                color: #0284c7 !important;
-            }
-            .stamp-batal {
-                border-color: #e11d48 !important;
-                background-color: rgba(255, 241, 242, 0.6) !important;
-                color: #e11d48 !important;
-            }
-            .stamp-batal::before {
-                border-color: rgba(225, 29, 72, 0.7) !important;
-            }
-            .stamp-batal span {
-                color: #e11d48 !important;
-            }
-            .stamp-overdue {
-                border-color: #ea580c !important;
-                background-color: rgba(255, 247, 237, 0.6) !important;
-                color: #ea580c !important;
-            }
-            .stamp-overdue::before {
-                border-color: rgba(234, 88, 12, 0.7) !important;
-            }
-            .stamp-overdue span {
-                color: #ea580c !important;
-            }
-            .invoice-total-due-label {
-                color: var(--invoice-gold) !important;
-            }
-            .invoice-total-due-value {
-                color: var(--invoice-ink) !important;
-            }
-            .invoice-payment-block,
-            .invoice-meta-card,
-            .invoice-summary-block,
-            .invoice-subtotal-block,
-            .invoice-notes-block,
-            .invoice-signature-block,
-            .invoice-line-row {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-            .invoice-block {
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
-            }
-            .invoice-overview-block {
-                margin-bottom: 4mm !important;
-                padding-top: 5mm !important;
-                padding-bottom: 4mm !important;
-            }
-            .invoice-table-block {
-                margin-top: 0 !important;
-                padding-top: 0 !important;
-                padding-bottom: 0 !important;
-            }
-            .invoice-main-title {
-                font-size: 2.4rem !important;
-                line-height: 0.95 !important;
-                margin-bottom: 3mm !important;
-            }
-            .invoice-bill-to-name {
-                font-size: 0.98rem !important;
-                line-height: 1.25 !important;
-                letter-spacing: 0.07em !important;
-            }
-            .invoice-meta-card {
-                padding: 4mm !important;
-                font-size: 10px !important;
-            }
-            .invoice-table-block .w-full {
-                overflow: visible !important;
-            }
-            .invoice-table-block table {
-                width: 100% !important;
-                table-layout: fixed;
-            }
-            .invoice-table-block thead {
-                display: table-header-group;
-            }
-            .invoice-table-block tbody {
-                display: table-row-group;
-            }
-            .invoice-table th:nth-child(7),
-            .invoice-table td:nth-child(7) {
-                display: none !important;
-            }
-            .invoice-table th:nth-child(1),
-            .invoice-table td:nth-child(1) { width: 5%; }
-            .invoice-table th:nth-child(2),
-            .invoice-table td:nth-child(2) { width: 31%; }
-            .invoice-table th:nth-child(3),
-            .invoice-table td:nth-child(3) { width: 12%; }
-            .invoice-table th:nth-child(4),
-            .invoice-table td:nth-child(4) { width: 19%; }
-            .invoice-table th:nth-child(5),
-            .invoice-table td:nth-child(5) { width: 15%; }
-            .invoice-table th:nth-child(6),
-            .invoice-table td:nth-child(6) { width: 18%; }
-            .invoice-table th {
-                font-size: 6.8px !important;
-                line-height: 1.2 !important;
-                padding: 1.4mm 1.1mm !important;
-                white-space: normal !important;
-                word-break: break-word !important;
-                vertical-align: bottom !important;
-            }
             .invoice-table td {
-                font-size: 9px !important;
-                line-height: 1.25 !important;
-                padding: 1.8mm 1.1mm !important;
-                word-break: break-word !important;
-                vertical-align: top !important;
+                font-size: 13px !important;
+                padding: 12px 14px !important;
             }
             .invoice-row-description {
-                font-size: 10px !important;
-                line-height: 1.25 !important;
+                font-size: 13.5px !important;
             }
-            .invoice-payment-summary-section {
-                display: grid !important;
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-                gap: 4mm !important;
-                align-items: start !important;
-            }
-            .invoice-payment-summary-section > .invoice-payment-block,
-            .invoice-payment-summary-section > .invoice-summary-block {
-                min-width: 0 !important;
-                width: auto !important;
-            }
-            .invoice-payment-summary-section > .invoice-subtotal-block {
-                grid-column: 1 / -1 !important;
-            }
+            ${columnStyles}
+            
+            .invoice-payment-block,
             .invoice-bank-card,
-            .invoice-rate-card {
-                min-height: 36mm !important;
-            }
-            .invoice-subtotal-card {
-                border-top-width: 2px !important;
-                border-top-color: var(--invoice-gold) !important;
-            }
-            .invoice-subtotal-label {
-                color: var(--invoice-gold) !important;
-            }
-            .invoice-subtotal-value {
-                color: var(--invoice-ink) !important;
-            }
-            thead,
-            tbody,
-            tr,
-            td,
-            th {
+            .invoice-rate-card,
+            .invoice-subtotal-card,
+            .invoice-notes,
+            .invoice-signature-block,
+            .invoice-table tr {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
@@ -809,204 +1133,162 @@ export async function exportInvoicePdf(
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
-        .rub-el-hizb-pattern {
-            position: relative;
-            isolation: isolate;
-            background: #ffffff;
-        }
-        .rub-el-hizb-pattern::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background-image: url("${escapeHtml(logoUrl)}");
-            background-repeat: repeat;
-            background-position: 0 0;
-            background-size: 170px auto;
-            opacity: 0.028;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .rub-el-hizb-pattern > * {
-            position: relative;
-            z-index: 1;
-        }
-        .luxury-gradient {
-            background: linear-gradient(135deg, #1A1A1A 0%, #333333 100%);
-        }
-        .invoice-header-brand {
-            color: var(--invoice-gold) !important;
-        }
-        .invoice-header-subtitle {
-            color: var(--invoice-gold) !important;
-        }
-        .invoice-header-doc-label {
-            color: var(--invoice-gold-soft) !important;
-        }
-        .invoice-total-due-row {
-            background: transparent !important;
-            color: var(--invoice-ink) !important;
-            border-top: 2px solid var(--invoice-gold) !important;
-            box-shadow: none !important;
-        }
-        .invoice-section-accent,
-        .invoice-accent-icon {
-            color: var(--invoice-gold) !important;
-        }
-        .invoice-status-label,
-        .invoice-status-value {
-            color: var(--invoice-ink) !important;
-        }
-        .invoice-total-due-label {
-            color: var(--invoice-gold) !important;
-        }
-        .invoice-total-due-value {
-            color: var(--invoice-ink) !important;
-        }
-        .invoice-footer {
-            border-top: 2px solid var(--invoice-gold) !important;
-        }
-        .invoice-footer,
-        .invoice-footer * {
-            color: var(--invoice-gold) !important;
-        }
-        .invoice-footer-muted {
-            color: var(--invoice-gold-soft) !important;
-        }
-        .gold-border {
-            border-image: linear-gradient(to bottom, #D4AF37, #B8860B) 1;
-        }
     </style>
 </head>
 <body class="font-body text-luxury-black antialiased">
 <div class="print-container bg-white rub-el-hizb-pattern border border-stone-200">
-<header class="w-full luxury-gradient flex justify-between items-center px-10 py-7 relative z-10 border-b-4 border-gold-primary">
-<div class="flex items-center gap-6">
-<img alt="Logo" class="h-16 w-auto object-contain" decoding="sync" fetchpriority="high" src="${escapeHtml(logoUrl)}"/>
-<div class="flex flex-col">
-<span class="invoice-header-brand font-bold text-xl uppercase tracking-[0.3em] font-headline">Ghaniya Tour</span>
-<span class="invoice-header-subtitle font-manrope text-xl font-light tracking-tight">Umrah Group Summary</span>
+<header class="invoice-header">
+<div class="invoice-header-left">
+<img alt="Logo" class="invoice-header-logo" decoding="sync" fetchpriority="high" src="${escapeHtml(logoUrl)}"/>
+<div class="invoice-header-info">
+<h1 class="invoice-header-title">PT. Ghaniya Zilia Rahman</h1>
+<span class="invoice-header-sub">IZIN PPIU: SK NO U.419 TAHUN 2021</span>
+<p class="invoice-header-address">
+Graha Al Badegel Jl. Hajjah Tutty Alawiyah No.7, RT.2/RW.5, Kalibata, Kec. Pancoran, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta
+</p>
 </div>
 </div>
-<div class="text-right">
-<span class="invoice-header-doc-label uppercase tracking-[0.3em] text-[10px] font-bold">Official Document</span>
+<div class="invoice-header-right">
+<span class="invoice-header-doc-label">INVOICE</span>
 </div>
 </header>
-<section class="invoice-block invoice-overview-block px-10 py-6 grid grid-cols-12 gap-5 items-start">
-<div class="col-span-7">
-<h1 class="invoice-main-title font-headline text-5xl font-extrabold text-luxury-black tracking-tighter mb-4">INVOICE</h1>
-${stampHtml}
-<div class="space-y-1">
-<h2 class="invoice-bill-to-name text-lg font-bold uppercase text-luxury-black">BILL TO: ${escapeHtml(billToName)}</h2>
+<section class="invoice-overview">
+<div class="invoice-bill-to">
+<h2 class="invoice-bill-to-title">Bill To</h2>
+<h3 class="invoice-bill-to-name">${escapeHtml(billToName)}</h3>
+${payload.recipientName?.trim() ? `<p class="invoice-bill-to-recipient">U.p. / Penerima: <span>${escapeHtml(payload.recipientName)}</span></p>` : ""}
+${payload.address?.trim() ? `<p class="invoice-bill-to-address">${escapeHtml(payload.address).replace(/\n/g, "<br/>")}</p>` : ""}
 </div>
+<div class="invoice-meta-container">
+<div class="invoice-meta-row">
+<span class="invoice-meta-label">Invoice #</span>
+<span class="invoice-meta-value invoice-num-highlight">${escapeHtml(payload.invoiceNumber)}</span>
 </div>
-<div class="invoice-meta-card col-span-5 bg-stone-50 p-5 border-t-2 border-luxury-black space-y-3">
-<div class="flex justify-between">
-<span class="text-stone-500 text-[10px] font-bold uppercase tracking-widest">Invoice #</span>
-<span class="font-bold text-luxury-black">${escapeHtml(payload.invoiceNumber)}</span>
+<div class="invoice-meta-row">
+<span class="invoice-meta-label">Date</span>
+<span class="invoice-meta-value">${escapeHtml(formatDateLabel(payload.issueDateIso))}</span>
 </div>
-<div class="flex justify-between">
-<span class="text-stone-500 text-[10px] font-bold uppercase tracking-widest">Date</span>
-<span class="font-bold text-luxury-black">${escapeHtml(formatDateLabel(payload.issueDateIso))}</span>
+<div class="invoice-meta-row">
+<span class="invoice-meta-label">Due Date</span>
+<span class="invoice-meta-value">${escapeHtml(formatDateLabel(payload.dueDateIso))}</span>
 </div>
-<div class="pt-4 border-t border-stone-200">
-<div class="flex justify-between items-center">
-<span class="invoice-status-label font-bold text-[10px] uppercase tracking-widest">Status</span>
-<span class="invoice-status-value text-[10px] font-bold uppercase tracking-widest">${escapeHtml(printableStatusLabel)}</span>
-</div>
+<div class="invoice-meta-row" style="margin-top: 6px; border-top: 1px solid rgba(184, 134, 11, 0.15); padding-top: 8px;">
+<span class="invoice-meta-label">Status</span>
+<span class="invoice-meta-value">${statusBadgeHtml}</span>
 </div>
 </div>
 </section>
-<section class="invoice-block invoice-table-block px-10 py-2">
-<div class="w-full overflow-hidden">
-<table class="invoice-table min-w-full border-collapse text-left">
-<thead class="border-b border-stone-300 bg-stone-100/90">
-<tr class="text-luxury-black">
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">No</th>
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">Uraian</th>
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">Jumlah (PAX)</th>
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">Harga per Unit (PAX)</th>
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">Total Harga</th>
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">Total Harga (IDR)</th>
-<th class="py-3 px-4 font-headline text-[9px] font-extrabold uppercase tracking-[0.13em] text-stone-500">Action</th>
+<section class="invoice-table-section">
+<table class="invoice-table">
+${isSingleCurrencyBilling ? `
+<thead>
+<tr>
+<th style="text-align: center;">No</th>
+<th>Uraian</th>
+<th style="text-align: center;">Jumlah (PAX)</th>
+<th style="text-align: right;">Harga Satuan</th>
+<th style="text-align: right;">Total Harga</th>
 </tr>
 </thead>
+` : `
+<thead>
+<tr>
+<th style="text-align: center;">No</th>
+<th>Uraian</th>
+<th style="text-align: center;">Jumlah (PAX)</th>
+<th style="text-align: right;">Harga per Unit</th>
+<th style="text-align: right;">Kurs</th>
+<th style="text-align: right;">Total Harga</th>
+<th style="text-align: right;">Total Harga (IDR)</th>
+</tr>
+</thead>
+`}
 <tbody class="divide-y divide-stone-100">
-${rowsHtml || '<tr><td colspan="7" class="py-6 px-4 text-center text-stone-500 text-sm">No invoice items</td></tr>'}
+${rowsHtml || `<tr><td colspan="${isSingleCurrencyBilling ? 5 : 7}" class="py-6 px-4 text-center text-stone-500 text-sm">No invoice items</td></tr>`}
 </tbody>
 </table>
+</section>
+<section class="invoice-summary-section">
+<div class="invoice-summary-left">
+<div class="invoice-payment-block">
+<h3 class="invoice-section-title">
+<span class="material-symbols-outlined" style="font-size: 12px; vertical-align: middle;">account_balance</span>
+Payment Instructions
+</h3>
+<div class="invoice-bank-card">
+<div class="bank-details">
+Account Bank: <strong>${escapeHtml(bankMeta.bankName)}</strong><br/>
+Account Number: <strong>${escapeHtml(bankMeta.accountNumber)}</strong><br/>
+Penerima / Beneficiary: <strong>${escapeHtml(beneficiaryName.toUpperCase())}</strong>
+</div>
+</div>
+</div>
+${isSingleCurrencyBilling && valasCurrency !== "IDR" ? '' : isRupiahOnly ? '' : `
+<div class="invoice-rate-block">
+<h3 class="invoice-section-title">
+<span class="material-symbols-outlined" style="font-size: 12px; vertical-align: middle;">currency_exchange</span>
+Exchange Rates
+</h3>
+<div class="invoice-rate-card">
+<div class="bank-details" style="display: flex; flex-direction: column; gap: 4px;">
+<div style="display: flex; justify-content: space-between;">
+<span>Rate SAR/IDR</span>
+<strong>IDR ${escapeHtml(formatRate(payload.sarToIdr))}</strong>
+</div>
+<div style="display: flex; justify-content: space-between;">
+<span>Rate USD/IDR</span>
+<strong>IDR ${escapeHtml(formatRate(payload.usdToIdr))}</strong>
+</div>
+</div>
+</div>
+</div>
+`}
+</div>
+<div class="invoice-summary-right">
+<div class="invoice-subtotal-card">
+<div class="subtotal-row">
+<span>Subtotal</span>
+<strong>${escapeHtml(displaySubtotal)}</strong>
+</div>
+${payload.tax > 0 ? `
+<div class="subtotal-row">
+<span>Tax (${taxPercentage}%)</span>
+<strong>${escapeHtml(formatCurrency(payload.tax, valasCurrency))}</strong>
+</div>
+` : ''}
+${payload.downPayment > 0 ? `
+<div class="subtotal-row">
+<span>Total Tagihan</span>
+<strong>${escapeHtml(displayTotalPayable)}</strong>
+</div>
+<div class="subtotal-row" style="color: #dc2626;">
+<span>Uang Muka / DP</span>
+<strong>-${escapeHtml(displayDownPayment)}</strong>
+</div>
+` : ''}
+<div class="subtotal-row grand-total ${isPaidInvoice ? 'invoice-paid-total' : ''}">
+<span class="grand-total-label">${escapeHtml(resolveOutstandingBalanceLabel(payload))}</span>
+<span class="grand-total-value">${escapeHtml(displayRemainingBalance)}</span>
+</div>
+</div>
 </div>
 </section>
-<section class="invoice-block invoice-payment-summary-section grid grid-cols-1 gap-4 px-10 py-4 bg-stone-50/50 lg:grid-cols-2 items-start">
-<div class="invoice-payment-block space-y-3">
-<h3 class="invoice-section-accent text-[9px] font-extrabold uppercase tracking-[0.25em] mb-1">Payment Instructions</h3>
-<div class="invoice-bank-card bg-white p-4 border border-stone-200 shadow-sm">
-<div class="flex items-center gap-2 mb-2">
-<span class="invoice-accent-icon material-symbols-outlined">account_balance</span>
-<span class="font-bold text-luxury-black uppercase tracking-[0.18em] text-[13px]">${escapeHtml(bankMeta.bankName)}</span>
+<section class="invoice-bottom-section">
+<div class="invoice-notes">
+<h3 class="invoice-notes-title">Message / Catatan</h3>
+<p class="invoice-notes-text">${notesHtml}</p>
 </div>
-<p class="text-[11px] text-stone-500 mb-1">Account Number: <span class="font-bold text-luxury-black text-[13px]">${escapeHtml(bankMeta.accountNumber)}</span></p>
-<p class="text-[11px] text-stone-500">Beneficiary: <span class="font-bold text-luxury-black uppercase tracking-wider text-[13px]">${escapeHtml(companyProfile.brandName.toUpperCase())}</span></p>
+<div class="invoice-signature-block">
+<div class="signature-container">
+<img alt="Cap Ghaniya" class="stamp-img" decoding="sync" fetchpriority="high" src="${escapeHtml(capUrl)}"/>
+<img alt="Tanda Tangan Husein" class="signature-img" decoding="sync" fetchpriority="high" src="${escapeHtml(signatureUrl)}"/>
 </div>
-</div>
-<div class="invoice-summary-block invoice-rate-block space-y-3">
-<h3 class="invoice-section-accent text-[9px] font-extrabold uppercase tracking-[0.25em] mb-1">Exchange Rates</h3>
-<div class="invoice-rate-card bg-white p-4 border border-stone-200 shadow-sm">
-<div class="space-y-2">
-<div class="flex justify-between items-center gap-4 border-b border-stone-100 pb-2">
-<span class="text-[8px] text-stone-400 font-bold uppercase tracking-widest">Rate SAR/IDR</span>
-<span class="font-bold text-[13px] text-luxury-black">IDR ${escapeHtml(formatRate(payload.sarToIdr))}</span>
-</div>
-<div class="flex justify-between items-center gap-4 pt-1">
-<span class="text-[8px] text-stone-400 font-bold uppercase tracking-widest">Rate USD/IDR</span>
-<span class="font-bold text-[13px] text-luxury-black">IDR ${escapeHtml(formatRate(payload.usdToIdr))}</span>
-</div>
-</div>
-</div>
-</div>
-<div class="invoice-subtotal-block lg:col-span-2">
-<div class="invoice-subtotal-card bg-white p-4 border border-stone-200 shadow-sm">
-<div class="flex justify-between items-end gap-4 border-b border-stone-100 pb-2 mb-2">
-<span class="invoice-subtotal-label text-[9px] font-extrabold uppercase tracking-[0.25em]">Subtotal</span>
-<span class="invoice-subtotal-value font-manrope text-2xl font-extrabold tracking-tight text-right">${escapeHtml(formatIdr(payload.subtotalIdr))}</span>
-</div>
-<div class="space-y-1.5">
-<div class="flex justify-between items-center text-[11px]">
-<span class="text-stone-500 font-medium">Tax (${taxPercentage}%)</span>
-<span class="font-manrope font-semibold text-luxury-black">${escapeHtml(formatIdr(payload.taxIdr))}</span>
-</div>
-<div class="flex justify-between items-center text-[11px]">
-<span class="text-stone-500 font-medium">Yang harus dibayarkan</span>
-<span class="font-manrope font-semibold text-luxury-black">${escapeHtml(formatIdr(payload.totalPayableIdr))}</span>
-</div>
-<div class="flex justify-between items-center text-[11px]">
-<span class="text-stone-500 font-medium">DP</span>
-<span class="font-manrope font-semibold text-red-700">${escapeHtml(formatIdr(payload.downPaymentIdr))}</span>
-</div>
-</div>
-<div class="invoice-total-due-row mt-2 flex justify-between items-center py-2.5 ${isPaidInvoice ? "invoice-paid-total px-3 rounded-xl" : ""}">
-<span class="invoice-total-due-label font-bold uppercase tracking-[0.2em] text-[9px]">${escapeHtml(resolveOutstandingBalanceLabel(payload))}</span>
-<span class="invoice-total-due-value font-manrope text-lg font-extrabold tracking-tight">${escapeHtml(formatIdr(payload.remainingBalanceIdr))}</span>
-</div>
+<p class="signature-name">${escapeHtml(companyProfile.directorName)}</p>
+<p class="signature-title">${escapeHtml(companyProfile.directorTitle)}</p>
 </div>
 </section>
-<section class="invoice-block px-10 py-4 grid grid-cols-2 gap-6 border-t border-stone-100 items-start">
-<div class="invoice-notes-block space-y-3">
-<div>
-<p class="text-[10px] font-extrabold text-luxury-black uppercase tracking-widest mb-1.5">Message</p>
-<p class="text-xs text-stone-500 leading-relaxed">${notesHtml}</p>
-</div>
-</div>
-<div class="invoice-signature-block flex flex-col items-center justify-start pt-1">
-<div class="w-48 border-b-2 border-gold-primary mb-2 relative pb-2 pt-3 flex justify-center">
-<img alt="Cap Ghaniya" class="h-16 w-auto object-contain opacity-25 absolute -top-6 left-1/2 -translate-x-1/2" decoding="sync" fetchpriority="high" src="${escapeHtml(capUrl)}"/>
-<img alt="Tanda Tangan Husein" class="h-14 w-auto object-contain relative z-10" decoding="sync" fetchpriority="high" src="${escapeHtml(signatureUrl)}"/>
-</div>
-<p class="font-bold text-luxury-black uppercase tracking-[0.25em] text-[10px]">${escapeHtml(companyProfile.directorName)}</p>
-<p class="invoice-section-accent text-[8px] font-bold uppercase tracking-widest mt-1">${escapeHtml(companyProfile.directorTitle)}</p>
-</div>
-</section>
-<footer class="invoice-footer flex justify-center items-center w-full px-10 py-2 mt-auto luxury-gradient border-t-2 border-gold-primary">
-<span class="invoice-footer-muted font-inter text-[8pt] uppercase tracking-[0.2em]">© 2026 Ghaniya Tour</span>
+<footer class="invoice-footer">
+<span class="invoice-footer-text">© 2026 PT. Ghaniya Zilia Rahman</span>
 </footer>
 </div>
 </body></html>`;

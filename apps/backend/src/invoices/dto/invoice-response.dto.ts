@@ -64,6 +64,12 @@ export class InvoiceListItemResponseDto {
   @ApiProperty({ example: "2026-04" })
   monthKey!: string;
 
+  @ApiPropertyOptional({ example: "PT Ghaniya Tour Travel" })
+  recipientName?: string;
+
+  @ApiPropertyOptional({ example: "Catatan tambahan invoice..." })
+  notes?: string;
+
   @ApiPropertyOptional({
     description: "Daftar item invoice yang tersimpan.",
     type: [InvoiceLineItemDto],
