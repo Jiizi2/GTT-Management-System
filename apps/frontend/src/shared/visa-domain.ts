@@ -377,6 +377,7 @@ export function filterAgreementDrafts(
     rowReturnIso?: string;
     totalPax: number;
     connectedAgreementKeys: Set<string>;
+    existingAgreements?: Array<{ stayStartIso: string; stayEndIso: string }>;
   },
 ): { makkah: HotelAgreementDraft[]; madinah: HotelAgreementDraft[] } {
   const availableDrafts: Record<"makkah" | "madinah", HotelAgreementDraft[]> = {
@@ -386,6 +387,42 @@ export function filterAgreementDrafts(
 
   const groupArrival = (params.groupArrivalDate ?? "").trim() || (params.rowDepartureIso ?? "").trim();
   const groupReturn = (params.groupReturnDate ?? "").trim() || (params.rowReturnIso ?? "").trim();
+
+  const getStayNights = (startIso: string, endIso: string): string[] => {
+    const nights: string[] = [];
+    const startMs = Date.parse(startIso);
+    const endMs = Date.parse(endIso);
+    if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+      return [];
+    }
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    for (let currentMs = startMs; currentMs < endMs; currentMs += oneDayMs) {
+      nights.push(new Date(currentMs).toISOString().slice(0, 10));
+    }
+    return nights;
+  };
+
+  const groupNights = isIsoDateValue(groupArrival) && isIsoDateValue(groupReturn)
+    ? getStayNights(groupArrival, groupReturn)
+    : [];
+
+  const coveredNights = new Set<string>();
+  if (params.existingAgreements) {
+    for (const agreement of params.existingAgreements) {
+      const aggStart = (agreement.stayStartIso ?? "").trim();
+      const aggEnd = (agreement.stayEndIso ?? "").trim();
+      if (isIsoDateValue(aggStart) && isIsoDateValue(aggEnd)) {
+        const aggNights = getStayNights(aggStart, aggEnd);
+        for (const night of aggNights) {
+          coveredNights.add(night);
+        }
+      }
+    }
+  }
+
+  const uncoveredNights = groupNights.length > 0
+    ? groupNights.filter((night) => !coveredNights.has(night))
+    : [];
 
   for (const draft of drafts) {
     if (draft.assignmentStatus === "Assigned") {
@@ -397,21 +434,61 @@ export function filterAgreementDrafts(
       continue;
     }
 
-    // 1. Group Travel Period Filtering (Option A: Fully Contained)
+    const draftStart = (draft.stayStartIso ?? "").trim();
+    const draftEnd = (draft.stayEndIso ?? "").trim();
+
+    // 1. Group Travel Period Filtering (Option A: Fully Contained -> replaced with Coverage-Centric Overlap)
     if (isIsoDateValue(groupArrival) && isIsoDateValue(groupReturn)) {
-      const draftStart = (draft.stayStartIso ?? "").trim();
-      const draftEnd = (draft.stayEndIso ?? "").trim();
       if (isIsoDateValue(draftStart) && isIsoDateValue(draftEnd)) {
-        if (draftStart < groupArrival || draftEnd > groupReturn) {
+        const groupStartMs = Date.parse(groupArrival);
+        const groupEndMs = Date.parse(groupReturn);
+        const draftStartMs = Date.parse(draftStart);
+        const draftEndMs = Date.parse(draftEnd);
+        const overlapsWithGroup = Math.max(groupStartMs, draftStartMs) < Math.min(groupEndMs, draftEndMs);
+        if (!overlapsWithGroup) {
           continue;
         }
       }
     }
 
+    let targetNights = uncoveredNights.length > 0 ? uncoveredNights : groupNights;
+    if (targetNights.length > 0 && isIsoDateValue(draftStart) && isIsoDateValue(draftEnd)) {
+      targetNights = targetNights.filter((night) => night >= draftStart && night < draftEnd);
+      if (targetNights.length === 0) {
+        continue;
+      }
+    }
+
     // 2. Pax Sufficiency Filtering
-    const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
-    if (availablePax < params.totalPax) {
-      continue;
+    if (targetNights.length > 0) {
+      const assignedGroups = draft.assignedGroups ?? [];
+      let minRemaining = assignedGroups.length > 0
+        ? draft.pax
+        : (draft.remainingPax !== undefined ? draft.remainingPax : draft.pax);
+      for (const night of targetNights) {
+        const occupiedOnNight = assignedGroups
+          .filter((g: any) => {
+            const gStart = g.stayStart ?? g.stayStartIso;
+            const gEnd = g.stayEnd ?? g.stayEndIso;
+            if (gStart && gEnd) {
+              return night >= gStart && night < gEnd;
+            }
+            return true;
+          })
+          .reduce((sum: number, g: any) => sum + g.pax, 0);
+        const remainingOnNight = Math.max(0, draft.pax - occupiedOnNight);
+        if (remainingOnNight < minRemaining) {
+          minRemaining = remainingOnNight;
+        }
+      }
+      if (minRemaining < params.totalPax) {
+        continue;
+      }
+    } else {
+      const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+      if (availablePax < params.totalPax) {
+        continue;
+      }
     }
 
     availableDrafts[draft.city].push(draft);

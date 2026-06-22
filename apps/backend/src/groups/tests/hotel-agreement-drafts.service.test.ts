@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { AgreementApprovalStatus, AgreementCity } from "@prisma/client";
+import { AgreementApprovalStatus, AgreementCity, VisaStatus, VisaPaymentStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
 import { HotelAgreementDraftsService } from "../application/hotel-agreement-drafts.service";
@@ -463,6 +463,140 @@ async function testDraftUpdateCascade(): Promise<void> {
   }
 }
 
+async function testPartialAgreementConsumption(): Promise<void> {
+  const { groupsService, draftsService, restore } = await createMemoryServices();
+
+  try {
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-P-1",
+        pax: 4,
+        arrivalDate: "2026-06-10",
+        returnDate: "2026-06-15",
+        visaSetup: {
+          visaStatus: VisaStatus.DRAFT,
+          syarikah: "Provider",
+          paymentStatus: VisaPaymentStatus.UNPAID,
+          hotelAgreements: [
+            {
+              id: "existing-mak-b",
+              city: AgreementCity.MAKKAH,
+              hotelName: "Hotel B",
+              agreementNumber: "AG-B",
+              pax: 4,
+              status: AgreementApprovalStatus.APPROVED,
+              stayStart: "2026-06-10",
+              stayEnd: "2026-06-13",
+            }
+          ],
+          raudhahAppointments: [],
+        } as any
+      })
+    );
+
+    const draftA = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Hotel A",
+      agreementNumber: "AG-A",
+      pax: 4,
+      status: AgreementApprovalStatus.APPROVED,
+      stayStart: "2026-06-01",
+      stayEnd: "2026-06-30",
+    })) as { id: string; remainingPax: number };
+
+    await draftsService.assign(draftA.id, {
+      groupCode: "GROUP-P-1",
+    });
+
+    const group = (await groupsService.findOneByIdOrCode("GROUP-P-1")) as any;
+    const hotelAgreements = group.visaSetup?.hotelAgreements ?? [];
+    assert.equal(hotelAgreements.length, 2);
+    const assignedA = hotelAgreements.find((h: any) => h.agreementNumber === "AG-A");
+    assert.ok(assignedA);
+    assert.equal(assignedA.stayStart, "2026-06-13");
+    assert.equal(assignedA.stayEnd, "2026-06-15");
+    assert.equal(assignedA.pax, 4);
+
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-P-2",
+        pax: 4,
+        arrivalDate: "2026-06-01",
+        returnDate: "2026-06-12",
+      })
+    );
+
+    const assignedTo2 = (await draftsService.assign(draftA.id, {
+      groupCode: "GROUP-P-2",
+    })) as any;
+    assert.ok(assignedTo2);
+    const group2 = (await groupsService.findOneByIdOrCode("GROUP-P-2")) as any;
+    const hotelAgreements2 = group2.visaSetup?.hotelAgreements ?? [];
+    assert.equal(hotelAgreements2.length, 1);
+    assert.equal(hotelAgreements2[0].agreementNumber, "AG-A");
+    assert.equal(hotelAgreements2[0].stayStart, "2026-06-01");
+    assert.equal(hotelAgreements2[0].stayEnd, "2026-06-12");
+
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-P-3",
+        pax: 4,
+        arrivalDate: "2026-06-12",
+        returnDate: "2026-06-15",
+      })
+    );
+    await assert.rejects(
+      draftsService.assign(draftA.id, { groupCode: "GROUP-P-3" }),
+      /remaining capacity/i
+    );
+
+  } finally {
+    restore();
+  }
+}
+
+async function testExplicitSubPeriodAssignment(): Promise<void> {
+  const { groupsService, draftsService, restore } = await createMemoryServices();
+
+  try {
+    await groupsService.create(
+      createGroupPayload({
+        code: "GROUP-SUB-1",
+        pax: 5,
+        arrivalDate: "2026-06-10",
+        returnDate: "2026-06-20",
+      })
+    );
+
+    const draft = (await draftsService.create({
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Sub",
+      agreementNumber: "AG-SUB",
+      pax: 10,
+      status: AgreementApprovalStatus.APPROVED,
+      stayStart: "2026-06-01",
+      stayEnd: "2026-06-30",
+    })) as { id: string };
+
+    // Explicitly assign only for 12 June - 15 June (3 nights)
+    await draftsService.assign(draft.id, {
+      groupCode: "GROUP-SUB-1",
+      stayStart: "2026-06-12",
+      stayEnd: "2026-06-15",
+    });
+
+    const group = (await groupsService.findOneByIdOrCode("GROUP-SUB-1")) as any;
+    const hotelAgreements = group.visaSetup?.hotelAgreements ?? [];
+    assert.equal(hotelAgreements.length, 1);
+    assert.equal(hotelAgreements[0].stayStart, "2026-06-12");
+    assert.equal(hotelAgreements[0].stayEnd, "2026-06-15");
+    assert.equal(hotelAgreements[0].pax, 5);
+
+  } finally {
+    restore();
+  }
+}
+
 async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft create update delete",
@@ -487,6 +621,14 @@ async function main(): Promise<void> {
   await runCase(
     "hotel agreement draft update cascade to linked agreements",
     testDraftUpdateCascade,
+  );
+  await runCase(
+    "hotel agreement draft partial consumption and period capacity validation",
+    testPartialAgreementConsumption,
+  );
+  await runCase(
+    "hotel agreement draft explicit sub-period assignment dates override",
+    testExplicitSubPeriodAssignment,
   );
 }
 

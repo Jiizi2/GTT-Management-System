@@ -401,7 +401,7 @@ function testFilterAgreementDrafts(): void {
       pax: 50,
       remainingPax: 50,
       status: "Approved",
-      stayStartIso: "2026-06-20", // starts too early
+      stayStartIso: "2026-06-20", // starts too early but overlaps
       stayEndIso: "2026-07-02",
       notes: "",
       assignmentStatus: "Unassigned",
@@ -418,7 +418,7 @@ function testFilterAgreementDrafts(): void {
       remainingPax: 50,
       status: "Approved",
       stayStartIso: "2026-06-24",
-      stayEndIso: "2026-07-05", // ends too late
+      stayEndIso: "2026-07-05", // ends too late but overlaps
       notes: "",
       assignmentStatus: "Unassigned",
       createdAtIso: "2026-06-20T00:00:00Z",
@@ -440,6 +440,25 @@ function testFilterAgreementDrafts(): void {
       createdAtIso: "2026-06-20T00:00:00Z",
       updatedAtIso: "2026-06-20T00:00:00Z",
     },
+    {
+      id: "d6",
+      city: "makkah",
+      agentName: "Agent F",
+      hotelName: "Makkah Palace",
+      agreementNumber: "AG-6",
+      pax: 50,
+      remainingPax: 0, // overall remaining is 0, but it is free for our group stay dates
+      assignedGroups: [
+        { groupCode: "OTHER", pax: 50, stayStartIso: "2026-06-20", stayEndIso: "2026-06-24" }
+      ],
+      status: "Approved",
+      stayStartIso: "2026-06-20",
+      stayEndIso: "2026-07-02",
+      notes: "",
+      assignmentStatus: "Partially Assigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    }
   ];
 
   const result = filterAgreementDrafts(drafts, {
@@ -449,8 +468,11 @@ function testFilterAgreementDrafts(): void {
     connectedAgreementKeys: new Set(),
   });
 
-  assert.equal(result.makkah.length, 1);
-  assert.equal(result.makkah[0].id, "d1");
+  assert.equal(result.makkah.length, 4);
+  assert.equal(result.makkah.some(d => d.id === "d1"), true);
+  assert.equal(result.makkah.some(d => d.id === "d3"), true);
+  assert.equal(result.makkah.some(d => d.id === "d4"), true);
+  assert.equal(result.makkah.some(d => d.id === "d6"), true);
 
   assert.equal(result.madinah.length, 1);
   assert.equal(result.madinah[0].id, "d5");

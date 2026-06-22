@@ -30,6 +30,7 @@ import type {
 
 const {
   formatVisaDateWithYear,
+  formatVisaShortDate,
   generateWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   isIsoDateValue,
@@ -290,278 +291,253 @@ function getRaudhahStatusBadgeClasses(status: RaudhahStatus): string {
   return "border-brand-secondary/30 bg-brand-secondary/12 text-brand-secondary";
 }
 
-const inlineHotelFieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-medium text-slate-700";
-const inlineHotelInputClassName =
-  "h-11 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
-const inlineHotelSelectClassName = "serene-select";
 
-const inlineHotelSchema = z
-  .object({
-    hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
-    agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
-    pax: z
-      .string()
-      .trim()
-      .min(1, "Total pax wajib diisi.")
-      .refine((value) => {
-        const parsedValue = Number.parseInt(value, 10);
-        return Number.isInteger(parsedValue) && parsedValue > 0;
-      }, "Total pax harus lebih dari 0."),
-    status: z.enum(["Waiting for Approval", "Approved", "Rejected"]),
-    stayStartIso: z.string().trim().min(1, "Stay start date wajib diisi."),
-    stayEndIso: z.string().trim().min(1, "Stay end date wajib diisi."),
-  })
-  .refine((values) => values.stayEndIso >= values.stayStartIso, {
-    path: ["stayEndIso"],
-    message: "Stay end date tidak boleh sebelum stay start date.",
-  });
 
-function InlineHotelAgreementForm({
-  title,
-  hotelPlaceholder,
-  initialValue,
-  onCancel,
-  onSave,
-}: {
-  title: string;
-  hotelPlaceholder: string;
-  initialValue: VisaHotelEditFormState;
-  onCancel: () => void;
-  onSave: (values: VisaHotelEditFormState) => void | Promise<void>;
-}) {
-  const {
-    control,
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<VisaHotelEditFormState>({
-    resolver: zodResolver(inlineHotelSchema),
-    defaultValues: initialValue,
-  });
-  const hotelNameErrorMessage = errors.hotelName?.message;
-  const agreementNumberErrorMessage = errors.agreementNumber?.message;
-  const paxErrorMessage = errors.pax?.message;
-  const statusErrorMessage = errors.status?.message;
-  const stayStartErrorMessage = errors.stayStartIso?.message;
-  const stayEndErrorMessage = errors.stayEndIso?.message;
-
-  return (
-    <article className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-      <div className="mb-3 flex items-center gap-2 text-emerald-900">
-        <span className="material-symbols-outlined text-base" aria-hidden="true">
-          add_home_work
-        </span>
-        <h3 className="text-sm font-semibold">{title}</h3>
-      </div>
-
-      <form className="space-y-4" onSubmit={handleSubmit((values) => void onSave(values))}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="grid gap-1.5">
-            <label className={inlineHotelFieldClassName}>
-              <span>Hotel Name</span>
-              <input
-                id="visa-inline-hotel-name"
-                type="text"
-                className={inlineHotelInputClassName}
-                placeholder={hotelPlaceholder}
-                {...register("hotelName")}
-                aria-invalid={getFieldAriaInvalid(hotelNameErrorMessage)}
-                aria-describedby={getFieldDescribedBy("visa-inline-hotel-name", {
-                  errorMessage: hotelNameErrorMessage,
-                })}
-              />
-            </label>
-            <FieldErrorMessage fieldId="visa-inline-hotel-name" message={hotelNameErrorMessage} />
-          </div>
-
-          <div className="grid gap-1.5">
-            <label className={inlineHotelFieldClassName}>
-              <span>Agreement Number</span>
-              <input
-                id="visa-inline-agreement-number"
-                type="text"
-                className={inlineHotelInputClassName}
-                placeholder="2026xxxxxxxxxxxxx"
-                {...register("agreementNumber")}
-                aria-invalid={getFieldAriaInvalid(agreementNumberErrorMessage)}
-                aria-describedby={getFieldDescribedBy("visa-inline-agreement-number", {
-                  errorMessage: agreementNumberErrorMessage,
-                })}
-              />
-            </label>
-            <FieldErrorMessage fieldId="visa-inline-agreement-number" message={agreementNumberErrorMessage} />
-          </div>
-
-          <div className="grid gap-1.5">
-            <label className={inlineHotelFieldClassName}>
-              <span>Total Pax</span>
-              <input
-                id="visa-inline-hotel-pax"
-                type="number"
-                min={1}
-                className={inlineHotelInputClassName}
-                placeholder="70"
-                {...register("pax")}
-                aria-invalid={getFieldAriaInvalid(paxErrorMessage)}
-                aria-describedby={getFieldDescribedBy("visa-inline-hotel-pax", {
-                  errorMessage: paxErrorMessage,
-                })}
-              />
-            </label>
-            <FieldErrorMessage fieldId="visa-inline-hotel-pax" message={paxErrorMessage} />
-          </div>
-
-          <div className="grid gap-1.5">
-            <label className={inlineHotelFieldClassName}>
-              <span>Approval Status</span>
-              <div className="relative">
-                <Controller
-                  control={control}
-                  name="status"
-                  render={({ field }) => (
-                    <SereneSelect
-                      id="visa-inline-hotel-status"
-                      className={inlineHotelSelectClassName}
-                      value={field.value}
-                      onChange={(event) => field.onChange(event.target.value)}
-                      aria-invalid={getFieldAriaInvalid(statusErrorMessage)}
-                      aria-describedby={getFieldDescribedBy("visa-inline-hotel-status", {
-                        errorMessage: statusErrorMessage,
-                      })}
-                    >
-                      <option value="Waiting for Approval">Waiting for Approval</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
-                    </SereneSelect>
-                  )}
-                />
-              </div>
-            </label>
-            <FieldErrorMessage fieldId="visa-inline-hotel-status" message={statusErrorMessage} />
-          </div>
-
-          <div className="grid gap-1.5">
-            <label className={inlineHotelFieldClassName}>
-              <span>Stay Start Date</span>
-              <Controller
-                control={control}
-                name="stayStartIso"
-                render={({ field }) => (
-                  <DatePickerInput
-                    id="visa-inline-hotel-stay-start"
-                    inputClassName={inlineHotelInputClassName}
-                    value={field.value}
-                    onChange={field.onChange}
-                    ariaInvalid={getFieldAriaInvalid(stayStartErrorMessage)}
-                    ariaDescribedBy={getFieldDescribedBy("visa-inline-hotel-stay-start", {
-                      errorMessage: stayStartErrorMessage,
-                    })}
-                  />
-                )}
-              />
-            </label>
-            <FieldErrorMessage fieldId="visa-inline-hotel-stay-start" message={stayStartErrorMessage} />
-          </div>
-
-          <div className="grid gap-1.5">
-            <label className={inlineHotelFieldClassName}>
-              <span>Stay End Date</span>
-              <Controller
-                control={control}
-                name="stayEndIso"
-                render={({ field }) => (
-                  <DatePickerInput
-                    id="visa-inline-hotel-stay-end"
-                    inputClassName={inlineHotelInputClassName}
-                    value={field.value}
-                    onChange={field.onChange}
-                    ariaInvalid={getFieldAriaInvalid(stayEndErrorMessage)}
-                    ariaDescribedBy={getFieldDescribedBy("visa-inline-hotel-stay-end", {
-                      errorMessage: stayEndErrorMessage,
-                    })}
-                  />
-                )}
-              />
-            </label>
-            <FieldErrorMessage fieldId="visa-inline-hotel-stay-end" message={stayEndErrorMessage} />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center rounded-xl border border-slate-300 bg-surface-container-lowest px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="inline-flex items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Saving..." : "Save Agreement"}
-          </button>
-          {isSubmitting ? (
-            <p className="sr-only" role="status" aria-live="polite">
-              Saving hotel agreement.
-            </p>
-          ) : null}
-        </div>
-      </form>
-    </article>
-  );
-}
-
-function getRemainingPaxForDraft(draft: HotelAgreementDraft, group: GroupData | null): number {
-  if (!group) {
-    return 0;
+function getUncoveredPeriod(
+  city: "makkah" | "madinah",
+  groupArrival: string,
+  groupReturn: string,
+  existingAgreements: GroupAgreementHotel[]
+): { start: string; end: string } {
+  if (!isIsoDateValue(groupArrival) || !isIsoDateValue(groupReturn)) {
+    return { start: "", end: "" };
   }
-  const city = draft.city;
-  const hotels = getGroupAgreementHotelsByCity(group, city);
-  
-  const draftStart = draft.stayStartIso.trim();
-  const draftEnd = draft.stayEndIso.trim();
-  if (!isIsoDateValue(draftStart) || !isIsoDateValue(draftEnd)) {
-    return Math.max(0, group.pax);
+  const nights: string[] = [];
+  const startMs = Date.parse(groupArrival);
+  const endMs = Date.parse(groupReturn);
+  if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+    return { start: "", end: "" };
   }
-  const draftStartMs = Date.parse(draftStart);
-  const draftEndMs = Date.parse(draftEnd);
-  
-  const overlappingHotels = hotels.filter((h) => {
-    const hStart = h.stayStartIso.trim();
-    const hEnd = h.stayEndIso.trim();
-    if (!isIsoDateValue(hStart) || !isIsoDateValue(hEnd)) {
-      return false;
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  for (let currentMs = startMs; currentMs < endMs; currentMs += oneDayMs) {
+    nights.push(new Date(currentMs).toISOString().slice(0, 10));
+  }
+
+  const covered = new Set<string>();
+  for (const agg of existingAgreements) {
+    const aggStart = (agg.stayStartIso ?? "").trim();
+    const aggEnd = (agg.stayEndIso ?? "").trim();
+    if (isIsoDateValue(aggStart) && isIsoDateValue(aggEnd)) {
+      const startValMs = Date.parse(aggStart);
+      const endValMs = Date.parse(aggEnd);
+      for (let currMs = startValMs; currMs < endValMs; currMs += oneDayMs) {
+        covered.add(new Date(currMs).toISOString().slice(0, 10));
+      }
     }
-    return Math.max(draftStartMs, Date.parse(hStart)) < Math.min(draftEndMs, Date.parse(hEnd));
-  });
-  
-  const assignedSum = overlappingHotels.reduce((sum, h) => sum + Math.max(0, h.pax || 0), 0);
-  return Math.max(0, group.pax - assignedSum);
+  }
+
+  const uncovered = nights.filter((n) => !covered.has(n));
+  if (uncovered.length === 0) {
+    return { start: groupArrival, end: groupReturn };
+  }
+
+  const sorted = uncovered.sort();
+  const first = sorted[0];
+  let last = first;
+  for (let i = 1; i < sorted.length; i++) {
+    const currentMs = Date.parse(sorted[i]);
+    const prevMs = Date.parse(sorted[i - 1]);
+    if (currentMs - prevMs === oneDayMs) {
+      last = sorted[i];
+    } else {
+      break;
+    }
+  }
+  const nextDay = new Date(Date.parse(last) + oneDayMs).toISOString().slice(0, 10);
+  return { start: first, end: nextDay };
 }
 
 function AgreementInboxDraftAssignmentList({
   city,
   drafts,
   group,
-  remainingPax,
   isLoading,
   isError,
   assigningDraftId,
   onAssignDraft,
+  coverageStartIso,
+  coverageEndIso,
+  onCoverageDatesChange,
+  onCancel,
 }: {
   city: "makkah" | "madinah";
   drafts: HotelAgreementDraft[];
   group: GroupData | null;
-  remainingPax: number;
   isLoading: boolean;
   isError: boolean;
   assigningDraftId: string | null;
-  onAssignDraft: (draft: HotelAgreementDraft) => void;
+  onAssignDraft: (draft: HotelAgreementDraft, selectedStart: string, selectedEnd: string) => void;
+  coverageStartIso: string;
+  coverageEndIso: string;
+  onCoverageDatesChange: (start: string, end: string) => void;
+  onCancel: () => void;
 }) {
   const cityLabel = city === "makkah" ? "Makkah" : "Madinah";
-  const safeRemainingPax = Math.max(0, remainingPax);
+
+  // Filter drafts that overlap with the selected coverage period
+  const eligibleDrafts = useMemo(() => {
+    if (!isIsoDateValue(coverageStartIso) || !isIsoDateValue(coverageEndIso)) {
+      return [];
+    }
+    const startMs = Date.parse(coverageStartIso);
+    const endMs = Date.parse(coverageEndIso);
+    if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+      return [];
+    }
+
+    const getStayNights = (startIso: string, endIso: string): string[] => {
+      const nights: string[] = [];
+      const startValMs = Date.parse(startIso);
+      const endValMs = Date.parse(endIso);
+      if (isNaN(startValMs) || isNaN(endValMs) || startValMs >= endValMs) {
+        return [];
+      }
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      for (let currentMs = startValMs; currentMs < endValMs; currentMs += oneDayMs) {
+        nights.push(new Date(currentMs).toISOString().slice(0, 10));
+      }
+      return nights;
+    };
+
+    const targetNights = getStayNights(coverageStartIso, coverageEndIso);
+
+    return drafts
+      .filter((draft) => {
+        if (draft.city !== city) return false;
+        if (draft.assignmentStatus === "Assigned") return false;
+
+        const draftStart = (draft.stayStartIso ?? "").trim();
+        const draftEnd = (draft.stayEndIso ?? "").trim();
+        if (!isIsoDateValue(draftStart) || !isIsoDateValue(draftEnd)) return false;
+
+        const draftStartMs = Date.parse(draftStart);
+        const draftEndMs = Date.parse(draftEnd);
+
+        // Verify overlap with the selected range
+        return Math.max(startMs, draftStartMs) < Math.min(endMs, draftEndMs);
+      })
+      .map((draft) => {
+        const draftStart = (draft.stayStartIso ?? "").trim();
+        const draftEnd = (draft.stayEndIso ?? "").trim();
+
+        // Calculate actual coverage sub-period
+        const overlapStart = new Date(Math.max(startMs, Date.parse(draftStart))).toISOString().slice(0, 10);
+        const overlapEnd = new Date(Math.min(endMs, Date.parse(draftEnd))).toISOString().slice(0, 10);
+
+        const overlapNights = targetNights.filter((n) => n >= draftStart && n < draftEnd);
+
+        // Calculate available capacity for this draft on the overlap nights
+        let minRemaining = draft.pax;
+        const assignedGroups = draft.assignedGroups ?? [];
+        if (overlapNights.length > 0) {
+          minRemaining = assignedGroups.length > 0
+            ? draft.pax
+            : (draft.remainingPax !== undefined ? draft.remainingPax : draft.pax);
+
+          for (const night of overlapNights) {
+            const occupiedOnNight = assignedGroups
+              .filter((g: any) => {
+                const gStart = g.stayStart ?? g.stayStartIso;
+                const gEnd = g.stayEnd ?? g.stayEndIso;
+                if (gStart && gEnd) {
+                  return night >= gStart && night < gEnd;
+                }
+                return true;
+              })
+              .reduce((sum: number, g: any) => sum + g.pax, 0);
+            const remainingOnNight = Math.max(0, draft.pax - occupiedOnNight);
+            if (remainingOnNight < minRemaining) {
+              minRemaining = remainingOnNight;
+            }
+          }
+        } else {
+          minRemaining = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+        }
+
+        const isFullCoverage = draftStart <= coverageStartIso && draftEnd >= coverageEndIso;
+
+        return {
+          draft,
+          minRemaining,
+          overlapStart,
+          overlapEnd,
+          isFullCoverage,
+        };
+      })
+      .filter((item) => item.minRemaining > 0);
+  }, [drafts, city, coverageStartIso, coverageEndIso]);
+
+  const fullCoverageDrafts = useMemo(() => eligibleDrafts.filter((d) => d.isFullCoverage), [eligibleDrafts]);
+  const partialCoverageDrafts = useMemo(() => eligibleDrafts.filter((d) => !d.isFullCoverage), [eligibleDrafts]);
+
+  const renderDraftList = (items: typeof eligibleDrafts, typeLabel: "Full" | "Partial") => {
+    return (
+      <div className="space-y-2 mt-4">
+        <h4 className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 mb-2">
+          {typeLabel === "Full" ? "Full Coverage Available" : "Partial Coverage Available"} ({items.length})
+        </h4>
+        {items.map(({ draft, minRemaining, overlapStart, overlapEnd }) => {
+          const isAssigning = assigningDraftId === draft.id;
+          const isAlreadyAssignedToGroup = draft.assignedGroups?.some(
+            (g) => normalizeAgreementMatchValue(g.groupCode) === normalizeAgreementMatchValue(group?.code ?? "")
+          ) ?? false;
+          const isAssignable = minRemaining > 0 && !assigningDraftId && !isAlreadyAssignedToGroup;
+
+          return (
+            <article
+              key={draft.id}
+              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-surface-container-low p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h5 className="break-words text-sm font-bold text-slate-900">{draft.hotelName}</h5>
+                  <span className="inline-flex rounded-md border border-slate-200 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
+                    Pax {draft.remainingPax !== undefined && draft.remainingPax < draft.pax ? `${minRemaining}/${draft.pax}` : draft.pax}
+                  </span>
+                  <span
+                    className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                      typeLabel === "Full"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {typeLabel === "Full" ? "Full Coverage" : "Partial Coverage"}
+                  </span>
+                </div>
+                {draft.agentName ? (
+                  <p className="mt-1 text-xs font-semibold text-brand-primary">Agent: {draft.agentName}</p>
+                ) : null}
+                <p className="mt-1 break-words text-xs font-semibold text-slate-700">{draft.agreementNumber}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                  Validity: {formatAgreementDraftStayRange(draft)}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-700">
+                  Coverage: {formatVisaShortDate(overlapStart)} - {formatVisaShortDate(overlapEnd)}
+                </p>
+                {isAlreadyAssignedToGroup ? (
+                  <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                    Sudah di-assign ke grup ini.
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-xs font-bold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => onAssignDraft(draft, overlapStart, overlapEnd)}
+                disabled={!isAssignable}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  {isAssigning ? "sync" : "link"}
+                </span>
+                <span>{isAssigning ? "Assigning..." : "Assign"}</span>
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <section className="mt-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
@@ -570,9 +546,41 @@ function AgreementInboxDraftAssignmentList({
           <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand-primary">Agreement Inbox</p>
           <h3 className="mt-0.5 text-sm font-bold text-slate-900">Available {cityLabel} Agreements</h3>
         </div>
-        <span className="inline-flex w-fit rounded-lg border border-slate-200 bg-surface-container-low px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
-          {safeRemainingPax} pax remaining
-        </span>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-xs font-semibold text-slate-700 transition hover:border-brand-tertiary hover:text-brand-tertiary"
+          onClick={onCancel}
+        >
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            close
+          </span>
+          <span>Close</span>
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-3 rounded-xl border border-slate-200 bg-surface-container-low p-3 shadow-sm sm:flex-row sm:items-center">
+        <div className="flex-1">
+          <label htmlFor={`coverage-start-${city}`} className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
+            Start Date
+          </label>
+          <DatePickerInput
+            id={`coverage-start-${city}`}
+            inputClassName="mt-1 block w-full rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+            value={coverageStartIso}
+            onChange={(val) => onCoverageDatesChange(val, coverageEndIso)}
+          />
+        </div>
+        <div className="flex-1">
+          <label htmlFor={`coverage-end-${city}`} className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
+            End Date
+          </label>
+          <DatePickerInput
+            id={`coverage-end-${city}`}
+            inputClassName="mt-1 block w-full rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+            value={coverageEndIso}
+            onChange={(val) => onCoverageDatesChange(coverageStartIso, val)}
+          />
+        </div>
       </div>
 
       {isLoading ? (
@@ -587,75 +595,14 @@ function AgreementInboxDraftAssignmentList({
         </p>
       ) : null}
 
-      {!isLoading && drafts.length === 0 ? (
+      {!isLoading && eligibleDrafts.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500">
-          Tidak ada draft {cityLabel} yang belum assigned.
+          Tidak ada draft {cityLabel} yang cocok dengan periode dan kapasitas yang dicari.
         </p>
       ) : null}
 
-      {drafts.length > 0 ? (
-        <div className="mt-3 space-y-2">
-          {drafts.map((draft) => {
-            const isAssigning = assigningDraftId === draft.id;
-            const draftAvailablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
-            const isAlreadyAssignedToGroup = draft.assignedGroups?.some(
-              (g) => normalizeAgreementMatchValue(g.groupCode) === normalizeAgreementMatchValue(group?.code ?? "")
-            ) ?? false;
-            const isAssignable = draftAvailablePax > 0 && !assigningDraftId && !isAlreadyAssignedToGroup;
-
-            return (
-              <article
-                key={draft.id}
-                className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-surface-container-low p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="break-words text-sm font-bold text-slate-900">{draft.hotelName}</h4>
-                    <span className="inline-flex rounded-md border border-slate-200 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
-                      Pax {draft.remainingPax !== undefined && draft.remainingPax < draft.pax ? `${draft.remainingPax}/${draft.pax}` : draft.pax}
-                    </span>
-                    <span
-                      className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${getAgreementStatusClasses(
-                        draft.status === "Approved",
-                      )}`}
-                    >
-                      {getAgreementStatusLabel(draft.status)}
-                    </span>
-                  </div>
-                  {draft.agentName ? (
-                    <p className="mt-1 text-xs font-semibold text-brand-primary">Agent: {draft.agentName}</p>
-                  ) : null}
-                  <p className="mt-1 break-words text-xs font-semibold text-slate-700">{draft.agreementNumber}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                    {formatAgreementDraftStayRange(draft)}
-                  </p>
-                  {draftAvailablePax <= 0 ? (
-                    <p className="mt-1 text-[11px] font-semibold text-amber-700">
-                      Draft ini sudah terpakai sepenuhnya.
-                    </p>
-                  ) : isAlreadyAssignedToGroup ? (
-                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">
-                      Sudah di-assign ke grup ini.
-                    </p>
-                  ) : null}
-                </div>
-
-                <button
-                  type="button"
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-xs font-bold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => onAssignDraft(draft)}
-                  disabled={!isAssignable}
-                >
-                  <span className="material-symbols-outlined text-base" aria-hidden="true">
-                    {isAssigning ? "sync" : "link"}
-                  </span>
-                  <span>{isAssigning ? "Assigning..." : "Assign"}</span>
-                </button>
-              </article>
-            );
-          })}
-        </div>
-      ) : null}
+      {!isLoading && fullCoverageDrafts.length > 0 ? renderDraftList(fullCoverageDrafts, "Full") : null}
+      {!isLoading && partialCoverageDrafts.length > 0 ? renderDraftList(partialCoverageDrafts, "Partial") : null}
     </section>
   );
 }
@@ -742,6 +689,8 @@ export function VisaTrackingDetailScreen({
   const [hotelDraftSeed, setHotelDraftSeed] = useState<VisaHotelEditFormState | null>(null);
   const [hotelDraftOwnerGroupCode, setHotelDraftOwnerGroupCode] = useState<string | null>(null);
   const [addingHotelCity, setAddingHotelCity] = useState<"makkah" | "madinah" | null>(null);
+  const [coverageStartIso, setCoverageStartIso] = useState<string>("");
+  const [coverageEndIso, setCoverageEndIso] = useState<string>("");
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
   const [isDeleteGroupModalOpen, setIsDeleteGroupModalOpen] = useState(false);
   const [deleteAgreementDraft, setDeleteAgreementDraft] = useState<{
@@ -818,6 +767,10 @@ export function VisaTrackingDetailScreen({
       rowReturnIso: row.returnIso,
       totalPax,
       connectedAgreementKeys,
+      existingAgreements: [
+        ...makkahAgreements,
+        ...madinahAgreements,
+      ],
     });
   }, [
     agreementDraftsQuery.data,
@@ -827,6 +780,8 @@ export function VisaTrackingDetailScreen({
     row.departureIso,
     row.returnIso,
     totalPax,
+    makkahAgreements,
+    madinahAgreements,
   ]);
   const assignedDraftByAgreementId = useMemo(() => {
     const drafts = agreementDraftsQuery.data ?? [];
@@ -1026,6 +981,14 @@ export function VisaTrackingDetailScreen({
     setActiveModal(null);
     setHotelDraftSeed(null);
     setAddingHotelCity(city);
+    setDraftAssignFeedback(null);
+
+    const groupArrival = group?.arrivalDate || row.departureIso || "";
+    const groupReturn = group?.returnDate || row.returnIso || "";
+    const existing = city === "makkah" ? makkahAgreements : madinahAgreements;
+    const { start, end } = getUncoveredPeriod(city, groupArrival, groupReturn, existing);
+    setCoverageStartIso(start);
+    setCoverageEndIso(end);
   };
 
   const cancelAddHotelInline = () => {
@@ -1167,27 +1130,21 @@ export function VisaTrackingDetailScreen({
     closeModal();
   };
 
-  const saveAddHotelInline = (city: "makkah" | "madinah", hotel: VisaHotelEditFormState) => {
-    onUpdateVisaHotel(activeGroupCode, city, hotel);
-    setAddingHotelCity(null);
-  };
 
-  const assignAgreementDraft = async (draft: HotelAgreementDraft) => {
-    const remainingPax = getRemainingPaxForDraft(draft, group);
-    if (remainingPax <= 0) {
-      setDraftAssignFeedback({
-        tone: "error",
-        message: `Pax ${draft.city === "makkah" ? "Makkah" : "Madinah"} sudah penuh untuk periode stay ini.`,
-      });
-      return;
-    }
 
+  const assignAgreementDraft = async (
+    draft: HotelAgreementDraft,
+    selectedStart?: string,
+    selectedEnd?: string,
+  ) => {
     setAssigningAgreementDraftId(draft.id);
     setDraftAssignFeedback(null);
     try {
       await assignAgreementDraftInBackend({
         draftId: draft.id,
         groupCode: activeGroupCode,
+        stayStartIso: selectedStart,
+        stayEndIso: selectedEnd,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
@@ -1749,26 +1706,22 @@ export function VisaTrackingDetailScreen({
           </div>
 
           {addingHotelCity === "makkah" ? (
-            <>
-              <AgreementInboxDraftAssignmentList
-                city="makkah"
-                drafts={availableAgreementDraftsByCity.makkah}
-                group={group}
-                remainingPax={makkahMissing}
-                isLoading={agreementDraftsQuery.isLoading}
-                isError={agreementDraftsQuery.isError}
-                assigningDraftId={assigningAgreementDraftId}
-                onAssignDraft={(draft) => void assignAgreementDraft(draft)}
-              />
-              <InlineHotelAgreementForm
-                key="makkah-add-agreement"
-                title="New Makkah Agreement"
-                hotelPlaceholder="e.g. Swissotel Al Maqam"
-                initialValue={buildHotelDraft("makkah", "add")}
-                onCancel={cancelAddHotelInline}
-                onSave={(hotel) => saveAddHotelInline("makkah", hotel)}
-              />
-            </>
+            <AgreementInboxDraftAssignmentList
+              city="makkah"
+              drafts={agreementDraftsQuery.data ?? []}
+              group={group}
+              isLoading={agreementDraftsQuery.isLoading}
+              isError={agreementDraftsQuery.isError}
+              assigningDraftId={assigningAgreementDraftId}
+              onAssignDraft={(draft, selectedStart, selectedEnd) => void assignAgreementDraft(draft, selectedStart, selectedEnd)}
+              coverageStartIso={coverageStartIso}
+              coverageEndIso={coverageEndIso}
+              onCoverageDatesChange={(start, end) => {
+                setCoverageStartIso(start);
+                setCoverageEndIso(end);
+              }}
+              onCancel={cancelAddHotelInline}
+            />
           ) : null}
 
           <div
@@ -1906,26 +1859,22 @@ export function VisaTrackingDetailScreen({
           </div>
 
           {addingHotelCity === "madinah" ? (
-            <>
-              <AgreementInboxDraftAssignmentList
-                city="madinah"
-                drafts={availableAgreementDraftsByCity.madinah}
-                group={group}
-                remainingPax={madinahMissing}
-                isLoading={agreementDraftsQuery.isLoading}
-                isError={agreementDraftsQuery.isError}
-                assigningDraftId={assigningAgreementDraftId}
-                onAssignDraft={(draft) => void assignAgreementDraft(draft)}
-              />
-              <InlineHotelAgreementForm
-                key="madinah-add-agreement"
-                title="New Madinah Agreement"
-                hotelPlaceholder="e.g. Pullman Zamzam Madinah"
-                initialValue={buildHotelDraft("madinah", "add")}
-                onCancel={cancelAddHotelInline}
-                onSave={(hotel) => saveAddHotelInline("madinah", hotel)}
-              />
-            </>
+            <AgreementInboxDraftAssignmentList
+              city="madinah"
+              drafts={agreementDraftsQuery.data ?? []}
+              group={group}
+              isLoading={agreementDraftsQuery.isLoading}
+              isError={agreementDraftsQuery.isError}
+              assigningDraftId={assigningAgreementDraftId}
+              onAssignDraft={(draft, selectedStart, selectedEnd) => void assignAgreementDraft(draft, selectedStart, selectedEnd)}
+              coverageStartIso={coverageStartIso}
+              coverageEndIso={coverageEndIso}
+              onCoverageDatesChange={(start, end) => {
+                setCoverageStartIso(start);
+                setCoverageEndIso(end);
+              }}
+              onCancel={cancelAddHotelInline}
+            />
           ) : null}
 
           <div
