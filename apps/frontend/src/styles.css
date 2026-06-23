@@ -203,7 +203,7 @@
   --serene-input-border-width: 0px;
   --serene-input-bottom-border-width: 2px;
   --serene-input-focus-shadow: none;
-  --serene-floating-surface: rgb(var(--color-surface-variant) / 0.7);
+  --serene-floating-surface: rgb(var(--color-background-deep));
   --serene-floating-blur: 12px;
   --checklist-need-border-rgb: 128 108 75;
   --checklist-need-section-bg-rgb: 41 38 33;
@@ -295,6 +295,7 @@ img {
   word-wrap: normal;
   direction: ltr;
   -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
   font-variation-settings:
     "FILL" 0,

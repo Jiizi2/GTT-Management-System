@@ -1948,7 +1948,7 @@ export function CreateInvoiceWorkspace({
         ? createPortal(
             <div
               ref={cancelConfirmationDialogRef}
-              className="serene-modal-overlay fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4"
+              className="serene-modal-overlay fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
               role="dialog"
               aria-modal="true"
               aria-labelledby="invoice-cancel-confirmation-title"
@@ -2010,23 +2010,7 @@ export function CreateInvoiceWorkspace({
           )
         : null}
 
-      <div
-        className={`fixed bottom-6 left-1/2 z-[60] w-[min(94vw,42rem)] -translate-x-1/2 rounded-2xl border-2 border-amber-300 bg-amber-50 px-5 py-4 text-amber-900 shadow-[0_20px_42px_rgba(146,64,14,0.24)] transition-all duration-200 ${
-          saveFeedback ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
-        }`}
-        role="alert"
-        aria-live="assertive"
-      >
-        <div className="flex items-start gap-3">
-          <span className="material-symbols-outlined mt-0.5 text-2xl text-amber-700" aria-hidden="true">
-            warning
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-extrabold uppercase tracking-[0.08em]">Periksa Data Invoice</p>
-            <p className="mt-1 text-base font-bold leading-snug">{saveFeedback ?? ""}</p>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 }

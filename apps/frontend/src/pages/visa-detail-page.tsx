@@ -1349,30 +1349,34 @@ export function VisaTrackingDetailScreen({
               {row.groupCode}
             </h1>
             {familyGroups.length > 1 && (
-              <span className={`inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600 ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
-                <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
-                <span>Terhubung:</span>
-                {familyGroups.filter(g => g.code !== activeGroupCode).map((g, index) => (
-                  <span key={g.code} className="inline-flex items-center gap-1">
-                    {index > 0 && ", "}
-                    <button
-                      type="button"
-                      onClick={() => setActiveGroupCode(g.code)}
-                      className="font-bold text-slate-900 hover:underline"
-                    >
-                      {g.code}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenUnlinkModal(g)}
-                      className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
-                      title="Pisahkan grup ini"
-                    >
-                      <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
-                    </button>
-                  </span>
-                ))}
-              </span>
+              <div className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 sm:inline-flex ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
+                <div className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
+                  <span>Terhubung:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {familyGroups.filter(g => g.code !== activeGroupCode).map((g, index) => (
+                    <span key={g.code} className="inline-flex items-center gap-0.5">
+                      {index > 0 && <span className="mr-1.5 text-slate-300">,</span>}
+                      <button
+                        type="button"
+                        onClick={() => setActiveGroupCode(g.code)}
+                        className="font-bold text-slate-900 hover:underline"
+                      >
+                        {g.code}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUnlinkModal(g)}
+                        className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
+                        title="Pisahkan grup ini"
+                      >
+                        <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">

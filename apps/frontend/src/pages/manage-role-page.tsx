@@ -1190,7 +1190,7 @@ export function UserManagementScreen() {
       {editingUser ? (
         <UserManagementModalPortal>
           <div
-            className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
+            className="serene-modal-overlay fixed inset-0 z-[160] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
             onClick={closeEditModal}
           >
             <section
@@ -1307,7 +1307,7 @@ export function UserManagementScreen() {
       {passwordTargetUser ? (
         <UserManagementModalPortal>
           <div
-            className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
+            className="serene-modal-overlay fixed inset-0 z-[160] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
             onClick={closePasswordModal}
           >
             <section
@@ -1413,7 +1413,7 @@ export function UserManagementScreen() {
       {deleteTargetUser ? (
         <UserManagementModalPortal>
           <div
-            className="serene-modal-overlay fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4"
+            className="serene-modal-overlay fixed inset-0 z-[160] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
             onClick={closeDeleteModal}
           >
             <section
