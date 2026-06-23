@@ -16,6 +16,7 @@ import {
   resolveVisaProvider,
   shiftIsoDate,
   filterAgreementDrafts,
+  getInclusiveDays,
 } from "../shared/visa-domain.js";
 import { runCase } from "../test/run-case.js";
 
@@ -478,6 +479,18 @@ function testFilterAgreementDrafts(): void {
   assert.equal(result.madinah[0].id, "d5");
 }
 
+function testGetInclusiveDays(): void {
+  // same day
+  assert.equal(getInclusiveDays("2026-07-01", "2026-07-01"), 1);
+  // normal range
+  assert.equal(getInclusiveDays("2026-07-01", "2026-07-05"), 5);
+  // reverse range
+  assert.equal(getInclusiveDays("2026-07-05", "2026-07-01"), 0);
+  // invalid dates
+  assert.equal(getInclusiveDays("bad-date", "2026-07-01"), 0);
+  assert.equal(getInclusiveDays("", ""), 0);
+}
+
 describe("visa-domain", () => {
   runCase("shift and formatter behavior", testShiftAndDateFormatters);
   runCase("agreement number and city helpers", testAgreementNumberIsoValidationAndCityHotelSelection);
@@ -488,5 +501,6 @@ describe("visa-domain", () => {
   runCase("provider and action requirement helpers", testProviderAndActionRequirementHelpers);
   runCase("generate whatsapp copy text template", testGenerateWhatsappCopyText);
   runCase("filter agreement drafts in Add Hotel modal", testFilterAgreementDrafts);
+  runCase("inclusive days counting helper", testGetInclusiveDays);
 });
 

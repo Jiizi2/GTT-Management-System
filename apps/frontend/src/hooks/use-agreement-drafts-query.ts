@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { HotelAgreementDraft, HotelAgreementDraftFormState } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
@@ -259,5 +259,6 @@ export function useAgreementDraftsQuery(query: string, status: AgreementDraftSta
     retry: false,
     staleTime: 15_000,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }

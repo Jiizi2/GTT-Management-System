@@ -13,6 +13,7 @@ import {
   resolveVisaProvider,
   shiftIsoDate,
   filterAgreementDrafts,
+  getInclusiveDays,
 } from "./visa-domain.js";
 
 
@@ -210,6 +211,7 @@ export {
   resolveVisaProvider,
   shiftIsoDate,
   filterAgreementDrafts,
+  getInclusiveDays,
 };
 export {
   buildItineraryItemFromEditForm,

@@ -504,4 +504,16 @@ export function filterAgreementDrafts(
   };
 }
 
+export function getInclusiveDays(startIso: string, endIso: string): number {
+  if (!startIso || !endIso) return 0;
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
+  const diffTime = end.getTime() - start.getTime();
+  if (diffTime < 0) return 0;
+  return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+}
+
 

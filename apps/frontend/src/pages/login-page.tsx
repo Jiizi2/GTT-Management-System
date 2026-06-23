@@ -88,7 +88,7 @@ export function LoginScreen({
   };
 
   return (
-    <main className="flex min-h-screen bg-surface text-on-surface">
+    <main className="flex min-h-screen bg-surface text-on-surface animate-page-fade-in">
       <div className="fixed right-6 top-4 z-[120] sm:right-8 sm:top-6">
         <ThemeToggleButton variant="floating" />
       </div>

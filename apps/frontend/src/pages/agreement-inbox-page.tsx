@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Controller, type Control, type FieldErrors, type UseFormRegister, useForm } from "react-hook-form";
@@ -24,6 +24,7 @@ import {
   type AgreementApprovalStatus,
   type HotelAgreementDraft,
   type HotelAgreementDraftFormState,
+  getInclusiveDays,
 } from "../shared/app-domain";
 import { agreementDraftQueryKeys, groupQueryKeys } from "../shared/query-keys";
 
@@ -128,6 +129,8 @@ function getApprovalStatusIconName(draft: HotelAgreementDraft): "check_circle" |
 function getApprovalStatusLabel(draft: HotelAgreementDraft): AgreementApprovalStatus {
   return draft.status;
 }
+
+
 
 function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormState {
   return {
@@ -526,6 +529,8 @@ export function AgreementInboxScreen() {
   const linkedGroupCode = searchParams.get("groupCode")?.trim().toUpperCase() ?? "";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDraftComposerOpen, setIsDraftComposerOpen] = useState(false);
   const [editingDraft, setEditingDraft] = useState<HotelAgreementDraft | null>(null);
@@ -535,14 +540,45 @@ export function AgreementInboxScreen() {
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
   const normalizedSearchQuery = query.trim();
   const isSearchingAcrossStatuses = normalizedSearchQuery.length > 0;
-  const effectiveStatusFilter: AgreementDraftStatusFilter = isSearchingAcrossStatuses ? "all" : statusFilter;
+
+  const hasDatesSelected = startDateFilter !== "" && endDateFilter !== "";
+  const isDateRangeInvalid = hasDatesSelected && startDateFilter > endDateFilter;
+
+  const effectiveStatusFilter: AgreementDraftStatusFilter =
+    hasDatesSelected ? "all" : (isSearchingAcrossStatuses ? "all" : statusFilter);
   const draftsQuery = useAgreementDraftsQuery(query, effectiveStatusFilter);
   const drafts = draftsQuery.data ?? [];
-  const totalPages = Math.max(1, Math.ceil(drafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
+
+  const filteredDrafts = useMemo(() => {
+    let result = drafts;
+
+    if (hasDatesSelected && !isDateRangeInvalid) {
+      result = result.filter((draft) => {
+        return draft.stayStartIso <= endDateFilter && draft.stayEndIso >= startDateFilter;
+      });
+    }
+
+    if (hasDatesSelected && statusFilter !== "all") {
+      result = result.filter((draft) => {
+        const isAssigned = draft.assignmentStatus === "Assigned" || draft.assignmentStatus === "Partially Assigned";
+        if (statusFilter === "assigned") {
+          return isAssigned;
+        }
+        if (statusFilter === "unassigned") {
+          return !isAssigned;
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDrafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
-  const paginatedDrafts = drafts.slice(pageStartIndex, pageStartIndex + AGREEMENT_DRAFT_PAGE_SIZE);
-  const rangeStart = drafts.length === 0 ? 0 : pageStartIndex + 1;
-  const rangeEnd = drafts.length === 0 ? 0 : Math.min(drafts.length, pageStartIndex + paginatedDrafts.length);
+  const paginatedDrafts = filteredDrafts.slice(pageStartIndex, pageStartIndex + AGREEMENT_DRAFT_PAGE_SIZE);
+  const rangeStart = filteredDrafts.length === 0 ? 0 : pageStartIndex + 1;
+  const rangeEnd = filteredDrafts.length === 0 ? 0 : Math.min(filteredDrafts.length, pageStartIndex + paginatedDrafts.length);
 
   const saveDraftMutation = useMutation({
     mutationFn: saveAgreementDraftInBackend,
@@ -734,7 +770,7 @@ export function AgreementInboxScreen() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter]);
+  }, [query, statusFilter, startDateFilter, endDateFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -839,35 +875,106 @@ export function AgreementInboxScreen() {
         ) : null}
       </section>
 
-      <section className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2" aria-label="Agreement draft filters">
-          {(["unassigned", "assigned", "all"] as AgreementDraftStatusFilter[]).map((filter) => {
-            const isActive = effectiveStatusFilter === filter;
-            const label = filter === "all" ? "All" : filter === "assigned" ? "Assigned" : "Unassigned";
-            return (
-              <button
-                key={filter}
-                type="button"
-                className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${
-                  isActive
-                    ? "border-brand-primary/30 bg-brand-primary/12 text-brand-primary"
-                    : "border-slate-200 bg-surface-container-lowest text-slate-600 hover:border-brand-primary/30 hover:text-brand-primary"
-                }`}
-                onClick={() => setStatusFilter(filter)}
-              >
-                {label}
-              </button>
-            );
-          })}
+      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          {/* Status Segmented Control */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</span>
+            <div className="relative flex items-center bg-slate-100 dark:bg-surface-container-high/65 p-1 rounded-xl w-[278px] h-9">
+              {/* Sliding background indicator */}
+              <div
+                className="absolute top-1 bottom-1 left-1 bg-white dark:bg-surface-container-lowest rounded-lg shadow-sm transition-transform duration-200 ease-out"
+                style={{
+                  width: "88px",
+                  transform: `translateX(${
+                    statusFilter === "unassigned"
+                      ? "0px"
+                      : statusFilter === "assigned"
+                      ? "90px"
+                      : "180px"
+                  })`,
+                }}
+              />
+              {(["unassigned", "assigned", "all"] as AgreementDraftStatusFilter[]).map((filter) => {
+                const isActive = statusFilter === filter;
+                const label = filter === "all" ? "All" : filter === "assigned" ? "Assigned" : "Unassigned";
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    className={`relative z-10 w-[90px] h-full rounded-lg text-xs font-extrabold transition-colors duration-200 leading-none text-center ${
+                      isActive
+                        ? "text-brand-primary dark:text-primary"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    }`}
+                    onClick={() => setStatusFilter(filter)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Date Period Filter */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Stay Period</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <DatePickerInput
+                id="filter-start-date"
+                inputClassName="h-8 w-36 rounded-lg border border-slate-200 bg-surface-container-lowest px-2 text-xs font-semibold text-slate-900 outline-none transition focus:border-brand-primary"
+                value={startDateFilter}
+                onChange={setStartDateFilter}
+                placeholder="Start Date"
+              />
+              <span className="text-slate-400 font-bold text-xs">➔</span>
+              <DatePickerInput
+                id="filter-end-date"
+                inputClassName="h-8 w-36 rounded-lg border border-slate-200 bg-surface-container-lowest px-2 text-xs font-semibold text-slate-900 outline-none transition focus:border-brand-primary"
+                value={endDateFilter}
+                onChange={setEndDateFilter}
+                placeholder="End Date"
+              />
+              {(startDateFilter || endDateFilter) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDateFilter("");
+                    setEndDateFilter("");
+                  }}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-rose-600 transition shadow-sm border border-slate-200"
+                  title="Clear stay period"
+                  aria-label="Clear stay period"
+                >
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
+        {isDateRangeInvalid && (
+          <div className="mt-3 text-xs font-semibold text-rose-600 flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+              error
+            </span>
+            <span>End Date tidak boleh sebelum Start Date</span>
+          </div>
+        )}
+      </section>
+
+      <section className={`space-y-2 transition-opacity duration-200 ${draftsQuery.isFetching ? "opacity-60" : ""}`}>
         {draftsQuery.isLoading ? (
           <div className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-4 py-6 text-sm font-semibold text-slate-600">
             Loading agreement drafts...
           </div>
         ) : null}
 
-        {!draftsQuery.isLoading && drafts.length === 0 ? (
+        {!draftsQuery.isLoading && filteredDrafts.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-surface-container-lowest px-4 py-8 text-center">
             <span className="material-symbols-outlined text-3xl text-slate-400" aria-hidden="true">
               inventory_2
@@ -932,9 +1039,9 @@ export function AgreementInboxScreen() {
                         {draft.city === "makkah" ? "Makkah" : "Madinah"}
                       </span>
                       <span className="inline-flex rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-800">
-                        {draft.remainingPax !== undefined && draft.remainingPax < draft.pax
-                          ? `${draft.remainingPax}/${draft.pax} Pax`
-                          : `${draft.pax} Pax`}
+                        {draft.remainingPax !== undefined
+                          ? `Available: ${draft.remainingPax}/${draft.pax} Pax`
+                          : `Available: ${draft.pax} Pax`}
                       </span>
                     </div>
                   </div>
@@ -979,6 +1086,28 @@ export function AgreementInboxScreen() {
                         >
                           {draft.assignmentStatus}
                         </span>
+                        {hasDatesSelected && !isDateRangeInvalid && (() => {
+                          const isFullCoverage = draft.stayStartIso <= startDateFilter && draft.stayEndIso >= endDateFilter;
+                          const coverageType = isFullCoverage ? "Full Coverage" : "Partial Coverage";
+                          const filterDays = getInclusiveDays(startDateFilter, endDateFilter);
+                          const overlapStart = draft.stayStartIso > startDateFilter ? draft.stayStartIso : startDateFilter;
+                          const overlapEnd = draft.stayEndIso < endDateFilter ? draft.stayEndIso : endDateFilter;
+                          const matchDays = getInclusiveDays(overlapStart, overlapEnd);
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold uppercase leading-none tracking-[0.08em] ${
+                                isFullCoverage
+                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                  : "border-amber-400 bg-amber-50 text-amber-800"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
+                                {isFullCoverage ? "assignment_turned_in" : "assignment_late"}
+                              </span>
+                              <span>{coverageType} ({matchDays}/{filterDays} hari)</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <button

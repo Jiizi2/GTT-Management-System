@@ -112,7 +112,7 @@ export function DashboardWorkspaceShell({
       {syncFeedback ? (
         <div className="fixed bottom-24 left-4 right-4 z-[90] lg:bottom-6 lg:left-auto lg:right-6 lg:w-full lg:max-w-sm">
           <div
-            className={`flex items-start gap-3 rounded-2xl px-4 py-3 shadow-float backdrop-blur-serene ${syncFeedbackToneClassMap[syncFeedback.tone]}`}
+            className={`flex items-start gap-3 rounded-2xl px-4 py-3 shadow-float backdrop-blur-serene ${syncFeedbackToneClassMap[syncFeedback.tone]} animate-slide-down`}
             role="status"
             aria-live="polite"
           >
