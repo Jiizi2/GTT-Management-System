@@ -40,7 +40,7 @@ export function FieldErrorMessage({
   }
 
   return (
-    <p id={getFieldErrorId(fieldId)} role="alert" aria-live="polite" className={className}>
+    <p id={getFieldErrorId(fieldId)} role="alert" aria-live="polite" className={`${className} animate-slide-down`}>
       {message}
     </p>
   );

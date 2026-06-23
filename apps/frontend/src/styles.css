@@ -234,6 +234,7 @@
 html {
   min-height: 100%;
   background-color: rgb(var(--serene-app-background));
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -362,13 +363,13 @@ img {
   }
 
   .serene-accordion {
-    @apply overflow-hidden rounded-2xl bg-surface-container-lowest;
+    @apply overflow-hidden rounded-2xl bg-surface-container-lowest transition-all duration-300;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background-image: var(--serene-card-gradient);
   }
 
   .serene-accordion-summary {
-    @apply flex cursor-pointer list-none items-start gap-3 px-4 py-4 text-left transition-colors;
+    @apply flex cursor-pointer list-none items-start gap-3 px-4 py-4 text-left transition-colors duration-200;
   }
 
   .serene-accordion-summary::-webkit-details-marker {
@@ -376,7 +377,7 @@ img {
   }
 
   .serene-accordion-chevron {
-    @apply shrink-0 transition-transform duration-200;
+    @apply shrink-0 transition-transform duration-300 ease-out;
   }
 
   .serene-accordion[open] .serene-accordion-chevron {
@@ -386,6 +387,11 @@ img {
   .serene-accordion-content {
     @apply px-4 pb-4 pt-4;
     border-top: var(--serene-frame-border-width) solid var(--serene-divider-color);
+  }
+
+  .serene-accordion[open] .serene-accordion-content {
+    animation: serene-accordion-reveal 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top;
   }
 
   .serene-btn-primary {
@@ -774,12 +780,14 @@ img {
   .serene-modal-overlay {
     @apply fixed inset-0;
     background-color: rgb(var(--serene-overlay-rgb) / var(--serene-overlay-opacity));
+    animation: serene-fade-in 0.22s ease-out forwards;
   }
 
   .serene-modal-shell {
     @apply overflow-hidden rounded-3xl shadow-float;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background: var(--serene-floating-surface);
+    animation: serene-zoom-in 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
   .serene-dialog-header {
@@ -840,6 +848,76 @@ img {
     opacity: 0.05;
     pointer-events: none;
   }
+}
+
+/* Keyframes & Animations */
+@keyframes serene-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes serene-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes serene-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes serene-accordion-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+  }
+}
+
+.animate-page-fade-in {
+  animation: page-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-slide-down {
+  animation: serene-slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Global Form Alert Animation */
+[role="alert"] {
+  animation: serene-slide-down 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -89,187 +89,189 @@ export function AppMainContent({ controller }: { controller: AppController }) {
     // Reset the revealed route boundary on navigation so lazy-loaded screens
     // do not keep the previous page visible while the next chunk is loading.
     <Suspense key={`${location.pathname}${location.search}`} fallback={<ScreenLoadingFallback />}>
-      <Routes>
-        <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
-        <Route
-          path="/overview"
-          element={
-            <LazyOverviewScreen
-              query={controller.query}
-              filteredGroups={controller.filteredGroups}
-              isActiveOnly={controller.isActiveOnly}
-              overviewMonthFilter={controller.overviewMonthFilter}
-              overviewMonthOptions={controller.overviewMonthOptions}
-              statCards={controller.statCards}
-              summaryMessage={controller.summaryMessage}
-              onQueryChange={controller.handleQueryChange}
-              onToggleActiveOnly={controller.handleToggleActiveOnly}
-              onOverviewMonthFilterChange={controller.handleOverviewMonthFilterChange}
-              onOpenDetail={controller.handleOpenDetail}
-              groups={controller.groupRecords}
-            />
-          }
-        />
-        <Route
-          path="/groups/:groupCode"
-          element={
-            controller.selectedGroup ? (
-              <LazyGroupDetail
-                group={controller.selectedGroup}
+      <div className="animate-page-fade-in">
+        <Routes>
+          <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
+          <Route
+            path="/overview"
+            element={
+              <LazyOverviewScreen
+                query={controller.query}
+                filteredGroups={controller.filteredGroups}
+                isActiveOnly={controller.isActiveOnly}
+                overviewMonthFilter={controller.overviewMonthFilter}
+                overviewMonthOptions={controller.overviewMonthOptions}
+                statCards={controller.statCards}
+                summaryMessage={controller.summaryMessage}
+                onQueryChange={controller.handleQueryChange}
+                onToggleActiveOnly={controller.handleToggleActiveOnly}
+                onOverviewMonthFilterChange={controller.handleOverviewMonthFilterChange}
+                onOpenDetail={controller.handleOpenDetail}
                 groups={controller.groupRecords}
-                onBack={controller.handleBackToOverview}
-                onDeleteGroup={controller.handleDeleteGroup}
-                onSaveGroup={controller.handleSaveGroupDetail}
-                onPatchGroup={controller.handlePatchGroupDetail}
               />
-            ) : (
-              <LazyPlaceholderScreen
-                eyebrow="Group Detail"
-                title="Group belum ditemukan"
-                description="Endpoint group detail sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
-                icon="travel_explore"
+            }
+          />
+          <Route
+            path="/groups/:groupCode"
+            element={
+              controller.selectedGroup ? (
+                <LazyGroupDetail
+                  group={controller.selectedGroup}
+                  groups={controller.groupRecords}
+                  onBack={controller.handleBackToOverview}
+                  onDeleteGroup={controller.handleDeleteGroup}
+                  onSaveGroup={controller.handleSaveGroupDetail}
+                  onPatchGroup={controller.handlePatchGroupDetail}
+                />
+              ) : (
+                <LazyPlaceholderScreen
+                  eyebrow="Group Detail"
+                  title="Group belum ditemukan"
+                  description="Endpoint group detail sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
+                  icon="travel_explore"
+                />
+              )
+            }
+          />
+          <Route
+            path="/itinerary-builder/:groupCode"
+            element={
+              controller.selectedGroup ? (
+                <LazyGroupItineraryBuilderPage
+                  group={controller.selectedGroup}
+                  onBack={controller.handleOpenDetail}
+                  onSaveGroup={controller.handleSaveGroupDetail}
+                />
+              ) : (
+                <LazyPlaceholderScreen
+                  eyebrow="Itinerary Builder"
+                  title="Group belum ditemukan"
+                  description="Endpoint itinerary builder sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
+                  icon="edit_note"
+                />
+              )
+            }
+          />
+          <Route
+            path="/new-group"
+            element={
+              <LazyAddGroupWorkspaceScreen
+                onSaveGroup={controller.handleSaveInputGroup}
+                onSaveIdentity={controller.handleSaveGroupIdentity}
+                onCancel={controller.handleBackToOverview}
               />
-            )
-          }
-        />
-        <Route
-          path="/itinerary-builder/:groupCode"
-          element={
-            controller.selectedGroup ? (
-              <LazyGroupItineraryBuilderPage
-                group={controller.selectedGroup}
-                onBack={controller.handleOpenDetail}
-                onSaveGroup={controller.handleSaveGroupDetail}
-              />
-            ) : (
-              <LazyPlaceholderScreen
-                eyebrow="Itinerary Builder"
-                title="Group belum ditemukan"
-                description="Endpoint itinerary builder sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
-                icon="edit_note"
-              />
-            )
-          }
-        />
-        <Route
-          path="/new-group"
-          element={
-            <LazyAddGroupWorkspaceScreen
-              onSaveGroup={controller.handleSaveInputGroup}
-              onSaveIdentity={controller.handleSaveGroupIdentity}
-              onCancel={controller.handleBackToOverview}
-            />
-          }
-        />
-        <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
-        <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
-        <Route path="/agreement-inbox" element={<LazyAgreementInboxScreen />} />
-        <Route
-          path="/visa"
-          element={
-            <LazyVisaTrackingScreen
-              groups={controller.groupRecords}
-              onOpenDetail={controller.handleOpenVisaDetail}
-              onUpdateAgreementStatus={controller.handleUpdateAgreementStatus}
-            />
-          }
-        />
-        <Route
-          path="/visa/:groupCode"
-          element={
-            freshSelectedVisaRow ? (
-              <LazyVisaTrackingDetailScreen
-                row={freshSelectedVisaRow}
+            }
+          />
+          <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
+          <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
+          <Route path="/agreement-inbox" element={<LazyAgreementInboxScreen />} />
+          <Route
+            path="/visa"
+            element={
+              <LazyVisaTrackingScreen
                 groups={controller.groupRecords}
-                onBack={controller.handleBackToVisaTracking}
-                onDeleteGroup={controller.handleDeleteVisaGroup}
-                onSaveGroup={controller.handleSaveVisaGroupDetail}
-                onUpdateVisaStatus={controller.handleUpdateVisaStatus}
-                onUpdateVisaType={controller.handleUpdateVisaType}
-                onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
-                onUpdateSyarikah={controller.handleUpdateSyarikah}
-                onUpdateVisaHotel={controller.handleUpdateVisaHotel}
-                onDeleteVisaHotel={controller.handleDeleteVisaHotel}
-                onUpdateRaudhahAppointment={controller.handleUpdateRaudhahAppointment}
-                onClearRaudhahAppointment={controller.handleClearRaudhahAppointment}
+                onOpenDetail={controller.handleOpenVisaDetail}
+                onUpdateAgreementStatus={controller.handleUpdateAgreementStatus}
               />
-            ) : (
+            }
+          />
+          <Route
+            path="/visa/:groupCode"
+            element={
+              freshSelectedVisaRow ? (
+                <LazyVisaTrackingDetailScreen
+                  row={freshSelectedVisaRow}
+                  groups={controller.groupRecords}
+                  onBack={controller.handleBackToVisaTracking}
+                  onDeleteGroup={controller.handleDeleteVisaGroup}
+                  onSaveGroup={controller.handleSaveVisaGroupDetail}
+                  onUpdateVisaStatus={controller.handleUpdateVisaStatus}
+                  onUpdateVisaType={controller.handleUpdateVisaType}
+                  onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
+                  onUpdateSyarikah={controller.handleUpdateSyarikah}
+                  onUpdateVisaHotel={controller.handleUpdateVisaHotel}
+                  onDeleteVisaHotel={controller.handleDeleteVisaHotel}
+                  onUpdateRaudhahAppointment={controller.handleUpdateRaudhahAppointment}
+                  onClearRaudhahAppointment={controller.handleClearRaudhahAppointment}
+                />
+              ) : (
+                <LazyPlaceholderScreen
+                  eyebrow="Visa Detail"
+                  title="Visa detail belum ditemukan"
+                  description="Endpoint visa detail sedang dibuka, tapi data visa group-nya belum tersedia di browser saat ini."
+                  icon="fact_check"
+                />
+              )
+            }
+          />
+          <Route
+            path="/invoice"
+            element={<LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />}
+          />
+          <Route
+            path="/raudhah-reminder"
+            element={
+              <LazyRaudhahReminderScreen
+                groups={controller.groupRecords}
+                onOpenDetail={controller.handleOpenDetail}
+                onOpenVisaDetail={controller.handleOpenVisaDetail}
+                onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
+              />
+            }
+          />
+          <Route
+            path="/user-management"
+            element={
+              controller.sessionAccessTier === "super-admin" ? (
+                <LazyUserManagementScreen />
+              ) : (
+                <LazyPlaceholderScreen
+                  eyebrow="Restricted"
+                  title="Super Admin Only"
+                  description="User Management hanya tersedia untuk akun Super Admin."
+                  icon="lock"
+                />
+              )
+            }
+          />
+          <Route path="/manage-role" element={<Navigate to="/user-management" replace />} />
+          <Route
+            path="/master-data"
+            element={
+              controller.sessionAccessTier === "super-admin" ? (
+                <LazyMasterDataScreen />
+              ) : (
+                <LazyPlaceholderScreen
+                  eyebrow="Restricted"
+                  title="Super Admin Only"
+                  description="Master Data hanya tersedia untuk akun Super Admin."
+                  icon="lock"
+                />
+              )
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <LazyProfileScreen
+                onNavigate={controller.handleNavigate}
+                sessionAccessTier={controller.sessionAccessTier}
+              />
+            }
+          />
+          <Route
+            path="*"
+            element={
               <LazyPlaceholderScreen
-                eyebrow="Visa Detail"
-                title="Visa detail belum ditemukan"
-                description="Endpoint visa detail sedang dibuka, tapi data visa group-nya belum tersedia di browser saat ini."
-                icon="fact_check"
+                eyebrow="Coming Soon"
+                title="Page Not Available"
+                description="This module is not available yet."
+                icon="dashboard_customize"
               />
-            )
-          }
-        />
-        <Route
-          path="/invoice"
-          element={<LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />}
-        />
-        <Route
-          path="/raudhah-reminder"
-          element={
-            <LazyRaudhahReminderScreen
-              groups={controller.groupRecords}
-              onOpenDetail={controller.handleOpenDetail}
-              onOpenVisaDetail={controller.handleOpenVisaDetail}
-              onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
-            />
-          }
-        />
-        <Route
-          path="/user-management"
-          element={
-            controller.sessionAccessTier === "super-admin" ? (
-              <LazyUserManagementScreen />
-            ) : (
-              <LazyPlaceholderScreen
-                eyebrow="Restricted"
-                title="Super Admin Only"
-                description="User Management hanya tersedia untuk akun Super Admin."
-                icon="lock"
-              />
-            )
-          }
-        />
-        <Route path="/manage-role" element={<Navigate to="/user-management" replace />} />
-        <Route
-          path="/master-data"
-          element={
-            controller.sessionAccessTier === "super-admin" ? (
-              <LazyMasterDataScreen />
-            ) : (
-              <LazyPlaceholderScreen
-                eyebrow="Restricted"
-                title="Super Admin Only"
-                description="Master Data hanya tersedia untuk akun Super Admin."
-                icon="lock"
-              />
-            )
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <LazyProfileScreen
-              onNavigate={controller.handleNavigate}
-              sessionAccessTier={controller.sessionAccessTier}
-            />
-          }
-        />
-        <Route
-          path="*"
-          element={
-            <LazyPlaceholderScreen
-              eyebrow="Coming Soon"
-              title="Page Not Available"
-              description="This module is not available yet."
-              icon="dashboard_customize"
-            />
-          }
-        />
-      </Routes>
+            }
+          />
+        </Routes>
+      </div>
     </Suspense>
   );
 }

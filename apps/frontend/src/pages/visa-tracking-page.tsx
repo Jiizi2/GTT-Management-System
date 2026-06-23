@@ -903,38 +903,67 @@ export function VisaTrackingScreen({
       />
 
       <section className="flex flex-wrap items-center gap-2" aria-label="Visa tracking filters">
-        <button
-          type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "all", isDarkMode)}`}
-          onClick={() => setActiveFilter("all")}
-        >
-          <span className="sm:hidden">All ({visaRows.length})</span>
-          <span className="hidden sm:inline">All Groups ({visaRows.length})</span>
-        </button>
-        <button
-          type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "not-issued", isDarkMode)}`}
-          onClick={() => setActiveFilter("not-issued")}
-        >
-          <span className="sm:hidden">Pending ({notIssuedCount})</span>
-          <span className="hidden sm:inline">Not Issued ({notIssuedCount})</span>
-        </button>
-        <button
-          type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "missing-hotel", isDarkMode)}`}
-          onClick={() => setActiveFilter("missing-hotel")}
-        >
-          <span className="sm:hidden">No Hotel ({missingHotelCount})</span>
-          <span className="hidden sm:inline">Missing Hotel ({missingHotelCount})</span>
-        </button>
-        <button
-          type="button"
-          className={`rounded-lg border px-3 py-1.5 text-sm font-bold leading-none transition ${getFilterChipClasses(activeFilter === "unpaid", isDarkMode)}`}
-          onClick={() => setActiveFilter("unpaid")}
-        >
-          <span className="sm:hidden">Unpaid ({unpaidCount})</span>
-          <span className="hidden sm:inline">Unpaid ({unpaidCount})</span>
-        </button>
+        <div className="relative flex items-center bg-slate-100 dark:bg-surface-container-high/65 p-1 rounded-xl w-full sm:w-[560px] h-9">
+          {/* Sliding background indicator */}
+          <div
+            className="absolute top-1 bottom-1 bg-white dark:bg-surface-container-lowest rounded-lg shadow-sm transition-all duration-200 ease-out"
+            style={{
+              width: "calc(25% - 6px)",
+              left:
+                activeFilter === "all"
+                  ? "3px"
+                  : activeFilter === "not-issued"
+                  ? "calc(25% + 3px)"
+                  : activeFilter === "missing-hotel"
+                  ? "calc(50% + 3px)"
+                  : "calc(75% + 3px)",
+            }}
+          />
+          {(["all", "not-issued", "missing-hotel", "unpaid"] as VisaFilterId[]).map((filter) => {
+            const isActive = activeFilter === filter;
+            let label = "";
+            let count = 0;
+            if (filter === "all") {
+              label = "All Groups";
+              count = visaRows.length;
+            } else if (filter === "not-issued") {
+              label = "Not Issued";
+              count = notIssuedCount;
+            } else if (filter === "missing-hotel") {
+              label = "Missing Hotel";
+              count = missingHotelCount;
+            } else {
+              label = "Unpaid";
+              count = unpaidCount;
+            }
+            return (
+              <button
+                key={filter}
+                type="button"
+                className={`relative z-10 flex-1 h-full rounded-lg text-xs font-extrabold transition-colors duration-200 leading-none text-center ${
+                  isActive
+                    ? "text-brand-primary dark:text-primary"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                }`}
+                onClick={() => setActiveFilter(filter)}
+              >
+                <span className="sm:hidden">
+                  {filter === "all"
+                    ? "All"
+                    : filter === "not-issued"
+                    ? "Pending"
+                    : filter === "missing-hotel"
+                    ? "No Hotel"
+                    : "Unpaid"}{" "}
+                  ({count})
+                </span>
+                <span className="hidden sm:inline">
+                  {label} ({count})
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         <div className="flex items-center gap-2 sm:ml-auto">
           <div className="relative min-w-[11rem]">
