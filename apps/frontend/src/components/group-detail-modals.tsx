@@ -162,7 +162,10 @@ export function MusyrifModal({
 
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
+        onClick={onClose}
+      >
         <div
           ref={dialogRef}
           className={`${modalShellClassName} w-full max-w-2xl`}
@@ -266,7 +269,10 @@ export function UnlinkGroupConfirmModal({
 
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
+        onClick={onClose}
+      >
         <div
           ref={dialogRef}
           className={`${modalShellClassName} w-full max-w-xl`}
@@ -341,7 +347,10 @@ export function DeleteConfirmModal({
 
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
+        onClick={onClose}
+      >
         <div
           ref={dialogRef}
           className={`${modalShellClassName} w-full max-w-xl`}
@@ -433,7 +442,10 @@ export function DeleteGroupModal({
 
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
+        onClick={onClose}
+      >
         <div
           ref={dialogRef}
           className={`${modalShellClassName} w-full max-w-xl`}
@@ -591,7 +603,10 @@ export function GroupEditModal({
 
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
+        onClick={onClose}
+      >
         <div
           id="group-edit-modal"
           ref={dialogRef}
@@ -876,7 +891,7 @@ export function ScheduleModal({
   return (
     <ModalPortal>
       <div
-        className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`}
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
         onClick={onClose}
       >
         <div
@@ -1341,7 +1356,7 @@ export function EditScheduleModal({
   return (
     <ModalPortal>
       <div
-        className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`}
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
         onClick={onClose}
       >
         <div
@@ -1756,7 +1771,10 @@ export function NoteModal({
 
   return (
     <ModalPortal>
-      <div className={`${modalOverlayClassName} grid place-items-center p-3 sm:p-4`} onClick={onClose}>
+      <div
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
+        onClick={onClose}
+      >
         <div
           ref={dialogRef}
           className={`${modalShellClassName} w-full max-w-2xl`}

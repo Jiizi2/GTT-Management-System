@@ -383,7 +383,7 @@ function AgreementDraftEditModal({
   return (
     <ModalPortal>
       <div
-        className="serene-modal-overlay z-[130] flex items-center justify-center overflow-y-auto p-3 sm:p-4"
+        className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
         onClick={onClose}
       >
         <section
@@ -471,7 +471,10 @@ function DeleteAgreementDraftModal({
 
   return (
     <ModalPortal>
-      <div className="serene-modal-overlay z-[130] flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
+        onClick={onClose}
+      >
         <section
           ref={dialogRef}
           className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-2xl"

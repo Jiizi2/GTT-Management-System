@@ -127,7 +127,7 @@ function ProfileModalOverlay({ onClose, children }: { onClose: () => void; child
   return (
     <ProfileModalPortal>
       <div
-        className="serene-modal-overlay z-[120] flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4"
+        className="serene-modal-overlay z-[120] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
         onClick={onClose}
         aria-hidden="true"
       >

@@ -1310,26 +1310,30 @@ export function GroupDetail({
                     {familyGroups.length > 1 ? familyGroups.map(g => g.code).join(" - ") : group.code}
                   </h2>
                   {familyGroups.length > 1 && (
-                    <span className={`inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600 ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
-                      <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
-                      <span>Terhubung:</span>
-                      {familyGroups.filter(g => g.code !== group.code).map((g, index) => (
-                        <span key={g.code} className="inline-flex items-center gap-1">
-                          {index > 0 && ", "}
-                          <Link to={`/groups/${g.code}`} className="font-bold text-slate-900 hover:underline">
-                            {g.code}
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenUnlinkModal(g)}
-                            className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
-                            title="Pisahkan grup ini"
-                          >
-                            <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
-                          </button>
-                        </span>
-                      ))}
-                    </span>
+                    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 sm:inline-flex ${familyGroups.length > 2 ? 'text-[10px]' : 'text-xs'}`}>
+                      <div className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">link</span>
+                        <span>Terhubung:</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                        {familyGroups.filter(g => g.code !== group.code).map((g, index) => (
+                          <span key={g.code} className="inline-flex items-center gap-0.5">
+                            {index > 0 && <span className="mr-1.5 text-slate-300">,</span>}
+                            <Link to={`/groups/${g.code}`} className="font-bold text-slate-900 hover:underline">
+                              {g.code}
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenUnlinkModal(g)}
+                              className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
+                              title="Pisahkan grup ini"
+                            >
+                              <span className="material-symbols-outlined text-[13px]" aria-hidden="true">link_off</span>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   <span className={`${statusBadgeClassName} hidden md:inline-flex`}>{group.status}</span>
                   <button

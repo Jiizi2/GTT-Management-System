@@ -2058,7 +2058,7 @@ export function InputItineraryScreen({
             {isScheduleFormVisible && typeof document !== "undefined"
               ? createPortal(
                   <div
-                    className="serene-modal-overlay fixed inset-0 z-[130] grid place-items-center p-3 sm:p-6"
+                    className="serene-modal-overlay fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-6 sm:pt-20 sm:pb-20"
                     onClick={handleCloseScheduleForm}
                     role="presentation"
                   >

@@ -107,7 +107,7 @@ function ModalShell({
   return (
     <ModalPortal>
       <div
-        className={`${modalOverlayClassName} flex items-center justify-center overflow-y-auto p-3 sm:p-4`}
+        className={`${modalOverlayClassName} flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20`}
         onClick={onClose}
       >
         <div
