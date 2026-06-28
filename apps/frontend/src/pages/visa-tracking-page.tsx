@@ -725,10 +725,10 @@ export function VisaTrackingScreen({
     return (
       <article
         key={row.id}
-        className="grid items-start gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-slate-50/30"
+        className="grid items-center gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-slate-50/30"
         style={{ gridTemplateColumns: desktopTableGridTemplate }}
       >
-        <div className="flex min-w-0 items-start gap-1.5 py-1 font-semibold text-slate-800">
+        <div className="flex min-w-0 items-center gap-1.5 py-1 font-semibold text-slate-800">
           {hasFollowers ? (
             <button
               type="button"
@@ -749,7 +749,7 @@ export function VisaTrackingScreen({
           {row.groupName}
         </div>
 
-        <div className="flex min-w-0 items-start py-1">
+        <div className="flex min-w-0 justify-self-center py-1">
           <span className="inline-flex max-w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-bold leading-tight text-slate-700">
             {row.pax} Pax
           </span>
@@ -802,7 +802,7 @@ export function VisaTrackingScreen({
           </span>
         </div>
 
-        <div className="flex min-w-0 flex-col items-start gap-1 py-1">
+        <div className="flex min-w-0 flex-col items-center justify-self-center py-1">
           <span
             className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none w-fit ${getVisaTypeClasses(
               visaTypeLabel,
@@ -813,7 +813,7 @@ export function VisaTrackingScreen({
           </span>
         </div>
 
-        <div className="flex min-w-0 items-start py-1">
+        <div className="flex min-w-0 justify-self-center py-1">
           <button
             type="button"
             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
@@ -1070,18 +1070,18 @@ export function VisaTrackingScreen({
             <div className="overflow-x-auto">
               <div className="min-w-full">
                 <div
-                  className="grid gap-2.5 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600"
+                  className="grid items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600"
                   style={{ gridTemplateColumns: desktopTableGridTemplate }}
                 >
                   <div>Group Number</div>
                   <div>Group Name</div>
-                  <div>Total Pax</div>
+                  <div className="text-center">Total Pax</div>
                   <div>Makkah Agreement</div>
                   <div>Madinah Agreement</div>
                   <div className="text-center">Raudhah</div>
                   <div className="text-center">Visa Status</div>
-                  <div>Visa Type</div>
-                  <div>Actions</div>
+                  <div className="text-center">Visa Type</div>
+                  <div className="text-center">Actions</div>
                 </div>
 
                 <div className="divide-y divide-slate-100">
