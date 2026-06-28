@@ -318,8 +318,8 @@ function testGenerateWhatsappCopyText(): void {
   
   assert.equal(copiedText.includes("*NEED MOFA VISA ONLY GROUP CODE*"), true);
   assert.equal(copiedText.includes("902133273 *( 05 PAX )*"), true);
-  assert.equal(copiedText.includes("DOH - JED / QR1190 / 07.30 / 22 MAR 2026"), true);
-  assert.equal(copiedText.includes("JED - CGK / SV822 / 12.55 / 14 APR 2026"), true);
+  assert.equal(copiedText.includes("DOH / QR1190 / 07.30 / 22 MAR 2026"), true);
+  assert.equal(copiedText.includes("CGK / SV822 / 12.55 / 14 APR 2026"), true);
   assert.equal(copiedText.includes("🏨 *BRN MAKKAH*\n*Swissotel*\n📅 28/03/2026 - 31/03/2026\n└─ 902133273: 18014399405337794 (40 PAX)"), true);
   assert.equal(copiedText.includes("🏨 *BRN MADINAH*\n*Burj Almarjan*\n📅 23/03/2026 - 28/03/2026\n└─ 902133273: 15762599591351269 (40 PAX)"), true);
 
@@ -354,7 +354,7 @@ function testGenerateWhatsappCopyText(): void {
   const emptyText = generateWhatsappCopyText(emptyGroup);
   assert.equal(emptyText.includes("*NEED MOFA VISA ONLY GROUP CODE*"), true);
   assert.equal(emptyText.includes("[GROUP_CODE] *( 00 PAX )*"), true);
-  assert.equal(emptyText.includes("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]"), true);
+  assert.equal(emptyText.includes("[AIRPORT] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]"), true);
   assert.equal(emptyText.includes("🏨 *BRN MAKKAH*\n*[HOTEL MAKKAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
   assert.equal(emptyText.includes("🏨 *BRN MADINAH*\n*[HOTEL MADINAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
 }

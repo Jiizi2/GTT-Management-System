@@ -176,11 +176,13 @@ export function exportGroupDetailPdf(
     itineraryItems,
     noteItems,
     musyrifProfile,
+    familyGroups = [],
   }: {
     group: GroupData;
     itineraryItems: ItineraryItem[];
     noteItems: NoteItem[];
     musyrifProfile: Musyrif;
+    familyGroups?: GroupData[];
   },
   options: { printWindow?: Window | null } = {},
 ): boolean {
@@ -201,6 +203,11 @@ export function exportGroupDetailPdf(
       hour12: false,
     })
     .toUpperCase();
+
+  const logoUrl = new URL("/logo-ghaniya-travel-polos.png", window.location.origin).toString();
+  const appCssUrl = new URL("/index.css", window.location.origin).toString();
+  const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
+
   const sortedItinerary = [...itineraryItems].sort((left, right) => {
     const leftIso = left.isoDate ?? parseDisplayDateToIso(left.date, left.year);
     const rightIso = right.isoDate ?? parseDisplayDateToIso(right.date, right.year);
@@ -283,7 +290,6 @@ export function exportGroupDetailPdf(
     returnItem?.isoDate ?? (returnItem ? parseDisplayDateToIso(returnItem.date, returnItem.year) : fallbackEndIso);
   const arrivalFlightNumber = arrivalItem?.flightNumber?.trim() || "-";
   const returnFlightNumber = returnItem?.flightNumber?.trim() || "-";
-  const resolvedTotalBuses = resolveTotalBusCount(group.pax, group.totalBuses);
   const cityHotelNames = {
     makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
     madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
@@ -343,7 +349,7 @@ export function exportGroupDetailPdf(
   const itineraryTimelineRows = sortedItinerary
     .map((item, index) => {
       const itemIso = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
-      const { dateLabel, dayLabel } = formatTimelineDate(itemIso);
+      const { dateLabel } = formatTimelineDate(itemIso);
       const categoryKey = inferCategoryKey(item);
       const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item) : "";
       const badgeLabel = categoryKey === "city-tour" && cityTourCity ? `City Tour / ${cityTourCity}` : item.category;
@@ -357,7 +363,6 @@ export function exportGroupDetailPdf(
           <tr>
             <td class="cell-center">${index + 1}</td>
             <td>${escapeHtml(dateLabel)}</td>
-            <td>${escapeHtml(dayLabel)}</td>
             <td class="cell-center">${escapeHtml(timelineTime)}</td>
             <td>${escapeHtml(badgeLabel)}</td>
             <td>${escapeHtml(activityHeading)}</td>
@@ -381,20 +386,36 @@ export function exportGroupDetailPdf(
       : defaultGuidelines;
   const noteRows = noteHighlightItems.map((text) => `<li>${escapeHtml(text)}</li>`).join("");
 
+  const allGroupCodes = familyGroups.length > 0
+    ? familyGroups.map((g) => g.code).join(" - ")
+    : group.code;
+
+  const totalPaxCount = familyGroups.length > 0
+    ? familyGroups.reduce((acc, g) => acc + g.pax, 0)
+    : group.pax;
+
   const printableHtml = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ghaniya Tour And Travel - ${escapeHtml(group.code)}</title>
+    <link rel="preload" as="style" href="${escapeHtml(fontsCssUrl)}" />
+    <link rel="preload" as="style" href="${escapeHtml(appCssUrl)}" />
+    <link rel="preload" as="image" href="${escapeHtml(logoUrl)}" />
+    <link rel="stylesheet" href="${escapeHtml(fontsCssUrl)}" />
+    <link rel="stylesheet" href="${escapeHtml(appCssUrl)}" />
     <style>
       :root {
+        --ghaniya-gold: #b8860b;
+        --ghaniya-gold-light: #faf8f2;
+        --ghaniya-gold-soft: rgba(184, 134, 11, 0.15);
         --ink: #1f2937;
+        --ink-dark: #111111;
         --muted: #6b7280;
-        --line: #d1d5db;
+        --line: #e2e8f0;
         --surface: #ffffff;
-        --soft: #f9fafb;
-        --header: #f3f4f6;
+        --soft: #f8fafc;
       }
       * {
         box-sizing: border-box;
@@ -405,10 +426,10 @@ export function exportGroupDetailPdf(
       }
       body {
         margin: 0;
-        padding: 20px;
+        padding: 10px;
         background: var(--surface);
         color: var(--ink);
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
@@ -417,79 +438,167 @@ export function exportGroupDetailPdf(
         width: 100%;
       }
       .doc-header {
-        margin-bottom: 10px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--ghaniya-gold);
+        margin-bottom: 20px;
       }
-      .doc-header h1 {
-        margin: 0;
-        font-size: 20px;
-        line-height: 1.1;
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
       }
-      .doc-header p {
-        margin: 4px 0 0;
+      .header-logo {
+        height: 52px;
+        width: auto;
+        object-fit: contain;
+      }
+      .brand-info {
+        display: flex;
+        flex-direction: column;
+      }
+      .brand-name {
+        font-family: 'Outfit', 'Inter', sans-serif;
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--ink-dark);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        line-height: 1.2;
+      }
+      .brand-tagline {
+        font-family: 'Manrope', 'Inter', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ghaniya-gold);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-top: 2px;
+      }
+      .header-right {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+      }
+      .doc-title {
+        font-family: 'Outfit', 'Inter', sans-serif;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--ghaniya-gold);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        line-height: 1.2;
+      }
+      .group-code-badge {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 4px 10px;
         font-size: 11px;
-        color: var(--muted);
+        font-weight: 700;
+        background: var(--ghaniya-gold-light);
+        border: 1px solid var(--ghaniya-gold-soft);
+        color: var(--ink-dark);
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        line-height: 1;
       }
       .meta-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 6px 8px;
-        margin-bottom: 12px;
+        gap: 8px 10px;
+        margin-bottom: 20px;
       }
       .meta-item {
-        padding: 6px 8px;
+        padding: 8px 10px;
         border: 1px solid var(--line);
+        border-left: 3px solid var(--ghaniya-gold);
         background: var(--soft);
+        border-radius: 4px;
       }
       .meta-label {
         display: block;
-        margin-bottom: 3px;
-        font-size: 10px;
+        margin-bottom: 4px;
+        font-size: 9px;
         font-weight: 700;
         color: var(--muted);
         text-transform: uppercase;
+        letter-spacing: 0.05em;
       }
       .meta-value {
         font-size: 12px;
         font-weight: 700;
+        color: var(--ink-dark);
         overflow-wrap: anywhere;
+        line-height: 1.25;
       }
       .section {
-        margin-top: 12px;
+        margin-top: 20px;
       }
-      .section h2 {
-        margin: 0 0 8px;
-        font-size: 18px;
-        line-height: 1.15;
+      .section-header {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 6px;
+        margin-bottom: 12px;
       }
-      .itinerary-section h2 {
-        margin-bottom: 10px;
-        font-size: 20px;
+      .section-header h2 {
+        margin: 0;
+        font-family: 'Outfit', 'Inter', sans-serif;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--ink-dark);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        position: relative;
+        display: inline-block;
+      }
+      .section-header h2::after {
+        content: '';
+        position: absolute;
+        bottom: -7px;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--ghaniya-gold);
       }
       table {
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
+        margin-bottom: 8px;
       }
       th,
       td {
         border: 1px solid var(--line);
-        padding: 9px 10px;
-        font-size: 12px;
-        line-height: 1.45;
+        padding: 8px 10px;
+        font-size: 11.5px;
+        line-height: 1.4;
         vertical-align: top;
         word-break: break-word;
       }
       th {
-        background: var(--header);
-        text-align: left;
-        font-size: 11px;
-        letter-spacing: 0.02em;
+        background-color: var(--ghaniya-gold-light) !important;
+        color: var(--ink-dark) !important;
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
+        border-bottom: 2px solid var(--ghaniya-gold);
+        text-align: left;
+      }
+      tr:nth-child(even) {
+        background-color: var(--soft);
       }
       .cell-center {
         text-align: center;
+      }
+      .notes-card {
+        background: var(--ghaniya-gold-light);
+        border: 1px solid var(--ghaniya-gold-soft);
+        border-radius: 6px;
+        padding: 14px 18px;
       }
       .notes-list {
         margin: 0;
@@ -497,15 +606,23 @@ export function exportGroupDetailPdf(
       }
       .notes-list li {
         margin: 0 0 6px;
-        font-size: 11px;
-        line-height: 1.4;
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: var(--ink);
+      }
+      .notes-list li:last-child {
+        margin-bottom: 0;
       }
       .footer {
-        margin-top: 18px;
+        margin-top: 24px;
         padding-top: 10px;
         border-top: 1px solid var(--line);
-        font-size: 11px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 9.5px;
         color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
       }
       .empty {
         text-align: center;
@@ -526,14 +643,23 @@ export function exportGroupDetailPdf(
   <body>
     <main class="doc">
       <header class="doc-header">
-        <h1>Package Info</h1>
-        <p>Ghaniya Tour And Travel</p>
+        <div class="header-left">
+          <img src="${escapeHtml(logoUrl)}" alt="Ghaniya Tour & Travel" class="header-logo" decoding="sync" fetchpriority="high" />
+          <div class="brand-info">
+            <div class="brand-name">Ghaniya Tour & Travel</div>
+            <div class="brand-tagline">Spiritual Pilgrimage & Services</div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="doc-title">Group Detail Overview</div>
+          <div class="group-code-badge">${escapeHtml(group.code)}</div>
+        </div>
       </header>
 
       <section class="meta-grid" aria-label="Group summary details">
         <div class="meta-item">
-          <span class="meta-label">Primary Group ID</span>
-          <div class="meta-value">${escapeHtml(group.code)}</div>
+          <span class="meta-label">Group Code(s)</span>
+          <div class="meta-value">${escapeHtml(allGroupCodes)}</div>
         </div>
         <div class="meta-item">
           <span class="meta-label">Group Name</span>
@@ -541,11 +667,7 @@ export function exportGroupDetailPdf(
         </div>
         <div class="meta-item">
           <span class="meta-label">Pax Count</span>
-          <div class="meta-value">${group.pax}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Total Bus</span>
-          <div class="meta-value">${resolvedTotalBuses}</div>
+          <div class="meta-value">${totalPaxCount}</div>
         </div>
         <div class="meta-item">
           <span class="meta-label">Musyrif</span>
@@ -582,35 +704,41 @@ export function exportGroupDetailPdf(
       </section>
 
       <section class="section itinerary-section">
-        <h2>Full Itinerary</h2>
+        <div class="section-header">
+          <h2>Full Itinerary</h2>
+        </div>
         <table aria-label="Full itinerary table">
           <thead>
             <tr>
               <th style="width: 34px;">No</th>
-              <th style="width: 72px;">Date</th>
-              <th style="width: 68px;">Day</th>
-              <th style="width: 58px;">Time</th>
-              <th style="width: 90px;">Category</th>
-              <th style="width: 130px;">Activity</th>
-              <th style="width: 145px;">Route / Summary</th>
+              <th style="width: 80px;">Date</th>
+              <th style="width: 60px;">Time</th>
+              <th style="width: 100px;">Category</th>
+              <th style="width: 140px;">Activity</th>
+              <th style="width: 160px;">Route / Summary</th>
               <th>Details</th>
             </tr>
           </thead>
           <tbody>
-            ${itineraryTimelineRows || '<tr><td class="empty" colspan="8">No itinerary data available.</td></tr>'}
+            ${itineraryTimelineRows || '<tr><td class="empty" colspan="7">No itinerary data available.</td></tr>'}
           </tbody>
         </table>
       </section>
 
       <section class="section">
-        <h2>Operational Notes</h2>
-        <ol class="notes-list">
-          ${noteRows}
-        </ol>
+        <div class="section-header">
+          <h2>Operational Notes</h2>
+        </div>
+        <div class="notes-card">
+          <ol class="notes-list">
+            ${noteRows}
+          </ol>
+        </div>
       </section>
 
       <footer class="footer">
-        Document Timestamp: ${escapeHtml(generatedTimestamp)}
+        <span>Generated: ${escapeHtml(generatedTimestamp)}</span>
+        <span>Ghaniya Tour & Travel</span>
       </footer>
     </main>
   </body>
