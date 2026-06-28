@@ -5,6 +5,8 @@ import {
   mergeInvoiceClientsWithMasterData,
   resolveInvoiceDownPaymentIdr,
   resolveInvoiceOutstandingBalanceLabel,
+  resolveBankAccountLabel,
+  defaultBankDisbursementOptions,
 } from "../pages/invoice-page-shared.js";
 import { runCase } from "../test/run-case.js";
 
@@ -79,5 +81,37 @@ describe("invoice-page-shared", () => {
     assert.equal(resolveInvoiceOutstandingBalanceLabel(0), "Tagihan");
     assert.equal(resolveInvoiceOutstandingBalanceLabel(1), "Sisa Tagihan");
     assert.equal(resolveInvoiceOutstandingBalanceLabel(1_000_000, 0), "Lunas");
+  });
+
+  runCase("resolves bank account label correctly", () => {
+    // 1. Resolve using default options
+    assert.equal(
+      resolveBankAccountLabel("bca"),
+      "BCA (IDR) - 035 123 4455",
+    );
+    assert.equal(
+      resolveBankAccountLabel("unknown_bank"),
+      "unknown_bank",
+    );
+
+    // 2. Resolve using custom options
+    const customOptions = [
+      { value: "mandiri_custom", label: "Bank Mandiri - 9999" },
+    ];
+    assert.equal(
+      resolveBankAccountLabel("mandiri_custom", customOptions),
+      "Bank Mandiri - 9999",
+    );
+  });
+
+  runCase("parses bank account from invoice notes", () => {
+    const extractBankKey = (notes?: string) => {
+      const notesRaw = notes ?? "";
+      const bankMatch = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
+      return bankMatch && bankMatch[1] ? bankMatch[1].trim() : "bsi";
+    };
+
+    assert.equal(extractBankKey("Some user notes here\n[BankAccount:bca]"), "bca");
+    assert.equal(extractBankKey("No bank account info here"), "bsi"); // fallback
   });
 });

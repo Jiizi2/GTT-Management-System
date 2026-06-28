@@ -497,9 +497,11 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
 export async function viewInvoicePdfFromRow({
   row,
   groups,
+  bankDisbursementOptions,
 }: {
   row: InvoiceRow;
   groups: GroupData[];
+  bankDisbursementOptions?: SelectOption[];
 }): Promise<boolean> {
   const linkedGroup = row.groupCode
     ? (groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null)
@@ -523,6 +525,19 @@ export async function viewInvoicePdfFromRow({
   const totals = resolveInvoiceDisplayTotals(row);
   const { exportInvoicePdf } = await import("./invoice-export");
 
+  const notesRaw = row.notes ?? "";
+  const bankMatch = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
+  const bankKey = bankMatch && bankMatch[1] ? bankMatch[1].trim() : "bsi";
+  const bankAccountLabel = resolveBankAccountLabel(bankKey, bankDisbursementOptions);
+
+  // Strip metadata tags from notes for final printing
+  const cleanNotes = notesRaw
+    .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
+    .replace(/\[KeepValasTotal\]/g, "")
+    .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
+    .replace(/\[BankAccount:[^\]]+\]/g, "")
+    .trim();
+
   return await exportInvoicePdf(
     {
       invoiceNumber: row.invoiceNumber,
@@ -534,8 +549,8 @@ export async function viewInvoicePdfFromRow({
       clientCode: row.groupCode ?? row.clientLabel,
       address: row.clientLabel,
       recipientName: row.recipientName,
-      bankAccountLabel: resolveBankAccountLabel("bsi"),
-      notes: row.notes ?? "",
+      bankAccountLabel,
+      notes: cleanNotes,
       usdToIdr: totals.usdToIdr,
       sarToIdr: totals.sarToIdr,
       currency: totals.currency as any,

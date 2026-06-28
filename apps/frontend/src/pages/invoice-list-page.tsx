@@ -225,7 +225,7 @@ export function InvoiceScreen({
 
   const handleViewPdf = (row: InvoiceRow) => {
     setActionFeedback("Menyiapkan PDF...");
-    void viewInvoicePdfFromRow({ row, groups })
+    void viewInvoicePdfFromRow({ row, groups, bankDisbursementOptions })
       .then((exported) => {
         if (exported) {
           setActionFeedback("");

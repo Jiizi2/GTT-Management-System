@@ -188,6 +188,16 @@ function hasAgreementPaxMismatch(group: GroupData): boolean {
   return false;
 }
 
+function getDayDiff(date1: string, date2: string): number {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) {
+    return Infinity;
+  }
+  const diffMs = Math.abs(d1.getTime() - d2.getTime());
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+
 export function resolveGroupCompleteness(
   group: GroupData,
   dependencies: Pick<GroupVisaDomainDependencies, "getItineraryIsoDate" | "parseTimeForInput">,
@@ -260,8 +270,11 @@ export function resolveGroupCompleteness(
   const allHotels = collectGroupAgreementHotels(group);
   const periods = getStayPeriods(allHotels);
   const isContinuous = periods.length === 1;
+
+  const startDiff = (earliestIsoDate && periods[0]) ? getDayDiff(periods[0].startIso, earliestIsoDate) : Infinity;
+  const endDiff = (latestIsoDate && periods[0]) ? getDayDiff(periods[0].endIso, latestIsoDate) : Infinity;
   const coversItinerary =
-    isContinuous && periods[0].startIso === earliestIsoDate && periods[0].endIso === latestIsoDate;
+    isContinuous && startDiff <= 1 && endDiff <= 1;
 
   if (hasAnyAgreement && !isContinuous) {
     issues.push({

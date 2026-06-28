@@ -234,7 +234,7 @@ export function generateWhatsappCopyText(
   }
   lines.push("");
 
-  lines.push("✈️ *ARRIVAL*");
+  lines.push("✈️ *Flight Detail*");
   const flightItems = (group.itinerary || []).filter(
     (item) => item.category?.toLowerCase() === "arrival" || item.category?.toLowerCase() === "departure"
   );
@@ -257,12 +257,29 @@ export function generateWhatsappCopyText(
   };
 
   const formatFlightLine = (item: any) => {
-    const from = item.from?.trim() || "[DEP]";
-    const to = item.to?.trim() || "[ARR]";
+    const mapCityToAirport = (val: string): string => {
+      const lower = val.trim().toLowerCase();
+      if (lower === "madinah") return "MED";
+      if (lower === "jeddah") return "JED";
+      if (lower === "makkah") return "JED";
+      return val;
+    };
+
+    const category = (item.category || "").toLowerCase();
+    let rawAirport = "";
+    if (category === "arrival") {
+      rawAirport = item.from?.trim() || "[DEP]";
+    } else if (category === "departure") {
+      rawAirport = item.to?.trim() || "[ARR]";
+    } else {
+      rawAirport = item.from?.trim() || "[DEP]";
+    }
+
+    const airport = mapCityToAirport(rawAirport);
     const flightNo = item.flightNumber?.trim() || "[FLIGHT_NO]";
     const time = item.time?.trim() ? item.time.trim().replace(/:/g, ".") : "[FLIGHT_TIME]";
     const dateFormatted = formatFlightDate(item.isoDate, item.date, item.year);
-    return `${from} - ${to} / ${flightNo} / ${time} / ${dateFormatted}`;
+    return `${airport} / ${flightNo} / ${time} / ${dateFormatted}`;
   };
 
   if (flightItems.length > 0) {
@@ -270,8 +287,8 @@ export function generateWhatsappCopyText(
       lines.push(formatFlightLine(item));
     });
   } else {
-    lines.push("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
-    lines.push("[DEP] - [ARR] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
+    lines.push("[AIRPORT] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
+    lines.push("[AIRPORT] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
   }
   lines.push("");
 

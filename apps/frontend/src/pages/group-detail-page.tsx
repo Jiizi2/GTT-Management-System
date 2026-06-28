@@ -1177,6 +1177,7 @@ export function GroupDetail({
             itineraryItems,
             noteItems,
             musyrifProfile,
+            familyGroups,
           },
           {
             printWindow: printableWindow,

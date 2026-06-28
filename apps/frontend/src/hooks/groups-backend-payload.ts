@@ -161,7 +161,7 @@ export function mapGroupIdentityDraftToBackendPayload(identity: GroupIdentityDra
           avatar: musyrifAvatar,
         }
         : undefined,
-    busStatus: identity.busStatus,
+    busStatus: mapBusStatusToBackend(identity.busStatus),
   };
 }
 

@@ -419,7 +419,16 @@ function testGroupCompletenessFlagsMissingPartsAndMismatches(): void {
           {
             ...completeGroup.visaSetup!.makkahHotels[0],
             pax: 30,
-            stayStartIso: "2099-01-02",
+            stayStartIso: "2099-01-03",
+            stayEndIso: "2099-01-05",
+          },
+        ],
+        madinahHotels: [
+          {
+            ...completeGroup.visaSetup!.madinahHotels[0],
+            pax: 45,
+            stayStartIso: "2099-01-05",
+            stayEndIso: "2099-01-07",
           },
         ],
       },
@@ -1198,12 +1207,132 @@ function testGroupCompletenessCalculatesDailyPaxCorrectly(): void {
   );
 }
 
+function testItineraryDateToleranceWarning(): void {
+  const baseGroup = createBaseGroup({
+    code: "TOLERANCE-TEST",
+    pax: 45,
+    itinerary: [
+      {
+        date: "01 Jan",
+        year: "2099",
+        category: "Arrival",
+        categoryKey: "arrival",
+        title: "Arrival Trip",
+        meta: "08:00 | Airport",
+        icon: "flight_land",
+        isoDate: "2099-01-01",
+        time: "08:00",
+        from: "JED Airport",
+        to: "Makkah Hotel",
+        requiresBus: true,
+      },
+      {
+        date: "05 Jan",
+        year: "2099",
+        category: "Departure",
+        categoryKey: "departure",
+        title: "Departure Trip",
+        meta: "21:00 | Hotel to Airport",
+        icon: "flight_takeoff",
+        isoDate: "2099-01-05",
+        time: "21:00",
+        from: "Madinah Hotel",
+        to: "MED Airport",
+        requiresBus: true,
+      },
+    ],
+  });
+
+  // 1. Exact match: Makkah Jan 1-3, Madinah Jan 3-5 -> No date-mismatch warning.
+  const exactGroup: GroupData = {
+    ...baseGroup,
+    visaSetup: {
+      visaStatus: "Issued",
+      issuedDate: "2098-12-31",
+      syarikah: "Provider Unit",
+      paymentStatus: "Paid",
+      makkahHotels: [
+        { id: "m-1", hotelName: "H1", agreementNumber: "A1", pax: 45, status: "Approved", stayStartIso: "2099-01-01", stayEndIso: "2099-01-03" },
+      ],
+      madinahHotels: [
+        { id: "d-1", hotelName: "H2", agreementNumber: "A2", pax: 45, status: "Approved", stayStartIso: "2099-01-03", stayEndIso: "2099-01-05" },
+      ],
+      raudhahAppointments: [],
+    },
+  };
+  assert.equal(
+    resolveGroupCompleteness(exactGroup).issues.some((i) => i.key === "date-mismatch"),
+    false,
+  );
+
+  // 2. 1-day difference in arrival (starts Jan 2) -> No date-mismatch warning.
+  const diffArrival1DayGroup: GroupData = {
+    ...baseGroup,
+    visaSetup: {
+      ...exactGroup.visaSetup!,
+      makkahHotels: [
+        { ...exactGroup.visaSetup!.makkahHotels[0], stayStartIso: "2099-01-02" },
+      ],
+    },
+  };
+  assert.equal(
+    resolveGroupCompleteness(diffArrival1DayGroup).issues.some((i) => i.key === "date-mismatch"),
+    false,
+  );
+
+  // 3. 1-day difference in departure (ends Jan 4) -> No date-mismatch warning.
+  const diffDeparture1DayGroup: GroupData = {
+    ...baseGroup,
+    visaSetup: {
+      ...exactGroup.visaSetup!,
+      madinahHotels: [
+        { ...exactGroup.visaSetup!.madinahHotels[0], stayEndIso: "2099-01-04" },
+      ],
+    },
+  };
+  assert.equal(
+    resolveGroupCompleteness(diffDeparture1DayGroup).issues.some((i) => i.key === "date-mismatch"),
+    false,
+  );
+
+  // 4. 2-day difference in arrival (starts Jan 3) -> Warning.
+  const diffArrival2DaysGroup: GroupData = {
+    ...baseGroup,
+    visaSetup: {
+      ...exactGroup.visaSetup!,
+      makkahHotels: [
+        { ...exactGroup.visaSetup!.makkahHotels[0], stayStartIso: "2099-01-03" },
+      ],
+    },
+  };
+  assert.equal(
+    resolveGroupCompleteness(diffArrival2DaysGroup).issues.some((i) => i.key === "date-mismatch"),
+    true,
+  );
+
+  // 5. 2-day difference in departure (ends Jan 3) -> Warning.
+  const diffDeparture2DaysGroup: GroupData = {
+    ...baseGroup,
+    visaSetup: {
+      ...exactGroup.visaSetup!,
+      madinahHotels: [
+        { ...exactGroup.visaSetup!.madinahHotels[0], stayEndIso: "2099-01-03" },
+      ],
+    },
+  };
+  assert.equal(
+    resolveGroupCompleteness(diffDeparture2DaysGroup).issues.some((i) => i.key === "date-mismatch"),
+    true,
+  );
+}
+
 describe("app-domain", () => {
   runCase("raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
   runCase("route helper behavior", testRouteHelpersForCategorySpecificBehavior);
   runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);
   runCase("visa tracking row builder", testBuildVisaTrackingRowsUsesItineraryBoundariesAndStatuses);
   runCase("group completeness helper", testGroupCompletenessFlagsMissingPartsAndMismatches);
+  runCase("itinerary date tolerance warning", testItineraryDateToleranceWarning);
   runCase("group completeness calculates daily pax correctly", testGroupCompletenessCalculatesDailyPaxCorrectly);
   runCase("agreement pax exceeding group pax does not mismatch", testAgreementPaxExceedsGroupPaxDoesNotMismatch);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);

@@ -635,7 +635,17 @@ export function CreateInvoiceWorkspace({
       selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
       address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
       recipientName: resolvedInitialInvoice?.recipientName ?? "",
-      bankAccount: isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "",
+      bankAccount: (() => {
+        if (!resolvedInitialInvoice) {
+          return isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "";
+        }
+        const notesRaw = resolvedInitialInvoice.notes ?? "";
+        const match = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+        return isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "";
+      })(),
       downPaymentIdr: (() => {
         if (!resolvedInitialInvoice) return 0;
         const notesRaw = resolvedInitialInvoice.notes ?? "";
@@ -658,6 +668,7 @@ export function CreateInvoiceWorkspace({
             .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
             .replace(/\[KeepValasTotal\]/g, "")
             .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
+            .replace(/\[BankAccount:[^\]]+\]/g, "")
             .trim()
         : "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
@@ -1105,7 +1116,7 @@ export function CreateInvoiceWorkspace({
     const payloadAmount = keepValasCurrency !== "IDR"
       ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
       : totalPayable;
-    const payloadNotes = `${values.notes.trim()}${keepValasCurrency !== "IDR" ? `\n[KeepValasTotal:${keepValasCurrency}]` : ""}\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+    const payloadNotes = `${values.notes.trim()}${keepValasCurrency !== "IDR" ? `\n[KeepValasTotal:${keepValasCurrency}]` : ""}\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]\n[BankAccount:${values.bankAccount}]`;
 
     setIsSubmitting(true);
     try {
