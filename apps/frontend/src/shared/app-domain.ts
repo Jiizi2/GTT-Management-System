@@ -564,7 +564,7 @@ export function createDummyOverviewGroups(): GroupData[] {
 
 export const OVERVIEW_PAGE_SIZE = 9;
 export const CHECKLIST_PAGE_SIZE = 6;
-export const VISA_PAGE_SIZE = 15;
+export const VISA_PAGE_SIZE = 8;
 export const MAX_PAX_PER_BUS = 50;
 
 export function getMinimumBusCountForPax(pax: number): number {

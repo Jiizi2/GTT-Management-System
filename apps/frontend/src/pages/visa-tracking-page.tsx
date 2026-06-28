@@ -374,7 +374,11 @@ export function VisaTrackingScreen({
   const notIssuedCount = visaRows.filter((row) => row.visaStatus !== "Issued").length;
   const missingHotelCount = visaRows.filter((row) => hasMissingHotelAllocation(row)).length;
   const unpaidCount = visaRows.filter((row) => row.paymentStatus !== "Paid").length;
-  const issuedCount = visaRows.filter((row) => row.visaStatus === "Issued").length;
+  const issuedPaxCount = useMemo(() => {
+    return visaRows
+      .filter((row) => row.visaStatus === "Issued")
+      .reduce((sum, row) => sum + row.pax, 0);
+  }, [visaRows]);
   const hasRowsForExport = filteredGroupedRows.length > 0;
   const selectedIssuedMonthLabel =
     issuedMonthFilter === "all"
@@ -1014,7 +1018,7 @@ export function VisaTrackingScreen({
               <span className="sm:hidden">Issued</span>
               <span className="hidden sm:inline">Visas Issued</span>
             </p>
-            <strong className="text-xl font-bold text-slate-900">{issuedCount}</strong>
+            <strong className="text-xl font-bold text-slate-900">{issuedPaxCount}</strong>
           </div>
         </article>
 

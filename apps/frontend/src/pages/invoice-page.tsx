@@ -678,6 +678,7 @@ export function CreateInvoiceWorkspace({
   const invoiceStatus = watch("invoiceStatus") as InvoiceStatus | "";
   const issuingOffice = watch("issuingOffice");
   const selectedClientId = watch("selectedClientId");
+  const prevClientIdRef = useRef(selectedClientId);
   const selectedGroupCode = watch("selectedGroupCode");
   const address = watch("address");
   const bankAccount = watch("bankAccount");
@@ -798,19 +799,27 @@ export function CreateInvoiceWorkspace({
   }, [isEditMode, bankAccount, bankDisbursementOptions, setValue]);
 
   useEffect(() => {
-    if (!selectedClientId || selectedClientId === MANUAL_CLIENT_OPTION_ID) {
+    if (!selectedClientId) {
+      prevClientIdRef.current = selectedClientId;
       return;
     }
 
-    const matchedClient = clients.find((client) => client.id === selectedClientId);
-    if (matchedClient) {
-      const metadata = (matchedClient as any).metadata;
-      const defaultRecipient = metadata?.penerima || "";
-      if (defaultRecipient) {
+    const isInitialClient = isEditMode && resolvedInitialInvoice && selectedClientId === resolvedInitialInvoice.clientId;
+    const isClientChanged = prevClientIdRef.current !== selectedClientId;
+
+    if (!isInitialClient || isClientChanged) {
+      if (selectedClientId === MANUAL_CLIENT_OPTION_ID) {
+        setValue("recipientName", "", { shouldDirty: true });
+      } else {
+        const matchedClient = clients.find((client) => client.id === selectedClientId);
+        const metadata = (matchedClient as any)?.metadata;
+        const defaultRecipient = metadata?.penerima || "";
         setValue("recipientName", defaultRecipient, { shouldDirty: true });
       }
     }
-  }, [selectedClientId, clients, setValue]);
+
+    prevClientIdRef.current = selectedClientId;
+  }, [selectedClientId, clients, setValue, isEditMode, resolvedInitialInvoice]);
 
   useEffect(() => {
     if (!saveFeedback) {
@@ -1039,7 +1048,7 @@ export function CreateInvoiceWorkspace({
         downPaymentIdr: payloadDownPaymentIdr,
         status: values.invoiceStatus ? (values.invoiceStatus as InvoiceStatus) : "Pending",
         notes: payloadNotes,
-        recipientName: values.recipientName || undefined,
+        recipientName: values.recipientName?.trim() ?? "",
         items: printableItems,
       });
 
@@ -1134,7 +1143,7 @@ export function CreateInvoiceWorkspace({
                 downPaymentIdr: payloadDownPaymentIdr,
                 status: values.invoiceStatus as InvoiceStatus,
                 notes: payloadNotes,
-                recipientName: values.recipientName || undefined,
+                recipientName: values.recipientName?.trim() ?? "",
                 items: printableItems,
               },
             })
@@ -1148,7 +1157,7 @@ export function CreateInvoiceWorkspace({
               downPaymentIdr: payloadDownPaymentIdr,
               status: values.invoiceStatus as InvoiceStatus,
               notes: payloadNotes,
-              recipientName: values.recipientName || undefined,
+              recipientName: values.recipientName?.trim() ?? "",
               items: printableItems,
             });
       if (isEditMode) {
