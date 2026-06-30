@@ -99,18 +99,27 @@ export const DEFAULT_MASTER_DATA_OPTIONS: MasterDataSeedOption[] = [
     value: "bsi",
     label: "Mandiri Syariah (BSI) - 7088 1234 5678",
     sortOrder: 1,
+    metadata: {
+      penerima: "PT. Ghaniya Zilia Rahman",
+    },
   },
   {
     categoryKey: "bank-disbursement",
     value: "bca",
     label: "BCA (IDR) - 035 123 4455",
     sortOrder: 2,
+    metadata: {
+      penerima: "PT. Ghaniya Zilia Rahman",
+    },
   },
   {
     categoryKey: "bank-disbursement",
     value: "bca_usd",
     label: "BCA (USD) - 035 998 7766",
     sortOrder: 3,
+    metadata: {
+      penerima: "PT. Ghaniya Zilia Rahman",
+    },
   },
   {
     categoryKey: "invoice-client-name",

@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -51,6 +52,7 @@ export class UpdateInvoiceDto {
     example: "2026-04-30",
   })
   @IsOptional()
+  @ValidateIf((o) => o.dueDate !== "" && o.dueDate !== null && o.dueDate !== undefined)
   @IsDateString()
   dueDate?: string;
 

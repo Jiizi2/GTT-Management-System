@@ -11,6 +11,11 @@ export type InvoiceExportLineItem = {
   totalPriceIdr: number;
 };
 
+export type InvoiceExportPaymentItem = {
+  amount: number;
+  dateIso: string;
+};
+
 export type InvoiceExportPayload = {
   invoiceNumber: string;
   issueDateIso: string;
@@ -33,6 +38,7 @@ export type InvoiceExportPayload = {
   downPayment: number;
   remainingBalance: number;
   items: InvoiceExportLineItem[];
+  payments?: InvoiceExportPaymentItem[];
 };
 
 type InvoiceExportWindowOptions = {
@@ -44,7 +50,7 @@ const PRINT_FALLBACK_TIMEOUT_MS = 4_500;
 const RESOURCE_WAIT_TIMEOUT_MS = 2_500;
 
 const companyProfile = {
-  brandName: "PT.Ghaniya Zilia Rahman",
+  brandName: "PT. Ghaniya Zilia Rahman",
   directorName: "Husein Ghanim",
   directorTitle: "Director",
   izinPpiu: "SK NO U.419 TAHUN 2021",
@@ -385,6 +391,8 @@ export async function exportInvoicePdf(
   const valasCurrency = payload.currency || "IDR";
   const isRupiahOnly = payload.items.every((item) => isIdrCurrency(item.currency));
   const isSingleCurrencyBilling = valasCurrency !== "IDR" || isRupiahOnly;
+  const hasUsdItems = payload.items.some((item) => item.currency === "USD");
+  const hasSarItems = payload.items.some((item) => item.currency === "SAR");
 
   let statusBadgeHtml = "";
   const normalizedStatus = statusLabel.trim().toLowerCase();
@@ -432,9 +440,6 @@ export async function exportInvoicePdf(
 </tr>`;
       } else {
         const totalPriceLabel = formatCurrency(item.totalPrice, item.currency);
-        const kursLabel = isIdrCurrency(item.currency)
-          ? "-"
-          : `IDR ${formatRate(item.currency === "USD" ? payload.usdToIdr : payload.sarToIdr)}`;
         return `
 <tr class="invoice-line-row">
 <td class="invoice-cell-no">${String(index + 1).padStart(2, "0")}</td>
@@ -443,7 +448,6 @@ export async function exportInvoicePdf(
 </td>
 <td class="invoice-cell-pax">${escapeHtml(formatNumber(item.pax))}</td>
 <td class="invoice-cell-price">${escapeHtml(formatCurrency(item.unitPrice, item.currency))}</td>
-<td class="invoice-cell-kurs">${escapeHtml(kursLabel)}</td>
 <td class="invoice-cell-total">${escapeHtml(totalPriceLabel)}</td>
 <td class="invoice-cell-total-idr">${escapeHtml(formatIdr(item.totalPriceIdr))}</td>
 </tr>`;
@@ -473,13 +477,12 @@ export async function exportInvoicePdf(
             .invoice-table th:nth-child(4), .invoice-table td:nth-child(4) { width: 16%; }
             .invoice-table th:nth-child(5), .invoice-table td:nth-child(5) { width: 16%; }
   ` : `
-            .invoice-table th:nth-child(1), .invoice-table td:nth-child(1) { width: 5%; }
-            .invoice-table th:nth-child(2), .invoice-table td:nth-child(2) { width: 30%; }
-            .invoice-table th:nth-child(3), .invoice-table td:nth-child(3) { width: 10%; }
-            .invoice-table th:nth-child(4), .invoice-table td:nth-child(4) { width: 14%; }
-            .invoice-table th:nth-child(5), .invoice-table td:nth-child(5) { width: 11%; }
-            .invoice-table th:nth-child(6), .invoice-table td:nth-child(6) { width: 15%; }
-            .invoice-table th:nth-child(7), .invoice-table td:nth-child(7) { width: 15%; }
+            .invoice-table th:nth-child(1), .invoice-table td:nth-child(1) { width: 6%; }
+            .invoice-table th:nth-child(2), .invoice-table td:nth-child(2) { width: 34%; }
+            .invoice-table th:nth-child(3), .invoice-table td:nth-child(3) { width: 12%; }
+            .invoice-table th:nth-child(4), .invoice-table td:nth-child(4) { width: 16%; }
+            .invoice-table th:nth-child(5), .invoice-table td:nth-child(5) { width: 16%; }
+            .invoice-table th:nth-child(6), .invoice-table td:nth-child(6) { width: 16%; }
   `;
 
   const printableHtml = `<!DOCTYPE html>
@@ -765,6 +768,12 @@ export async function exportInvoicePdf(
             font-weight: 700 !important;
             color: #111111 !important;
             line-height: 1.3;
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
+        .invoice-cell-desc {
+            white-space: normal !important;
+            word-break: break-word !important;
         }
         .invoice-cell-pax {
             text-align: center !important;
@@ -892,6 +901,8 @@ export async function exportInvoicePdf(
         }
         .invoice-notes {
             flex: 1;
+            padding-left: 16px !important;
+            border-left: 3px solid var(--invoice-gold) !important;
         }
         .invoice-notes-title {
             font-size: 11px !important;
@@ -903,8 +914,9 @@ export async function exportInvoicePdf(
         }
         .invoice-notes-text {
             font-size: 12.5px !important;
-            line-height: 1.5;
-            color: var(--invoice-gray-muted) !important;
+            line-height: 1.6;
+            color: #1a1a1a !important;
+            font-weight: 700 !important;
             margin: 0 !important;
         }
         
@@ -1116,6 +1128,12 @@ export async function exportInvoicePdf(
             }
             .invoice-row-description {
                 font-size: 13.5px !important;
+                white-space: normal !important;
+                word-break: break-word !important;
+            }
+            .invoice-cell-desc {
+                white-space: normal !important;
+                word-break: break-word !important;
             }
             ${columnStyles}
             
@@ -1168,10 +1186,12 @@ ${payload.address?.trim() ? `<p class="invoice-bill-to-address">${escapeHtml(pay
 <span class="invoice-meta-label">Date</span>
 <span class="invoice-meta-value">${escapeHtml(formatDateLabel(payload.issueDateIso))}</span>
 </div>
+${payload.dueDateIso ? `
 <div class="invoice-meta-row">
 <span class="invoice-meta-label">Due Date</span>
 <span class="invoice-meta-value">${escapeHtml(formatDateLabel(payload.dueDateIso))}</span>
 </div>
+` : ""}
 <div class="invoice-meta-row" style="margin-top: 6px; border-top: 1px solid rgba(184, 134, 11, 0.15); padding-top: 8px;">
 <span class="invoice-meta-label">Status</span>
 <span class="invoice-meta-value">${statusBadgeHtml}</span>
@@ -1197,14 +1217,13 @@ ${isSingleCurrencyBilling ? `
 <th>Uraian</th>
 <th style="text-align: center;">Jumlah (PAX)</th>
 <th style="text-align: right;">Harga per Unit</th>
-<th style="text-align: right;">Kurs</th>
 <th style="text-align: right;">Total Harga</th>
 <th style="text-align: right;">Total Harga (IDR)</th>
 </tr>
 </thead>
 `}
 <tbody class="divide-y divide-stone-100">
-${rowsHtml || `<tr><td colspan="${isSingleCurrencyBilling ? 5 : 7}" class="py-6 px-4 text-center text-stone-500 text-sm">No invoice items</td></tr>`}
+${rowsHtml || `<tr><td colspan="${isSingleCurrencyBilling ? 5 : 6}" class="py-6 px-4 text-center text-stone-500 text-sm">No invoice items</td></tr>`}
 </tbody>
 </table>
 </section>
@@ -1231,14 +1250,18 @@ Exchange Rates
 </h3>
 <div class="invoice-rate-card">
 <div class="bank-details" style="display: flex; flex-direction: column; gap: 4px;">
+${hasSarItems ? `
 <div style="display: flex; justify-content: space-between;">
 <span>Rate SAR/IDR</span>
 <strong>IDR ${escapeHtml(formatRate(payload.sarToIdr))}</strong>
 </div>
+` : ""}
+${hasUsdItems ? `
 <div style="display: flex; justify-content: space-between;">
 <span>Rate USD/IDR</span>
 <strong>IDR ${escapeHtml(formatRate(payload.usdToIdr))}</strong>
 </div>
+` : ""}
 </div>
 </div>
 </div>
@@ -1246,30 +1269,35 @@ Exchange Rates
 </div>
 <div class="invoice-summary-right">
 <div class="invoice-subtotal-card">
-<div class="subtotal-row">
-<span>Subtotal</span>
-<strong>${escapeHtml(displaySubtotal)}</strong>
-</div>
-${payload.tax > 0 ? `
-<div class="subtotal-row">
-<span>Tax (${taxPercentage}%)</span>
-<strong>${escapeHtml(formatCurrency(payload.tax, valasCurrency))}</strong>
-</div>
-` : ''}
-${payload.downPayment > 0 ? `
-<div class="subtotal-row">
-<span>Total Tagihan</span>
-<strong>${escapeHtml(displayTotalPayable)}</strong>
-</div>
-<div class="subtotal-row" style="color: #dc2626;">
-<span>Uang Muka / DP</span>
-<strong>-${escapeHtml(displayDownPayment)}</strong>
-</div>
-` : ''}
-<div class="subtotal-row grand-total ${isPaidInvoice ? 'invoice-paid-total' : ''}">
-<span class="grand-total-label">${escapeHtml(resolveOutstandingBalanceLabel(payload))}</span>
-<span class="grand-total-value">${escapeHtml(displayRemainingBalance)}</span>
-</div>
+  <div class="invoice-section-title" style="margin-bottom: 4px;">Total Pembayaran</div>
+  <div style="border-top: 1px solid var(--invoice-gold); margin-bottom: 12px;"></div>
+
+  <div class="subtotal-row" style="font-size: 13.5px; font-weight: 700; color: #111111; margin-bottom: 8px;">
+    <span>Total Tagihan :</span>
+    <strong>${escapeHtml(displayTotalPayable)}</strong>
+  </div>
+
+  ${payload.payments && payload.payments.length > 0 ? payload.payments.map((p, index) => {
+    return `
+    <div class="subtotal-row" style="color: #4a5568; font-size: 12.5px; margin-bottom: 4px;">
+      <span>Pembayaran ${index + 1} (${escapeHtml(formatDateLabel(p.dateIso))}) :</span>
+      <strong>${escapeHtml(formatCurrency(p.amount, valasCurrency))}</strong>
+    </div>`;
+  }).join("") : ""}
+
+  ${!isPaidInvoice ? `
+  <div class="subtotal-row" style="border-top: 1px solid var(--invoice-border); margin-top: 12px; padding-top: 12px; font-size: 12.5px; color: #dc2626; font-weight: 800; text-transform: uppercase;">
+    <span>Sisa Tagihan :</span>
+    <strong>${escapeHtml(displayRemainingBalance)}</strong>
+  </div>
+  ` : ""}
+
+  <div class="subtotal-row" style="${isPaidInvoice ? 'border-top: 1px solid var(--invoice-border); margin-top: 12px; padding-top: 12px;' : 'margin-top: 6px;'} font-size: 14px; font-weight: 800;">
+    <span style="color: var(--invoice-gold); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Status :</span>
+    <span style="color: ${isPaidInvoice ? '#047857' : '#dc2626'}; text-transform: uppercase;">
+      ${isPaidInvoice ? 'Lunas' : 'Belum Lunas'}
+    </span>
+  </div>
 </div>
 </div>
 </section>

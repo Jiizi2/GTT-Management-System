@@ -68,6 +68,9 @@ export function formatIdr(value: number): string {
 }
 
 export function formatDateLabel(isoDate: string): string {
+  if (!isoDate || isoDate.trim() === "") {
+    return "-";
+  }
   const parsedDate = new Date(`${isoDate}T12:00:00`);
   if (Number.isNaN(parsedDate.getTime())) {
     return isoDate;
@@ -498,10 +501,12 @@ export async function viewInvoicePdfFromRow({
   row,
   groups,
   bankDisbursementOptions,
+  issuingOfficeOptions,
 }: {
   row: InvoiceRow;
   groups: GroupData[];
   bankDisbursementOptions?: SelectOption[];
+  issuingOfficeOptions?: SelectOption[];
 }): Promise<boolean> {
   const linkedGroup = row.groupCode
     ? (groups.find((group) => group.code.trim().toUpperCase() === row.groupCode?.trim().toUpperCase()) ?? null)
@@ -528,7 +533,33 @@ export async function viewInvoicePdfFromRow({
   const notesRaw = row.notes ?? "";
   const bankMatch = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
   const bankKey = bankMatch && bankMatch[1] ? bankMatch[1].trim() : "bsi";
-  const bankAccountLabel = resolveBankAccountLabel(bankKey, bankDisbursementOptions);
+  const matchedBank = bankDisbursementOptions?.find((option) => option.value === bankKey);
+  const bankAccountLabel = matchedBank?.label ?? resolveBankAccountLabel(bankKey, bankDisbursementOptions);
+  const bankAccountRecipient = matchedBank?.metadata?.penerima || matchedBank?.metadata?.beneficiary || matchedBank?.metadata?.recipient || matchedBank?.metadata?.recipientName;
+
+  const issuingOfficeMatch = notesRaw.match(/\[IssuingOffice:([^\]]+)\]/);
+  const issuingOfficeKey = issuingOfficeMatch && issuingOfficeMatch[1] ? issuingOfficeMatch[1].trim() : "Bekasi Office";
+  const issuingOfficeLabel = issuingOfficeOptions?.find((option) => option.value === issuingOfficeKey)?.label ?? issuingOfficeKey;
+
+  const addressMatch = notesRaw.match(/\[Address:([^\]]*)\]/);
+  const address = addressMatch ? decodeURIComponent(addressMatch[1]) : "";
+
+  const paymentsMatch = notesRaw.match(/\[Payments:([^\]]*)\]/);
+  let payments: Array<{ amount: number; dateIso: string }> = [];
+  if (paymentsMatch && paymentsMatch[1]) {
+    try {
+      payments = JSON.parse(decodeURIComponent(paymentsMatch[1]));
+    } catch {
+      payments = [];
+    }
+  } else {
+    if (totals.downPayment > 0) {
+      payments = [{
+        amount: totals.downPayment,
+        dateIso: row.issuedDateIso || "",
+      }];
+    }
+  }
 
   // Strip metadata tags from notes for final printing
   const cleanNotes = notesRaw
@@ -536,6 +567,10 @@ export async function viewInvoicePdfFromRow({
     .replace(/\[KeepValasTotal\]/g, "")
     .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
     .replace(/\[BankAccount:[^\]]+\]/g, "")
+    .replace(/\[IssuingOffice:[^\]]+\]/g, "")
+    .replace(/\[NoDueDate:true\]/g, "")
+    .replace(/\[Address:[^\]]*\]/g, "")
+    .replace(/\[Payments:[^\]]*\]/g, "")
     .trim();
 
   return await exportInvoicePdf(
@@ -544,11 +579,12 @@ export async function viewInvoicePdfFromRow({
       issueDateIso: row.issuedDateIso,
       dueDateIso: row.dueDateIso,
       statusLabel: getInvoiceStatusDisplayLabel(row.status),
-      issuingOffice: "Bekasi Office",
+      issuingOffice: issuingOfficeLabel,
       clientName: row.clientName,
       clientCode: row.groupCode ?? row.clientLabel,
-      address: row.clientLabel,
+      address,
       recipientName: row.recipientName,
+      bankAccountRecipient,
       bankAccountLabel,
       notes: cleanNotes,
       usdToIdr: totals.usdToIdr,
@@ -560,6 +596,7 @@ export async function viewInvoicePdfFromRow({
       downPayment: totals.downPayment,
       remainingBalance: totals.remainingBalance,
       items: printableItems,
+      payments,
     }
   );
 }

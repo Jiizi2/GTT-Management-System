@@ -225,7 +225,7 @@ export function InvoiceScreen({
 
   const handleViewPdf = (row: InvoiceRow) => {
     setActionFeedback("Menyiapkan PDF...");
-    void viewInvoicePdfFromRow({ row, groups, bankDisbursementOptions })
+    void viewInvoicePdfFromRow({ row, groups, bankDisbursementOptions, issuingOfficeOptions })
       .then((exported) => {
         if (exported) {
           setActionFeedback("");
@@ -630,7 +630,7 @@ export function InvoiceScreen({
                           </p>
                           {displayTotals.downPayment > 0 && (
                             <p className="text-[9px] text-on-surface-variant font-semibold mt-0.5">
-                              Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                              Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | Terbayar: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
                             </p>
                           )}
                         </>
@@ -759,7 +759,7 @@ export function InvoiceScreen({
                               <p className="font-display text-[0.95rem] font-bold text-on-surface">{formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}</p>
                               {displayTotals.downPayment > 0 && (
                                 <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
-                                  Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                                  Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | Terbayar: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
                                 </p>
                               )}
                             </>

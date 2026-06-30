@@ -207,6 +207,7 @@ function resolveEffectiveStatus(
   dueDateIso: string,
   amount: number,
   downPaymentIdr: number,
+  notes?: string,
 ): InvoiceStatus {
   if (status === InvoiceStatus.CANCELLED) {
     return InvoiceStatus.CANCELLED;
@@ -223,13 +224,16 @@ function resolveEffectiveStatus(
     return InvoiceStatus.PAID;
   }
 
-  const todayIso = toIsoDateOnly(new Date());
-  if (dueDateIso < todayIso) {
-    return InvoiceStatus.OVERDUE;
+  const isNoDueDate = notes?.includes("[NoDueDate:true]");
+  if (!isNoDueDate && dueDateIso && dueDateIso !== "none") {
+    const todayIso = toIsoDateOnly(new Date());
+    if (dueDateIso < todayIso) {
+      return InvoiceStatus.OVERDUE;
+    }
   }
 
   if (status === InvoiceStatus.OVERDUE) {
-    return InvoiceStatus.OVERDUE;
+    return isNoDueDate ? InvoiceStatus.PENDING : InvoiceStatus.OVERDUE;
   }
 
   if (sanitizedDownPayment > 0 && sanitizedDownPayment < sanitizedAmount) {
@@ -641,7 +645,9 @@ export class InvoicesService implements OnModuleInit {
   private findAllFromMemory(): InvoiceListItem[] {
     const todayIso = toIsoDateOnly(new Date());
     this.memoryInvoices.forEach((inv) => {
+      const isNoDueDate = inv.notes?.includes("[NoDueDate:true]");
       if (
+        !isNoDueDate &&
         (inv.status === InvoiceStatus.PENDING || inv.status === InvoiceStatus.PARTIALLY_PAID) &&
         inv.dueDateIso < todayIso
       ) {
@@ -672,18 +678,26 @@ export class InvoicesService implements OnModuleInit {
     const client = this.resolveClientForCreateInMemory(payload);
 
     const issuedDateIso = normalizeIsoDate(payload.issuedDate, "issuedDate");
-    const dueDateIso = normalizeIsoDate(payload.dueDate, "dueDate");
+    const isNoDueDate = !payload.dueDate || !payload.dueDate.trim();
+    const dueDateIso = isNoDueDate
+      ? issuedDateIso
+      : normalizeIsoDate(payload.dueDate!, "dueDate");
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
     const existingInvoiceNumbers = this.memoryInvoices.map((entry) => entry.invoiceNumber);
     const invoiceNumber = buildInvoiceNumber(invoiceYear, this.resolveNextSerial(existingInvoiceNumbers));
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
     const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
+    let notes = getTrimmedString(payload.notes);
+    if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
+      notes = `${notes}\n[NoDueDate:true]`.trim();
+    }
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? InvoiceStatus.PENDING,
       dueDateIso,
       roundedAmount,
       payload.downPaymentIdr ?? 0,
+      notes,
     );
     const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
 
@@ -698,7 +712,7 @@ export class InvoicesService implements OnModuleInit {
       amount: roundedAmount,
       downPaymentIdr: normalizeDownPaymentByAmount(roundedAmount, payload.downPaymentIdr ?? 0),
       status: effectiveStatus,
-      notes: getTrimmedString(payload.notes) || undefined,
+      notes: notes || undefined,
       recipientName: getTrimmedString(payload.recipientName) || undefined,
       items: normalizedItems.length > 0 ? normalizedItems : undefined,
     };
@@ -748,9 +762,15 @@ export class InvoicesService implements OnModuleInit {
     const issuedDateIso = payload.issuedDate
       ? normalizeIsoDate(payload.issuedDate, "issuedDate")
       : currentInvoice.issuedDateIso;
-    const dueDateIso = payload.dueDate
-      ? normalizeIsoDate(payload.dueDate, "dueDate")
-      : currentInvoice.dueDateIso;
+
+    const isNoDueDate = payload.dueDate !== undefined
+      ? (!payload.dueDate || !payload.dueDate.trim())
+      : (currentInvoice.notes?.includes("[NoDueDate:true]") ?? false);
+
+    const dueDateIso = (payload.dueDate !== undefined && payload.dueDate.trim())
+      ? normalizeIsoDate(payload.dueDate!, "dueDate")
+      : issuedDateIso;
+
     const baseAmount = payload.amount !== undefined ? payload.amount : currentInvoice.amount;
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : undefined;
     const resolvedAmount =
@@ -760,11 +780,22 @@ export class InvoicesService implements OnModuleInit {
       roundedAmount,
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : currentInvoice.downPaymentIdr,
     );
+
+    let notes = payload.notes !== undefined ? payload.notes.trim() : (currentInvoice.notes ?? "");
+    if (isNoDueDate) {
+      if (!notes.includes("[NoDueDate:true]")) {
+        notes = `${notes}\n[NoDueDate:true]`.trim();
+      }
+    } else {
+      notes = notes.replace(/\[NoDueDate:true\]/g, "").trim();
+    }
+
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? currentInvoice.status,
       dueDateIso,
       roundedAmount,
       nextDownPaymentIdr,
+      notes,
     );
 
     let nextGroupCode = currentInvoice.groupCode;
@@ -783,8 +814,6 @@ export class InvoicesService implements OnModuleInit {
       nextGroupName = resolvedClient.groupName;
     }
 
-    const nextNotes =
-      payload.notes !== undefined ? payload.notes.trim() || undefined : currentInvoice.notes;
     const nextRecipientName =
       payload.recipientName !== undefined ? payload.recipientName.trim() || undefined : currentInvoice.recipientName;
 
@@ -798,7 +827,7 @@ export class InvoicesService implements OnModuleInit {
       amount: roundedAmount,
       downPaymentIdr: nextDownPaymentIdr,
       status: effectiveStatus,
-      notes: nextNotes,
+      notes: notes || undefined,
       recipientName: nextRecipientName,
       items: normalizedItems !== undefined ? (normalizedItems.length > 0 ? normalizedItems : undefined) : currentInvoice.items,
     };
@@ -818,7 +847,9 @@ export class InvoicesService implements OnModuleInit {
       invoice.dueDateIso,
       roundedAmount,
       invoice.downPaymentIdr,
+      invoice.notes,
     );
+    const isNoDueDate = invoice.notes?.includes("[NoDueDate:true]");
     return {
       id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -829,7 +860,7 @@ export class InvoicesService implements OnModuleInit {
       groupCode: invoice.groupCode ?? client.groupCode,
       groupName: invoice.groupName ?? client.groupName,
       issuedDateIso: invoice.issuedDateIso,
-      dueDateIso: invoice.dueDateIso,
+      dueDateIso: isNoDueDate ? "" : invoice.dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, invoice.downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
@@ -1026,6 +1057,10 @@ export class InvoicesService implements OnModuleInit {
         dueDate: {
           lt: todayUtc,
         },
+        OR: [
+          { notes: { not: { contains: "[NoDueDate:true]" } } },
+          { notes: null },
+        ],
       },
       data: {
         status: InvoiceStatus.OVERDUE,
@@ -1048,7 +1083,10 @@ export class InvoicesService implements OnModuleInit {
     const client = await this.resolveClientForCreateWithPrisma(payload);
 
     const issuedDateIso = normalizeIsoDate(payload.issuedDate, "issuedDate");
-    const dueDateIso = normalizeIsoDate(payload.dueDate, "dueDate");
+    const isNoDueDate = !payload.dueDate || !payload.dueDate.trim();
+    const dueDateIso = isNoDueDate
+      ? issuedDateIso
+      : normalizeIsoDate(payload.dueDate!, "dueDate");
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
     const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
     let resolvedGroupId: string | null = client.groupId ?? null;
@@ -1072,11 +1110,16 @@ export class InvoicesService implements OnModuleInit {
 
     const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
+    let notes = getTrimmedString(payload.notes);
+    if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
+      notes = `${notes}\n[NoDueDate:true]`.trim();
+    }
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? InvoiceStatus.PENDING,
       dueDateIso,
       roundedAmount,
       payload.downPaymentIdr ?? 0,
+      notes,
     );
     const normalizedDownPaymentIdr = normalizeDownPaymentByAmount(
       roundedAmount,
@@ -1099,7 +1142,7 @@ export class InvoicesService implements OnModuleInit {
               dueDate: createUtcDateFromIso(dueDateIso),
               amount: roundedAmount,
               status: effectiveStatus,
-              notes: getTrimmedString(payload.notes) || null,
+              notes: notes || null,
               recipientName: getTrimmedString(payload.recipientName) || null,
               items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
             },
@@ -1206,9 +1249,15 @@ export class InvoicesService implements OnModuleInit {
     const issuedDateIso = payload.issuedDate
       ? normalizeIsoDate(payload.issuedDate, "issuedDate")
       : toIsoDateOnly(existingInvoice.issuedDate);
-    const dueDateIso = payload.dueDate
-      ? normalizeIsoDate(payload.dueDate, "dueDate")
-      : toIsoDateOnly(existingInvoice.dueDate);
+
+    const isNoDueDate = payload.dueDate !== undefined
+      ? (!payload.dueDate || !payload.dueDate.trim())
+      : (existingInvoice.notes?.includes("[NoDueDate:true]") ?? false);
+
+    const dueDateIso = (payload.dueDate !== undefined && payload.dueDate.trim())
+      ? normalizeIsoDate(payload.dueDate!, "dueDate")
+      : issuedDateIso;
+
     const baseAmount =
       payload.amount !== undefined ? payload.amount : toNumberAmount(existingInvoice.amount);
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
@@ -1219,11 +1268,22 @@ export class InvoicesService implements OnModuleInit {
       roundedAmount,
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : existingDownPaymentIdr,
     );
+
+    let notes = payload.notes !== undefined ? payload.notes.trim() : (existingInvoice.notes ?? "");
+    if (isNoDueDate) {
+      if (!notes.includes("[NoDueDate:true]")) {
+        notes = `${notes}\n[NoDueDate:true]`.trim();
+      }
+    } else {
+      notes = notes.replace(/\[NoDueDate:true\]/g, "").trim();
+    }
+
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? existingInvoice.status,
       dueDateIso,
       roundedAmount,
       normalizedDownPaymentIdr,
+      notes,
     );
 
     let resolvedGroupId: string | null = existingInvoice.groupId;
@@ -1264,7 +1324,7 @@ export class InvoicesService implements OnModuleInit {
           dueDate: createUtcDateFromIso(dueDateIso),
           amount: roundedAmount,
           status: effectiveStatus,
-          notes: payload.notes !== undefined ? payload.notes.trim() || null : existingInvoice.notes,
+          notes: notes || null,
           recipientName: payload.recipientName !== undefined ? payload.recipientName.trim() || null : existingInvoice.recipientName,
           ...(payload.items !== undefined
             ? {
@@ -1373,7 +1433,9 @@ export class InvoicesService implements OnModuleInit {
       dueDateIso,
       roundedAmount,
       downPaymentIdr,
+      invoice.notes ?? undefined,
     );
+    const isNoDueDate = invoice.notes?.includes("[NoDueDate:true]");
 
     return {
       id: invoice.id,
@@ -1385,7 +1447,7 @@ export class InvoicesService implements OnModuleInit {
       groupCode: invoice.group?.code,
       groupName: invoice.group?.name,
       issuedDateIso,
-      dueDateIso,
+      dueDateIso: isNoDueDate ? "" : dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
       status: toStatusLabel(effectiveStatus),

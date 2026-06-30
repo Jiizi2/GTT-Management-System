@@ -697,30 +697,28 @@ export class MasterDataService {
     const model = this.getPrismaMasterDataModelOrThrow();
 
     for (const option of DEFAULT_MASTER_DATA_OPTIONS) {
-      await model.upsert({
+      const existing = await model.findUnique({
         where: {
           categoryKey_value: {
             categoryKey: normalizeCategoryKey(option.categoryKey),
             value: option.value,
           },
         },
-        update: {
-          label: option.label,
-          description: option.description ?? null,
-          metadata: option.metadata ?? Prisma.JsonNull,
-          sortOrder: option.sortOrder,
-          isActive: option.isActive ?? true,
-        },
-        create: {
-          categoryKey: normalizeCategoryKey(option.categoryKey),
-          value: option.value,
-          label: option.label,
-          description: option.description ?? null,
-          metadata: option.metadata ?? Prisma.JsonNull,
-          sortOrder: option.sortOrder,
-          isActive: option.isActive ?? true,
-        },
       });
+
+      if (!existing) {
+        await model.create({
+          data: {
+            categoryKey: normalizeCategoryKey(option.categoryKey),
+            value: option.value,
+            label: option.label,
+            description: option.description ?? null,
+            metadata: (option.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+            sortOrder: option.sortOrder,
+            isActive: option.isActive ?? true,
+          },
+        });
+      }
     }
   }
 

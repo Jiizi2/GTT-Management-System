@@ -115,18 +115,22 @@ const invoiceDraftItemSchema = z.object({
 const invoiceWorkspaceFormSchema = z
   .object({
     issueDateIso: z.string().trim().min(1, "Select issue date before saving invoice."),
-    dueDateIso: z.string().trim().min(1, "Select due date before saving invoice."),
+    dueDateIso: z.string().optional(),
     invoiceStatus: z.string(),
     issuingOffice: z.string(),
     selectedClientId: z.string().trim().min(1, "Select a client before saving invoice."),
     manualClientName: z.string(),
     selectedGroupCode: z.string(),
-    address: z.string(),
+    address: z.string().optional(),
     recipientName: z.string().optional(),
     bankAccount: z.string(),
     downPaymentIdr: z.number().min(0),
     notes: z.string(),
     items: z.array(invoiceDraftItemSchema),
+    payments: z.array(z.object({
+      amount: z.number(),
+      dateIso: z.string(),
+    })).optional(),
   })
   .superRefine((values, context) => {
     if (values.selectedClientId === MANUAL_CLIENT_OPTION_ID && values.manualClientName.trim().length === 0) {
@@ -623,7 +627,14 @@ export function CreateInvoiceWorkspace({
       issueDateIso: resolvedInitialInvoice?.issuedDateIso ?? "",
       dueDateIso: resolvedInitialInvoice?.dueDateIso ?? "",
       invoiceStatus: resolvedInitialInvoice?.status ?? (isEditMode ? (invoiceStatusOptions[0]?.value ?? "") : ""),
-      issuingOffice: isEditMode ? (issuingOfficeOptions[0]?.value ?? "") : "",
+      issuingOffice: (() => {
+        const notesRaw = resolvedInitialInvoice?.notes ?? "";
+        const match = notesRaw.match(/\[IssuingOffice:([^\]]+)\]/);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+        return issuingOfficeOptions[0]?.value ?? "";
+      })(),
       selectedClientId: resolvedInitialInvoice
         ? hasResolvedInitialClient
           ? initialClientId
@@ -633,18 +644,28 @@ export function CreateInvoiceWorkspace({
         : "",
       manualClientName: hasResolvedInitialManualClient ? resolvedInitialClientName : "",
       selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
-      address: resolvedInitialInvoice?.clientLabel || resolvedInitialInvoice?.clientName || "",
+      address: (() => {
+        if (!resolvedInitialInvoice) return "";
+        const notesRaw = resolvedInitialInvoice.notes ?? "";
+        const match = notesRaw.match(/\[Address:([^\]]*)\]/);
+        if (match) {
+          return decodeURIComponent(match[1]);
+        }
+        // Fallback to clientLabel but exclude it if it is just a sequence pattern like '01. Yassir'
+        const label = resolvedInitialInvoice.clientLabel || "";
+        if (label.match(/^\d+\.\s/)) {
+          return "";
+        }
+        return label || resolvedInitialInvoice.clientName || "";
+      })(),
       recipientName: resolvedInitialInvoice?.recipientName ?? "",
       bankAccount: (() => {
-        if (!resolvedInitialInvoice) {
-          return isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "";
-        }
-        const notesRaw = resolvedInitialInvoice.notes ?? "";
+        const notesRaw = resolvedInitialInvoice?.notes ?? "";
         const match = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
         if (match && match[1]) {
           return match[1].trim();
         }
-        return isEditMode ? (bankDisbursementOptions[0]?.value ?? "") : "";
+        return bankDisbursementOptions[0]?.value ?? "";
       })(),
       downPaymentIdr: (() => {
         if (!resolvedInitialInvoice) return 0;
@@ -669,11 +690,52 @@ export function CreateInvoiceWorkspace({
             .replace(/\[KeepValasTotal\]/g, "")
             .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
             .replace(/\[BankAccount:[^\]]+\]/g, "")
+            .replace(/\[IssuingOffice:[^\]]+\]/g, "")
+            .replace(/\[NoDueDate:true\]/g, "")
+            .replace(/\[Address:[^\]]*\]/g, "")
+            .replace(/\[Payments:[^\]]*\]/g, "")
             .trim()
         : "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
+      payments: (() => {
+        if (!resolvedInitialInvoice) return [];
+        const notesRaw = resolvedInitialInvoice.notes ?? "";
+        const match = notesRaw.match(/\[Payments:([^\]]*)\]/);
+        if (match && match[1]) {
+          try {
+            return JSON.parse(decodeURIComponent(match[1]));
+          } catch {
+            return [];
+          }
+        }
+        
+        let initialKeepValasCurrency: "IDR" | "USD" | "SAR" = "IDR";
+        if (notesRaw.includes("[KeepValasTotal:USD]")) initialKeepValasCurrency = "USD";
+        else if (notesRaw.includes("[KeepValasTotal:SAR]")) initialKeepValasCurrency = "SAR";
+        else if (notesRaw.includes("[KeepValasTotal]")) {
+          initialKeepValasCurrency = resolvedInitialInvoice.items.find((item) => item.currency !== "IDR")?.currency || "IDR";
+        }
+        let legacyAmount = resolvedInitialInvoice.downPaymentIdr;
+        if (initialKeepValasCurrency !== "IDR") {
+          const rateVal = initialKeepValasCurrency === "USD" ? initialRates.usdToIdr : initialRates.sarToIdr;
+          if (rateVal > 0) {
+            legacyAmount = Math.ceil(resolvedInitialInvoice.downPaymentIdr / rateVal);
+          }
+        }
+
+        if (legacyAmount > 0) {
+          return [
+            {
+              amount: legacyAmount,
+              dateIso: resolvedInitialInvoice.issuedDateIso || "",
+            },
+          ];
+        }
+        return [];
+      })(),
     },
   });
+  const issueDateIso = watch("issueDateIso");
   const dueDateIso = watch("dueDateIso");
   const invoiceStatus = watch("invoiceStatus") as InvoiceStatus | "";
   const issuingOffice = watch("issuingOffice");
@@ -693,6 +755,14 @@ export function CreateInvoiceWorkspace({
     name: "items",
     keyName: "fieldKey",
   });
+  const {
+    fields: paymentFields,
+    append: appendPayment,
+    remove: removePayment,
+  } = useFieldArray({
+    control,
+    name: "payments" as any,
+  });
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId],
@@ -703,8 +773,8 @@ export function CreateInvoiceWorkspace({
     [groups, selectedGroupCode],
   );
   const nextInvoiceNumberPreview = useMemo(
-    () => buildNextInvoiceNumber(existingInvoiceNumbers, extractYearFromIsoDate(dueDateIso)),
-    [existingInvoiceNumbers, dueDateIso],
+    () => buildNextInvoiceNumber(existingInvoiceNumbers, extractYearFromIsoDate(dueDateIso || issueDateIso || "")),
+    [existingInvoiceNumbers, dueDateIso, issueDateIso],
   );
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -769,7 +839,7 @@ export function CreateInvoiceWorkspace({
       setValue("selectedGroupCode", selectedClient.groupCode);
     }
 
-    if (!address.trim()) {
+    if (!address || !address.trim()) {
       setValue("address", selectedClient.name);
     }
   }, [selectedClient, selectedGroupCode, isEditMode, isManualClientSelected, address, setValue]);
@@ -896,11 +966,18 @@ export function CreateInvoiceWorkspace({
     const prevRate = prevCurrency === "USD" ? usdToIdr : prevCurrency === "SAR" ? sarToIdr : 1;
     const nextRate = nextCurrency === "USD" ? usdToIdr : nextCurrency === "SAR" ? sarToIdr : 1;
 
-    const dpInIdr = prevRate > 0 ? downPaymentIdr * prevRate : downPaymentIdr;
-    const convertedDp = nextRate > 0 ? dpInIdr / nextRate : 0;
-    const finalDp = nextCurrency !== "IDR" ? Math.ceil(convertedDp) : Math.round(convertedDp);
+    // Convert each payment's amount to the new currency
+    const updatedPayments = payments.map((p) => {
+      const amtInIdr = prevRate > 0 ? p.amount * prevRate : p.amount;
+      const convertedAmt = nextRate > 0 ? amtInIdr / nextRate : 0;
+      const finalAmt = nextCurrency !== "IDR" ? Math.ceil(convertedAmt) : Math.round(convertedAmt);
+      return {
+        ...p,
+        amount: finalAmt,
+      };
+    });
 
-    setValue("downPaymentIdr", finalDp, {
+    setValue("payments", updatedPayments, {
       shouldDirty: true,
       shouldValidate: false,
     });
@@ -923,39 +1000,40 @@ export function CreateInvoiceWorkspace({
     totalPayable > 0 ? Math.min(100, Math.round((normalizedDownPayment / totalPayable) * 100)) : 0;
   const remainingBalance = resolveInvoiceRemainingBalanceIdr(totalPayable, normalizedDownPayment);
 
+  const payments = watch("payments") || [];
+  const totalPaid = useMemo(() => {
+    return payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  }, [payments]);
+
+  // Sync downPaymentIdr to totalPaid
   useEffect(() => {
-    if (downPaymentIdr <= totalPayable) {
+    setValue("downPaymentIdr", totalPaid, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [totalPaid, setValue]);
+
+  // Automatically calculate status based on payment progress
+  useEffect(() => {
+    if (invoiceStatus === "Cancelled") {
       return;
     }
 
-    setValue("downPaymentIdr", totalPayable, {
-      shouldDirty: true,
-      shouldValidate: false,
-    });
-  }, [downPaymentIdr, totalPayable, setValue]);
-
-  // Automatically adjust downPaymentIdr based on invoiceStatus changes to prevent DB override mismatch
-  useEffect(() => {
-    if (invoiceStatus === "Paid") {
-      if (downPaymentIdr !== totalPayable) {
-        setValue("downPaymentIdr", totalPayable, {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
+    if (totalPayable > 0 && totalPaid >= totalPayable) {
+      setValue("invoiceStatus", "Paid", { shouldDirty: true, shouldValidate: true });
+    } else if (totalPaid > 0) {
+      setValue("invoiceStatus", "Partially Paid", { shouldDirty: true, shouldValidate: true });
+    } else {
+      if (dueDateIso) {
+        const todayIso = Domain.formatLocalIsoDate(new Date());
+        if (dueDateIso < todayIso) {
+          setValue("invoiceStatus", "Overdue", { shouldDirty: true, shouldValidate: true });
+          return;
+        }
       }
-    } else if (
-      invoiceStatus === "Pending" ||
-      invoiceStatus === "Overdue" ||
-      invoiceStatus === "Cancelled"
-    ) {
-      if (downPaymentIdr !== 0) {
-        setValue("downPaymentIdr", 0, {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
-      }
+      setValue("invoiceStatus", "Pending", { shouldDirty: true, shouldValidate: true });
     }
-  }, [invoiceStatus, totalPayable, setValue]);
+  }, [totalPaid, totalPayable, dueDateIso, setValue, invoiceStatus]);
 
   const addItemRow = () => {
     const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
@@ -1034,7 +1112,27 @@ export function CreateInvoiceWorkspace({
     const payloadAmount = keepValasCurrency !== "IDR"
       ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
       : totalPayable;
-    const payloadNotes = `${values.notes.trim()}${keepValasCurrency !== "IDR" ? `\n[KeepValasTotal:${keepValasCurrency}]` : ""}\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+    
+    let payloadNotes = values.notes.trim();
+    if (keepValasCurrency !== "IDR") {
+      payloadNotes += `\n[KeepValasTotal:${keepValasCurrency}]`;
+    }
+    payloadNotes += `\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+    if (values.bankAccount) {
+      payloadNotes += `\n[BankAccount:${values.bankAccount}]`;
+    }
+    if (values.issuingOffice) {
+      payloadNotes += `\n[IssuingOffice:${values.issuingOffice}]`;
+    }
+    if (values.address) {
+      payloadNotes += `\n[Address:${encodeURIComponent(values.address)}]`;
+    }
+    if (values.payments && values.payments.length > 0) {
+      payloadNotes += `\n[Payments:${encodeURIComponent(JSON.stringify(values.payments))}]`;
+    }
+    if (!values.dueDateIso || !values.dueDateIso.trim()) {
+      payloadNotes += `\n[NoDueDate:true]`;
+    }
 
     setIsSavingDraft(true);
     try {
@@ -1043,7 +1141,7 @@ export function CreateInvoiceWorkspace({
         clientName: clientSelection.clientName,
         groupCode: linkedGroupCode || undefined,
         issuedDateIso: values.issueDateIso,
-        dueDateIso: values.dueDateIso,
+        dueDateIso: values.dueDateIso || "",
         amount: payloadAmount,
         downPaymentIdr: payloadDownPaymentIdr,
         status: values.invoiceStatus ? (values.invoiceStatus as InvoiceStatus) : "Pending",
@@ -1125,7 +1223,27 @@ export function CreateInvoiceWorkspace({
     const payloadAmount = keepValasCurrency !== "IDR"
       ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
       : totalPayable;
-    const payloadNotes = `${values.notes.trim()}${keepValasCurrency !== "IDR" ? `\n[KeepValasTotal:${keepValasCurrency}]` : ""}\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]\n[BankAccount:${values.bankAccount}]`;
+    
+    let payloadNotes = values.notes.trim();
+    if (keepValasCurrency !== "IDR") {
+      payloadNotes += `\n[KeepValasTotal:${keepValasCurrency}]`;
+    }
+    payloadNotes += `\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+    if (values.bankAccount) {
+      payloadNotes += `\n[BankAccount:${values.bankAccount}]`;
+    }
+    if (values.issuingOffice) {
+      payloadNotes += `\n[IssuingOffice:${values.issuingOffice}]`;
+    }
+    if (values.address) {
+      payloadNotes += `\n[Address:${encodeURIComponent(values.address)}]`;
+    }
+    if (values.payments && values.payments.length > 0) {
+      payloadNotes += `\n[Payments:${encodeURIComponent(JSON.stringify(values.payments))}]`;
+    }
+    if (!values.dueDateIso || !values.dueDateIso.trim()) {
+      payloadNotes += `\n[NoDueDate:true]`;
+    }
 
     setIsSubmitting(true);
     try {
@@ -1138,7 +1256,7 @@ export function CreateInvoiceWorkspace({
                 clientName: clientSelection.clientName,
                 groupCode: linkedGroupCode || undefined,
                 issuedDateIso: values.issueDateIso,
-                dueDateIso: values.dueDateIso,
+                dueDateIso: values.dueDateIso || "",
                 amount: payloadAmount,
                 downPaymentIdr: payloadDownPaymentIdr,
                 status: values.invoiceStatus as InvoiceStatus,
@@ -1152,7 +1270,7 @@ export function CreateInvoiceWorkspace({
               clientName: clientSelection.clientName,
               groupCode: linkedGroupCode || undefined,
               issuedDateIso: values.issueDateIso,
-              dueDateIso: values.dueDateIso,
+              dueDateIso: values.dueDateIso || "",
               amount: payloadAmount,
               downPaymentIdr: payloadDownPaymentIdr,
               status: values.invoiceStatus as InvoiceStatus,
@@ -1357,7 +1475,7 @@ export function CreateInvoiceWorkspace({
                       <DatePickerInput
                         id="invoice-due-date"
                         inputClassName="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                        value={field.value}
+                        value={field.value || ""}
                         onChange={field.onChange}
                         ariaInvalid={getFieldAriaInvalid(dueDateErrorMessage)}
                         ariaDescribedBy={getFieldDescribedBy("invoice-due-date", {
@@ -1617,19 +1735,30 @@ export function CreateInvoiceWorkspace({
                     const currentTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
                     const lineSubtotalLabel = `${item.currency} ${formatNumberInput(currentTotals.totalPrice)}`;
                     return (
-                      <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
+                       <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
                         <td className="px-5 py-3 text-xs font-bold text-on-surface">
                           {String(index + 1).padStart(2, "0")}
                         </td>
-                        <td className="px-5 py-3">
-                          <input
-                            type="text"
-                            className="w-full border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0"
+                        <td className="px-5 py-3 min-w-[200px]">
+                          <textarea
+                            rows={1}
+                            placeholder="Input description / uraian..."
+                            className="w-full resize-none overflow-hidden border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0 placeholder:italic placeholder:text-on-surface-variant/40"
                             value={item.description}
-                            onChange={(event) => updateItemRow(index, { ...item, description: event.target.value })}
+                            onChange={(event) => {
+                              event.target.style.height = "auto";
+                              event.target.style.height = `${event.target.scrollHeight}px`;
+                              updateItemRow(index, { ...item, description: event.target.value });
+                            }}
+                            ref={(el) => {
+                              if (el) {
+                                el.style.height = "auto";
+                                el.style.height = `${el.scrollHeight}px`;
+                              }
+                            }}
                           />
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3 w-[80px]">
                           <input
                             type="number"
                             min={0}
@@ -1643,7 +1772,7 @@ export function CreateInvoiceWorkspace({
                             }
                           />
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3 min-w-[200px]">
                           <div className="flex items-center gap-2">
                             <SereneSelect
                               className="serene-select h-8 min-w-[76px] rounded-lg bg-surface-container-low text-xs font-bold text-on-surface shadow-none border-none py-1 px-2"
@@ -1697,7 +1826,7 @@ export function CreateInvoiceWorkspace({
           </article>
 
           <div className="grid grid-cols-12 gap-5">
-            <div className="col-span-12 space-y-5 xl:col-span-7">
+            <div className="col-span-12 space-y-5 xl:col-span-6">
               <article className="serene-form-section">
                 <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/70">
                   Bank Disbursement
@@ -1730,6 +1859,17 @@ export function CreateInvoiceWorkspace({
                     )}
                   />
                   <FieldErrorMessage fieldId="invoice-bank-account" message={bankAccountErrorMessage} />
+                  {bankAccount ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-2.5 flex items-center justify-between text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="text-slate-500 font-medium">Penerima / Beneficiary:</span>
+                      <strong className="text-amber-800 dark:text-amber-400 font-extrabold uppercase">
+                        {(() => {
+                          const matchedBank = bankDisbursementOptions.find((o) => o.value === bankAccount);
+                          return matchedBank?.metadata?.penerima || matchedBank?.metadata?.beneficiary || matchedBank?.metadata?.recipient || matchedBank?.metadata?.recipientName || "PT. Ghaniya Zilia Rahman";
+                        })()}
+                      </strong>
+                    </div>
+                  ) : null}
                   <div className={bankDisbursementHintClassName}>
                     <span className="material-symbols-outlined mt-0.5 text-sm text-primary" aria-hidden="true">
                       info
@@ -1776,10 +1916,8 @@ export function CreateInvoiceWorkspace({
                   </label>
                 </div>
               </article>
-            </div>
 
-            <div className="col-span-12 xl:col-span-5 xl:h-full">
-              <article className="serene-form-section border-primary/20 bg-surface-container-low ring-1 ring-primary/10 xl:flex xl:h-full xl:flex-col">
+              <article className="serene-form-section border-primary/20 bg-surface-container-low ring-1 ring-primary/10 flex flex-col min-h-[140px]">
                 <div className="mb-2 flex items-center gap-2.5">
                   <div className="flex items-center gap-2.5">
                     <span
@@ -1798,13 +1936,119 @@ export function CreateInvoiceWorkspace({
                     </div>
                   </div>
                 </div>
-
                 <textarea
                   id="invoice-notes"
-                  className="h-[92px] w-full resize-none rounded-xl border border-primary/15 bg-surface-container-lowest p-3 text-sm leading-relaxed text-on-surface outline-none ring-0 placeholder:italic placeholder:text-on-surface-variant/55 focus:ring-2 focus:ring-primary/25 xl:h-auto xl:min-h-0 xl:flex-1"
+                  className="h-[92px] w-full resize-none rounded-xl border border-primary/15 bg-surface-container-lowest p-3 text-sm leading-relaxed text-on-surface outline-none ring-0 placeholder:italic placeholder:text-on-surface-variant/55 focus:ring-2 focus:ring-primary/25 flex-1"
                   placeholder="Terms, installments, or group specifics..."
                   {...register("notes")}
                 />
+              </article>
+            </div>
+
+            <div className="col-span-12 xl:col-span-6 xl:h-full">
+              <article className="serene-form-section border border-amber-200/50 bg-amber-50/40 p-5 space-y-4 xl:flex xl:h-full xl:flex-col">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800">
+                      <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
+                        account_balance
+                      </span>
+                      Histori Pembayaran
+                    </span>
+                    <p className="text-[11px] leading-snug text-amber-900/70">
+                      Catat pembayaran cicilan atau pelunasan dari customer.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700/10 px-3 py-1.5 text-[10px] font-bold text-amber-800 hover:bg-amber-700/20 transition shadow-sm"
+                    onClick={() => appendPayment({ amount: 0, dateIso: Domain.formatLocalIsoDate(new Date()) })}
+                  >
+                    <span className="material-symbols-outlined text-[12px]" aria-hidden="true">add</span>
+                    <span>Tambah Pembayaran</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                  {paymentFields.map((field, idx) => {
+                    return (
+                      <div key={field.id} className="relative bg-white/95 dark:bg-surface-container-lowest rounded-xl p-3 border border-amber-200/50 shadow-sm space-y-2 transition hover:shadow-md">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                            Pembayaran #{idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                            aria-label={`Hapus Pembayaran ${idx + 1}`}
+                            onClick={() => removePayment(idx)}
+                          >
+                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">delete</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
+                              Nominal
+                            </label>
+                            <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 h-9">
+                              <span className="text-[9px] font-extrabold text-slate-500">{invoiceCurrency}</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-xs font-extrabold text-on-surface outline-none ring-0 focus:ring-0"
+                                value={formatNumberInput(watch(`payments.${idx}.amount`) ?? 0)}
+                                onChange={(event) =>
+                                  setValue(`payments.${idx}.amount`, Math.max(0, parseNumberInput(event.target.value)), {
+                                    shouldDirty: true,
+                                  })
+                                }
+                                aria-label={`Payment ${idx + 1} amount`}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
+                              Tanggal Bayar
+                            </label>
+                            <Controller
+                              name={`payments.${idx}.dateIso`}
+                              control={control}
+                              render={({ field: dateField }) => (
+                                <DatePickerInput
+                                  id={`payment-date-${idx}`}
+                                  inputClassName="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 text-[10px] font-semibold text-on-surface outline-none ring-0 focus:ring-1 focus:ring-primary/20"
+                                  value={dateField.value || ""}
+                                  onChange={dateField.onChange}
+                                />
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {normalizedDownPayment > 0 ? (
+                  <div className="pt-2 border-t border-amber-200/40">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-amber-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-[width] duration-300 ease-out"
+                        style={{ width: `${downPaymentCoveragePercent}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] font-medium text-amber-700 mt-1.5">
+                      Terbayar {downPaymentCoveragePercent}% dari total tagihan.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] font-medium text-amber-700/60 italic pt-2 border-t border-amber-200/40">
+                    Belum ada pembayaran yang dicatat.
+                  </p>
+                )}
               </article>
             </div>
           </div>
@@ -1868,62 +2112,7 @@ export function CreateInvoiceWorkspace({
                   </span>
                 </div>
               </div>
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-800">
-                      <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
-                        account_balance
-                      </span>
-                      DP / Uang muka
-                    </span>
-                    <p className="text-[10px] leading-snug text-amber-900/70">
-                      Masukkan nominal DP yang sudah diterima dari customer.
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
-                      normalizedDownPayment > 0
-                        ? "border-amber-200 bg-white text-amber-800"
-                        : "border-outline-variant/30 bg-white text-on-surface-variant/60"
-                    }`}
-                  >
-                    {normalizedDownPayment > 0 ? `${downPaymentCoveragePercent}%` : "Opsional"}
-                  </span>
-                </div>
 
-                <label className="mt-2 block space-y-1.5">
-                  <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700/80">{invoiceCurrency}</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-sm font-extrabold text-amber-900 outline-none ring-0 placeholder:text-amber-900/30 focus:ring-0"
-                      value={formatNumberInput(downPaymentIdr)}
-                      onChange={(event) =>
-                        setValue("downPaymentIdr", Math.max(0, parseNumberInput(event.target.value)), {
-                          shouldDirty: true,
-                          shouldValidate: false,
-                        })
-                      }
-                      aria-label="Down payment amount"
-                    />
-                  </div>
-                </label>
-
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-amber-100">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-[width] duration-300 ease-out"
-                    style={{ width: `${downPaymentCoveragePercent}%` }}
-                  />
-                </div>
-
-                <p className="mt-1.5 text-[10px] font-medium text-amber-700">
-                  {normalizedDownPayment > 0
-                    ? `DP menutup ${downPaymentCoveragePercent}% dari total tagihan.`
-                    : "DP belum diisi, jadi total pembayaran masih utuh."}
-                </p>
-              </div>
               <div
                 className={`flex items-center justify-between rounded-xl border px-3 py-2 ${
                   remainingBalance <= 0
