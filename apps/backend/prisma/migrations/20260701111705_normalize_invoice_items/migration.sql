@@ -1,5 +1,3 @@
--- AlterEnum
-ALTER TYPE "InvoiceStatus" ADD VALUE 'PARTIALLY_PAID';
 
 -- AlterTable
 ALTER TABLE "Invoice" ADD COLUMN     "recipientName" TEXT,
