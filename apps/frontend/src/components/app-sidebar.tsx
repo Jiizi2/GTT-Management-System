@@ -84,7 +84,7 @@ export function AppSidebar({
   return (
     <>
       <aside
-        className={`fixed inset-y-0 left-0 z-10 hidden flex-col bg-surface-container-low pb-7 pt-4 shadow-ambient transition-[width,padding] duration-200 lg:flex ${
+        className={`fixed inset-y-0 left-0 z-10 hidden flex-col bg-surface-container-low pb-7 pt-4 shadow-ambient transition-[width,padding] duration-200 xl:flex ${
           isCollapsed ? "w-[104px] px-3.5" : "w-[280px] pl-6 pr-5"
         }`}
       >
