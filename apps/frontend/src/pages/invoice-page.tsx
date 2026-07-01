@@ -1382,9 +1382,9 @@ export function CreateInvoiceWorkspace({
                   />
                   <FieldErrorMessage fieldId="invoice-bank-account" message={bankAccountErrorMessage} />
                   {bankAccount ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-2.5 flex items-center justify-between text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      <span className="text-slate-500 font-medium">Penerima / Beneficiary:</span>
-                      <strong className="text-amber-800 dark:text-amber-400 font-extrabold uppercase">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-surface-container-low p-2.5 flex items-center justify-between text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">Penerima / Beneficiary:</span>
+                      <strong className="text-primary font-extrabold uppercase">
                         {(() => {
                           const matchedBank = bankDisbursementOptions.find((o) => o.value === bankAccount);
                           return matchedBank?.metadata?.penerima || matchedBank?.metadata?.beneficiary || matchedBank?.metadata?.recipient || matchedBank?.metadata?.recipientName || "PT. Ghaniya Zilia Rahman";
