@@ -1580,7 +1580,6 @@ const PackageItemsSection = memo(function PackageItemsSection({
   } = useFieldArray({
     control,
     name: "items",
-    keyName: "fieldKey",
   });
 
   const rowCounterRef = useRef(itemFields.length + 1);
@@ -1657,7 +1656,7 @@ const PackageItemsSection = memo(function PackageItemsSection({
               const currentTotals = itemsWithTotals[index] || { totalPrice: 0, totalPriceIdr: 0 };
               const lineSubtotalLabel = `${item.currency} ${formatNumberInput(currentTotals.totalPrice)}`;
               return (
-                <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
+                <tr key={itemField.id} className="transition hover:bg-surface-container-low/45">
                   <td className="px-5 py-3 text-xs font-bold text-on-surface">
                     {String(index + 1).padStart(2, "0")}
                   </td>
