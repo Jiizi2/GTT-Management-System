@@ -3,6 +3,7 @@ import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
 import { GroupCard } from "../components/group-card";
+import { Button } from "../components/button";
 import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -168,13 +169,8 @@ export function OverviewScreen({
           </p>
 
           <div className="mt-auto pt-3">
-            <button
-              type="button"
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                hasGroupsForExport
-                  ? "bg-primary text-on-primary shadow-cta-soft hover:bg-primary-container"
-                  : "cursor-not-allowed bg-surface-container-high/70 text-on-surface-variant/70"
-              }`}
+            <Button
+              className="w-full"
               onClick={handleExportReport}
               disabled={!hasGroupsForExport}
             >
@@ -183,7 +179,7 @@ export function OverviewScreen({
               </span>
               <span className="sm:hidden">Export</span>
               <span className="hidden sm:inline">Export Report</span>
-            </button>
+            </Button>
           </div>
         </article>
 

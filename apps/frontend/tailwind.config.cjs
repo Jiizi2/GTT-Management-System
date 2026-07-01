@@ -37,6 +37,7 @@ module.exports = {
         "on-tertiary-fixed-variant": "rgb(var(--color-on-tertiary-fixed-variant) / <alpha-value>)",
         "error-container": "rgb(var(--color-error-container) / <alpha-value>)",
         "on-error-container": "rgb(var(--color-on-error-container) / <alpha-value>)",
+        error: "rgb(var(--color-tertiary) / <alpha-value>)",
         slate: {
           50: "rgb(var(--color-slate-50) / <alpha-value>)",
           100: "rgb(var(--color-slate-100) / <alpha-value>)",

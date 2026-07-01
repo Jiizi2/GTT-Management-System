@@ -13,6 +13,7 @@ import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useModalFocusTrap } from "../components/use-modal-focus-trap";
 import { useThemeMode } from "../theme/theme-provider";
+import { Button } from "../components/button";
 import {
   type BackendInvoiceClient,
   type BackendInvoiceItem,
@@ -1316,16 +1317,17 @@ export function CreateInvoiceWorkspace({
       aria-busy={isWorkspaceBusy ? "true" : "false"}
     >
       <section className="space-y-3">
-        <button
-          type="button"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:justify-start"
           onClick={onBack}
         >
           <span className="material-symbols-outlined text-base" aria-hidden="true">
             arrow_back
           </span>
           <span>Back to List</span>
-        </button>
+        </Button>
 
         {!isBackendAvailable ? (
           <section
@@ -1363,13 +1365,8 @@ export function CreateInvoiceWorkspace({
 
             <div className="serene-form-actions rounded-xl bg-surface-container-low p-2">
               {!isEditMode ? (
-                <button
-                  type="button"
-                  className={`inline-flex items-center justify-center rounded-lg border border-outline-variant/40 px-4 py-2 text-sm font-bold transition ${
-                    isWorkspaceBusy || !isBackendAvailable
-                      ? "cursor-not-allowed bg-surface-container-low text-on-surface-variant/60"
-                      : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low"
-                  }`}
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     void handleSaveDraft();
                   }}
@@ -1381,13 +1378,10 @@ export function CreateInvoiceWorkspace({
                   }
                 >
                   {isSavingDraft ? "Saving Draft..." : "Save Draft"}
-                </button>
+                </Button>
               ) : null}
-              <button
-                type="button"
-                className={`inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-bold text-on-primary shadow-cta-soft transition ${
-                  isSubmitDisabled ? "cursor-not-allowed bg-slate-300" : "bg-primary hover:bg-primary-container"
-                }`}
+              <Button
+                variant="primary"
                 onClick={handleSubmitButtonClick}
                 disabled={isSubmitDisabled}
                 title={
@@ -1405,7 +1399,7 @@ export function CreateInvoiceWorkspace({
                   : isEditMode
                     ? "Save Changes"
                     : "Generate Invoice"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1971,12 +1965,19 @@ export function CreateInvoiceWorkspace({
 
                 <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                   {paymentFields.map((field, idx) => {
+                    const runningPaid = payments.slice(0, idx + 1).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                    const remainingAfterThis = Math.max(0, totalPayable - runningPaid);
                     return (
                       <div key={field.id} className="relative bg-white/95 dark:bg-surface-container-lowest rounded-xl p-3 border border-amber-200/50 shadow-sm space-y-2 transition hover:shadow-md">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
-                            Pembayaran #{idx + 1}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                              Pembayaran #{idx + 1}
+                            </span>
+                            <span className="rounded-md bg-slate-100 dark:bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-400">
+                              Sisa: {invoiceCurrency} {formatNumberInput(remainingAfterThis)}
+                            </span>
+                          </div>
                           <button
                             type="button"
                             className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"

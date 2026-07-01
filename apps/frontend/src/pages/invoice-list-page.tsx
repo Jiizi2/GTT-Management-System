@@ -8,6 +8,8 @@ import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useInvoiceDashboardQuery } from "../hooks/use-invoice-query";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { useThemeMode } from "../theme/theme-provider";
+import { Button } from "../components/button";
+import { Badge } from "../components/badge";
 import {
   createInvoiceWorkspaceInitialData,
   defaultBankDisbursementOptions,
@@ -413,11 +415,9 @@ export function InvoiceScreen({
           </>
         }
         actions={
-          <button
-            type="button"
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-primary shadow-cta-soft transition sm:w-auto ${
-              isInvoiceBackendAvailable ? "bg-primary hover:bg-primary-container" : "cursor-not-allowed bg-slate-300"
-            }`}
+          <Button
+            variant="primary"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2"
             aria-label="Create new invoice"
             disabled={!isInvoiceBackendAvailable}
             onClick={() => {
@@ -435,7 +435,7 @@ export function InvoiceScreen({
               add
             </span>
             <span>New Invoice</span>
-          </button>
+          </Button>
         }
       />
 
@@ -583,14 +583,12 @@ export function InvoiceScreen({
                     </p>
                     <p className="truncate text-sm font-bold text-primary">{row.invoiceNumber}</p>
                   </div>
-                  <span
-                    className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold leading-none ${getStatusClasses(
-                      row.status,
-                      isDarkMode,
-                    )}`}
+                  <Badge
+                    status={row.status === "Paid" ? "success" : row.status === "Pending" ? "warning" : "error"}
+                    className="px-2.5 py-1 text-[11px] font-bold border-none"
                   >
                     {getInvoiceStatusDisplayLabel(row.status)}
-                  </span>
+                  </Badge>
                 </div>
 
                 <div className="mt-3 flex items-center gap-2">
@@ -768,14 +766,12 @@ export function InvoiceScreen({
                       </div>
 
                       <div>
-                        <span
-                          className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] ${getStatusClasses(
-                            row.status,
-                            isDarkMode,
-                          )}`}
+                        <Badge
+                          status={row.status === "Paid" ? "success" : row.status === "Pending" ? "warning" : "error"}
+                          className="px-2.5 py-1 text-[11px] font-bold border-none"
                         >
                           {getInvoiceStatusDisplayLabel(row.status)}
-                        </span>
+                        </Badge>
                       </div>
 
                       <div className="flex items-center justify-end gap-1">
