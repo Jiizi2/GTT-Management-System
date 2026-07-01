@@ -2,11 +2,6 @@
 -- AlterTable
 ALTER TABLE "Invoice" ADD COLUMN     "version" INTEGER NOT NULL DEFAULT 0;
 
--- AlterTable
-ALTER TABLE "VisaSetup" ALTER COLUMN "outstandingAmount" DROP NOT NULL,
-ALTER COLUMN "outstandingAmount" DROP DEFAULT,
-ALTER COLUMN "outstandingAmount" SET DATA TYPE DECIMAL(65,30);
-
 -- CreateTable
 CREATE TABLE "InvoiceItem" (
     "id" TEXT NOT NULL,
