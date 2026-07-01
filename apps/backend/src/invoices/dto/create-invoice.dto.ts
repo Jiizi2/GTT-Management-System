@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -48,12 +49,14 @@ export class CreateInvoiceDto {
   @IsDateString()
   issuedDate!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: "Tanggal jatuh tempo invoice dalam format ISO date.",
     example: "2026-04-26",
   })
+  @IsOptional()
+  @ValidateIf((o) => o.dueDate !== "" && o.dueDate !== null && o.dueDate !== undefined)
   @IsDateString()
-  dueDate!: string;
+  dueDate?: string;
 
   @ApiProperty({
     description: "Nominal invoice. Akan dinormalisasi ke nilai non-negatif.",

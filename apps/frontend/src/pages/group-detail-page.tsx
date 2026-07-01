@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import * as Domain from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { Button } from "../components/button";
+import { Badge } from "../components/badge";
 import { buildGroupItineraryBuilderPath, buildVisaDetailPath } from "../shared/app-route";
 import type {
   EditScheduleFormState,
@@ -1198,17 +1200,17 @@ export function GroupDetail({
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-24 pt-4 sm:px-6 lg:px-8">
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-1.5 text-sm font-bold leading-none text-on-surface-variant shadow-ambient transition hover:border-primary/45 hover:text-primary"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onBack}
         >
-          <span className="material-symbols-outlined" aria-hidden="true">
+          <span className="material-symbols-outlined text-base" aria-hidden="true">
             arrow_back
           </span>
           <span className="sm:hidden">Back</span>
           <span className="hidden sm:inline">Back to Groups</span>
-        </button>
+        </Button>
 
         <ThemeToggleButton className="ml-auto sm:mr-5" />
       </div>
@@ -1241,43 +1243,44 @@ export function GroupDetail({
             <span>Visa Detail</span>
           </Link>
 
-          <button
-            type="button"
-            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${
+          <Button
+            variant="secondary"
+            size="sm"
+            className={
               isWhatsappCopied
-                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
-                : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-brand-primary hover:text-brand-primary"
-            }`}
+                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-500/15"
+                : ""
+            }
             onClick={handleCopyWhatsapp}
             aria-label={`Copy WhatsApp formatted details for ${group.name}`}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
               {isWhatsappCopied ? "check" : "content_copy"}
             </span>
             <span>{isWhatsappCopied ? "Copied" : "Copy WhatsApp"}</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3.5 py-2 text-xs font-bold text-brand-tertiary transition hover:bg-brand-tertiary/15"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleDeleteGroup}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
               delete
             </span>
             <span>Delete Group</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-surface-container-lowest px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleExportPdf}
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
               picture_as_pdf
             </span>
             <span>Export to PDF</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -1289,10 +1292,11 @@ export function GroupDetail({
                 <div className="flex items-start justify-between gap-3 md:hidden">
                   <span className={detailKickerClassName}>Group Number</span>
                   <div className="flex items-center gap-2">
-                    <span className={`${statusBadgeClassName} shrink-0 whitespace-nowrap`}>{group.status}</span>
-                    <button
-                      type="button"
-                      className="inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2 text-[11px] font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
+                    <Badge status={group.tone === "active" ? "success" : "neutral"} className="shrink-0 whitespace-nowrap">{group.status}</Badge>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-[22px] px-2 text-[11px] leading-none border-brand-primary/35 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/15"
                       onClick={handleOpenGroupEditModal}
                       aria-label={`Edit group info for ${group.name}`}
                       aria-haspopup="dialog"
@@ -1303,7 +1307,7 @@ export function GroupDetail({
                         edit
                       </span>
                       <span>Edit</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1336,10 +1340,11 @@ export function GroupDetail({
                       </div>
                     </div>
                   )}
-                  <span className={`${statusBadgeClassName} hidden md:inline-flex`}>{group.status}</span>
-                  <button
-                    type="button"
-                    className="hidden h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2 text-[11px] font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15 md:inline-flex"
+                  <Badge status={group.tone === "active" ? "success" : "neutral"} className="hidden md:inline-flex">{group.status}</Badge>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="hidden h-[22px] shrink-0 items-center gap-1 whitespace-nowrap border-brand-primary/35 bg-brand-primary/10 px-2 text-[11px] font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15 md:inline-flex"
                     onClick={handleOpenGroupEditModal}
                     aria-label={`Edit group info for ${group.name}`}
                     aria-haspopup="dialog"
@@ -1350,7 +1355,7 @@ export function GroupDetail({
                       edit
                     </span>
                     <span>Edit</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1438,17 +1443,22 @@ export function GroupDetail({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className={detailKickerClassName}>Assigned Musyrif</p>
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={
+                    isMusyrifCopied
+                      ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-500/15"
+                      : ""
+                  }
                   onClick={handleCopyMusyrif}
                   aria-label={`Copy musyrif data for ${group.name}`}
                 >
-                  <span className="material-symbols-outlined" aria-hidden="true">
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
                     {isMusyrifCopied ? "check" : "content_copy"}
                   </span>
                   <span>{isMusyrifCopied ? "Copied" : "Copy"}</span>
-                </button>
+                </Button>
                 {isMusyrifCopied ? (
                   <p className="sr-only" role="status" aria-live="polite">
                     Musyrif data copied.
@@ -1456,17 +1466,18 @@ export function GroupDetail({
                 ) : null}
 
                 {!group.parentGroupId && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-lg border border-brand-primary/35 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="border-brand-primary/35 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/15"
                     onClick={handleOpenMusyrifModal}
                     aria-label={`Edit musyrif data for ${group.name}`}
                   >
-                    <span className="material-symbols-outlined" aria-hidden="true">
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
                       edit
                     </span>
                     <span>Edit</span>
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -1519,15 +1530,12 @@ export function GroupDetail({
                   <div key={summary.city} className="py-2 first:pt-0 last:pb-0">
                     <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className={`inline-flex h-6 min-w-[4.75rem] items-center justify-center rounded-lg px-2 font-extrabold uppercase tracking-[0.08em] ${
-                            summary.isMissing
-                              ? "bg-brand-tertiary/12 text-brand-tertiary"
-                              : "bg-brand-primary/10 text-brand-primary"
-                          }`}
+                        <Badge
+                          status={summary.isMissing ? "error" : "success"}
+                          className="h-6 min-w-[4.75rem] justify-center rounded-lg px-2 font-extrabold uppercase tracking-[0.08em] border-none"
                         >
                           {summary.cityLabel}
-                        </span>
+                        </Badge>
                         <p className="truncate font-bold text-on-surface" title={summary.primaryHotelLabel}>
                           {summary.primaryHotelLabel}
                         </p>
@@ -1581,13 +1589,14 @@ export function GroupDetail({
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex flex-wrap gap-1.5">
                   {completeness.issues.map((issue) => (
-                    <span
+                    <Badge
                       key={issue.key}
-                      className="inline-flex rounded bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em]"
+                      status="neutral"
+                      className="rounded bg-surface-container-lowest/70 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.05em] border-none"
                       title={issue.message}
                     >
                       {issue.label}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
 
@@ -1854,9 +1863,12 @@ export function GroupDetail({
                     <div className="inline">
                       <p className="inline text-sm text-on-surface-variant">{note.text}</p>
                       {note.pinned ? (
-                        <span className="ml-2 inline-flex rounded-lg border border-brand-tertiary/30 bg-brand-tertiary/20 px-2 py-0.5 text-[11px] font-bold leading-none text-brand-tertiary">
+                        <Badge
+                          status="error"
+                          className="ml-2 px-2 py-0.5 text-[11px] font-bold leading-none rounded-lg border-none"
+                        >
                           Pinned
-                        </span>
+                        </Badge>
                       ) : null}
                     </div>
                   </li>

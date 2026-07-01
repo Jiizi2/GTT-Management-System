@@ -6,6 +6,7 @@ type VisaExportRow = {
   groupName: string;
   totalPax: number;
   visaServiceType: string;
+  syarikah: string;
 };
 
 function resolveVisaFilterLabel(filter: VisaFilterId): string {
@@ -31,12 +32,19 @@ function resolveVisaServiceType(group: GroupData | undefined): string {
 function buildVisaExportRows(rows: VisaTrackingRow[], groups: GroupData[]): VisaExportRow[] {
   const groupByCode = new Map(groups.map((group) => [group.code, group] as const));
 
-  return rows.map((row) => ({
-    groupCode: row.groupCode,
-    groupName: row.groupName,
-    totalPax: row.pax,
-    visaServiceType: resolveVisaServiceType(groupByCode.get(row.groupCode)),
-  }));
+  return rows.map((row) => {
+    const group = groupByCode.get(row.groupCode);
+    const rawSyarikah = group?.visaSetup?.syarikah?.trim() ?? "";
+    const syarikah = rawSyarikah.toLowerCase() === "not assigned" ? "-" : rawSyarikah || "-";
+
+    return {
+      groupCode: row.groupCode,
+      groupName: row.groupName,
+      totalPax: row.pax,
+      visaServiceType: resolveVisaServiceType(group),
+      syarikah,
+    };
+  });
 }
 
 export function exportVisaTrackingReportPdf(
@@ -83,6 +91,7 @@ export function exportVisaTrackingReportPdf(
           <td>${escapeHtml(row.groupName)}</td>
           <td class="cell-center">${row.totalPax}</td>
           <td class="cell-center">${escapeHtml(row.visaServiceType)}</td>
+          <td>${escapeHtml(row.syarikah)}</td>
         </tr>`,
     )
     .join("");
@@ -216,14 +225,15 @@ export function exportVisaTrackingReportPdf(
             <th>Group Name</th>
             <th style="width: 96px">Total Pax</th>
             <th style="width: 140px">Visa Type</th>
+            <th style="width: 140px">Syarikah</th>
           </tr>
         </thead>
         <tbody>
-          ${tableRows || '<tr><td class="empty" colspan="4">No visa tracking rows for the current filter.</td></tr>'}
+          ${tableRows || '<tr><td class="empty" colspan="5">No visa tracking rows for the current filter.</td></tr>'}
         </tbody>
       </table>
 
-      <p class="foot">Columns included: Group Number, Group Name, Total Pax, and Visa Type.</p>
+      <p class="foot">Columns included: Group Number, Group Name, Total Pax, Visa Type, and Syarikah.</p>
     </main>
   </body>
 </html>`;

@@ -11,6 +11,8 @@ import { PaginationControls } from "../components/pagination-controls";
 import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { Button } from "../components/button";
+import { Badge } from "../components/badge";
 import { useThemeMode } from "../theme/theme-provider";
 
 const {
@@ -26,43 +28,6 @@ const {
   VISA_PAGE_SIZE,
 } = Domain;
 
-function getFilterChipClasses(isActive: boolean, isDarkMode: boolean): string {
-  if (isActive) {
-    return isDarkMode ? "border-primary/45 bg-primary/18 text-primary" : "border-emerald-700 bg-emerald-700 text-white";
-  }
-
-  return isDarkMode
-    ? "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/50 hover:text-primary"
-    : "border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:text-emerald-700";
-}
-
-function getVisaStatusClasses(status: VisaTrackingRow["visaStatus"], isDarkMode: boolean): string {
-  if (status === "Issued") {
-    return isDarkMode
-      ? "border-primary/30 bg-primary/14 text-primary"
-      : "border-emerald-200 bg-emerald-100 text-emerald-800";
-  }
-
-  if (status === "Pending") {
-    return isDarkMode
-      ? "border-secondary/35 bg-secondary/16 text-secondary"
-      : "border-amber-200 bg-amber-100 text-amber-800";
-  }
-
-  return isDarkMode
-    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
-    : "border-slate-300 bg-slate-100 text-slate-700";
-}
-
-function getVisaTypeClasses(visaType: "Visa+" | "Visa Only", isDarkMode: boolean): string {
-  if (visaType === "Visa+") {
-    return isDarkMode ? "border-sky-400/35 bg-sky-500/14 text-sky-200" : "border-sky-200 bg-sky-100 text-sky-800";
-  }
-
-  return isDarkMode
-    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
-    : "border-slate-300 bg-slate-100 text-slate-700";
-}
 
 function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Only" {
   return group?.visaSetup?.busStatus === "Visa+" ? "Visa+" : "Visa Only";
@@ -93,9 +58,7 @@ function getRaudhahStatusClasses(status: GroupRaudhahStatus, isDarkMode: boolean
       : "border-amber-200 bg-amber-100 text-amber-800";
   }
 
-  return isDarkMode
-    ? "border-tertiary/35 bg-tertiary/16 text-tertiary"
-    : "border-slate-300 bg-slate-100 text-slate-700";
+  return "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]";
 }
 
 function toAgreementStatusSelectValue(status: AgreementApprovalStatus): "approved" | "waiting" {
@@ -588,9 +551,9 @@ export function VisaTrackingScreen({
           </div>
 
           <div className="flex flex-col gap-1 items-end shrink-0">
-            <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
+            <Badge status="neutral" className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]">
               {row.pax} Pax
-            </span>
+            </Badge>
           </div>
         </div>
 
@@ -618,7 +581,7 @@ export function VisaTrackingScreen({
                 {visibleRaudhahEntries.map((entry) => (
                   <span
                     key={`${row.id}-mobile-raudhah-${entry.key}`}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
                       entry.status,
                       isDarkMode,
                     )}`}
@@ -629,7 +592,7 @@ export function VisaTrackingScreen({
                   </span>
                 ))}
                 {hiddenRaudhahEntriesCount > 0 ? (
-                  <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
+                  <span className="inline-flex rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
                     +{hiddenRaudhahEntriesCount}
                   </span>
                 ) : null}
@@ -644,40 +607,39 @@ export function VisaTrackingScreen({
           <div className="rounded-xl bg-surface-container-lowest p-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
             <div className="mt-1 flex flex-col gap-1">
-              <span
-                className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none w-fit ${getVisaStatusClasses(
-                  row.visaStatus,
-                  isDarkMode,
-                )}`}
+              <Badge
+                status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
+                className={`px-2.5 py-1 text-[11px] font-bold w-fit ${
+                  row.visaStatus !== "Issued" && row.visaStatus !== "Pending"
+                    ? "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
+                    : "border-transparent"
+                }`}
               >
                 {row.visaStatus}
-              </span>
+              </Badge>
             </div>
           </div>
 
           <div className="rounded-xl bg-surface-container-lowest p-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
             <div className="mt-1 flex flex-col gap-1">
-              <span
-                className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-bold leading-none w-fit ${getVisaTypeClasses(
-                  visaTypeLabel,
-                  isDarkMode,
-                )}`}
+              <Badge
+                status="neutral"
+                className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
               >
                 {visaTypeLabel}
-              </span>
+              </Badge>
             </div>
           </div>
         </div>
 
         <div className="mt-3 flex flex-col gap-2">
-          <button
-            type="button"
-            className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold tracking-[0.06em] text-on-primary shadow-cta-soft transition hover:bg-primary-container"
+          <Button
+            className="w-full"
             onClick={() => onOpenDetail(row)}
           >
             View Details
-          </button>
+          </Button>
         </div>
       </article>
     );
@@ -725,7 +687,7 @@ export function VisaTrackingScreen({
     return (
       <article
         key={row.id}
-        className="grid items-center gap-2.5 px-4 py-3 text-sm transition-colors hover:bg-slate-50/30"
+        className="grid items-center gap-2.5 px-5 py-4 text-sm transition-colors hover:bg-surface-container-low/40"
         style={{ gridTemplateColumns: desktopTableGridTemplate }}
       >
         <div className="flex min-w-0 items-center gap-1.5 py-1 font-semibold text-slate-800">
@@ -750,9 +712,9 @@ export function VisaTrackingScreen({
         </div>
 
         <div className="flex min-w-0 justify-self-center py-1">
-          <span className="inline-flex max-w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-bold leading-tight text-slate-700">
+          <Badge status="neutral" className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]">
             {row.pax} Pax
-          </span>
+          </Badge>
         </div>
 
         <div className="min-w-0 space-y-0.5 py-1">
@@ -769,7 +731,7 @@ export function VisaTrackingScreen({
               {visibleRaudhahEntries.map((entry) => (
                 <span
                   key={`${row.id}-desktop-raudhah-${entry.key}`}
-                  className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-bold leading-none ${getRaudhahStatusClasses(
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold leading-none ${getRaudhahStatusClasses(
                     entry.status,
                     isDarkMode,
                   )}`}
@@ -781,7 +743,7 @@ export function VisaTrackingScreen({
                 </span>
               ))}
               {hiddenRaudhahEntriesCount > 0 ? (
-                <span className="inline-flex rounded-md border border-slate-300 bg-slate-200 px-3 py-1.5 text-xs font-bold leading-none text-slate-700">
+                <span className="inline-flex rounded-full border border-slate-300 bg-slate-200 px-3 py-1.5 text-xs font-bold leading-none text-slate-700">
                   +{hiddenRaudhahEntriesCount}
                 </span>
               ) : null}
@@ -792,40 +754,39 @@ export function VisaTrackingScreen({
         </div>
 
         <div className="flex min-w-0 flex-col gap-1 justify-self-center py-1">
-          <span
-            className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none ${getVisaStatusClasses(
-              row.visaStatus,
-              isDarkMode,
-            )}`}
+          <Badge
+            status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
+            className={`px-3 py-1.5 text-xs font-bold w-fit ${
+              row.visaStatus !== "Issued" && row.visaStatus !== "Pending"
+                ? "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
+                : "border-transparent"
+            }`}
           >
             {row.visaStatus}
-          </span>
+          </Badge>
         </div>
 
         <div className="flex min-w-0 flex-col items-center justify-self-center py-1">
-          <span
-            className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-bold leading-none w-fit ${getVisaTypeClasses(
-              visaTypeLabel,
-              isDarkMode,
-            )}`}
+          <Badge
+            status="neutral"
+            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
           >
             {visaTypeLabel}
-          </span>
+          </Badge>
         </div>
 
         <div className="flex min-w-0 justify-self-center py-1">
-          <button
-            type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold leading-none text-on-primary shadow-cta-soft transition hover:bg-primary-container"
+          <Button
+            size="sm"
             onClick={() => onOpenDetail(row)}
             title="View Details"
             aria-label={`View details for group ${row.groupCode}`}
           >
-            <span className="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
               search
             </span>
             <span>View</span>
-          </button>
+          </Button>
         </div>
       </article>
     );
@@ -887,13 +848,10 @@ export function VisaTrackingScreen({
         }
         className="backdrop-blur"
         actions={
-          <button
-            type="button"
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition sm:w-auto ${
-              hasRowsForExport
-                ? "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
-                : "cursor-not-allowed bg-surface-container-high/70 text-on-surface-variant/70"
-            }`}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full sm:w-auto"
             onClick={handleExportPdf}
             disabled={!hasRowsForExport}
           >
@@ -902,7 +860,7 @@ export function VisaTrackingScreen({
             </span>
             <span className="sm:hidden">Export PDF</span>
             <span className="hidden sm:inline">Export to PDF</span>
-          </button>
+          </Button>
         }
       />
 
@@ -1070,7 +1028,7 @@ export function VisaTrackingScreen({
             <div className="overflow-x-auto">
               <div className="min-w-full">
                 <div
-                  className="grid items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600"
+                  className="grid items-center gap-2.5 border-b border-slate-200 bg-surface-container-low px-5 py-3 text-xs font-semibold uppercase tracking-[0.11em] text-on-surface-variant/80"
                   style={{ gridTemplateColumns: desktopTableGridTemplate }}
                 >
                   <div>Group Number</div>

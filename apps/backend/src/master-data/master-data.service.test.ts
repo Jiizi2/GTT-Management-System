@@ -74,6 +74,15 @@ async function testPrismaMissingTableFailsFastInProduction(): Promise<void> {
     async () => {
       const prisma = {
         masterDataOption: {
+          findUnique: async () => {
+            throw new Prisma.PrismaClientKnownRequestError("missing table", {
+              code: "P2021",
+              clientVersion: "unit-test",
+              meta: {
+                table: "public.MasterDataOption",
+              },
+            });
+          },
           upsert: async () => {
             throw new Prisma.PrismaClientKnownRequestError("missing table", {
               code: "P2021",

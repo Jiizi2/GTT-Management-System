@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
+import { Button } from "./button";
+import { Badge } from "./badge";
 
 const {
   inferCategoryKey,
@@ -279,59 +281,117 @@ export function GroupCard({
   const itineraryPreview = buildItineraryPreview(group);
   const busBadgeLabel = getRequiredBusBadgeLabel(group);
   const completeness = resolveGroupCompleteness(group);
-  const metadataBadges = [
-    `${totalPax} Linked Pax`,
-    ...(busBadgeLabel ? [busBadgeLabel] : []),
-    group.packageName,
-    getServiceTypeBadgeLabel(group),
-  ];
   const visibleIssues = completeness.issues.slice(0, 2);
   const hiddenIssueCount = Math.max(0, completeness.issues.length - visibleIssues.length);
 
+  const packageLabel = useMemo(() => {
+    if (!group.packageName) return "";
+    const trimmed = group.packageName.trim();
+    if (trimmed.toLowerCase().endsWith("package")) {
+      return trimmed;
+    }
+    return `${trimmed} Package`;
+  }, [group.packageName]);
+
+  const busLabel = useMemo(() => {
+    if (!busBadgeLabel) return "";
+    return busBadgeLabel.replace("bus", "Bus");
+  }, [busBadgeLabel]);
+
   return (
     <article className="serene-card flex h-full w-full flex-col px-5 py-6">
-      <div className="mx-1 mb-4 py-1">
+      {/* Row 1: Group Code & Name */}
+      <div className="mx-1 py-1">
         <span className="block break-words font-display text-2xl font-extrabold leading-none tracking-tighter text-primary sm:text-3xl xl:text-4xl">
           {group.code}
         </span>
         <h2 className="mt-2 truncate font-display text-lg font-bold leading-tight text-on-surface-variant">
           {group.name}
         </h2>
-        {familyGroups.length > 1 && (
-          <p className="mt-1 text-xs text-on-surface-variant/80 font-medium">
-            Linked Pax Detail: {familyGroups.map(g => `${g.code} (${g.pax} Pax)`).join(" + ")}
-          </p>
-        )}
-        <div className="mt-2 flex min-h-4 flex-wrap items-center gap-1.5" aria-label="Group status">
-          <span
-            className={`inline-flex whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.08em] ${getStatusBadgeClasses(
-              group.tone,
-            )}`}
+      </div>
+
+      {/* Row 2: Linked Groups Summary (Optional) */}
+      {familyGroups.length > 1 && (
+        <div className="mx-1 mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/50 pt-2" aria-label="Linked groups summary">
+          <div className="flex items-center gap-1.5 min-w-0" title={`${familyGroups.length} Linked Groups`}>
+            <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">
+              link
+            </span>
+            <span className="truncate">{familyGroups.length} Linked Groups</span>
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0" title={`${totalPax} Linked Pax`}>
+            <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">
+              groups
+            </span>
+            <span className="truncate">{totalPax} Linked Pax</span>
+          </div>
+        </div>
+      )}
+
+      {/* Row 3: Status Badges (Operational Status) */}
+      <div className="mx-1 mt-3 space-y-2 border-t border-slate-100 dark:border-slate-800/50 pt-3">
+        {/* Row 1 of Badges: Active/Archived/Draft and Ready/Incomplete */}
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Group status">
+          <Badge
+            status={group.tone === "active" ? "success" : "neutral"}
+            className="text-[10px] font-bold uppercase leading-none tracking-[0.08em] px-2 py-0.5 rounded-lg border-none"
           >
             {getStatusLabel(group.tone)}
-          </span>
-          <span
-            className={`inline-flex whitespace-nowrap rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.08em] ${getCompletenessBadgeClasses(
-              completeness.state,
-            )}`}
+          </Badge>
+          <Badge
+            status={
+              completeness.state === "ready"
+                ? "success"
+                : completeness.state === "action-required"
+                  ? "error"
+                  : "warning"
+            }
+            className="text-[10px] font-bold uppercase leading-none tracking-[0.08em] px-2 py-0.5 rounded-lg"
           >
             {completeness.badgeLabel}
-          </span>
+          </Badge>
         </div>
       </div>
 
-      <div className="mx-1 mb-4 flex min-h-[3rem] flex-wrap content-start gap-2 py-1">
-        {metadataBadges.map((label, index) => (
-          <span
-            key={`${group.code}-${index}-${label}`}
-            className={`inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-[11px] font-bold leading-none ${getStatusBadgeClasses(
-              group.tone,
-            )}`}
-            title={label}
-          >
-            <span className="truncate">{label}</span>
+      {/* Row 4: Informational Metadata (2-Column Grid) */}
+      <div className="mx-1 mt-3 mb-4 grid grid-cols-1 min-[280px]:grid-cols-2 gap-x-4 gap-y-2 text-xs font-semibold text-slate-600 dark:text-slate-400" aria-label="Group metadata">
+        {/* Total Pax */}
+        <div className="flex items-center gap-1.5 min-w-0" title={`${totalPax} Pax`}>
+          <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">
+            groups
           </span>
-        ))}
+          <span className="truncate">{totalPax} Pax</span>
+        </div>
+
+        {/* Package Name */}
+        {packageLabel ? (
+          <div className="flex items-center gap-1.5 min-w-0" title={packageLabel}>
+            <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">
+              inventory_2
+            </span>
+            <span className="truncate">{packageLabel}</span>
+          </div>
+        ) : null}
+
+        {/* Visa Type */}
+        {getServiceTypeBadgeLabel(group) ? (
+          <div className="flex items-center gap-1.5 min-w-0" title={getServiceTypeBadgeLabel(group)}>
+            <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">
+              flight_takeoff
+            </span>
+            <span className="truncate">{getServiceTypeBadgeLabel(group)}</span>
+          </div>
+        ) : null}
+
+        {/* Bus Service (if present) */}
+        {busLabel ? (
+          <div className="flex items-center gap-1.5 min-w-0" title={busLabel}>
+            <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">
+              directions_bus
+            </span>
+            <span className="truncate">{busLabel}</span>
+          </div>
+        ) : null}
       </div>
 
       {!completeness.isReadyForOperations ? (
@@ -372,59 +432,65 @@ export function GroupCard({
         </section>
       ) : null}
 
-      <section className="mx-1 mb-8 pt-1" aria-label="Itinerary preview">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/80">Itinerary Preview</p>
-          <span className="text-[10px] font-medium text-on-surface-variant/55">{itineraryPreview.length} stops</span>
-        </div>
+      {/* Flexible empty space to push itinerary preview to the bottom */}
+      <div className="flex-grow" />
 
-        <ul className="space-y-2.5">
-          {itineraryPreview.map((previewItem, index) => (
-            <li key={previewItem.id} className="grid grid-cols-[1rem_minmax(0,1fr)] gap-x-3">
-              <div className="relative flex justify-center">
-                {index < itineraryPreview.length - 1 ? (
+      {/* Card Footer: Itinerary Preview & Action Button */}
+      <div className="mt-auto">
+        <section className="mx-1 mb-8 pt-1" aria-label="Itinerary preview">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/80">Itinerary Preview</p>
+            <span className="text-[10px] font-medium text-on-surface-variant/55">{itineraryPreview.length} stops</span>
+          </div>
+
+          <ul className="space-y-2.5">
+            {itineraryPreview.map((previewItem, index) => (
+              <li key={previewItem.id} className="grid grid-cols-[1rem_minmax(0,1fr)] gap-x-3">
+                <div className="relative flex justify-center">
+                  {index < itineraryPreview.length - 1 ? (
+                    <span
+                      className="absolute left-1/2 top-3 h-[calc(100%+0.625rem)] w-px -translate-x-1/2 bg-outline-variant/25"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   <span
-                    className="absolute left-1/2 top-3 h-[calc(100%+0.625rem)] w-px -translate-x-1/2 bg-outline-variant/25"
-                    aria-hidden="true"
-                  />
-                ) : null}
-                <span
-                  className={`relative z-10 mt-1.5 h-2.5 w-2.5 rounded-full ${getItineraryPreviewDotClasses(
-                    previewItem.state,
-                  )}`}
-                  aria-hidden="true"
-                />
-              </div>
-              <div className={getItineraryPreviewRowClasses(previewItem.state)}>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <p
-                    className={`min-w-0 truncate pb-0.5 text-sm font-medium leading-snug ${getItineraryPreviewTextClasses(
+                    className={`relative z-10 mt-1.5 h-2.5 w-2.5 rounded-full ${getItineraryPreviewDotClasses(
                       previewItem.state,
                     )}`}
-                  >
-                    {previewItem.label}
-                  </p>
-
-                  {previewItem.state === "next" ? (
-                    <span className="justify-self-end rounded-lg bg-primary/16 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-primary">
-                      Next
-                    </span>
-                  ) : null}
+                    aria-hidden="true"
+                  />
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+                <div className={getItineraryPreviewRowClasses(previewItem.state)}>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                    <p
+                      className={`min-w-0 truncate pb-0.5 text-sm font-medium leading-snug ${getItineraryPreviewTextClasses(
+                        previewItem.state,
+                      )}`}
+                    >
+                      {previewItem.label}
+                    </p>
 
-      <div className="mx-1 mt-auto">
-        <button
-          type="button"
-          className="serene-btn-secondary w-full py-3.5 text-sm font-bold"
-          onClick={() => onOpenDetail(group.code)}
-        >
-          View Detail
-        </button>
+                    {previewItem.state === "next" ? (
+                      <span className="justify-self-end rounded-lg bg-primary/16 px-2 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-primary">
+                        Next
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div className="mx-1">
+          <Button
+            variant="secondary"
+            className="w-full py-3.5 text-sm font-bold"
+            onClick={() => onOpenDetail(group.code)}
+          >
+            View Detail
+          </Button>
+        </div>
       </div>
     </article>
   );

@@ -48,28 +48,54 @@ function createPrismaKnownRequestError(code: string, message = `prisma error ${c
   });
 }
 
-function withPrismaTransactionMocks<T extends Record<string, unknown>>(
+function withPrismaTransactionMocks<T extends Record<string, any>>(
   mock: T,
   onExecuteRaw?: () => void,
-): T & {
-  $executeRaw: (...args: unknown[]) => Promise<number>;
-  $transaction: <R>(
-    callback: (tx: T & { $executeRaw: (...args: unknown[]) => Promise<number> }) => Promise<R>,
-  ) => Promise<R>;
-} {
+): any {
   const executeRaw = async (..._args: unknown[]): Promise<number> => {
     onExecuteRaw?.();
     return 1;
   };
 
-  return {
+  let lastUpdatedRecord: any = null;
+
+  const enhancedMock = {
     ...mock,
+    invoice: {
+      updateMany: async (args: any) => {
+        if (typeof mock.invoice?.update === "function") {
+          lastUpdatedRecord = await mock.invoice.update(args);
+        }
+        return { count: 1 };
+      },
+      deleteMany: async () => ({ count: 0 }),
+      createMany: async () => ({ count: 0 }),
+      ...mock.invoice,
+      findUnique: async (args: any) => {
+        if (lastUpdatedRecord !== null) {
+          return lastUpdatedRecord;
+        }
+        if (typeof mock.invoice?.findUnique === "function") {
+          return mock.invoice.findUnique(args);
+        }
+        return null;
+      },
+    },
+    invoiceItem: {
+      deleteMany: async () => ({ count: 0 }),
+      createMany: async () => ({ count: 0 }),
+      ...mock.invoiceItem,
+    },
+  };
+
+  return {
+    ...enhancedMock,
     $executeRaw: executeRaw,
     $transaction: async <R>(
-      callback: (tx: T & { $executeRaw: typeof executeRaw }) => Promise<R>,
+      callback: (tx: any) => Promise<R>,
     ): Promise<R> =>
       callback({
-        ...mock,
+        ...enhancedMock,
         $executeRaw: executeRaw,
       }),
   };
@@ -238,6 +264,7 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
     assert.equal(created.downPaymentIdr, 300_000);
 
     const updated = await service.update(created.id, {
+      version: 0,
       downPaymentIdr: 120_000,
       items: [
         {
@@ -256,6 +283,7 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
     assert.equal(updated.downPaymentIdr, 120_000);
 
     const manuallyAdjusted = await service.update(created.id, {
+      version: 0,
       amount: 8_880_000,
       downPaymentIdr: 120_000,
       status: InvoiceStatus.PAID,
@@ -338,6 +366,7 @@ async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void
     });
 
     const cancelled = await service.update(created.id, {
+      version: 0,
       amount: 2_500_000,
       status: InvoiceStatus.CANCELLED,
       notes: "Cancelled by operator",
@@ -347,6 +376,7 @@ async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void
     assert.equal(cancelled.groupCode, "GRP-001");
 
     const switched = await service.update(created.id, {
+      version: 1,
       clientName: "Switched Client",
       dueDate: "2099-03-20",
       groupCode: "  ",
@@ -369,7 +399,7 @@ async function testUpdateValidationErrors(): Promise<void> {
   const { service, restore } = createMemoryInvoicesService();
   try {
     await assert.rejects(
-      () => service.update("missing-invoice-id", { notes: "noop" }),
+      () => service.update("missing-invoice-id", { version: 0, notes: "noop" }),
       (error: unknown) => {
         assert.equal(error instanceof NotFoundException, true);
         assert.match((error as Error).message, /Invoice 'missing-invoice-id' not found/i);
@@ -387,6 +417,7 @@ async function testUpdateValidationErrors(): Promise<void> {
     await assert.rejects(
       () =>
         service.update(created.id, {
+          version: 0,
           clientId: "missing-client-id",
         }),
       (error: unknown) => {
@@ -1065,7 +1096,7 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
     },
   }) as unknown as PrismaService;
 
-  const prismaMockError = {
+  const prismaMockError = withPrismaTransactionMocks({
     invoice: {
       findUnique: async () => ({
         id: "inv-101",
@@ -1092,12 +1123,13 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
         id: "grp-existing",
       }),
     },
-  } as unknown as PrismaService;
+  }) as unknown as PrismaService;
 
   {
     const { service, restore } = createPrismaInvoicesService(prismaMockSuccess);
     try {
       const updated = await service.update("inv-100", {
+        version: 0,
         clientName: "Brand New Client",
         groupCode: "g-new",
         issuedDate: "2099-04-02",
@@ -1128,6 +1160,7 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
       await assert.rejects(
         () =>
           service.update("inv-101", {
+            version: 0,
             clientId: "cli-old",
             groupCode: "GRP-EXISTING",
           }),
@@ -1140,6 +1173,51 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
     } finally {
       restore();
     }
+  }
+}
+
+async function testPrismaUpdateVersionConcurrencyConflict(): Promise<void> {
+  const prismaMock = withPrismaTransactionMocks({
+    invoiceClient: {
+      findUnique: async () => ({
+        id: "cli-1",
+        groupId: null,
+      }),
+    },
+    invoice: {
+      findUnique: async () => ({
+        id: "inv-conflict",
+        clientId: "cli-1",
+        groupId: null,
+        issuedDate: new Date("2099-04-01T00:00:00.000Z"),
+        dueDate: new Date("2099-04-05T00:00:00.000Z"),
+        amount: 990_000,
+        status: InvoiceStatus.PENDING,
+        notes: null,
+        version: 0,
+      }),
+      updateMany: async () => {
+        return { count: 0 };
+      },
+    },
+  }) as unknown as PrismaService;
+
+  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  try {
+    await assert.rejects(
+      () =>
+        service.update("inv-conflict", {
+          version: 0,
+          amount: 500_000,
+        }),
+      (error: unknown) => {
+        assert.equal(error instanceof ConflictException, true);
+        assert.match((error as Error).message, /Invoice telah dimodifikasi oleh transaksi lain/i);
+        return true;
+      },
+    );
+  } finally {
+    restore();
   }
 }
 
@@ -1164,6 +1242,7 @@ async function main(): Promise<void> {
   await runCase("invoice prisma client lookup is case-insensitive", testPrismaClientLookupIsCaseInsensitive);
   await runCase("invoice prisma create error mapping", testPrismaCreateErrorMappings);
   await runCase("invoice prisma update success and error mapping", testPrismaUpdateSuccessAndErrorMappings);
+  await runCase("invoice prisma update version concurrency conflict", testPrismaUpdateVersionConcurrencyConflict);
 }
 
 void main().catch((error: unknown) => {

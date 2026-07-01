@@ -10,6 +10,8 @@ import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../
 import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { useModalFocusTrap } from "../components/use-modal-focus-trap";
+import { Button } from "../components/button";
+import { DialogShell } from "../components/dialog-shell";
 import {
   assignAgreementDraftInBackend,
   deleteAgreementDraftInBackend,
@@ -465,64 +467,47 @@ function DeleteAgreementDraftModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
-  const titleId = useId();
   const descriptionId = useId();
 
   return (
-    <ModalPortal>
-      <div
-        className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
-        onClick={onClose}
-      >
-        <section
-          ref={dialogRef}
-          className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-2xl"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          aria-describedby={descriptionId}
-          tabIndex={-1}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
-              warning
-            </span>
-            <div className="min-w-0">
-              <h2 id={titleId} className="text-lg font-extrabold text-slate-900">
-                Delete Agreement?
-              </h2>
-              <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-slate-600">
-                Draft agreement <strong>{draft.agreementNumber}</strong> untuk hotel <strong>{draft.hotelName}</strong>{" "}
-                akan dihapus dari inbox.
-              </p>
-            </div>
+    <DialogShell
+      isOpen={true}
+      onClose={onClose}
+      title="Hapus Draft Agreement"
+      size="sm"
+    >
+      <div className="serene-dialog-body px-5 py-4">
+        <div className="flex items-start gap-3">
+          <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
+            warning
+          </span>
+          <div className="min-w-0">
+            <p id={descriptionId} className="text-sm leading-relaxed text-slate-600">
+              Draft agreement <strong>{draft.agreementNumber}</strong> untuk hotel <strong>{draft.hotelName}</strong>{" "}
+              akan dihapus dari inbox.
+            </p>
           </div>
+        </div>
 
-          <div className="mt-5 flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-surface-container-high"
-              onClick={onClose}
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-on-primary transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={onConfirm}
-              disabled={isDeleting}
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                {isDeleting ? "sync" : "delete"}
-              </span>
-              <span>{isDeleting ? "Deleting..." : "Delete Agreement"}</span>
-            </button>
-          </div>
-        </section>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Batal
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            className="inline-flex items-center gap-1.5"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              {isDeleting ? "sync" : "delete"}
+            </span>
+            <span>{isDeleting ? "Deleting..." : "Delete Agreement"}</span>
+          </Button>
+        </div>
       </div>
-    </ModalPortal>
+    </DialogShell>
   );
 }
 
@@ -840,9 +825,10 @@ export function AgreementInboxScreen() {
             <h2 className="text-base font-bold text-slate-900">New Draft Agreement</h2>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/15"
+          <Button
+            variant="secondary"
+            size="sm"
+            className="inline-flex items-center gap-1.5"
             onClick={() => setIsDraftComposerOpen((isOpen) => !isOpen)}
             aria-expanded={isDraftComposerOpen}
             aria-controls="agreement-draft-composer"
@@ -851,7 +837,7 @@ export function AgreementInboxScreen() {
               {isDraftComposerOpen ? "close" : "add"}
             </span>
             <span>{isDraftComposerOpen ? "Close" : "Create Draft"}</span>
-          </button>
+          </Button>
         </div>
 
         {isDraftComposerOpen ? (
@@ -863,16 +849,17 @@ export function AgreementInboxScreen() {
             <AgreementDraftFields control={control} register={register} errors={errors} idPrefix="agreement-draft" />
 
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="primary"
                 type="submit"
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5"
                 disabled={isSaving}
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
                   save
                 </span>
                 <span>{isSaving ? "Saving..." : "Save Draft"}</span>
-              </button>
+              </Button>
             </div>
           </form>
         ) : null}
@@ -1113,9 +1100,10 @@ export function AgreementInboxScreen() {
                         })()}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-tertiary/35 bg-brand-tertiary/12 text-brand-tertiary transition hover:bg-brand-tertiary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      className="h-9 w-9 p-0 rounded-full inline-flex items-center justify-center shrink-0"
                       aria-label={`Delete agreement draft ${draft.agreementNumber}`}
                       title={isAssigned ? "Unassign agreement before deleting it." : undefined}
                       onClick={() => requestDeleteDraft(draft)}
@@ -1124,7 +1112,7 @@ export function AgreementInboxScreen() {
                       <span className="material-symbols-outlined text-base" aria-hidden="true">
                         delete
                       </span>
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="border-t border-dashed border-black/20 pt-4">
@@ -1180,14 +1168,14 @@ export function AgreementInboxScreen() {
                           <input
                             id={`assign-${draft.id}`}
                             type="text"
-                            className="h-10 min-w-0 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                            className="serene-input serene-input-md min-w-0"
                             placeholder="Group number"
                             value={assignmentGroupCodes[draft.id] ?? linkedGroupCode}
                             onChange={(event) => updateAssignmentGroupCode(draft.id, event.target.value)}
                           />
-                          <button
-                            type="button"
-                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-brand-primary/35 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+                          <Button
+                            variant="secondary"
+                            className="inline-flex items-center gap-1.5"
                             onClick={() => void assignDraftToGroup(draft)}
                             disabled={assignDraftMutation.isPending}
                           >
@@ -1195,7 +1183,7 @@ export function AgreementInboxScreen() {
                               link
                             </span>
                             <span>{assignDraftMutation.isPending ? "Linking..." : "Link to Group"}</span>
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </div>

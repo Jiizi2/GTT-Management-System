@@ -12,6 +12,7 @@ import { InvoiceStatus, Prisma } from "@prisma/client";
 import { resolveConfiguredDataSource } from "../config/app-config";
 import { createStructuredLogger } from "../logging/create-structured-logger";
 import { PrismaService } from "../prisma/prisma.service";
+import { Telemetry } from "../logging/telemetry";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
 import {
@@ -59,6 +60,7 @@ type InvoiceListItem = {
   recipientName?: string;
   notes?: string;
   items?: InvoiceLineItem[];
+  version?: number;
 };
 
 type MemoryInvoiceClient = {
@@ -101,6 +103,7 @@ const invoiceSummarySelect = {
   notes: true,
   items: true,
   recipientName: true,
+  version: true,
   client: {
     select: {
       name: true,
@@ -111,6 +114,16 @@ const invoiceSummarySelect = {
     select: {
       code: true,
       name: true,
+    },
+  },
+  itemsRel: {
+    select: {
+      description: true,
+      pax: true,
+      currency: true,
+      unitPrice: true,
+      totalPrice: true,
+      totalPriceIdr: true,
     },
   },
 } satisfies Prisma.InvoiceSelect;
@@ -131,6 +144,71 @@ type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & 
 type PrismaInvoiceDownPaymentRow = {
   downPaymentIdr: Prisma.Decimal | number | null;
 };
+
+function validateAmounts(payload: { amount?: number; downPaymentIdr?: number }) {
+  if (payload.downPaymentIdr !== undefined && payload.downPaymentIdr < 0) {
+    throw new BadRequestException("Nominal downpayment tidak boleh kurang dari 0.");
+  }
+  if (payload.amount !== undefined && payload.amount < 0) {
+    throw new BadRequestException("Nominal amount invoice tidak boleh kurang dari 0.");
+  }
+}
+
+function validateItems(items: any) {
+  if (items === undefined) return;
+  if (!Array.isArray(items)) {
+    throw new BadRequestException("Format items invoice tidak valid.");
+  }
+  for (const item of items) {
+    if (!item || typeof item !== "object") {
+      throw new BadRequestException("Item invoice tidak valid.");
+    }
+    const { description, currency, pax, unitPrice } = item as any;
+    if (!description || typeof description !== "string" || !description.trim()) {
+      throw new BadRequestException("Uraian item invoice tidak boleh kosong.");
+    }
+    const cleanCurrency = String(currency).trim().toUpperCase();
+    if (cleanCurrency !== "IDR" && cleanCurrency !== "USD" && cleanCurrency !== "SAR") {
+      throw new BadRequestException(`Mata uang item '${cleanCurrency}' tidak valid.`);
+    }
+    if (Number(pax) <= 0 || !Number.isInteger(Number(pax))) {
+      throw new BadRequestException("Jumlah PAX item invoice harus berupa bilangan bulat positif.");
+    }
+    if (Number(unitPrice) <= 0) {
+      throw new BadRequestException("Harga unit item invoice harus lebih dari 0.");
+    }
+  }
+}
+
+function validatePayments(notes: string | undefined) {
+  if (notes === undefined) return;
+  const match = notes.match(/\[Payments:([^\]]+)\]/);
+  if (match) {
+    try {
+      const paymentsList = JSON.parse(decodeURIComponent(match[1]));
+      if (Array.isArray(paymentsList)) {
+        for (const p of paymentsList) {
+          if ((Number(p.amount) || 0) < 0) {
+            throw new BadRequestException("Nominal pembayaran tidak boleh kurang dari 0.");
+          }
+        }
+      }
+    } catch (e) {
+      throw new BadRequestException("Tag pembayaran dalam notes memiliki format JSON yang tidak valid.");
+    }
+  }
+}
+
+function validateInvoicePayloadInvariants(payload: {
+  amount?: number;
+  downPaymentIdr?: number;
+  notes?: string;
+  items?: any;
+}) {
+  validateAmounts(payload);
+  validateItems(payload.items);
+  validatePayments(payload.notes);
+}
 
 function normalizeIsoDate(input: string, fieldName: "issuedDate" | "dueDate"): string {
   const trimmed = input.trim();
@@ -207,6 +285,7 @@ function resolveEffectiveStatus(
   dueDateIso: string,
   amount: number,
   downPaymentIdr: number,
+  notes?: string,
 ): InvoiceStatus {
   if (status === InvoiceStatus.CANCELLED) {
     return InvoiceStatus.CANCELLED;
@@ -223,13 +302,16 @@ function resolveEffectiveStatus(
     return InvoiceStatus.PAID;
   }
 
-  const todayIso = toIsoDateOnly(new Date());
-  if (dueDateIso < todayIso) {
-    return InvoiceStatus.OVERDUE;
+  const isNoDueDate = notes?.includes("[NoDueDate:true]");
+  if (!isNoDueDate && dueDateIso && dueDateIso !== "none") {
+    const todayIso = toIsoDateOnly(new Date());
+    if (dueDateIso < todayIso) {
+      return InvoiceStatus.OVERDUE;
+    }
   }
 
   if (status === InvoiceStatus.OVERDUE) {
-    return InvoiceStatus.OVERDUE;
+    return isNoDueDate ? InvoiceStatus.PENDING : InvoiceStatus.OVERDUE;
   }
 
   if (sanitizedDownPayment > 0 && sanitizedDownPayment < sanitizedAmount) {
@@ -243,10 +325,6 @@ function resolveEffectiveStatus(
   return InvoiceStatus.PENDING;
 }
 
-function normalizeAmountByStatus(amount: number, status: InvoiceStatus): number {
-  const sanitizedAmount = Math.max(0, Math.round(amount));
-  return sanitizedAmount;
-}
 
 function buildInvoiceNumber(year: string, serial: number): string {
   return `GTT/INV/${year}/${String(serial).padStart(4, "0")}`;
@@ -308,7 +386,22 @@ function isInvoiceLineItemCurrency(value: string): value is InvoiceLineItemCurre
   return value === "IDR" || value === "USD" || value === "SAR";
 }
 
-function normalizeInvoiceLineItem(value: unknown): InvoiceLineItem | null {
+function extractExchangeRatesFromNotes(notes: string | undefined): { usdToIdr: number; sarToIdr: number } {
+  const rates = { usdToIdr: 0, sarToIdr: 0 };
+  if (!notes) return rates;
+  const match = notes.match(/\[ExchangeRate:USD=(\d+),SAR=(\d+)\]/);
+  if (match) {
+    rates.usdToIdr = Number.parseInt(match[1], 10);
+    rates.sarToIdr = Number.parseInt(match[2], 10);
+  }
+  return rates;
+}
+
+function normalizeInvoiceLineItem(
+  value: unknown,
+  usdToIdr: number,
+  sarToIdr: number,
+): InvoiceLineItem | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -318,8 +411,19 @@ function normalizeInvoiceLineItem(value: unknown): InvoiceLineItem | null {
   const currency = getTrimmedString(item.currency).toUpperCase();
   const pax = Math.max(0, Math.round(coerceNumber(item.pax, 0)));
   const unitPrice = Math.max(0, Math.round(coerceNumber(item.unitPrice, 0)));
-  const totalPrice = Math.max(0, Math.round(coerceNumber(item.totalPrice, pax * unitPrice)));
-  const totalPriceIdr = Math.max(0, Math.round(coerceNumber(item.totalPriceIdr, totalPrice)));
+
+  // Authoritatively recalculate totalPrice to reinforce data integrity
+  const totalPrice = pax * unitPrice;
+
+  // Authoritatively recalculate totalPriceIdr using extracted exchange rates
+  let totalPriceIdr = totalPrice;
+  if (currency === "USD" && usdToIdr > 0) {
+    totalPriceIdr = totalPrice * usdToIdr;
+  } else if (currency === "SAR" && sarToIdr > 0) {
+    totalPriceIdr = totalPrice * sarToIdr;
+  } else if (currency !== "IDR") {
+    totalPriceIdr = Math.max(0, Math.round(coerceNumber(item.totalPriceIdr, totalPrice)));
+  }
 
   if (!description || !isInvoiceLineItemCurrency(currency) || pax <= 0 || unitPrice <= 0) {
     return null;
@@ -335,12 +439,15 @@ function normalizeInvoiceLineItem(value: unknown): InvoiceLineItem | null {
   };
 }
 
-function normalizeInvoiceLineItems(items: unknown): InvoiceLineItem[] {
+function normalizeInvoiceLineItems(items: unknown, notes?: string): InvoiceLineItem[] {
   if (!Array.isArray(items)) {
     return [];
   }
 
-  return items.map(normalizeInvoiceLineItem).filter((item): item is InvoiceLineItem => item !== null);
+  const { usdToIdr, sarToIdr } = extractExchangeRatesFromNotes(notes);
+  return items
+    .map((item) => normalizeInvoiceLineItem(item, usdToIdr, sarToIdr))
+    .filter((item): item is InvoiceLineItem => item !== null);
 }
 
 function parseStoredInvoiceLineItems(items: unknown): InvoiceLineItem[] | undefined {
@@ -641,7 +748,9 @@ export class InvoicesService implements OnModuleInit {
   private findAllFromMemory(): InvoiceListItem[] {
     const todayIso = toIsoDateOnly(new Date());
     this.memoryInvoices.forEach((inv) => {
+      const isNoDueDate = inv.notes?.includes("[NoDueDate:true]");
       if (
+        !isNoDueDate &&
         (inv.status === InvoiceStatus.PENDING || inv.status === InvoiceStatus.PARTIALLY_PAID) &&
         inv.dueDateIso < todayIso
       ) {
@@ -672,18 +781,26 @@ export class InvoicesService implements OnModuleInit {
     const client = this.resolveClientForCreateInMemory(payload);
 
     const issuedDateIso = normalizeIsoDate(payload.issuedDate, "issuedDate");
-    const dueDateIso = normalizeIsoDate(payload.dueDate, "dueDate");
+    const isNoDueDate = !payload.dueDate || !payload.dueDate.trim();
+    const dueDateIso = isNoDueDate
+      ? issuedDateIso
+      : normalizeIsoDate(payload.dueDate!, "dueDate");
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
     const existingInvoiceNumbers = this.memoryInvoices.map((entry) => entry.invoiceNumber);
     const invoiceNumber = buildInvoiceNumber(invoiceYear, this.resolveNextSerial(existingInvoiceNumbers));
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
     const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
+    let notes = getTrimmedString(payload.notes);
+    if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
+      notes = `${notes}\n[NoDueDate:true]`.trim();
+    }
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? InvoiceStatus.PENDING,
       dueDateIso,
       roundedAmount,
       payload.downPaymentIdr ?? 0,
+      notes,
     );
     const normalizedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
 
@@ -698,7 +815,7 @@ export class InvoicesService implements OnModuleInit {
       amount: roundedAmount,
       downPaymentIdr: normalizeDownPaymentByAmount(roundedAmount, payload.downPaymentIdr ?? 0),
       status: effectiveStatus,
-      notes: getTrimmedString(payload.notes) || undefined,
+      notes: notes || undefined,
       recipientName: getTrimmedString(payload.recipientName) || undefined,
       items: normalizedItems.length > 0 ? normalizedItems : undefined,
     };
@@ -748,9 +865,15 @@ export class InvoicesService implements OnModuleInit {
     const issuedDateIso = payload.issuedDate
       ? normalizeIsoDate(payload.issuedDate, "issuedDate")
       : currentInvoice.issuedDateIso;
-    const dueDateIso = payload.dueDate
-      ? normalizeIsoDate(payload.dueDate, "dueDate")
-      : currentInvoice.dueDateIso;
+
+    const isNoDueDate = payload.dueDate !== undefined
+      ? (!payload.dueDate || !payload.dueDate.trim())
+      : (currentInvoice.notes?.includes("[NoDueDate:true]") ?? false);
+
+    const dueDateIso = (payload.dueDate !== undefined && payload.dueDate.trim())
+      ? normalizeIsoDate(payload.dueDate!, "dueDate")
+      : issuedDateIso;
+
     const baseAmount = payload.amount !== undefined ? payload.amount : currentInvoice.amount;
     const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : undefined;
     const resolvedAmount =
@@ -760,11 +883,22 @@ export class InvoicesService implements OnModuleInit {
       roundedAmount,
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : currentInvoice.downPaymentIdr,
     );
+
+    let notes = payload.notes !== undefined ? payload.notes.trim() : (currentInvoice.notes ?? "");
+    if (isNoDueDate) {
+      if (!notes.includes("[NoDueDate:true]")) {
+        notes = `${notes}\n[NoDueDate:true]`.trim();
+      }
+    } else {
+      notes = notes.replace(/\[NoDueDate:true\]/g, "").trim();
+    }
+
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? currentInvoice.status,
       dueDateIso,
       roundedAmount,
       nextDownPaymentIdr,
+      notes,
     );
 
     let nextGroupCode = currentInvoice.groupCode;
@@ -783,8 +917,6 @@ export class InvoicesService implements OnModuleInit {
       nextGroupName = resolvedClient.groupName;
     }
 
-    const nextNotes =
-      payload.notes !== undefined ? payload.notes.trim() || undefined : currentInvoice.notes;
     const nextRecipientName =
       payload.recipientName !== undefined ? payload.recipientName.trim() || undefined : currentInvoice.recipientName;
 
@@ -798,7 +930,7 @@ export class InvoicesService implements OnModuleInit {
       amount: roundedAmount,
       downPaymentIdr: nextDownPaymentIdr,
       status: effectiveStatus,
-      notes: nextNotes,
+      notes: notes || undefined,
       recipientName: nextRecipientName,
       items: normalizedItems !== undefined ? (normalizedItems.length > 0 ? normalizedItems : undefined) : currentInvoice.items,
     };
@@ -818,7 +950,9 @@ export class InvoicesService implements OnModuleInit {
       invoice.dueDateIso,
       roundedAmount,
       invoice.downPaymentIdr,
+      invoice.notes,
     );
+    const isNoDueDate = invoice.notes?.includes("[NoDueDate:true]");
     return {
       id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -829,7 +963,7 @@ export class InvoicesService implements OnModuleInit {
       groupCode: invoice.groupCode ?? client.groupCode,
       groupName: invoice.groupName ?? client.groupName,
       issuedDateIso: invoice.issuedDateIso,
-      dueDateIso: invoice.dueDateIso,
+      dueDateIso: isNoDueDate ? "" : invoice.dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, invoice.downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
@@ -1026,6 +1160,10 @@ export class InvoicesService implements OnModuleInit {
         dueDate: {
           lt: todayUtc,
         },
+        OR: [
+          { notes: { not: { contains: "[NoDueDate:true]" } } },
+          { notes: null },
+        ],
       },
       data: {
         status: InvoiceStatus.OVERDUE,
@@ -1045,14 +1183,21 @@ export class InvoicesService implements OnModuleInit {
   }
 
   private async createWithPrisma(payload: CreateInvoiceDto): Promise<InvoiceListItem> {
+    const submitTracker = Telemetry.start("invoice_submit_ms");
+    validateInvoicePayloadInvariants(payload);
+
+    const queryTracker = Telemetry.start("invoice_db_query_ms");
     const client = await this.resolveClientForCreateWithPrisma(payload);
 
     const issuedDateIso = normalizeIsoDate(payload.issuedDate, "issuedDate");
-    const dueDateIso = normalizeIsoDate(payload.dueDate, "dueDate");
+    const isNoDueDate = !payload.dueDate || !payload.dueDate.trim();
+    const dueDateIso = isNoDueDate
+      ? issuedDateIso
+      : normalizeIsoDate(payload.dueDate!, "dueDate");
     const invoiceYear = extractYearFromIsoDate(dueDateIso);
     const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
     let resolvedGroupId: string | null = client.groupId ?? null;
-    const normalizedItems = normalizeInvoiceLineItems(payload.items);
+    const normalizedItems = normalizeInvoiceLineItems(payload.items, payload.notes);
     if (requestedGroupCode) {
       const matchedGroup = await this.prisma.group.findUnique({
         where: {
@@ -1064,19 +1209,27 @@ export class InvoicesService implements OnModuleInit {
       });
 
       if (!matchedGroup) {
+        Telemetry.end(queryTracker, { action: "create_pre_queries_failed" });
+        Telemetry.end(submitTracker, { success: false });
         throw new NotFoundException(`Group '${requestedGroupCode}' not found.`);
       }
 
       resolvedGroupId = matchedGroup.id;
     }
+    Telemetry.end(queryTracker, { action: "create_pre_queries_success" });
 
     const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
+    let notes = getTrimmedString(payload.notes);
+    if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
+      notes = `${notes}\n[NoDueDate:true]`.trim();
+    }
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? InvoiceStatus.PENDING,
       dueDateIso,
       roundedAmount,
       payload.downPaymentIdr ?? 0,
+      notes,
     );
     const normalizedDownPaymentIdr = normalizeDownPaymentByAmount(
       roundedAmount,
@@ -1084,6 +1237,7 @@ export class InvoicesService implements OnModuleInit {
     );
     const canWriteInlineDownPayment = await this.ensurePrismaInvoiceDownPaymentColumn();
 
+    const txTracker = Telemetry.start("invoice_transaction_ms");
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const created = await this.prisma.$transaction(async (tx) => {
@@ -1099,9 +1253,21 @@ export class InvoicesService implements OnModuleInit {
               dueDate: createUtcDateFromIso(dueDateIso),
               amount: roundedAmount,
               status: effectiveStatus,
-              notes: getTrimmedString(payload.notes) || null,
+              notes: notes || null,
               recipientName: getTrimmedString(payload.recipientName) || null,
               items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
+              itemsRel: {
+                createMany: {
+                  data: normalizedItems.map((item) => ({
+                    description: item.description,
+                    pax: item.pax,
+                    currency: item.currency,
+                    unitPrice: item.unitPrice,
+                    totalPrice: item.totalPrice,
+                    totalPriceIdr: item.totalPriceIdr,
+                  })),
+                },
+              },
             },
             select: invoiceSummarySelect,
           });
@@ -1117,15 +1283,24 @@ export class InvoicesService implements OnModuleInit {
           return createdInvoice;
         });
 
+        Telemetry.end(txTracker, { success: true });
+        Telemetry.event("invoice_dual_write_success", { type: "create", id: created.id });
+
         if (!canWriteInlineDownPayment) {
           await this.writePrismaInvoiceDownPayment(created.id, normalizedDownPaymentIdr);
         }
 
-        return this.mapPrismaInvoiceToListItem(created as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
+        const result = this.mapPrismaInvoiceToListItem(created as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
+        Telemetry.end(submitTracker, { success: true, id: created.id });
+        return result;
       } catch (error: unknown) {
+        Telemetry.event("invoice_dual_write_failed", { type: "create", error: error instanceof Error ? error.message : String(error) });
         if (isRetryablePrismaWriteConflict(error) && attempt < 2) {
           continue;
         }
+
+        Telemetry.end(txTracker, { success: false, error: error instanceof Error ? error.message : String(error) });
+        Telemetry.end(submitTracker, { success: false, error: error instanceof Error ? error.message : String(error) });
 
         if (isRetryablePrismaWriteConflict(error)) {
           throw new ConflictException("Failed to generate a unique invoice number. Please retry.");
@@ -1141,10 +1316,18 @@ export class InvoicesService implements OnModuleInit {
       }
     }
 
+    Telemetry.end(submitTracker, { success: false, error: "max_attempts_exceeded" });
     throw new ConflictException("Failed to generate invoice number.");
   }
 
   private async updateWithPrisma(id: string, payload: UpdateInvoiceDto): Promise<InvoiceListItem> {
+    const submitTracker = Telemetry.start("invoice_submit_ms");
+    validateInvoicePayloadInvariants(payload);
+    if (payload.version === undefined) {
+      Telemetry.end(submitTracker, { success: false, error: "missing_version" });
+      throw new BadRequestException("Concurrency version token is required for invoice updates.");
+    }
+    const dbQueryTracker = Telemetry.start("invoice_db_query_ms");
     const existingInvoice = await this.prisma.invoice.findUnique({
       where: {
         id,
@@ -1160,14 +1343,44 @@ export class InvoicesService implements OnModuleInit {
         notes: true,
         items: true,
         recipientName: true,
+        version: true,
       },
     });
 
     if (!existingInvoice) {
+      Telemetry.end(dbQueryTracker, { action: "update_pre_queries_failed", id });
       throw new NotFoundException(`Invoice '${id}' not found.`);
     }
 
     const existingDownPaymentIdr = await this.readPrismaInvoiceDownPayment(id);
+    Telemetry.end(dbQueryTracker, { action: "update_pre_queries_success", id });
+
+    // Cancelled status business invariant: CANCELLED invoices cannot receive new/increased payments
+    if (existingInvoice.status === InvoiceStatus.CANCELLED) {
+      if (payload.downPaymentIdr !== undefined && payload.downPaymentIdr > existingDownPaymentIdr) {
+        throw new BadRequestException("Invoice yang berstatus CANCELLED tidak boleh menerima pembayaran baru.");
+      }
+      if (payload.notes !== undefined) {
+        const existingPaymentsMatch = existingInvoice.notes?.match(/\[Payments:([^\]]+)\]/);
+        const newPaymentsMatch = payload.notes.match(/\[Payments:([^\]]+)\]/);
+        const existingPaymentsStr = existingPaymentsMatch ? existingPaymentsMatch[1] : "";
+        const newPaymentsStr = newPaymentsMatch ? newPaymentsMatch[1] : "";
+        if (newPaymentsStr !== existingPaymentsStr) {
+          try {
+            const existingPayments: any[] = existingPaymentsStr ? JSON.parse(decodeURIComponent(existingPaymentsStr)) : [];
+            const newPayments: any[] = newPaymentsStr ? JSON.parse(decodeURIComponent(newPaymentsStr)) : [];
+            const existingTotal = existingPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const newTotal = newPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            if (newTotal > existingTotal || newPayments.length > existingPayments.length) {
+              throw new BadRequestException("Invoice yang berstatus CANCELLED tidak boleh menerima pembayaran baru.");
+            }
+          } catch (e) {
+            throw new BadRequestException("Format histori pembayaran tidak valid.");
+          }
+        }
+      }
+    }
+
     const requestedClientId = getTrimmedString(payload.clientId);
     const requestedClientName = getTrimmedString(payload.clientName);
     const hasClientChangeRequest = Boolean(requestedClientId || requestedClientName);
@@ -1206,12 +1419,19 @@ export class InvoicesService implements OnModuleInit {
     const issuedDateIso = payload.issuedDate
       ? normalizeIsoDate(payload.issuedDate, "issuedDate")
       : toIsoDateOnly(existingInvoice.issuedDate);
-    const dueDateIso = payload.dueDate
-      ? normalizeIsoDate(payload.dueDate, "dueDate")
-      : toIsoDateOnly(existingInvoice.dueDate);
+
+    const isNoDueDate = payload.dueDate !== undefined
+      ? (!payload.dueDate || !payload.dueDate.trim())
+      : (existingInvoice.notes?.includes("[NoDueDate:true]") ?? false);
+
+    const dueDateIso = (payload.dueDate !== undefined && payload.dueDate.trim())
+      ? normalizeIsoDate(payload.dueDate!, "dueDate")
+      : issuedDateIso;
+
     const baseAmount =
       payload.amount !== undefined ? payload.amount : toNumberAmount(existingInvoice.amount);
-    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items) : [];
+    const resolvedNotesForItems = payload.notes !== undefined ? payload.notes : (existingInvoice.notes ?? "");
+    const normalizedItems = payload.items !== undefined ? normalizeInvoiceLineItems(payload.items, resolvedNotesForItems) : [];
     const resolvedAmount =
       payload.items !== undefined ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems) : baseAmount;
     const roundedAmount = Math.max(0, Math.round(resolvedAmount));
@@ -1219,11 +1439,22 @@ export class InvoicesService implements OnModuleInit {
       roundedAmount,
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : existingDownPaymentIdr,
     );
+
+    let notes = payload.notes !== undefined ? payload.notes.trim() : (existingInvoice.notes ?? "");
+    if (isNoDueDate) {
+      if (!notes.includes("[NoDueDate:true]")) {
+        notes = `${notes}\n[NoDueDate:true]`.trim();
+      }
+    } else {
+      notes = notes.replace(/\[NoDueDate:true\]/g, "").trim();
+    }
+
     const effectiveStatus = resolveEffectiveStatus(
       payload.status ?? existingInvoice.status,
       dueDateIso,
       roundedAmount,
       normalizedDownPaymentIdr,
+      notes,
     );
 
     let resolvedGroupId: string | null = existingInvoice.groupId;
@@ -1251,33 +1482,99 @@ export class InvoicesService implements OnModuleInit {
       resolvedGroupId = resolvedClientGroupId;
     }
 
+    const canWriteInlineDownPayment = await this.ensurePrismaInvoiceDownPaymentColumn();
+
     let updated: PrismaInvoiceSummaryRow;
+    const txTracker = Telemetry.start("invoice_transaction_ms");
     try {
-      updated = await this.prisma.invoice.update({
-        where: {
+      updated = await this.prisma.$transaction(async (tx) => {
+        // Build the query clause with version check for optimistic locking
+        const whereClause: Prisma.InvoiceWhereInput = {
           id,
-        },
-        data: {
-          clientId: resolvedClientId,
-          groupId: resolvedGroupId,
-          issuedDate: createUtcDateFromIso(issuedDateIso),
-          dueDate: createUtcDateFromIso(dueDateIso),
-          amount: roundedAmount,
-          status: effectiveStatus,
-          notes: payload.notes !== undefined ? payload.notes.trim() || null : existingInvoice.notes,
-          recipientName: payload.recipientName !== undefined ? payload.recipientName.trim() || null : existingInvoice.recipientName,
-          ...(payload.items !== undefined
-            ? {
-                items:
-                  normalizedItems.length > 0
-                    ? (normalizedItems as Prisma.InputJsonValue)
-                    : Prisma.JsonNull,
-              }
-            : {}),
-        },
-        select: invoiceSummarySelect,
+          version: payload.version,
+        };
+
+        // Perform transactional update using updateMany
+        const updateResult = await tx.invoice.updateMany({
+          where: whereClause,
+          data: {
+            clientId: resolvedClientId,
+            groupId: resolvedGroupId,
+            issuedDate: createUtcDateFromIso(issuedDateIso),
+            dueDate: createUtcDateFromIso(dueDateIso),
+            amount: roundedAmount,
+            status: effectiveStatus,
+            notes: notes || null,
+            recipientName: payload.recipientName !== undefined ? payload.recipientName.trim() || null : existingInvoice.recipientName,
+            version: { increment: 1 },
+            ...(payload.items !== undefined
+              ? {
+                  items:
+                    normalizedItems.length > 0
+                      ? (normalizedItems as Prisma.InputJsonValue)
+                      : Prisma.JsonNull,
+                }
+              : {}),
+          },
+        });
+
+        if (updateResult.count === 0) {
+          Telemetry.event("invoice_version_conflict", { id, expected: payload.version, actual: existingInvoice.version });
+          throw new ConflictException("Invoice telah dimodifikasi oleh transaksi lain. Silakan muat ulang halaman.");
+        }
+
+        // Relational items dual-write updates
+        if (payload.items !== undefined) {
+          await tx.invoiceItem.deleteMany({
+            where: { invoiceId: id },
+          });
+
+          if (normalizedItems.length > 0) {
+            await tx.invoiceItem.createMany({
+              data: normalizedItems.map((item) => ({
+                invoiceId: id,
+                description: item.description,
+                pax: item.pax,
+                currency: item.currency,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                totalPriceIdr: item.totalPriceIdr,
+              })),
+            });
+          }
+        }
+
+        const result = await tx.invoice.findUnique({
+          where: { id },
+          select: invoiceSummarySelect,
+        });
+
+        if (!result) {
+          throw new NotFoundException(`Invoice '${id}' not found after update.`);
+        }
+
+        if (canWriteInlineDownPayment) {
+          await this.writePrismaInvoiceDownPaymentWithExecutor(
+            tx,
+            result.id,
+            normalizedDownPaymentIdr,
+          );
+        }
+
+        return result;
       });
+
+      Telemetry.end(txTracker, { id, success: true });
+      Telemetry.event("invoice_dual_write_success", { type: "update", id });
+
+      if (!canWriteInlineDownPayment) {
+        await this.writePrismaInvoiceDownPayment(updated.id, normalizedDownPaymentIdr);
+      }
+      Telemetry.end(submitTracker, { success: true, id });
     } catch (error: unknown) {
+      Telemetry.end(submitTracker, { success: false, error: error instanceof Error ? error.message : String(error) });
+      Telemetry.end(txTracker, { id, success: false, error: error instanceof Error ? error.message : String(error) });
+      Telemetry.event("invoice_dual_write_failed", { type: "update", id, error: error instanceof Error ? error.message : String(error) });
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2025"
@@ -1301,7 +1598,6 @@ export class InvoicesService implements OnModuleInit {
       throw error;
     }
 
-    await this.writePrismaInvoiceDownPayment(updated.id, normalizedDownPaymentIdr);
     return this.mapPrismaInvoiceToListItem(updated as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
   }
 
@@ -1365,15 +1661,65 @@ export class InvoicesService implements OnModuleInit {
   ): InvoiceListItem {
     const dueDateIso = toIsoDateOnly(invoice.dueDate);
     const issuedDateIso = toIsoDateOnly(invoice.issuedDate);
-    const items = parseStoredInvoiceLineItems(invoice.items);
-    const baseAmount = resolveStoredInvoiceAmount(toNumberAmount(invoice.amount), items);
+    
+    const legacyItems = parseStoredInvoiceLineItems(invoice.items) ?? [];
+    
+    // Map itemsRel to InvoiceLineItem[] format
+    const relationalItems: InvoiceLineItem[] = (invoice as any).itemsRel?.map((item: any) => ({
+      description: item.description,
+      pax: item.pax,
+      currency: item.currency,
+      unitPrice: Number(item.unitPrice),
+      totalPrice: Number(item.totalPrice),
+      totalPriceIdr: Number(item.totalPriceIdr),
+    })) ?? [];
+
+    // Perform shadow read verification
+    const shadowTracker = Telemetry.start("invoice_shadow_compare_ms");
+    let shadowMismatch = false;
+    if (legacyItems.length !== relationalItems.length) {
+      shadowMismatch = true;
+    } else {
+      for (let i = 0; i < legacyItems.length; i++) {
+        const legacy = legacyItems[i];
+        const relational = relationalItems[i];
+        if (
+          legacy.description !== relational.description ||
+          legacy.pax !== relational.pax ||
+          legacy.currency !== relational.currency ||
+          legacy.unitPrice !== relational.unitPrice ||
+          legacy.totalPrice !== relational.totalPrice ||
+          legacy.totalPriceIdr !== relational.totalPriceIdr
+        ) {
+          shadowMismatch = true;
+          break;
+        }
+      }
+    }
+    Telemetry.end(shadowTracker, { id: invoice.id });
+
+    if (shadowMismatch) {
+      Telemetry.event("invoice_shadow_mismatch", {
+        id: invoice.id,
+        legacyCount: legacyItems.length,
+        relationalCount: relationalItems.length,
+      });
+    }
+
+    // Determine return items based on feature flag
+    const readFromRelational = process.env.ENABLE_NEW_ITEM_READ === "true";
+    const finalItems = readFromRelational ? relationalItems : legacyItems;
+
+    const baseAmount = resolveStoredInvoiceAmount(toNumberAmount(invoice.amount), finalItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
     const effectiveStatus = resolveEffectiveStatus(
       invoice.status,
       dueDateIso,
       roundedAmount,
       downPaymentIdr,
+      invoice.notes ?? undefined,
     );
+    const isNoDueDate = invoice.notes?.includes("[NoDueDate:true]");
 
     return {
       id: invoice.id,
@@ -1385,14 +1731,15 @@ export class InvoicesService implements OnModuleInit {
       groupCode: invoice.group?.code,
       groupName: invoice.group?.name,
       issuedDateIso,
-      dueDateIso,
+      dueDateIso: isNoDueDate ? "" : dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
       recipientName: invoice.recipientName ?? undefined,
       notes: invoice.notes ?? undefined,
-      items,
+      items: finalItems.length ? finalItems : undefined,
+      version: invoice.version,
     };
   }
 
@@ -1518,5 +1865,102 @@ export class InvoicesService implements OnModuleInit {
       },
       "Invoice mutation completed.",
     );
+  }
+
+  async backfillLegacyItems(): Promise<{
+    processed: number;
+    success: number;
+    failed: number;
+    anomalies: Array<{ id: string; invoiceNumber: string; message: string }>;
+  }> {
+    if (this.dataSource !== "prisma") {
+      return { processed: 0, success: 0, failed: 0, anomalies: [] };
+    }
+
+    let processed = 0;
+    let success = 0;
+    let failed = 0;
+    const anomalies: Array<{ id: string; invoiceNumber: string; message: string }> = [];
+
+    let cursor: { id: string } | undefined = undefined;
+
+    while (true) {
+      const invoices: Array<{ id: string; invoiceNumber: string; items: any }> = await this.prisma.invoice.findMany({
+        take: 200,
+        ...(cursor ? { skip: 1, cursor } : {}),
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          invoiceNumber: true,
+          items: true,
+        },
+      });
+
+      if (invoices.length === 0) {
+        break;
+      }
+
+      cursor = { id: invoices[invoices.length - 1].id };
+
+      for (const invoice of invoices) {
+        processed += 1;
+        try {
+          // Parse legacy items
+          const items = parseStoredInvoiceLineItems(invoice.items) ?? [];
+
+          // Idempotency: clear existing
+          await this.prisma.invoiceItem.deleteMany({
+            where: { invoiceId: invoice.id },
+          });
+
+          if (items.length > 0) {
+            // Write to InvoiceItem
+            await this.prisma.invoiceItem.createMany({
+              data: items.map((item) => ({
+                invoiceId: invoice.id,
+                description: item.description,
+                pax: item.pax,
+                currency: item.currency,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice,
+                totalPriceIdr: item.totalPriceIdr,
+              })),
+            });
+          }
+
+          // Phase 3D Checksum Verification: read it back and compare
+          const writtenItems = await this.prisma.invoiceItem.findMany({
+            where: { invoiceId: invoice.id },
+            orderBy: { id: 'asc' },
+          });
+
+          // Verify length
+          if (writtenItems.length !== items.length) {
+            const msg = `Count mismatch: legacy=${items.length}, relational=${writtenItems.length}`;
+            anomalies.push({ id: invoice.id, invoiceNumber: invoice.invoiceNumber, message: msg });
+            console.error(`[TELEMETRY] invoice_backfill_verification_failed, id: ${invoice.id}, error: ${msg}`);
+          } else {
+            // Verify subtotals
+            const legacySubtotal = items.reduce((sum: number, it: InvoiceLineItem) => sum + it.totalPriceIdr, 0);
+            const writtenSubtotal = writtenItems.reduce((sum: number, it: any) => sum + Number(it.totalPriceIdr), 0);
+            if (Math.abs(legacySubtotal - writtenSubtotal) > 0.01) {
+              const msg = `Subtotal mismatch: legacy=${legacySubtotal}, relational=${writtenSubtotal}`;
+              anomalies.push({ id: invoice.id, invoiceNumber: invoice.invoiceNumber, message: msg });
+              console.error(`[TELEMETRY] invoice_backfill_verification_failed, id: ${invoice.id}, error: ${msg}`);
+            } else {
+              success += 1;
+              console.log(`[TELEMETRY] invoice_backfill_success, id: ${invoice.id}`);
+            }
+          }
+        } catch (error: any) {
+          failed += 1;
+          const msg = `Exception: ${error.message || String(error)}`;
+          anomalies.push({ id: invoice.id, invoiceNumber: invoice.invoiceNumber, message: msg });
+          console.error(`[TELEMETRY] invoice_backfill_failed, id: ${invoice.id}, error: ${msg}`);
+        }
+      }
+    }
+
+    return { processed, success, failed, anomalies };
   }
 }

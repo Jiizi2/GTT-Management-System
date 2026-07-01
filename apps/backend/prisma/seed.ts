@@ -52,9 +52,8 @@ async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): 
   const existingCount = await prisma.masterDataOption.count();
   if (existingCount > 0 && !resetDataFirst) {
     console.log(
-      `Master data seed skipped: found ${existingCount} existing option(s). Set SEED_RESET=true to reset and reseed.`,
+      `Master data options found. Syncing default master data options to database...`,
     );
-    return;
   }
 
   for (const option of DEFAULT_MASTER_DATA_OPTIONS) {

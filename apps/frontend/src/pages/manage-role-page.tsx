@@ -6,6 +6,8 @@ import * as z from "zod/v4";
 import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { Button } from "../components/button";
+import { Badge } from "../components/badge";
 import { type MasterDataOption } from "../hooks/use-master-data-backend";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import {
@@ -829,36 +831,39 @@ export function UserManagementScreen() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                        <button
-                          type="button"
-                          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="min-h-[40px] shrink-0 inline-flex items-center gap-1"
                           onClick={() => openPasswordModal(user)}
                         >
                           <span className="material-symbols-outlined text-sm" aria-hidden="true">
                             password
                           </span>
                           {user.hasPassword ? "Reset Password" : "Set Password"}
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:bg-surface-container-high"
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="min-h-[40px] shrink-0 inline-flex items-center gap-1"
                           onClick={() => openEditModal(user)}
                         >
                           <span className="material-symbols-outlined text-sm" aria-hidden="true">
                             edit_square
                           </span>
                           Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1 rounded-lg border border-error/35 bg-error-container/40 px-3 text-xs font-semibold text-on-error-container transition hover:brightness-95"
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          className="min-h-[40px] shrink-0 inline-flex items-center gap-1"
                           onClick={() => openDeleteModal(user)}
                         >
                           <span className="material-symbols-outlined text-sm" aria-hidden="true">
                             delete
                           </span>
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   );
