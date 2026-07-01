@@ -1786,22 +1786,22 @@ const PaymentHistorySection = memo(function PaymentHistorySection({
   const downPaymentCoveragePercent = totalPayable > 0 ? Math.min(100, Math.round((totalPaid / totalPayable) * 100)) : 0;
 
   return (
-    <article className="serene-form-section border border-amber-200/50 bg-amber-50/40 p-5 space-y-4 xl:flex xl:h-full xl:flex-col">
+    <article className="serene-form-section border border-indigo-200/50 dark:border-indigo-900/30 bg-indigo-50/30 dark:bg-indigo-950/10 p-5 space-y-4 xl:flex xl:h-full xl:flex-col">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800">
+          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-800 dark:text-indigo-400">
             <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
               account_balance
             </span>
             Histori Pembayaran
           </span>
-          <p className="text-[11px] leading-snug text-amber-900/70">
+          <p className="text-[11px] leading-snug text-indigo-900/70 dark:text-indigo-300/70">
             Catat pembayaran cicilan atau pelunasan dari customer.
           </p>
         </div>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700/10 px-3 py-1.5 text-[10px] font-bold text-amber-800 hover:bg-amber-700/20 transition shadow-sm"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-700/10 dark:bg-indigo-400/10 px-3 py-1.5 text-[10px] font-bold text-indigo-800 dark:text-indigo-300 hover:bg-indigo-700/20 dark:hover:bg-indigo-400/20 transition shadow-sm"
           onClick={() => appendPayment({ amount: 0, dateIso: Domain.formatLocalIsoDate(new Date()) })}
         >
           <span className="material-symbols-outlined text-[12px]" aria-hidden="true">add</span>
@@ -1814,10 +1814,10 @@ const PaymentHistorySection = memo(function PaymentHistorySection({
           const runningPaid = payments.slice(0, idx + 1).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
           const remainingAfterThis = Math.max(0, totalPayable - runningPaid);
           return (
-            <div key={field.id} className="relative bg-white/95 dark:bg-surface-container-lowest rounded-xl p-3 border border-amber-200/50 shadow-sm space-y-2 transition hover:shadow-md">
+            <div key={field.id} className="relative bg-white/95 dark:bg-surface-container-lowest rounded-xl p-3 border border-indigo-200/40 dark:border-indigo-900/20 shadow-sm space-y-2 transition hover:shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-800 dark:text-indigo-300">
                     Pembayaran #{idx + 1}
                   </span>
                   <span className="rounded-md bg-slate-100 dark:bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-400">
@@ -1860,11 +1860,17 @@ const PaymentHistorySection = memo(function PaymentHistorySection({
                   <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
                     Tanggal Bayar
                   </label>
-                  <input
-                    type="date"
-                    className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/10"
-                    {...register(`payments.${idx}.dateIso`)}
-                    aria-label={`Payment ${idx + 1} date`}
+                  <Controller
+                    name={`payments.${idx}.dateIso` as any}
+                    control={control}
+                    render={({ field }) => (
+                      <DatePickerInput
+                        id={`payment-date-${idx}`}
+                        inputClassName="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/10"
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                      />
+                    )}
                   />
                 </div>
               </div>
@@ -1874,19 +1880,19 @@ const PaymentHistorySection = memo(function PaymentHistorySection({
       </div>
 
       {totalPaid > 0 ? (
-        <div className="pt-2 border-t border-amber-200/40">
-          <div className="h-1.5 overflow-hidden rounded-full bg-amber-100">
+        <div className="pt-2 border-t border-indigo-200/30 dark:border-indigo-900/20">
+          <div className="h-1.5 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-950">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-[width] duration-300 ease-out"
+              className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-indigo-600 transition-[width] duration-300 ease-out"
               style={{ width: `${downPaymentCoveragePercent}%` }}
             />
           </div>
-          <p className="text-[10px] font-medium text-amber-700 mt-1.5">
+          <p className="text-[10px] font-medium text-indigo-700 dark:text-indigo-300 mt-1.5">
             Terbayar {downPaymentCoveragePercent}% dari total tagihan.
           </p>
         </div>
       ) : (
-        <p className="text-[10px] font-medium text-amber-700/60 italic pt-2 border-t border-amber-200/40">
+        <p className="text-[10px] font-medium text-indigo-700/60 dark:text-indigo-300/60 italic pt-2 border-t border-indigo-200/30 dark:border-indigo-900/20">
           Belum ada pembayaran yang dicatat.
         </p>
       )}
