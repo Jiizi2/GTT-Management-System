@@ -1279,9 +1279,12 @@ ${hasUsdItems ? `
 
   ${payload.payments && payload.payments.length > 0 ? payload.payments.map((p, index) => {
     return `
-    <div class="subtotal-row" style="color: #4a5568; font-size: 12.5px; margin-bottom: 4px;">
-      <span>Pembayaran ${index + 1} (${escapeHtml(formatDateLabel(p.dateIso))}) :</span>
-      <strong>${escapeHtml(formatCurrency(p.amount, valasCurrency))}</strong>
+    <div class="subtotal-row" style="color: #4a5568; font-size: 12.5px; margin-bottom: 6px; align-items: flex-start;">
+      <div style="display: flex; flex-direction: column; gap: 1px; text-align: left;">
+        <span style="font-weight: 600;">Pembayaran #${index + 1}</span>
+        <span style="font-size: 10.5px; color: var(--invoice-gray-muted); font-weight: 500;">${escapeHtml(formatDateLabel(p.dateIso))}</span>
+      </div>
+      <strong style="align-self: flex-start; text-align: right;">${escapeHtml(formatCurrency(p.amount, valasCurrency))}</strong>
     </div>`;
   }).join("") : ""}
 

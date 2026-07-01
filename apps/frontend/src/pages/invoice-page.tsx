@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, type FieldErrors, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Controller, type FieldErrors, useFieldArray, useForm, useWatch, FormProvider, useFormContext } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import * as z from "zod/v4";
 import * as Domain from "../shared/app-domain";
@@ -33,10 +33,23 @@ import {
   resolveInvoiceRemainingBalanceIdr,
   resolveExchangeRatesFromItems,
   resolveExchangeRatesFromRow,
+  deriveInvoiceState,
+  deriveItemTotals,
+  buildInvoicePayload,
+  resolveDraftItemTotals,
+  calculateSubtotalInCurrency,
+  resolveClientSelection,
+  normalizeInvoiceDraftItems,
+  buildPrintableInvoiceItems,
+  formatIdr,
+  formatDateLabel,
+  formatMonthLabel,
+  MANUAL_CLIENT_OPTION_ID,
+  type InvoiceDraftCurrency,
+  type InvoiceDraftItem,
 } from "./invoice-page-shared";
 
 const INVOICE_PAGE_SIZE = 8;
-const MANUAL_CLIENT_OPTION_ID = "__invoice_client_other__";
 
 type InvoiceStatus = BackendInvoiceRow["status"];
 type InvoiceRow = BackendInvoiceRow;
@@ -60,12 +73,6 @@ type InvoiceStatusOption = {
   label: string;
 };
 
-type InvoiceDraftCurrency = BackendInvoiceItem["currency"];
-
-type InvoiceDraftItem = BackendInvoiceItem & {
-  id: string;
-};
-
 type InvoiceWorkspaceInitialData = {
   id: string;
   invoiceNumber: string;
@@ -82,6 +89,7 @@ type InvoiceWorkspaceInitialData = {
   recipientName?: string;
   notes?: string;
   items: InvoiceDraftItem[];
+  version?: number;
 };
 
 const defaultBankDisbursementOptions: SelectOption[] = [
@@ -109,9 +117,9 @@ const invoiceDraftItemSchema = z.object({
   pax: z.number(),
   currency: z.enum(["IDR", "USD", "SAR"]),
   unitPrice: z.number(),
-  totalPrice: z.number(),
-  totalPriceIdr: z.number(),
 });
+
+export let globalIsDraftSubmit = false;
 
 const invoiceWorkspaceFormSchema = z
   .object({
@@ -125,13 +133,13 @@ const invoiceWorkspaceFormSchema = z
     address: z.string().optional(),
     recipientName: z.string().optional(),
     bankAccount: z.string(),
-    downPaymentIdr: z.number().min(0),
     notes: z.string(),
     items: z.array(invoiceDraftItemSchema),
     payments: z.array(z.object({
       amount: z.number(),
       dateIso: z.string(),
     })).optional(),
+    version: z.number().optional(),
   })
   .superRefine((values, context) => {
     if (values.selectedClientId === MANUAL_CLIENT_OPTION_ID && values.manualClientName.trim().length === 0) {
@@ -141,27 +149,33 @@ const invoiceWorkspaceFormSchema = z
         message: "Isi nama client manual terlebih dulu.",
       });
     }
+
+    if (!globalIsDraftSubmit) {
+      if (!values.invoiceStatus || values.invoiceStatus.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["invoiceStatus"],
+          message: "Select invoice status before saving invoice.",
+        });
+      }
+      if (!values.issuingOffice || values.issuingOffice.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["issuingOffice"],
+          message: "Select issuing office before saving invoice.",
+        });
+      }
+      if (!values.bankAccount || values.bankAccount.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["bankAccount"],
+          message: "Select bank account before saving invoice.",
+        });
+      }
+    }
   });
 
 type InvoiceWorkspaceFormValues = z.infer<typeof invoiceWorkspaceFormSchema>;
-
-function formatIdr(value: number): string {
-  const normalized = Math.max(0, Math.round(value));
-  return `IDR ${new Intl.NumberFormat("id-ID").format(normalized)}`;
-}
-
-function formatDateLabel(isoDate: string): string {
-  const parsedDate = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return isoDate;
-  }
-
-  return parsedDate.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function extractYearFromIsoDate(isoDate: string): string {
   const normalized = isoDate.trim();
@@ -171,22 +185,6 @@ function extractYearFromIsoDate(isoDate: string): string {
   }
 
   return matched[1];
-}
-
-function formatMonthLabel(monthKey: string): string {
-  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
-    return monthKey;
-  }
-
-  const parsedDate = new Date(`${monthKey}-01T12:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return monthKey;
-  }
-
-  return parsedDate.toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-  });
 }
 
 function shiftMonthKey(monthKey: string, offset: number): string {
@@ -309,72 +307,7 @@ function buildNextInvoiceNumber(existingInvoiceNumbers: string[], year: string):
   return `GTT/INV/${year}/${String(maxSerial + 1).padStart(4, "0")}`;
 }
 
-function convertToIdr({
-  amount,
-  currency,
-  usdToIdr,
-  sarToIdr,
-}: {
-  amount: number;
-  currency: InvoiceDraftCurrency;
-  usdToIdr: number;
-  sarToIdr: number;
-}): number {
-  if (currency === "USD") {
-    return amount * usdToIdr;
-  }
-
-  if (currency === "SAR") {
-    return amount * sarToIdr;
-  }
-
-  return amount;
-}
-
-function resolveDraftItemTotals(
-  item: Pick<InvoiceDraftItem, "pax" | "unitPrice" | "currency">,
-  usdToIdr: number,
-  sarToIdr: number,
-): Pick<InvoiceDraftItem, "totalPrice" | "totalPriceIdr"> {
-  const totalPrice = Math.max(0, Math.round(item.pax)) * Math.max(0, Math.round(item.unitPrice));
-  const totalPriceIdr = convertToIdr({
-    amount: totalPrice,
-    currency: item.currency,
-    usdToIdr,
-    sarToIdr,
-  });
-
-  return {
-    totalPrice,
-    totalPriceIdr,
-  };
-}
-
-function calculateSubtotalIdr(args: { items: InvoiceDraftItem[]; usdToIdr: number; sarToIdr: number }): number {
-  return args.items.reduce((total, item) => {
-    const nextTotals = resolveDraftItemTotals(item, args.usdToIdr, args.sarToIdr);
-    return total + Math.max(0, Math.round(nextTotals.totalPriceIdr));
-  }, 0);
-}
-
-function calculateSubtotalInCurrency(items: InvoiceDraftItem[], targetCurrency: string, usdToIdr: number, sarToIdr: number): number {
-  if (targetCurrency === "IDR") {
-    return items.reduce((sum, item) => {
-      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
-      return sum + Math.max(0, Math.round(nextTotals.totalPriceIdr));
-    }, 0);
-  } else {
-    const rate = targetCurrency === "USD" ? usdToIdr : sarToIdr;
-    if (rate <= 0) return 0;
-    return items.reduce((sum, item) => {
-      if (item.currency === targetCurrency) {
-        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
-      }
-      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
-      return sum + Math.max(0, Math.ceil(nextTotals.totalPriceIdr / rate));
-    }, 0);
-  }
-}
+// Calculations and conversions are imported from invoice-page-shared.ts
 
 function createEmptyDraftItems(): InvoiceDraftItem[] {
   return [
@@ -384,8 +317,6 @@ function createEmptyDraftItems(): InvoiceDraftItem[] {
       pax: 0,
       currency: "IDR",
       unitPrice: 0,
-      totalPrice: 0,
-      totalPriceIdr: 0,
     },
   ];
 }
@@ -402,8 +333,6 @@ function mapBackendInvoiceItemsToDraftItems(items: ReadonlyArray<BackendInvoiceI
       pax: Math.max(0, Math.round(item.pax)),
       currency: item.currency,
       unitPrice: Math.max(0, Math.round(item.unitPrice)),
-      totalPrice: Math.max(0, Math.round(item.totalPrice)),
-      totalPriceIdr: Math.max(0, Math.round(item.totalPriceIdr)),
     }))
     .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
 }
@@ -429,8 +358,6 @@ function createInitialInvoiceDraftItems(initialInvoice: InvoiceWorkspaceInitialD
       pax: 1,
       currency: "IDR",
       unitPrice: Math.max(0, Math.round(initialInvoice.amount)),
-      totalPrice: Math.max(0, Math.round(initialInvoice.amount)),
-      totalPriceIdr: Math.max(0, Math.round(initialInvoice.amount)),
     },
   ];
 }
@@ -494,6 +421,7 @@ function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceIni
     downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
     status: row.status,
     items: mapBackendInvoiceItemsToDraftItems(row.items),
+    version: row.version,
   };
 }
 
@@ -518,43 +446,7 @@ function resolveInvoiceWorkspaceValidationMessage(errors: FieldErrors<InvoiceWor
   return null;
 }
 
-function normalizeInvoiceDraftItems(items: InvoiceDraftItem[]): InvoiceDraftItem[] {
-  return items
-    .map((item) => ({
-      ...item,
-      description: item.description.trim(),
-      pax: Math.max(0, Math.round(item.pax)),
-      unitPrice: Math.max(0, Math.round(item.unitPrice)),
-    }))
-    .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
-}
-
-function buildPrintableInvoiceItems(
-  items: InvoiceDraftItem[],
-  usdToIdr: number,
-  sarToIdr: number,
-): BackendInvoiceItem[] {
-  return items.map((item) => {
-    const totalPrice = item.pax * item.unitPrice;
-    const totalPriceIdr = convertToIdr({
-      amount: totalPrice,
-      currency: item.currency,
-      usdToIdr,
-      sarToIdr,
-    });
-
-    return {
-      description: item.description,
-      pax: item.pax,
-      currency: item.currency,
-      unitPrice: item.unitPrice,
-      totalPrice,
-      totalPriceIdr,
-    };
-  });
-}
-
-// viewInvoicePdfFromRow and openPendingInvoicePdfWindow removed in favor of direct iframe-based printing
+// Items normalization and printable helpers are imported from invoice-page-shared.ts
 
 export function CreateInvoiceWorkspace({
   mode,
@@ -586,6 +478,7 @@ export function CreateInvoiceWorkspace({
   onUpdate: (invoice: InvoiceRow) => void;
 }) {
   const { theme } = useThemeMode();
+  const submitLockRef = useRef(false);
   const isDarkMode = theme === "dark";
   const createInvoiceMutation = useCreateInvoiceMutation();
   const updateInvoiceMutation = useUpdateInvoiceMutation();
@@ -612,22 +505,13 @@ export function CreateInvoiceWorkspace({
   const hasResolvedInitialClient = initialClientId ? clients.some((client) => client.id === initialClientId) : false;
   const hasResolvedInitialManualClient =
     Boolean(resolvedInitialInvoice) && !hasResolvedInitialClient && resolvedInitialClientName.length > 0;
-  const {
-    register,
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    setError,
-    clearErrors,
-    formState: { errors: formErrors },
-  } = useForm<InvoiceWorkspaceFormValues>({
+  const methods = useForm<InvoiceWorkspaceFormValues>({
     resolver: zodResolver(invoiceWorkspaceFormSchema),
     mode: "onChange",
     defaultValues: {
       issueDateIso: resolvedInitialInvoice?.issuedDateIso ?? "",
       dueDateIso: resolvedInitialInvoice?.dueDateIso ?? "",
-      invoiceStatus: resolvedInitialInvoice?.status ?? (isEditMode ? (invoiceStatusOptions[0]?.value ?? "") : ""),
+      invoiceStatus: resolvedInitialInvoice?.status ?? "Pending",
       issuingOffice: (() => {
         const notesRaw = resolvedInitialInvoice?.notes ?? "";
         const match = notesRaw.match(/\[IssuingOffice:([^\]]+)\]/);
@@ -668,23 +552,7 @@ export function CreateInvoiceWorkspace({
         }
         return bankDisbursementOptions[0]?.value ?? "";
       })(),
-      downPaymentIdr: (() => {
-        if (!resolvedInitialInvoice) return 0;
-        const notesRaw = resolvedInitialInvoice.notes ?? "";
-        let initialKeepValasCurrency: "IDR" | "USD" | "SAR" = "IDR";
-        if (notesRaw.includes("[KeepValasTotal:USD]")) initialKeepValasCurrency = "USD";
-        else if (notesRaw.includes("[KeepValasTotal:SAR]")) initialKeepValasCurrency = "SAR";
-        else if (notesRaw.includes("[KeepValasTotal]")) {
-          initialKeepValasCurrency = resolvedInitialInvoice.items.find((item) => item.currency !== "IDR")?.currency || "IDR";
-        }
-        if (initialKeepValasCurrency !== "IDR") {
-          const rateVal = initialKeepValasCurrency === "USD" ? initialRates.usdToIdr : initialRates.sarToIdr;
-          if (rateVal > 0) {
-            return Math.ceil(resolvedInitialInvoice.downPaymentIdr / rateVal);
-          }
-        }
-        return resolvedInitialInvoice.downPaymentIdr;
-      })(),
+
       notes: resolvedInitialInvoice?.notes
         ? resolvedInitialInvoice.notes
             .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
@@ -734,36 +602,29 @@ export function CreateInvoiceWorkspace({
         }
         return [];
       })(),
+      version: resolvedInitialInvoice?.version ?? 0,
     },
   });
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors: formErrors },
+  } = methods;
   const issueDateIso = watch("issueDateIso");
   const dueDateIso = watch("dueDateIso");
   const invoiceStatus = watch("invoiceStatus") as InvoiceStatus | "";
   const issuingOffice = watch("issuingOffice");
   const selectedClientId = watch("selectedClientId");
-  const prevClientIdRef = useRef(selectedClientId);
   const selectedGroupCode = watch("selectedGroupCode");
   const address = watch("address");
   const bankAccount = watch("bankAccount");
-  const downPaymentIdr = watch("downPaymentIdr");
-  const items = useWatch({ control, name: "items" }) || [];
-  const {
-    fields: itemFields,
-    append: appendItem,
-    remove: removeItemFromForm,
-  } = useFieldArray({
-    control,
-    name: "items",
-    keyName: "fieldKey",
-  });
-  const {
-    fields: paymentFields,
-    append: appendPayment,
-    remove: removePayment,
-  } = useFieldArray({
-    control,
-    name: "payments" as any,
-  });
+
+
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId],
@@ -799,24 +660,7 @@ export function CreateInvoiceWorkspace({
     : "flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2";
   const rowCounterRef = useRef(3);
 
-  const resolveClientSelection = (values: InvoiceWorkspaceFormValues) => {
-    const isUsingManualClient = values.selectedClientId === MANUAL_CLIENT_OPTION_ID;
-    const selectedClient = isUsingManualClient
-      ? null
-      : (clients.find((client) => client.id === values.selectedClientId) ?? null);
-    const isUsingMasterDataClient = Boolean(selectedClient && isMasterDataClientOptionId(selectedClient.id));
-    const manualClientName = values.manualClientName.trim();
 
-    return {
-      selectedClient,
-      clientId: selectedClient && !isUsingMasterDataClient ? selectedClient.id : undefined,
-      clientName: isUsingManualClient
-        ? manualClientName || undefined
-        : isUsingMasterDataClient
-          ? selectedClient?.name.trim() || undefined
-          : undefined,
-    };
-  };
 
   useEffect(() => {
     if (!isEditMode || selectedClient || selectedClientId === MANUAL_CLIENT_OPTION_ID || clients.length === 0) {
@@ -832,18 +676,13 @@ export function CreateInvoiceWorkspace({
     }
 
     if (!selectedClient) {
-      setValue("address", "");
       return;
     }
 
     if (selectedClient.groupCode && !selectedGroupCode) {
       setValue("selectedGroupCode", selectedClient.groupCode);
     }
-
-    if (!address || !address.trim()) {
-      setValue("address", selectedClient.name);
-    }
-  }, [selectedClient, selectedGroupCode, isEditMode, isManualClientSelected, address, setValue]);
+  }, [selectedClient, selectedGroupCode, isEditMode, isManualClientSelected, setValue]);
 
   useEffect(() => {
     if (!isEditMode || issuingOffice.trim() || issuingOfficeOptions.length === 0) {
@@ -869,28 +708,7 @@ export function CreateInvoiceWorkspace({
     setValue("bankAccount", bankDisbursementOptions[0].value);
   }, [isEditMode, bankAccount, bankDisbursementOptions, setValue]);
 
-  useEffect(() => {
-    if (!selectedClientId) {
-      prevClientIdRef.current = selectedClientId;
-      return;
-    }
 
-    const isInitialClient = isEditMode && resolvedInitialInvoice && selectedClientId === resolvedInitialInvoice.clientId;
-    const isClientChanged = prevClientIdRef.current !== selectedClientId;
-
-    if (!isInitialClient || isClientChanged) {
-      if (selectedClientId === MANUAL_CLIENT_OPTION_ID) {
-        setValue("recipientName", "", { shouldDirty: true });
-      } else {
-        const matchedClient = clients.find((client) => client.id === selectedClientId);
-        const metadata = (matchedClient as any)?.metadata;
-        const defaultRecipient = metadata?.penerima || "";
-        setValue("recipientName", defaultRecipient, { shouldDirty: true });
-      }
-    }
-
-    prevClientIdRef.current = selectedClientId;
-  }, [selectedClientId, clients, setValue, isEditMode, resolvedInitialInvoice]);
 
   useEffect(() => {
     if (!saveFeedback) {
@@ -926,35 +744,18 @@ export function CreateInvoiceWorkspace({
     };
   }, [isCancelConfirmationOpen]);
 
-  useEffect(() => {
-    items.forEach((item, index) => {
-      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
 
-      if (item.totalPrice !== nextTotals.totalPrice) {
-        setValue(`items.${index}.totalPrice`, nextTotals.totalPrice, {
-          shouldDirty: false,
-          shouldValidate: false,
-        });
-      }
 
-      if (item.totalPriceIdr !== nextTotals.totalPriceIdr) {
-        setValue(`items.${index}.totalPriceIdr`, nextTotals.totalPriceIdr, {
-          shouldDirty: false,
-          shouldValidate: false,
-        });
-      }
-    });
-  }, [items, usdToIdr, sarToIdr, setValue]);
-
+  const itemCurrenciesStr = useWatch({ control, name: "items" })?.map((item) => item.currency).join(",") || "";
   const uniqueValasCurrencies = useMemo(() => {
     const valas = new Set<"USD" | "SAR">();
-    items.forEach((item) => {
-      if (item.currency === "USD" || item.currency === "SAR") {
-        valas.add(item.currency);
+    itemCurrenciesStr.split(",").forEach((currency) => {
+      if (currency === "USD" || currency === "SAR") {
+        valas.add(currency);
       }
     });
     return Array.from(valas);
-  }, [items]);
+  }, [itemCurrenciesStr]);
 
   const valasCurrency = uniqueValasCurrencies[0] || "IDR";
 
@@ -967,8 +768,9 @@ export function CreateInvoiceWorkspace({
     const prevRate = prevCurrency === "USD" ? usdToIdr : prevCurrency === "SAR" ? sarToIdr : 1;
     const nextRate = nextCurrency === "USD" ? usdToIdr : nextCurrency === "SAR" ? sarToIdr : 1;
 
-    // Convert each payment's amount to the new currency
-    const updatedPayments = payments.map((p) => {
+    // Convert each payment's amount to the new currency without watching deep
+    const currentPayments = methods.getValues("payments") || [];
+    const updatedPayments = currentPayments.map((p) => {
       const amtInIdr = prevRate > 0 ? p.amount * prevRate : p.amount;
       const convertedAmt = nextRate > 0 ? amtInIdr / nextRate : 0;
       const finalAmt = nextCurrency !== "IDR" ? Math.ceil(convertedAmt) : Math.round(convertedAmt);
@@ -990,180 +792,80 @@ export function CreateInvoiceWorkspace({
     }
   }, [uniqueValasCurrencies, keepValasCurrency]);
 
-  const subtotal = useMemo(() => {
-    return calculateSubtotalInCurrency(items, invoiceCurrency, usdToIdr, sarToIdr);
-  }, [items, invoiceCurrency, usdToIdr, sarToIdr]);
-
-  const taxAmount = 0;
-  const totalPayable = subtotal + taxAmount;
-  const normalizedDownPayment = Math.min(totalPayable, Math.max(0, Math.round(downPaymentIdr)));
-  const downPaymentCoveragePercent =
-    totalPayable > 0 ? Math.min(100, Math.round((normalizedDownPayment / totalPayable) * 100)) : 0;
-  const remainingBalance = resolveInvoiceRemainingBalanceIdr(totalPayable, normalizedDownPayment);
-
-  const payments = watch("payments") || [];
-  const totalPaid = useMemo(() => {
-    return payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-  }, [payments]);
-
-  // Sync downPaymentIdr to totalPaid
-  useEffect(() => {
-    setValue("downPaymentIdr", totalPaid, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  }, [totalPaid, setValue]);
-
-  // Automatically calculate status based on payment progress
-  useEffect(() => {
-    if (invoiceStatus === "Cancelled") {
-      return;
-    }
-
-    if (totalPayable > 0 && totalPaid >= totalPayable) {
-      setValue("invoiceStatus", "Paid", { shouldDirty: true, shouldValidate: true });
-    } else if (totalPaid > 0) {
-      setValue("invoiceStatus", "Partially Paid", { shouldDirty: true, shouldValidate: true });
-    } else {
-      if (dueDateIso) {
-        const todayIso = Domain.formatLocalIsoDate(new Date());
-        if (dueDateIso < todayIso) {
-          setValue("invoiceStatus", "Overdue", { shouldDirty: true, shouldValidate: true });
-          return;
-        }
-      }
-      setValue("invoiceStatus", "Pending", { shouldDirty: true, shouldValidate: true });
-    }
-  }, [totalPaid, totalPayable, dueDateIso, setValue, invoiceStatus]);
-
-  const addItemRow = () => {
-    const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
-    rowCounterRef.current += 1;
-
-    appendItem({
-      id: nextId,
-      description: "",
-      pax: Math.max(1, selectedGroup?.pax ?? 1),
-      currency: "IDR",
-      unitPrice: 0,
-      totalPrice: 0,
-      totalPriceIdr: 0,
-    });
-  };
-
-  const updateItemRow = (index: number, nextItem: InvoiceDraftItem) => {
-    const nextTotals = resolveDraftItemTotals(nextItem, usdToIdr, sarToIdr);
-
-    setValue(
-      `items.${index}`,
-      {
-        ...nextItem,
-        ...nextTotals,
-      },
-      {
-        shouldDirty: true,
-        shouldValidate: true,
-      },
-    );
-  };
-
-  const removeItem = (index: number) => {
-    if (itemFields.length <= 1) {
-      return;
-    }
-
-    removeItemFromForm(index);
-  };
-
   const handleWorkspaceValidationError = (errors: FieldErrors<InvoiceWorkspaceFormValues>) => {
+    console.log("Validation Errors:", JSON.stringify(errors, null, 2));
     setSaveFeedback(
       resolveInvoiceWorkspaceValidationMessage(errors) ?? "Periksa kembali data invoice sebelum disimpan.",
     );
+    submitLockRef.current = false;
   };
 
   const handleSaveDraft = handleSubmit(async (values) => {
-    if (isEditMode || isWorkspaceBusy) {
+    if (isEditMode || isWorkspaceBusy || submitLockRef.current) {
       return;
     }
+    submitLockRef.current = true;
 
     if (!isBackendAvailable) {
       setSaveFeedback("Save Draft hanya tersedia saat backend invoice dan database terhubung.");
+      submitLockRef.current = false;
       return;
     }
 
-    const clientSelection = resolveClientSelection(values);
+    const clientSelection = resolveClientSelection(values, clients);
     if (!clientSelection.clientId && !clientSelection.clientName) {
       setSaveFeedback("Select a client before saving draft.");
+      submitLockRef.current = false;
       return;
     }
 
     const normalizedItems = normalizeInvoiceDraftItems(values.items);
     if (normalizedItems.length === 0) {
       setSaveFeedback("Add at least one valid package item first.");
+      submitLockRef.current = false;
       return;
     }
-    const printableItems = buildPrintableInvoiceItems(normalizedItems, usdToIdr, sarToIdr);
-
-    const linkedGroupCode = values.selectedGroupCode.trim() || (clientSelection.selectedClient?.groupCode ?? "");
 
     clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
-    const payloadDownPaymentIdr = keepValasCurrency !== "IDR"
-      ? Math.max(0, Math.round(normalizedDownPayment * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
-      : normalizedDownPayment;
-    const payloadAmount = keepValasCurrency !== "IDR"
-      ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
-      : totalPayable;
     
-    let payloadNotes = values.notes.trim();
-    if (keepValasCurrency !== "IDR") {
-      payloadNotes += `\n[KeepValasTotal:${keepValasCurrency}]`;
-    }
-    payloadNotes += `\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
-    if (values.bankAccount) {
-      payloadNotes += `\n[BankAccount:${values.bankAccount}]`;
-    }
-    if (values.issuingOffice) {
-      payloadNotes += `\n[IssuingOffice:${values.issuingOffice}]`;
-    }
-    if (values.address) {
-      payloadNotes += `\n[Address:${encodeURIComponent(values.address)}]`;
-    }
-    if (values.payments && values.payments.length > 0) {
-      payloadNotes += `\n[Payments:${encodeURIComponent(JSON.stringify(values.payments))}]`;
-    }
-    if (!values.dueDateIso || !values.dueDateIso.trim()) {
-      payloadNotes += `\n[NoDueDate:true]`;
-    }
+    const derivedForPayload = deriveInvoiceState({
+      items: values.items,
+      payments: values.payments || [],
+      usdToIdr,
+      sarToIdr,
+      keepValasCurrency,
+    });
+
+    const payload = buildInvoicePayload({
+      values: {
+        ...values,
+        version: resolvedInitialInvoice?.version ?? 0,
+      },
+      usdToIdr,
+      sarToIdr,
+      keepValasCurrency,
+      derived: derivedForPayload,
+      clients,
+    });
 
     setIsSavingDraft(true);
     try {
-      const savedInvoice = await createInvoiceMutation.mutateAsync({
-        clientId: clientSelection.clientId,
-        clientName: clientSelection.clientName,
-        groupCode: linkedGroupCode || undefined,
-        issuedDateIso: values.issueDateIso,
-        dueDateIso: values.dueDateIso || "",
-        amount: payloadAmount,
-        downPaymentIdr: payloadDownPaymentIdr,
-        status: values.invoiceStatus ? (values.invoiceStatus as InvoiceStatus) : "Pending",
-        notes: payloadNotes,
-        recipientName: values.recipientName?.trim() ?? "",
-        items: printableItems,
-      });
-
+      const savedInvoice = await createInvoiceMutation.mutateAsync(payload);
       onCreate(savedInvoice, "draft");
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to save invoice draft. Please retry.";
       setSaveFeedback(errorMessage);
     } finally {
       setIsSavingDraft(false);
+      submitLockRef.current = false;
     }
   }, handleWorkspaceValidationError);
 
   const handleSubmitInvoice = handleSubmit(async (values) => {
-    if (isWorkspaceBusy) {
+    if (isWorkspaceBusy || submitLockRef.current) {
       return;
     }
+    submitLockRef.current = true;
 
     if (!isBackendAvailable) {
       setSaveFeedback(
@@ -1171,80 +873,45 @@ export function CreateInvoiceWorkspace({
           ? "Save Changes hanya tersedia saat backend invoice dan database terhubung."
           : "Generate Invoice hanya tersedia saat backend invoice dan database terhubung.",
       );
+      submitLockRef.current = false;
       return;
     }
 
-    const clientSelection = resolveClientSelection(values);
+    const clientSelection = resolveClientSelection(values, clients);
     if (!clientSelection.clientId && !clientSelection.clientName) {
       setSaveFeedback(
         isEditMode ? "Select a client before saving invoice changes." : "Select a client before generating invoice.",
       );
+      submitLockRef.current = false;
       return;
     }
 
-    if (!values.invoiceStatus) {
-      setError("invoiceStatus", {
-        type: "manual",
-        message: "Select invoice status before saving invoice.",
-      });
-      setSaveFeedback("Select invoice status before saving invoice.");
-      return;
-    }
-
-    if (!values.issuingOffice.trim()) {
-      setError("issuingOffice", {
-        type: "manual",
-        message: "Select issuing office before saving invoice.",
-      });
-      setSaveFeedback("Select issuing office before saving invoice.");
-      return;
-    }
-
-    if (!values.bankAccount.trim()) {
-      setError("bankAccount", {
-        type: "manual",
-        message: "Select bank account before saving invoice.",
-      });
-      setSaveFeedback("Select bank account before saving invoice.");
-      return;
-    }
-
-    clearErrors(["invoiceStatus", "issuingOffice", "bankAccount"]);
     const normalizedItems = normalizeInvoiceDraftItems(values.items);
     if (normalizedItems.length === 0) {
       setSaveFeedback("Add at least one valid package item first.");
+      submitLockRef.current = false;
       return;
     }
-    const printableItems = buildPrintableInvoiceItems(normalizedItems, usdToIdr, sarToIdr);
 
-    const linkedGroupCode = values.selectedGroupCode.trim() || (clientSelection.selectedClient?.groupCode ?? "");
-    const payloadDownPaymentIdr = keepValasCurrency !== "IDR"
-      ? Math.max(0, Math.round(normalizedDownPayment * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
-      : normalizedDownPayment;
-    const payloadAmount = keepValasCurrency !== "IDR"
-      ? Math.max(0, Math.round(totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
-      : totalPayable;
-    
-    let payloadNotes = values.notes.trim();
-    if (keepValasCurrency !== "IDR") {
-      payloadNotes += `\n[KeepValasTotal:${keepValasCurrency}]`;
-    }
-    payloadNotes += `\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
-    if (values.bankAccount) {
-      payloadNotes += `\n[BankAccount:${values.bankAccount}]`;
-    }
-    if (values.issuingOffice) {
-      payloadNotes += `\n[IssuingOffice:${values.issuingOffice}]`;
-    }
-    if (values.address) {
-      payloadNotes += `\n[Address:${encodeURIComponent(values.address)}]`;
-    }
-    if (values.payments && values.payments.length > 0) {
-      payloadNotes += `\n[Payments:${encodeURIComponent(JSON.stringify(values.payments))}]`;
-    }
-    if (!values.dueDateIso || !values.dueDateIso.trim()) {
-      payloadNotes += `\n[NoDueDate:true]`;
-    }
+    const derivedForPayload = deriveInvoiceState({
+      items: values.items,
+      payments: values.payments || [],
+      usdToIdr,
+      sarToIdr,
+      keepValasCurrency,
+    });
+
+    const payload = buildInvoicePayload({
+      values: {
+        ...values,
+        version: resolvedInitialInvoice?.version ?? 0,
+      },
+      usdToIdr,
+      sarToIdr,
+      keepValasCurrency,
+      derived: derivedForPayload,
+      clients,
+    });
 
     setIsSubmitting(true);
     try {
@@ -1252,33 +919,9 @@ export function CreateInvoiceWorkspace({
         isEditMode && resolvedInitialInvoice
           ? await updateInvoiceMutation.mutateAsync({
               invoiceId: resolvedInitialInvoice.id,
-              payload: {
-                clientId: clientSelection.clientId,
-                clientName: clientSelection.clientName,
-                groupCode: linkedGroupCode || undefined,
-                issuedDateIso: values.issueDateIso,
-                dueDateIso: values.dueDateIso || "",
-                amount: payloadAmount,
-                downPaymentIdr: payloadDownPaymentIdr,
-                status: values.invoiceStatus as InvoiceStatus,
-                notes: payloadNotes,
-                recipientName: values.recipientName?.trim() ?? "",
-                items: printableItems,
-              },
+              payload,
             })
-          : await createInvoiceMutation.mutateAsync({
-              clientId: clientSelection.clientId,
-              clientName: clientSelection.clientName,
-              groupCode: linkedGroupCode || undefined,
-              issuedDateIso: values.issueDateIso,
-              dueDateIso: values.dueDateIso || "",
-              amount: payloadAmount,
-              downPaymentIdr: payloadDownPaymentIdr,
-              status: values.invoiceStatus as InvoiceStatus,
-              notes: payloadNotes,
-              recipientName: values.recipientName?.trim() ?? "",
-              items: printableItems,
-            });
+          : await createInvoiceMutation.mutateAsync(payload);
       if (isEditMode) {
         onUpdate(savedInvoice);
       } else {
@@ -1294,28 +937,35 @@ export function CreateInvoiceWorkspace({
       setSaveFeedback(errorMessage);
     } finally {
       setIsSubmitting(false);
+      submitLockRef.current = false;
     }
   }, handleWorkspaceValidationError);
 
   const handleSubmitButtonClick = () => {
+    if (submitLockRef.current) {
+      return;
+    }
     if (isEditMode && invoiceStatus === "Cancelled") {
       setIsCancelConfirmationOpen(true);
       return;
     }
 
+    globalIsDraftSubmit = false;
     void handleSubmitInvoice();
   };
 
   const handleConfirmCancelledStatus = () => {
     setIsCancelConfirmationOpen(false);
+    globalIsDraftSubmit = false;
     void handleSubmitInvoice();
   };
 
   return (
-    <div
-      className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8"
-      aria-busy={isWorkspaceBusy ? "true" : "false"}
-    >
+    <FormProvider {...methods}>
+      <div
+        className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8"
+        aria-busy={isWorkspaceBusy ? "true" : "false"}
+      >
       <section className="space-y-3">
         <Button
           variant="secondary"
@@ -1368,6 +1018,8 @@ export function CreateInvoiceWorkspace({
                 <Button
                   variant="secondary"
                   onClick={() => {
+                    if (submitLockRef.current) return;
+                    globalIsDraftSubmit = true;
                     void handleSaveDraft();
                   }}
                   disabled={isWorkspaceBusy || !isBackendAvailable}
@@ -1570,12 +1222,26 @@ export function CreateInvoiceWorkspace({
                         id="invoice-client"
                         className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
                         value={field.value}
-                        onChange={(event) => {
+                         onChange={(event) => {
                           const nextClientId = event.target.value;
                           clearErrors(["selectedClientId", "manualClientName"]);
                           field.onChange(nextClientId);
-                          if (nextClientId !== MANUAL_CLIENT_OPTION_ID) {
+                          if (nextClientId === MANUAL_CLIENT_OPTION_ID) {
                             setValue("manualClientName", "");
+                            setValue("recipientName", "", { shouldDirty: true });
+                          } else if (nextClientId) {
+                            const matchedClient = clients.find((client) => client.id === nextClientId);
+                            if (matchedClient) {
+                              const metadata = (matchedClient as any)?.metadata;
+                              const defaultRecipient = metadata?.penerima || "";
+                              setValue("recipientName", defaultRecipient, { shouldDirty: true });
+                              if (matchedClient.groupCode) {
+                                setValue("selectedGroupCode", matchedClient.groupCode, { shouldDirty: true });
+                              }
+                              setValue("address", matchedClient.name, { shouldDirty: true });
+                            }
+                          } else {
+                            setValue("recipientName", "", { shouldDirty: true });
                           }
                         }}
                         aria-invalid={getFieldAriaInvalid(selectedClientErrorMessage)}
@@ -1675,149 +1341,11 @@ export function CreateInvoiceWorkspace({
             </article>
           </div>
 
-          <article className="serene-table-shell">
-            <div className="flex items-center justify-between border-b border-outline-variant/20 px-5 py-3">
-              <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                  list_alt
-                </span>
-                <span>Package Items</span>
-              </h3>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.11em] text-primary transition hover:underline"
-                onClick={addItemRow}
-              >
-                <span className="material-symbols-outlined text-xs" aria-hidden="true">
-                  add_circle
-                </span>
-                <span>Add Row</span>
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-left">
-                <thead className="border-b border-outline-variant/20 bg-surface-container-low">
-                  <tr>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      No
-                    </th>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      Uraian
-                    </th>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      Jumlah (PAX)
-                    </th>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      Harga per Unit (PAX)
-                    </th>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      Total Harga
-                    </th>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      Total Harga (IDR)
-                    </th>
-                    <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-outline-variant/15">
-                  {itemFields.map((itemField, index) => {
-                    const item = items[index] ?? itemField;
-                    const currentTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
-                    const lineSubtotalLabel = `${item.currency} ${formatNumberInput(currentTotals.totalPrice)}`;
-                    return (
-                       <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
-                        <td className="px-5 py-3 text-xs font-bold text-on-surface">
-                          {String(index + 1).padStart(2, "0")}
-                        </td>
-                        <td className="px-5 py-3 min-w-[200px]">
-                          <textarea
-                            rows={1}
-                            placeholder="Input description / uraian..."
-                            className="w-full resize-none overflow-hidden border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0 placeholder:italic placeholder:text-on-surface-variant/40"
-                            value={item.description}
-                            onChange={(event) => {
-                              event.target.style.height = "auto";
-                              event.target.style.height = `${event.target.scrollHeight}px`;
-                              updateItemRow(index, { ...item, description: event.target.value });
-                            }}
-                            ref={(el) => {
-                              if (el) {
-                                el.style.height = "auto";
-                                el.style.height = `${el.scrollHeight}px`;
-                              }
-                            }}
-                          />
-                        </td>
-                        <td className="px-5 py-3 w-[80px]">
-                          <input
-                            type="number"
-                            min={0}
-                            className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
-                            value={item.pax}
-                            onChange={(event) =>
-                              updateItemRow(index, {
-                                ...item,
-                                pax: Math.max(0, Number.parseInt(event.target.value || "0", 10)),
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="px-5 py-3 min-w-[200px]">
-                          <div className="flex items-center gap-2">
-                            <SereneSelect
-                              className="serene-select h-8 min-w-[76px] rounded-lg bg-surface-container-low text-xs font-bold text-on-surface shadow-none border-none py-1 px-2"
-                              value={item.currency || "IDR"}
-                              onChange={(event) =>
-                                updateItemRow(index, {
-                                  ...item,
-                                  currency: event.target.value as InvoiceDraftCurrency,
-                                })
-                              }
-                            >
-                              <option value="IDR">IDR</option>
-                              <option value="USD">USD</option>
-                              <option value="SAR">SAR</option>
-                            </SereneSelect>
-                            <input
-                              type="text"
-                              className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
-                              value={formatNumberInput(item.unitPrice)}
-                              onChange={(event) =>
-                                updateItemRow(index, {
-                                  ...item,
-                                  unitPrice: parseNumberInput(event.target.value),
-                                })
-                              }
-                            />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3 text-xs font-bold text-on-surface">{lineSubtotalLabel}</td>
-                        <td className="px-5 py-3 text-xs font-bold text-on-surface">
-                          {formatIdr(currentTotals.totalPriceIdr)}
-                        </td>
-                        <td className="px-5 py-3">
-                          <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
-                            aria-label={`Delete row ${index + 1}`}
-                            onClick={() => removeItem(index)}
-                          >
-                            <span className="material-symbols-outlined text-base" aria-hidden="true">
-                              delete
-                            </span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </article>
+          <PackageItemsSection
+            usdToIdr={usdToIdr}
+            sarToIdr={sarToIdr}
+            selectedGroup={selectedGroup}
+          />
 
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 space-y-5 xl:col-span-6">
@@ -1940,218 +1468,24 @@ export function CreateInvoiceWorkspace({
             </div>
 
             <div className="col-span-12 xl:col-span-6 xl:h-full">
-              <article className="serene-form-section border border-amber-200/50 bg-amber-50/40 p-5 space-y-4 xl:flex xl:h-full xl:flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800">
-                      <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
-                        account_balance
-                      </span>
-                      Histori Pembayaran
-                    </span>
-                    <p className="text-[11px] leading-snug text-amber-900/70">
-                      Catat pembayaran cicilan atau pelunasan dari customer.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700/10 px-3 py-1.5 text-[10px] font-bold text-amber-800 hover:bg-amber-700/20 transition shadow-sm"
-                    onClick={() => appendPayment({ amount: 0, dateIso: Domain.formatLocalIsoDate(new Date()) })}
-                  >
-                    <span className="material-symbols-outlined text-[12px]" aria-hidden="true">add</span>
-                    <span>Tambah Pembayaran</span>
-                  </button>
-                </div>
-
-                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                  {paymentFields.map((field, idx) => {
-                    const runningPaid = payments.slice(0, idx + 1).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                    const remainingAfterThis = Math.max(0, totalPayable - runningPaid);
-                    return (
-                      <div key={field.id} className="relative bg-white/95 dark:bg-surface-container-lowest rounded-xl p-3 border border-amber-200/50 shadow-sm space-y-2 transition hover:shadow-md">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
-                              Pembayaran #{idx + 1}
-                            </span>
-                            <span className="rounded-md bg-slate-100 dark:bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-400">
-                              Sisa: {invoiceCurrency} {formatNumberInput(remainingAfterThis)}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                            aria-label={`Hapus Pembayaran ${idx + 1}`}
-                            onClick={() => removePayment(idx)}
-                          >
-                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">delete</span>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
-                              Nominal
-                            </label>
-                            <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 h-9">
-                              <span className="text-[9px] font-extrabold text-slate-500">{invoiceCurrency}</span>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-xs font-extrabold text-on-surface outline-none ring-0 focus:ring-0"
-                                value={formatNumberInput(watch(`payments.${idx}.amount`) ?? 0)}
-                                onChange={(event) =>
-                                  setValue(`payments.${idx}.amount`, Math.max(0, parseNumberInput(event.target.value)), {
-                                    shouldDirty: true,
-                                  })
-                                }
-                                aria-label={`Payment ${idx + 1} amount`}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
-                              Tanggal Bayar
-                            </label>
-                            <Controller
-                              name={`payments.${idx}.dateIso`}
-                              control={control}
-                              render={({ field: dateField }) => (
-                                <DatePickerInput
-                                  id={`payment-date-${idx}`}
-                                  inputClassName="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 text-[10px] font-semibold text-on-surface outline-none ring-0 focus:ring-1 focus:ring-primary/20"
-                                  value={dateField.value || ""}
-                                  onChange={dateField.onChange}
-                                />
-                              )}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {normalizedDownPayment > 0 ? (
-                  <div className="pt-2 border-t border-amber-200/40">
-                    <div className="h-1.5 overflow-hidden rounded-full bg-amber-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-[width] duration-300 ease-out"
-                        style={{ width: `${downPaymentCoveragePercent}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] font-medium text-amber-700 mt-1.5">
-                      Terbayar {downPaymentCoveragePercent}% dari total tagihan.
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-[10px] font-medium text-amber-700/60 italic pt-2 border-t border-amber-200/40">
-                    Belum ada pembayaran yang dicatat.
-                  </p>
-                )}
-              </article>
+              <PaymentHistorySection
+                usdToIdr={usdToIdr}
+                sarToIdr={sarToIdr}
+                keepValasCurrency={keepValasCurrency}
+                invoiceCurrency={invoiceCurrency}
+              />
             </div>
           </div>
         </section>
 
-        <aside className="col-span-12 space-y-4 lg:col-span-3">
-          <article className="serene-form-section p-5">
-            <h3 className="mb-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/65">
-              <span>Summary</span>
-              <span className="material-symbols-outlined text-base text-on-surface-variant/35" aria-hidden="true">
-                payments
-              </span>
-            </h3>
-
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-on-surface-variant">Subtotal</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
-                  <strong className="text-xs text-on-surface">{formatNumberInput(subtotal)}</strong>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-on-surface-variant">Tax (0%)</span>
-                <strong className="text-xs text-on-surface">{formatNumberInput(taxAmount)}</strong>
-              </div>
-
-              {uniqueValasCurrencies.length > 0 ? (
-                <div className="rounded-xl border border-primary/10 bg-primary/5 p-3 space-y-2">
-                  <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-primary">
-                    Mata Uang Tagihan Akhir
-                  </span>
-                  <SereneSelect
-                    className="serene-select h-8 w-full rounded-lg bg-white/70 text-xs font-bold text-on-surface shadow-none border border-primary/15 py-1 px-2"
-                    value={keepValasCurrency}
-                    onChange={(event) => handleKeepValasCurrencyChange(event.target.value as any)}
-                  >
-                    <option value="IDR">Rupiah (IDR)</option>
-                    {uniqueValasCurrencies.includes("USD") && (
-                      <option value="USD">Dollar (USD)</option>
-                    )}
-                    {uniqueValasCurrencies.includes("SAR") && (
-                      <option value="SAR">Riyal (SAR)</option>
-                    )}
-                  </SereneSelect>
-                  <p className="text-[10px] leading-snug text-on-surface-variant/75">
-                    Menentukan mata uang sisa tagihan & DP yang dicetak pada PDF invoice.
-                  </p>
-                </div>
-              ) : null}
-
-              <div className="h-px bg-outline-variant/25" />
-              <div className="pt-1">
-                <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/65">
-                  Yang harus dibayarkan
-                </span>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-xs font-bold text-primary">{invoiceCurrency}</span>
-                  <span className="font-display text-xl font-extrabold tracking-tight text-primary">
-                    {formatNumberInput(totalPayable)}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className={`flex items-center justify-between rounded-xl border px-3 py-2 ${
-                  remainingBalance <= 0
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-primary/10 bg-primary/5"
-                }`}
-              >
-                <span className="text-xs font-medium text-on-surface-variant">
-                  {resolveInvoiceOutstandingBalanceLabel(normalizedDownPayment, remainingBalance)}
-                </span>
-                <strong
-                  className={`text-xs font-bold ${remainingBalance <= 0 ? "text-emerald-700" : "text-primary"}`}
-                >
-                  <span className="mr-1 text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
-                  {formatNumberInput(remainingBalance)}
-                </strong>
-              </div>
-            </div>
-          </article>
-
-          <article className="serene-form-section p-5 text-center">
-            <div className="mb-3 border-b border-outline-variant/20 pb-6">
-              <span className="material-symbols-outlined mx-auto text-4xl text-primary/20" aria-hidden="true">
-                approval_delegation
-              </span>
-            </div>
-            <p className="text-xs font-extrabold text-on-surface">Husein Ghanim</p>
-            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/65">
-              Director Operations
-            </p>
-          </article>
-
-          <article className="serene-form-section border-primary/15 bg-primary/5">
-            <p className="text-[10px] italic leading-relaxed text-primary/75">
-              Note: Ensure all pilgrim PAX counts match the visa manifestations before generating the final document.
-            </p>
-          </article>
-        </aside>
+        <SummarySection
+          usdToIdr={usdToIdr}
+          sarToIdr={sarToIdr}
+          keepValasCurrency={keepValasCurrency}
+          handleKeepValasCurrencyChange={handleKeepValasCurrencyChange}
+          isDarkMode={isDarkMode}
+          invoiceCurrency={invoiceCurrency}
+        />
       </div>
 
       {isCancelConfirmationOpen && typeof document !== "undefined"
@@ -2221,6 +1555,493 @@ export function CreateInvoiceWorkspace({
         : null}
 
 
-    </div>
+      </div>
+    </FormProvider>
   );
 }
+
+const PackageItemsSection = memo(function PackageItemsSection({
+  usdToIdr,
+  sarToIdr,
+  selectedGroup,
+}: {
+  usdToIdr: number;
+  sarToIdr: number;
+  selectedGroup: GroupData | null;
+}) {
+  const { control, register } = useFormContext<InvoiceWorkspaceFormValues>();
+  const items = useWatch({ control, name: "items" }) || [];
+
+  const {
+    fields: itemFields,
+    append: appendItem,
+    remove: removeItem,
+    update: updateItemRow,
+  } = useFieldArray({
+    control,
+    name: "items",
+    keyName: "fieldKey",
+  });
+
+  const rowCounterRef = useRef(itemFields.length + 1);
+
+  const addItemRow = () => {
+    const nextId = `line-${Date.now()}-${rowCounterRef.current}`;
+    rowCounterRef.current += 1;
+
+    appendItem({
+      id: nextId,
+      description: "",
+      pax: Math.max(1, selectedGroup?.pax ?? 1),
+      currency: "IDR",
+      unitPrice: 0,
+    });
+  };
+
+  const itemsWithTotals = useMemo(() => {
+    return deriveItemTotals(items, usdToIdr, sarToIdr);
+  }, [items, usdToIdr, sarToIdr]);
+
+  return (
+    <article className="serene-table-shell">
+      <div className="flex items-center justify-between border-b border-outline-variant/20 px-5 py-3">
+        <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">
+            list_alt
+          </span>
+          <span>Package Items</span>
+        </h3>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.11em] text-primary transition hover:underline"
+          onClick={addItemRow}
+        >
+          <span className="material-symbols-outlined text-xs" aria-hidden="true">
+            add_circle
+          </span>
+          <span>Tambah Uraian</span>
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-left">
+          <thead className="border-b border-outline-variant/20 bg-surface-container-low">
+            <tr>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                No
+              </th>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                Uraian
+              </th>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                Jumlah (PAX)
+              </th>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                Harga per Unit (PAX)
+              </th>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                Total Harga
+              </th>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                Total Harga (IDR)
+              </th>
+              <th className="px-5 py-2.5 text-[9px] font-bold uppercase tracking-[0.13em] text-on-surface-variant/65">
+                Action
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-outline-variant/15">
+            {itemFields.map((itemField, index) => {
+              const item = items[index] ?? itemField;
+              const currentTotals = itemsWithTotals[index] || { totalPrice: 0, totalPriceIdr: 0 };
+              const lineSubtotalLabel = `${item.currency} ${formatNumberInput(currentTotals.totalPrice)}`;
+              return (
+                <tr key={itemField.fieldKey} className="transition hover:bg-surface-container-low/45">
+                  <td className="px-5 py-3 text-xs font-bold text-on-surface">
+                    {String(index + 1).padStart(2, "0")}
+                  </td>
+                  <td className="px-5 py-3 min-w-[200px]">
+                    <textarea
+                      rows={1}
+                      placeholder="Input description / uraian..."
+                      className="w-full resize-none overflow-hidden border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0 placeholder:italic placeholder:text-on-surface-variant/40"
+                      value={item.description}
+                      onChange={(event) => {
+                        event.target.style.height = "auto";
+                        event.target.style.height = `${event.target.scrollHeight}px`;
+                        updateItemRow(index, { ...item, description: event.target.value });
+                      }}
+                      ref={(el) => {
+                        if (el) {
+                          el.style.height = "auto";
+                          el.style.height = `${el.scrollHeight}px`;
+                        }
+                      }}
+                    />
+                  </td>
+                  <td className="px-5 py-3 w-[80px]">
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
+                      value={item.pax}
+                      onChange={(event) =>
+                        updateItemRow(index, {
+                          ...item,
+                          pax: Math.max(0, Number.parseInt(event.target.value || "0", 10)),
+                        })
+                      }
+                    />
+                  </td>
+                  <td className="px-5 py-3 min-w-[200px]">
+                    <div className="flex items-center gap-2">
+                      <SereneSelect
+                        className="serene-select h-8 min-w-[76px] rounded-lg bg-surface-container-low text-xs font-bold text-on-surface shadow-none border-none py-1 px-2"
+                        value={item.currency || "IDR"}
+                        onChange={(event) =>
+                          updateItemRow(index, {
+                            ...item,
+                            currency: event.target.value as InvoiceDraftCurrency,
+                          })
+                        }
+                      >
+                        <option value="IDR">IDR</option>
+                        <option value="USD">USD</option>
+                        <option value="SAR">SAR</option>
+                      </SereneSelect>
+                      <input
+                        type="text"
+                        className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
+                        value={formatNumberInput(item.unitPrice)}
+                        onChange={(event) =>
+                          updateItemRow(index, {
+                            ...item,
+                            unitPrice: parseNumberInput(event.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-xs font-bold text-on-surface">{lineSubtotalLabel}</td>
+                  <td className="px-5 py-3 text-xs font-bold text-on-surface">
+                    {formatIdr(currentTotals.totalPriceIdr)}
+                  </td>
+                  <td className="px-5 py-3">
+                    <button
+                      type="button"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
+                      aria-label={`Delete row ${index + 1}`}
+                      onClick={() => removeItem(index)}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        delete
+                      </span>
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+});
+
+const PaymentHistorySection = memo(function PaymentHistorySection({
+  usdToIdr,
+  sarToIdr,
+  keepValasCurrency,
+  invoiceCurrency,
+}: {
+  usdToIdr: number;
+  sarToIdr: number;
+  keepValasCurrency: "IDR" | "USD" | "SAR";
+  invoiceCurrency: string;
+}) {
+  const { control, register, setValue, watch } = useFormContext<InvoiceWorkspaceFormValues>();
+  const payments = useWatch({ control, name: "payments" }) || [];
+  const items = useWatch({ control, name: "items" }) || [];
+
+  const {
+    fields: paymentFields,
+    append: appendPayment,
+    remove: removePayment,
+  } = useFieldArray({
+    control,
+    name: "payments" as any,
+  });
+
+  const subtotal = useMemo(() => {
+    return calculateSubtotalInCurrency(items, keepValasCurrency, usdToIdr, sarToIdr);
+  }, [items, keepValasCurrency, usdToIdr, sarToIdr]);
+
+  const taxAmount = 0;
+  const totalPayable = subtotal + taxAmount;
+  const totalPaid = useMemo(() => {
+    return payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  }, [payments]);
+
+  const downPaymentCoveragePercent = totalPayable > 0 ? Math.min(100, Math.round((totalPaid / totalPayable) * 100)) : 0;
+
+  return (
+    <article className="serene-form-section border border-amber-200/50 bg-amber-50/40 p-5 space-y-4 xl:flex xl:h-full xl:flex-col">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-800">
+            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
+              account_balance
+            </span>
+            Histori Pembayaran
+          </span>
+          <p className="text-[11px] leading-snug text-amber-900/70">
+            Catat pembayaran cicilan atau pelunasan dari customer.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700/10 px-3 py-1.5 text-[10px] font-bold text-amber-800 hover:bg-amber-700/20 transition shadow-sm"
+          onClick={() => appendPayment({ amount: 0, dateIso: Domain.formatLocalIsoDate(new Date()) })}
+        >
+          <span className="material-symbols-outlined text-[12px]" aria-hidden="true">add</span>
+          <span>Tambah Pembayaran</span>
+        </button>
+      </div>
+
+      <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+        {paymentFields.map((field, idx) => {
+          const runningPaid = payments.slice(0, idx + 1).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          const remainingAfterThis = Math.max(0, totalPayable - runningPaid);
+          return (
+            <div key={field.id} className="relative bg-white/95 dark:bg-surface-container-lowest rounded-xl p-3 border border-amber-200/50 shadow-sm space-y-2 transition hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                    Pembayaran #{idx + 1}
+                  </span>
+                  <span className="rounded-md bg-slate-100 dark:bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-400">
+                    Sisa: {invoiceCurrency} {formatNumberInput(remainingAfterThis)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                  aria-label={`Hapus Pembayaran ${idx + 1}`}
+                  onClick={() => removePayment(idx)}
+                >
+                  <span className="material-symbols-outlined text-[16px]" aria-hidden="true">delete</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
+                    Nominal
+                  </label>
+                  <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 h-9">
+                    <span className="text-[9px] font-extrabold text-slate-500">{invoiceCurrency}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-xs font-extrabold text-on-surface outline-none ring-0 focus:ring-0"
+                      value={formatNumberInput(watch(`payments.${idx}.amount`) ?? 0)}
+                      onChange={(event) =>
+                        setValue(`payments.${idx}.amount`, Math.max(0, parseNumberInput(event.target.value)), {
+                          shouldDirty: true,
+                        })
+                      }
+                      aria-label={`Payment ${idx + 1} amount`}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
+                    Tanggal Bayar
+                  </label>
+                  <input
+                    type="date"
+                    className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/10"
+                    {...register(`payments.${idx}.dateIso`)}
+                    aria-label={`Payment ${idx + 1} date`}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {totalPaid > 0 ? (
+        <div className="pt-2 border-t border-amber-200/40">
+          <div className="h-1.5 overflow-hidden rounded-full bg-amber-100">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-[width] duration-300 ease-out"
+              style={{ width: `${downPaymentCoveragePercent}%` }}
+            />
+          </div>
+          <p className="text-[10px] font-medium text-amber-700 mt-1.5">
+            Terbayar {downPaymentCoveragePercent}% dari total tagihan.
+          </p>
+        </div>
+      ) : (
+        <p className="text-[10px] font-medium text-amber-700/60 italic pt-2 border-t border-amber-200/40">
+          Belum ada pembayaran yang dicatat.
+        </p>
+      )}
+    </article>
+  );
+});
+
+const SummarySection = memo(function SummarySection({
+  usdToIdr,
+  sarToIdr,
+  keepValasCurrency,
+  handleKeepValasCurrencyChange,
+  isDarkMode,
+  invoiceCurrency,
+}: {
+  usdToIdr: number;
+  sarToIdr: number;
+  keepValasCurrency: "IDR" | "USD" | "SAR";
+  handleKeepValasCurrencyChange: (val: "IDR" | "USD" | "SAR") => void;
+  isDarkMode: boolean;
+  invoiceCurrency: string;
+}) {
+  const { control } = useFormContext<InvoiceWorkspaceFormValues>();
+  const items = useWatch({ control, name: "items" }) || [];
+  const payments = useWatch({ control, name: "payments" }) || [];
+  const dueDateIso = useWatch({ control, name: "dueDateIso" });
+
+  const derived = useMemo(() => {
+    return deriveInvoiceState({
+      items,
+      payments,
+      usdToIdr,
+      sarToIdr,
+      dueDateIso,
+      keepValasCurrency,
+    });
+  }, [items, payments, usdToIdr, sarToIdr, dueDateIso, keepValasCurrency]);
+
+  const subtotal = derived.paymentSummary.subtotal;
+  const taxAmount = 0;
+  const totalPayable = derived.paymentSummary.totalPayable;
+  const normalizedDownPayment = derived.paymentSummary.totalPaid;
+  const remainingBalance = derived.paymentSummary.remainingBalance;
+  const previewStatus = derived.previewStatus;
+
+  const uniqueValasCurrencies = useMemo(() => {
+    const list = items
+      .map((item) => item.currency)
+      .filter((currency): currency is "USD" | "SAR" => currency === "USD" || currency === "SAR");
+    return Array.from(new Set(list));
+  }, [items]);
+
+  return (
+    <aside className="col-span-12 space-y-4 lg:col-span-3">
+      <article className="serene-form-section p-5">
+        <h3 className="mb-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/65">
+          <span>Summary</span>
+          <span className="material-symbols-outlined text-base text-on-surface-variant/35" aria-hidden="true">
+            payments
+          </span>
+        </h3>
+
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-on-surface-variant">Subtotal</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
+              <strong className="text-xs text-on-surface">{formatNumberInput(subtotal)}</strong>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-on-surface-variant">Tax (0%)</span>
+            <strong className="text-xs text-on-surface">{formatNumberInput(taxAmount)}</strong>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-on-surface-variant">Preview Status</span>
+            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold border ${getStatusClasses(previewStatus as any, isDarkMode)}`}>
+              {previewStatus}
+            </span>
+          </div>
+
+          {uniqueValasCurrencies.length > 0 ? (
+            <div className="rounded-xl border border-primary/10 bg-primary/5 p-3 space-y-2">
+              <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-primary">
+                Mata Uang Tagihan Akhir
+              </span>
+              <SereneSelect
+                className="serene-select h-8 w-full rounded-lg bg-white/70 text-xs font-bold text-on-surface shadow-none border border-primary/15 py-1 px-2"
+                value={keepValasCurrency}
+                onChange={(event) => handleKeepValasCurrencyChange(event.target.value as any)}
+              >
+                <option value="IDR">Rupiah (IDR)</option>
+                {uniqueValasCurrencies.includes("USD") && (
+                  <option value="USD">Dollar (USD)</option>
+                )}
+                {uniqueValasCurrencies.includes("SAR") && (
+                  <option value="SAR">Riyal (SAR)</option>
+                )}
+              </SereneSelect>
+              <p className="text-[10px] leading-snug text-on-surface-variant/75">
+                Menentukan mata uang sisa tagihan & DP yang dicetak pada PDF invoice.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="h-px bg-outline-variant/25" />
+          <div className="pt-1">
+            <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/65">
+              Yang harus dibayarkan
+            </span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-xs font-bold text-primary">{invoiceCurrency}</span>
+              <span className="font-display text-xl font-extrabold tracking-tight text-primary">
+                {formatNumberInput(totalPayable)}
+              </span>
+            </div>
+          </div>
+
+          <div
+            className={`flex items-center justify-between rounded-xl border px-3 py-2 ${
+              remainingBalance <= 0
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-primary/10 bg-primary/5"
+            }`}
+          >
+            <span className="text-xs font-medium text-on-surface-variant">
+              {resolveInvoiceOutstandingBalanceLabel(normalizedDownPayment, remainingBalance)}
+            </span>
+            <strong
+              className={`text-xs font-bold ${remainingBalance <= 0 ? "text-emerald-700" : "text-primary"}`}
+            >
+              <span className="mr-1 text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
+              {formatNumberInput(remainingBalance)}
+            </strong>
+          </div>
+        </div>
+      </article>
+
+      <article className="serene-form-section p-5 text-center">
+        <div className="mb-3 border-b border-outline-variant/20 pb-6">
+          <span className="material-symbols-outlined mx-auto text-4xl text-primary/20" aria-hidden="true">
+            approval_delegation
+          </span>
+        </div>
+        <p className="text-xs font-extrabold text-on-surface">Husein Ghanim</p>
+        <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/65">
+          Director Operations
+        </p>
+      </article>
+
+      <article className="serene-form-section border-primary/15 bg-primary/5">
+        <p className="text-[10px] italic leading-relaxed text-primary/75">
+          Note: Ensure all pilgrim PAX counts match the visa manifestations before generating the final document.
+        </p>
+      </article>
+    </aside>
+  );
+});

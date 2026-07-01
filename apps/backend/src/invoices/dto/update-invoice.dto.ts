@@ -3,6 +3,7 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,7 +12,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { InvoiceLineItemDto } from "./invoice-line-item.dto";
 
 export class UpdateInvoiceDto {
@@ -110,4 +111,12 @@ export class UpdateInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => InvoiceLineItemDto)
   items?: InvoiceLineItemDto[];
+
+  @ApiProperty({
+    description: "Versi concurrency locking invoice saat ini.",
+    example: 0,
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  version!: number;
 }

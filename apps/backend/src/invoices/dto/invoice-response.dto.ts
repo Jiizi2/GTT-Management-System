@@ -75,4 +75,7 @@ export class InvoiceListItemResponseDto {
     type: [InvoiceLineItemDto],
   })
   items?: InvoiceLineItemDto[];
+
+  @ApiPropertyOptional({ example: 0 })
+  version?: number;
 }

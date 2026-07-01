@@ -40,6 +40,7 @@ export type BackendInvoiceRow = {
   recipientName?: string;
   notes?: string;
   items?: BackendInvoiceItem[];
+  version?: number;
 };
 
 export type CreateBackendInvoicePayload = {
@@ -54,6 +55,7 @@ export type CreateBackendInvoicePayload = {
   notes?: string;
   recipientName?: string;
   items?: BackendInvoiceItem[];
+  version?: number;
 };
 
 export type UpdateBackendInvoicePayload = {
@@ -68,6 +70,7 @@ export type UpdateBackendInvoicePayload = {
   notes?: string;
   recipientName?: string;
   items?: BackendInvoiceItem[];
+  version?: number;
 };
 
 type BackendInvoiceClientRecord = {
@@ -97,6 +100,7 @@ type BackendInvoiceRecord = {
   recipientName?: unknown;
   notes?: unknown;
   items?: unknown;
+  version?: unknown;
 };
 
 type BackendInvoiceItemRecord = {
@@ -272,6 +276,7 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
           .map((item) => mapBackendInvoiceItem(item as BackendInvoiceItemRecord))
           .filter((item): item is BackendInvoiceItem => item !== null) ?? undefined)
       : undefined,
+    version: record.version !== undefined ? readNumber(record.version) : undefined,
   };
 }
 
@@ -325,11 +330,25 @@ export async function fetchInvoicesFromBackend({
 }: {
   signal?: AbortSignal;
 } = {}): Promise<BackendInvoiceRow[]> {
+  console.log(`[${new Date().toISOString()}] GET invoices request start`);
+  const getStartTime = performance.now();
   const { response, payload, responseText } = await fetchBackendParsed("/invoices", {
     method: "GET",
     signal,
     cache: "no-store",
   });
+  const duration = Math.round(performance.now() - getStartTime);
+  const rowCount = Array.isArray(payload) ? payload.length : 0;
+  console.log(`[${new Date().toISOString()}] GET invoices response\nrows=${rowCount}\nduration=${duration}ms`);
+  const lastId = (window as any)._lastEditedInvoiceId;
+  if (lastId && Array.isArray(payload)) {
+    const matched = payload.find((r: any) => r.id === lastId);
+    if (matched) {
+      console.log(`[${new Date().toISOString()}] GET response payload for target invoice ${lastId}:\nstatus=${matched.status}\namount=${matched.amount}`);
+    } else {
+      console.log(`[${new Date().toISOString()}] GET response payload did NOT contain target invoice ${lastId}`);
+    }
+  }
 
   if (!response.ok) {
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Backend invoice fetch failed"));
@@ -433,6 +452,9 @@ export async function updateInvoiceInBackend(
   }
   if (payload.items !== undefined) {
     requestBody.items = normalizeBackendInvoiceItems(payload.items);
+  }
+  if (payload.version !== undefined) {
+    requestBody.version = payload.version;
   }
 
   const {

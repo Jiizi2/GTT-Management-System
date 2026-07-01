@@ -133,6 +133,12 @@ export function InvoiceScreen({
     () => (isInvoiceBackendAvailable ? (invoiceDashboardQuery.data?.rows ?? []) : []),
     [invoiceDashboardQuery.data, isInvoiceBackendAvailable],
   );
+  const lastId = (window as any)._lastEditedInvoiceId;
+  const targetRow = lastId ? invoiceRows.find((r) => r.id === lastId) : null;
+  console.log(`[${new Date().toISOString()}] InvoiceScreen render (workspaceMode: ${workspaceMode})`);
+  if (targetRow) {
+    console.log(`[${new Date().toISOString()}] Rendered target invoice:\nid=${targetRow.id}\ninvoiceNumber=${targetRow.invoiceNumber}\nstatus=${targetRow.status}\namount=${targetRow.amount}`);
+  }
   const systemFeedback = useMemo(() => {
     if (invoiceDashboardQuery.error) {
       return "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.";
