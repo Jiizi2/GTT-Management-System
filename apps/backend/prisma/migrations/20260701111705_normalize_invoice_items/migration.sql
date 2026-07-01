@@ -1,7 +1,6 @@
 
 -- AlterTable
-ALTER TABLE "Invoice" ADD COLUMN     "recipientName" TEXT,
-ADD COLUMN     "version" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Invoice" ADD COLUMN     "version" INTEGER NOT NULL DEFAULT 0;
 
 -- AlterTable
 ALTER TABLE "VisaSetup" ALTER COLUMN "outstandingAmount" DROP NOT NULL,
