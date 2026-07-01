@@ -1661,64 +1661,78 @@ const PackageItemsSection = memo(function PackageItemsSection({
                     {String(index + 1).padStart(2, "0")}
                   </td>
                   <td className="px-5 py-3 min-w-[200px]">
-                    <textarea
-                      rows={1}
-                      placeholder="Input description / uraian..."
-                      className="w-full resize-none overflow-hidden border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0 placeholder:italic placeholder:text-on-surface-variant/40"
-                      value={item.description}
-                      onChange={(event) => {
-                        event.target.style.height = "auto";
-                        event.target.style.height = `${event.target.scrollHeight}px`;
-                        updateItemRow(index, { ...item, description: event.target.value });
-                      }}
-                      ref={(el) => {
-                        if (el) {
-                          el.style.height = "auto";
-                          el.style.height = `${el.scrollHeight}px`;
-                        }
-                      }}
+                    <Controller
+                      name={`items.${index}.description` as any}
+                      control={control}
+                      render={({ field }) => (
+                        <textarea
+                          rows={1}
+                          placeholder="Input description / uraian..."
+                          className="w-full resize-none overflow-hidden border-none bg-transparent p-0 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-0 placeholder:italic placeholder:text-on-surface-variant/40"
+                          value={field.value || ""}
+                          onChange={(event) => {
+                            event.target.style.height = "auto";
+                            event.target.style.height = `${event.target.scrollHeight}px`;
+                            field.onChange(event.target.value);
+                          }}
+                          ref={(el) => {
+                            field.ref(el);
+                            if (el) {
+                              el.style.height = "auto";
+                              el.style.height = `${el.scrollHeight}px`;
+                            }
+                          }}
+                        />
+                      )}
                     />
                   </td>
                   <td className="px-5 py-3 w-[80px]">
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
-                      value={item.pax}
-                      onChange={(event) =>
-                        updateItemRow(index, {
-                          ...item,
-                          pax: Math.max(0, Number.parseInt(event.target.value || "0", 10)),
-                        })
-                      }
+                    <Controller
+                      name={`items.${index}.pax` as any}
+                      control={control}
+                      render={({ field }) => (
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
+                          value={field.value ?? ""}
+                          onChange={(event) => {
+                            field.onChange(Math.max(0, Number.parseInt(event.target.value || "0", 10)));
+                          }}
+                        />
+                      )}
                     />
                   </td>
                   <td className="px-5 py-3 min-w-[200px]">
                     <div className="flex items-center gap-2">
-                      <SereneSelect
-                        className="serene-select h-8 min-w-[76px] rounded-lg bg-surface-container-low text-xs font-bold text-on-surface shadow-none border-none py-1 px-2"
-                        value={item.currency || "IDR"}
-                        onChange={(event) =>
-                          updateItemRow(index, {
-                            ...item,
-                            currency: event.target.value as InvoiceDraftCurrency,
-                          })
-                        }
-                      >
-                        <option value="IDR">IDR</option>
-                        <option value="USD">USD</option>
-                        <option value="SAR">SAR</option>
-                      </SereneSelect>
-                      <input
-                        type="text"
-                        className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
-                        value={formatNumberInput(item.unitPrice)}
-                        onChange={(event) =>
-                          updateItemRow(index, {
-                            ...item,
-                            unitPrice: parseNumberInput(event.target.value),
-                          })
-                        }
+                      <Controller
+                        name={`items.${index}.currency` as any}
+                        control={control}
+                        render={({ field }) => (
+                          <SereneSelect
+                            className="serene-select h-8 min-w-[76px] rounded-lg bg-surface-container-low text-xs font-bold text-on-surface shadow-none border-none py-1 px-2"
+                            value={field.value || "IDR"}
+                            onChange={field.onChange}
+                          >
+                            <option value="IDR">IDR</option>
+                            <option value="USD">USD</option>
+                            <option value="SAR">SAR</option>
+                          </SereneSelect>
+                        )}
+                      />
+                      <Controller
+                        name={`items.${index}.unitPrice` as any}
+                        control={control}
+                        render={({ field }) => (
+                          <input
+                            type="text"
+                            className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
+                            value={formatNumberInput(field.value || 0)}
+                            onChange={(event) => {
+                              field.onChange(parseNumberInput(event.target.value));
+                            }}
+                          />
+                        )}
                       />
                     </div>
                   </td>
