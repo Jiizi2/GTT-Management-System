@@ -2125,7 +2125,7 @@ export function VisaTrackingDetailScreen({
       {deleteAgreementDraft ? (
         <div
           ref={deleteAgreementDialogRef}
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-4"
+          className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-agreement-title"
@@ -2134,7 +2134,7 @@ export function VisaTrackingDetailScreen({
           onClick={() => setDeleteAgreementDraft(null)}
         >
           <section
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-2xl"
+            className="serene-modal-shell my-auto w-full max-w-md p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">
@@ -2189,7 +2189,7 @@ export function VisaTrackingDetailScreen({
       {isClearRaudhahConfirmOpen ? (
         <div
           ref={clearRaudhahDialogRef}
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-4"
+          className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
           role="dialog"
           aria-modal="true"
           aria-labelledby="clear-raudhah-title"
@@ -2198,7 +2198,7 @@ export function VisaTrackingDetailScreen({
           onClick={() => setIsClearRaudhahConfirmOpen(false)}
         >
           <section
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-surface-container-lowest p-5 shadow-2xl"
+            className="serene-modal-shell my-auto w-full max-w-md p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">

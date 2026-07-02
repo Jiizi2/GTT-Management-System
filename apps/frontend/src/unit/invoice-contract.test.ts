@@ -157,7 +157,7 @@ describe("invoice payload contract alignment", () => {
       location: {
         origin: "http://localhost:3000",
       },
-      setTimeout: (fn: Function) => fn(),
+      setTimeout: (fn: () => void) => fn(),
     } as any;
 
     const mockPayload = {

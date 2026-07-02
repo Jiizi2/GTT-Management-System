@@ -55,10 +55,8 @@ const draftSchema = z
   });
 
 const fieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-slate-700";
-const inputClassName =
-  "h-11 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
-const textareaClassName =
-  "min-h-24 w-full rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
+const inputClassName = "serene-input serene-input-md";
+const textareaClassName = "serene-textarea min-h-24";
 const AGREEMENT_DRAFT_PAGE_SIZE = 8;
 
 function createDefaultDraftForm(): HotelAgreementDraftFormState {
@@ -914,7 +912,7 @@ export function AgreementInboxScreen() {
             <div className="flex flex-wrap items-center gap-2">
               <DatePickerInput
                 id="filter-start-date"
-                inputClassName="h-8 w-36 rounded-lg border border-slate-200 bg-surface-container-lowest px-2 text-xs font-semibold text-slate-900 outline-none transition focus:border-brand-primary"
+                inputClassName="serene-input serene-input-sm w-36"
                 value={startDateFilter}
                 onChange={setStartDateFilter}
                 placeholder="Start Date"
@@ -922,7 +920,7 @@ export function AgreementInboxScreen() {
               <span className="text-slate-400 font-bold text-xs">➔</span>
               <DatePickerInput
                 id="filter-end-date"
-                inputClassName="h-8 w-36 rounded-lg border border-slate-200 bg-surface-container-lowest px-2 text-xs font-semibold text-slate-900 outline-none transition focus:border-brand-primary"
+                inputClassName="serene-input serene-input-sm w-36"
                 value={endDateFilter}
                 onChange={setEndDateFilter}
                 placeholder="End Date"

@@ -646,25 +646,6 @@ export function InvoiceScreen({
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     type="button"
-                    className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] shadow-cta-soft transition ${
-                      row.groupCode
-                        ? "bg-primary text-on-primary hover:bg-primary-container"
-                        : "cursor-not-allowed bg-surface-container-high text-on-surface-variant"
-                    }`}
-                    onClick={() => {
-                      if (row.groupCode) {
-                        onOpenDetail(row.groupCode);
-                      }
-                    }}
-                    disabled={!row.groupCode}
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      visibility
-                    </span>
-                    <span>View Group</span>
-                  </button>
-                  <button
-                    type="button"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
                     aria-label={`Open PDF for ${row.invoiceNumber}`}
                     onClick={() => handleViewPdf(row)}

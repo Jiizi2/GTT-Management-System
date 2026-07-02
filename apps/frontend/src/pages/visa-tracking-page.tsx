@@ -1026,7 +1026,7 @@ export function VisaTrackingScreen({
 
           <section className="serene-table-shell hidden md:block" aria-label="Visa tracking table">
             <div className="overflow-x-auto">
-              <div className="min-w-full">
+              <div className="min-w-[960px]">
                 <div
                   className="grid items-center gap-2.5 border-b border-slate-200 bg-surface-container-low px-5 py-3 text-xs font-semibold uppercase tracking-[0.11em] text-on-surface-variant/80"
                   style={{ gridTemplateColumns: desktopTableGridTemplate }}

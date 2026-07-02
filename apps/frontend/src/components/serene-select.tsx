@@ -309,7 +309,7 @@ export function SereneSelect({
         ? createPortal(
             <div
               ref={menuRef}
-              className="z-[260] overflow-auto rounded-2xl bg-surface-container-lowest p-1.5 shadow-float backdrop-blur-serene"
+              className="z-[260] overflow-auto rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-1.5 shadow-float backdrop-blur-serene"
               role="listbox"
               style={menuStyle}
               aria-label={ariaLabel}
@@ -326,7 +326,7 @@ export function SereneSelect({
                     role="option"
                     aria-selected={isSelected}
                     disabled={option.disabled}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 sm:py-2 text-left text-sm transition ${
                       option.disabled
                         ? "cursor-not-allowed text-slate-400"
                         : isSelected

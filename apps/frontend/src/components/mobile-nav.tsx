@@ -31,7 +31,7 @@ export function MobileNav({
       <button
         key={item.id}
         type="button"
-        className="flex min-w-0 flex-col items-center justify-end gap-0.5 rounded-xl px-1.5 py-1 text-center transition active:scale-[0.98]"
+        className="flex min-w-0 flex-col items-center justify-end gap-0.5 rounded-xl px-1.5 py-2 text-center transition active:scale-[0.98]"
         onClick={() => onNavigate(item.id)}
         aria-current={isActive ? "page" : undefined}
         aria-label={item.label}
@@ -56,7 +56,7 @@ export function MobileNav({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 xl:hidden"
       aria-label="Mobile navigation"
     >
       <div className="mx-auto max-w-md">
@@ -65,7 +65,7 @@ export function MobileNav({
 
           <button
             type="button"
-            className="flex min-w-0 flex-col items-center justify-end gap-0.5 rounded-xl px-1.5 py-1 text-center transition active:scale-[0.98]"
+            className="flex min-w-0 flex-col items-center justify-end gap-0.5 rounded-xl px-1.5 py-2 text-center transition active:scale-[0.98]"
             onClick={onToggleActions}
             aria-label={isActionsOpen ? "Close quick actions" : "Open quick actions"}
             aria-haspopup="dialog"

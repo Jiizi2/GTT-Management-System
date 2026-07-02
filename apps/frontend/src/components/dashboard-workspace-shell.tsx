@@ -80,8 +80,8 @@ export function DashboardWorkspaceShell({
       ) : null}
 
       <main
-        className={`relative px-4 pt-0 transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-8 lg:pt-0 ${
-          controller.isSidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[280px]"
+        className={`relative px-4 pt-0 transition-[margin] duration-200 sm:px-5 xl:px-8 xl:pb-8 xl:pt-0 ${
+          controller.isSidebarCollapsed ? "xl:ml-[104px]" : "xl:ml-[280px]"
         } ${shouldShowMobileNav ? "pb-28" : "pb-10"}`}
       >
         <AppMainContent controller={controller} />
@@ -110,7 +110,7 @@ export function DashboardWorkspaceShell({
       ) : null}
 
       {syncFeedback ? (
-        <div className="fixed bottom-24 left-4 right-4 z-[90] lg:bottom-6 lg:left-auto lg:right-6 lg:w-full lg:max-w-sm">
+        <div className="fixed bottom-24 left-4 right-4 z-[90] xl:bottom-6 xl:left-auto xl:right-6 xl:w-full xl:max-w-sm">
           <div
             className={`flex items-start gap-3 rounded-2xl px-4 py-3 shadow-float backdrop-blur-serene ${syncFeedbackToneClassMap[syncFeedback.tone]} animate-slide-down`}
             role="status"

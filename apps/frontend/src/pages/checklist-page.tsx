@@ -1117,12 +1117,12 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       {cancelTargetItem ? (
         <ChecklistModalPortal>
           <div
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-background-deep/72 p-4"
+            className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto bg-background-deep/72 p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
             onClick={handleCloseCancelConfirm}
             role="presentation"
           >
             <div
-              className="serene-modal-shell w-full max-w-md p-5"
+              className="serene-modal-shell my-auto w-full max-w-md p-5"
               role="dialog"
               aria-modal="true"
               aria-labelledby="cancel-assignment-title"
