@@ -1,134 +1,9 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
+import { withDataSource } from "../test/with-data-source";
 import { HttpException, HttpStatus } from "@nestjs/common";
 import type { PrismaService } from "../prisma/prisma.service";
 import { AuthLoginRateLimiter } from "./auth-login-rate-limiter";
-
-async function runCase(name: string, fn: () => Promise<void> | void): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
-
-function testResolveKeysUsesDirectIpWhenProxyTrustIsDisabled(): void {
-  const limiter = new AuthLoginRateLimiter({
-    windowMs: 10_000,
-    maxAttempts: 3,
-    lockMs: 1_000,
-    now: () => 0,
-  });
-
-  const keys = limiter.resolveKeys(" Admin.User@Example.Com ", {
-    ip: "198.51.100.7",
-    headers: {
-      "x-forwarded-for": "203.0.113.10, 10.0.0.20",
-    },
-  });
-
-  assert.equal(keys.ipKey, "ip:198.51.100.7");
-  assert.equal(keys.principalKey, "principal:198.51.100.7|admin.user@example.com");
-}
-
-function testResolveKeysUsesForwardedIpWhenProxyTrustIsEnabled(): void {
-  const limiter = new AuthLoginRateLimiter({
-    windowMs: 10_000,
-    maxAttempts: 3,
-    lockMs: 1_000,
-    now: () => 0,
-    trustProxyHeaders: true,
-  });
-
-  const keys = limiter.resolveKeys(" Admin.User@Example.Com ", {
-    ip: "198.51.100.7",
-    headers: {
-      "x-forwarded-for": "203.0.113.10, 10.0.0.20",
-    },
-  });
-
-  assert.equal(keys.ipKey, "ip:203.0.113.10");
-  assert.equal(keys.principalKey, "principal:203.0.113.10|admin.user@example.com");
-}
-
-async function testLocksAfterMaxFailuresAndUnlocksAfterCooldown(): Promise<void> {
-  let nowEpochMs = 0;
-  const limiter = new AuthLoginRateLimiter({
-    windowMs: 60_000,
-    maxAttempts: 3,
-    lockMs: 2_000,
-    now: () => nowEpochMs,
-  });
-  const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
-    ip: "198.51.100.7",
-  });
-
-  await limiter.assertAllowed(keys);
-  await limiter.registerFailure(keys);
-
-  await limiter.assertAllowed(keys);
-  await limiter.registerFailure(keys);
-
-  await limiter.assertAllowed(keys);
-  await limiter.registerFailure(keys);
-
-  await assert.rejects(
-    () => limiter.assertAllowed(keys),
-    (error: unknown) => {
-      assert.equal(error instanceof HttpException, true);
-      assert.equal((error as HttpException).getStatus(), HttpStatus.TOO_MANY_REQUESTS);
-      assert.match((error as Error).message, /Too many failed login attempts/i);
-      return true;
-    },
-  );
-
-  nowEpochMs += 2_100;
-  await assert.doesNotReject(() => limiter.assertAllowed(keys));
-}
-
-async function testIpLevelLockAppliesAcrossDifferentIdentifiers(): Promise<void> {
-  let nowEpochMs = 0;
-  const limiter = new AuthLoginRateLimiter({
-    windowMs: 60_000,
-    maxAttempts: 3,
-    lockMs: 5_000,
-    now: () => nowEpochMs,
-  });
-  const request = {
-    ip: "198.51.100.88",
-  };
-  const firstUserKeys = limiter.resolveKeys("first.user", request);
-  const secondUserKeys = limiter.resolveKeys("second.user", request);
-
-  await limiter.registerFailure(firstUserKeys);
-  await limiter.registerFailure(firstUserKeys);
-  await limiter.registerFailure(secondUserKeys);
-
-  await assert.rejects(
-    () => limiter.assertAllowed(secondUserKeys),
-    (error: unknown) => {
-      assert.equal(error instanceof HttpException, true);
-      assert.equal((error as HttpException).getStatus(), HttpStatus.TOO_MANY_REQUESTS);
-      return true;
-    },
-  );
-
-  nowEpochMs += 5_100;
-  await assert.doesNotReject(() => limiter.assertAllowed(secondUserKeys));
-}
-
-async function withDataSource<T>(
-  dataSource: "memory" | "prisma",
-  fn: () => Promise<T>,
-): Promise<T> {
-  const previousDataSource = process.env.DATA_SOURCE;
-  process.env.DATA_SOURCE = dataSource;
-  try {
-    return await fn();
-  } finally {
-    if (previousDataSource === undefined) {
-      delete process.env.DATA_SOURCE;
-    } else {
-      process.env.DATA_SOURCE = previousDataSource;
-    }
-  }
-}
 
 function createPrismaRateLimitMock(): PrismaService & {
   __state: Map<string, {
@@ -274,102 +149,157 @@ function createPrismaRateLimitMock(): PrismaService & {
   return prismaMock;
 }
 
-async function testPrismaStoragePersistsAndClearsPrincipalBucket(): Promise<void> {
-  await withDataSource("prisma", async () => {
+describe("AuthLoginRateLimiter", () => {
+  runCase("prefers direct ip when proxy trust is disabled", () => {
+    const limiter = new AuthLoginRateLimiter({
+      windowMs: 10_000,
+      maxAttempts: 3,
+      lockMs: 1_000,
+      now: () => 0,
+    });
+
+    const keys = limiter.resolveKeys(" Admin.User@Example.Com ", {
+      ip: "198.51.100.7",
+      headers: {
+        "x-forwarded-for": "203.0.113.10, 10.0.0.20",
+      },
+    });
+
+    expect(keys.ipKey).toBe("ip:198.51.100.7");
+    expect(keys.principalKey).toBe("principal:198.51.100.7|admin.user@example.com");
+  });
+
+  runCase("resolves forwarded ip when proxy trust is enabled", () => {
+    const limiter = new AuthLoginRateLimiter({
+      windowMs: 10_000,
+      maxAttempts: 3,
+      lockMs: 1_000,
+      now: () => 0,
+      trustProxyHeaders: true,
+    });
+
+    const keys = limiter.resolveKeys(" Admin.User@Example.Com ", {
+      ip: "198.51.100.7",
+      headers: {
+        "x-forwarded-for": "203.0.113.10, 10.0.0.20",
+      },
+    });
+
+    expect(keys.ipKey).toBe("ip:203.0.113.10");
+    expect(keys.principalKey).toBe("principal:203.0.113.10|admin.user@example.com");
+  });
+
+  runCase("locks and unlocks by cooldown", async () => {
     let nowEpochMs = 0;
-    const prismaMock = createPrismaRateLimitMock();
+    const limiter = new AuthLoginRateLimiter({
+      windowMs: 60_000,
+      maxAttempts: 3,
+      lockMs: 2_000,
+      now: () => nowEpochMs,
+    });
+    const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
+      ip: "198.51.100.7",
+    });
+
+    await limiter.assertAllowed(keys);
+    await limiter.registerFailure(keys);
+
+    await limiter.assertAllowed(keys);
+    await limiter.registerFailure(keys);
+
+    await limiter.assertAllowed(keys);
+    await limiter.registerFailure(keys);
+
+    await expect(limiter.assertAllowed(keys)).rejects.toThrow(
+      /Too many failed login attempts/i,
+    );
+
+    nowEpochMs += 2_100;
+    await expect(limiter.assertAllowed(keys)).resolves.toBeUndefined();
+  });
+
+  runCase("applies ip lock across identifiers", async () => {
+    let nowEpochMs = 0;
     const limiter = new AuthLoginRateLimiter({
       windowMs: 60_000,
       maxAttempts: 3,
       lockMs: 5_000,
       now: () => nowEpochMs,
-    }, undefined, prismaMock);
-
-    const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
-      ip: "198.51.100.77",
     });
+    const request = {
+      ip: "198.51.100.88",
+    };
+    const firstUserKeys = limiter.resolveKeys("first.user", request);
+    const secondUserKeys = limiter.resolveKeys("second.user", request);
 
-    await limiter.registerFailure(keys);
-    await limiter.registerFailure(keys);
-    assert.equal(prismaMock.__state.has(keys.ipKey), true);
-    assert.equal(prismaMock.__state.has(keys.principalKey), true);
+    await limiter.registerFailure(firstUserKeys);
+    await limiter.registerFailure(firstUserKeys);
+    await limiter.registerFailure(secondUserKeys);
 
-    await limiter.registerSuccess(keys);
-    assert.equal(prismaMock.__state.has(keys.ipKey), true);
-    assert.equal(prismaMock.__state.has(keys.principalKey), false);
-
-    await limiter.registerFailure(keys);
-    await limiter.registerFailure(keys);
-    await limiter.registerFailure(keys);
-
-    await assert.rejects(
-      () => limiter.assertAllowed(keys),
-      (error: unknown) => {
-        assert.equal(error instanceof HttpException, true);
-        assert.equal((error as HttpException).getStatus(), HttpStatus.TOO_MANY_REQUESTS);
-        return true;
-      },
-    );
+    await expect(limiter.assertAllowed(secondUserKeys)).rejects.toThrow();
 
     nowEpochMs += 5_100;
-    await assert.doesNotReject(() => limiter.assertAllowed(keys));
+    await expect(limiter.assertAllowed(secondUserKeys)).resolves.toBeUndefined();
   });
-}
 
-async function testPrismaStorageLocksBucketsInStableOrder(): Promise<void> {
-  await withDataSource("prisma", async () => {
-    const prismaMock = createPrismaRateLimitMock();
-    const limiter = new AuthLoginRateLimiter({
-      windowMs: 60_000,
-      maxAttempts: 3,
-      lockMs: 5_000,
-      now: () => 0,
-    }, undefined, prismaMock);
+  runCase("persists prisma buckets and clears principal bucket on success", async () => {
+    await withDataSource("prisma", async () => {
+      let nowEpochMs = 0;
+      const prismaMock = createPrismaRateLimitMock();
+      const limiter = new AuthLoginRateLimiter({
+        windowMs: 60_000,
+        maxAttempts: 3,
+        lockMs: 5_000,
+        now: () => nowEpochMs,
+      }, undefined, prismaMock);
 
-    const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
-      ip: "198.51.100.77",
+      const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
+        ip: "198.51.100.77",
+      });
+
+      await limiter.registerFailure(keys);
+      await limiter.registerFailure(keys);
+      expect(prismaMock.__state.has(keys.ipKey)).toBe(true);
+      expect(prismaMock.__state.has(keys.principalKey)).toBe(true);
+
+      await limiter.registerSuccess(keys);
+      expect(prismaMock.__state.has(keys.ipKey)).toBe(true);
+      expect(prismaMock.__state.has(keys.principalKey)).toBe(false);
+
+      await limiter.registerFailure(keys);
+      await limiter.registerFailure(keys);
+      await limiter.registerFailure(keys);
+
+      await expect(limiter.assertAllowed(keys)).rejects.toThrow();
+
+      nowEpochMs += 5_100;
+      await expect(limiter.assertAllowed(keys)).resolves.toBeUndefined();
     });
-
-    await limiter.registerFailure(keys);
-    await limiter.registerSuccess(keys);
-
-    assert.deepEqual(prismaMock.__lockKeys, [
-      keys.ipKey,
-      keys.principalKey,
-      keys.ipKey,
-      keys.principalKey,
-    ]);
   });
-}
 
-async function main(): Promise<void> {
-  await runCase(
-    "auth login limiter prefers direct ip when proxy trust is disabled",
-    testResolveKeysUsesDirectIpWhenProxyTrustIsDisabled,
-  );
-  await runCase(
-    "auth login limiter resolves forwarded ip when proxy trust is enabled",
-    testResolveKeysUsesForwardedIpWhenProxyTrustIsEnabled,
-  );
-  await runCase(
-    "auth login limiter locks and unlocks by cooldown",
-    testLocksAfterMaxFailuresAndUnlocksAfterCooldown,
-  );
-  await runCase(
-    "auth login limiter applies ip lock across identifiers",
-    testIpLevelLockAppliesAcrossDifferentIdentifiers,
-  );
-  await runCase(
-    "auth login limiter persists prisma buckets and clears principal bucket on success",
-    testPrismaStoragePersistsAndClearsPrincipalBucket,
-  );
-  await runCase(
-    "auth login limiter locks prisma buckets in stable order",
-    testPrismaStorageLocksBucketsInStableOrder,
-  );
-}
+  runCase("locks prisma buckets in stable order", async () => {
+    await withDataSource("prisma", async () => {
+      const prismaMock = createPrismaRateLimitMock();
+      const limiter = new AuthLoginRateLimiter({
+        windowMs: 60_000,
+        maxAttempts: 3,
+        lockMs: 5_000,
+        now: () => 0,
+      }, undefined, prismaMock);
 
-void main().catch((error: unknown) => {
-  console.error("Auth login rate limiter test failed:", error);
-  process.exitCode = 1;
+      const keys = limiter.resolveKeys("ops@ghaniyatravel.com", {
+        ip: "198.51.100.77",
+      });
+
+      await limiter.registerFailure(keys);
+      await limiter.registerSuccess(keys);
+
+      expect(prismaMock.__lockKeys).toEqual([
+        keys.ipKey,
+        keys.principalKey,
+        keys.ipKey,
+        keys.principalKey,
+      ]);
+    });
+  });
 });

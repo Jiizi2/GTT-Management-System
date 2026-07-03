@@ -2,13 +2,9 @@ import assert from "node:assert/strict";
 import { describe } from "vitest";
 import { fetchCurrentSessionFromBackend, loginWithBackend, logoutFromBackend } from "../hooks/use-auth-backend.js";
 import { runCase } from "../test/run-case.js";
-
-type FetchFn = typeof fetch;
-
-type FetchCall = {
-  input: string | URL | Request;
-  init?: RequestInit;
-};
+import { withMockFetch } from "../test/with-mock-fetch.js";
+import { withApiBaseOverride } from "../test/with-api-base-override.js";
+import { withLocationHostname } from "../test/with-location-hostname.js";
 
 function createSessionResponseJson(overrides: Partial<Record<string, unknown>> = {}): string {
   return JSON.stringify({
@@ -22,64 +18,6 @@ function createSessionResponseJson(overrides: Partial<Record<string, unknown>> =
       accessTier: "admin",
     },
     ...overrides,
-  });
-}
-
-function withMockFetch<T>(
-  implementation: (call: FetchCall) => Promise<Response>,
-  fn: (calls: FetchCall[]) => Promise<T>,
-): Promise<T> {
-  const calls: FetchCall[] = [];
-  const originalFetch = globalThis.fetch as FetchFn;
-
-  (globalThis as { fetch: FetchFn }).fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({ input, init });
-    return implementation({ input, init });
-  }) as FetchFn;
-
-  return fn(calls).finally(() => {
-    (globalThis as { fetch: FetchFn }).fetch = originalFetch;
-  });
-}
-
-function withApiBaseOverride<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
-  const key = "__GTT_API_BASE_URL__";
-  const holder = globalThis as { [key: string]: unknown };
-  const previous = holder[key];
-
-  if (value === undefined) {
-    delete holder[key];
-  } else {
-    holder[key] = value;
-  }
-
-  return fn().finally(() => {
-    if (previous === undefined) {
-      delete holder[key];
-    } else {
-      holder[key] = previous;
-    }
-  });
-}
-
-function withLocationHostname<T>(hostname: string, fn: () => Promise<T>): Promise<T> {
-  const previous = (globalThis as { location?: unknown }).location;
-  Object.defineProperty(globalThis, "location", {
-    configurable: true,
-    writable: true,
-    value: { hostname },
-  });
-
-  return fn().finally(() => {
-    if (previous === undefined) {
-      delete (globalThis as { location?: unknown }).location;
-    } else {
-      Object.defineProperty(globalThis, "location", {
-        configurable: true,
-        writable: true,
-        value: previous,
-      });
-    }
   });
 }
 

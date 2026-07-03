@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../../test/run-case";
 import { GroupLifecycleStatus, GroupTone } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
@@ -288,10 +289,10 @@ async function runGroupsContract(adapter: ContractAdapter): Promise<void> {
       }),
     )) as { code?: string; name?: string; arrivalDate?: unknown; returnDate?: unknown };
 
-    assert.equal(created.code, "CTR-ALPHA", `${adapter.name}: create normalizes code`);
-    assert.equal(created.name, "Contract Alpha", `${adapter.name}: create trims name`);
-    assert.equal(toIsoDate(created.arrivalDate), "2026-04-10", `${adapter.name}: create preserves arrival date`);
-    assert.equal(toIsoDate(created.returnDate), "2026-04-18", `${adapter.name}: create preserves return date`);
+    expect(created.code).toBe("CTR-ALPHA");
+    expect(created.name).toBe("Contract Alpha");
+    expect(toIsoDate(created.arrivalDate)).toBe("2026-04-10");
+    expect(toIsoDate(created.returnDate)).toBe("2026-04-18");
 
     await service.create(
       createGroupPayload({
@@ -308,16 +309,14 @@ async function runGroupsContract(adapter: ContractAdapter): Promise<void> {
       returnDate: "2026-04-19",
     })) as { code?: string; name?: string; status?: string; returnDate?: unknown };
 
-    assert.equal(updated.code, "CTR-ALPHA", `${adapter.name}: update keeps code lookup case-insensitive`);
-    assert.equal(updated.name, "Contract Alpha Updated", `${adapter.name}: update trims name`);
-    assert.equal(updated.status, "Completed", `${adapter.name}: update persists status`);
-    assert.equal(toIsoDate(updated.returnDate), "2026-04-19", `${adapter.name}: update persists return date`);
+    expect(updated.code).toBe("CTR-ALPHA");
+    expect(updated.name).toBe("Contract Alpha Updated");
+    expect(updated.status).toBe("Completed");
+    expect(toIsoDate(updated.returnDate)).toBe("2026-04-19");
 
-    await assert.rejects(
-      () => service.update("CTR-ALPHA", { arrivalDate: "2026-04-20", returnDate: "2026-04-19" }),
-      /Return date must be on or after arrival date/i,
-      `${adapter.name}: invalid travel date range is rejected`,
-    );
+    await expect(
+      () => service.update("CTR-ALPHA", { arrivalDate: "2026-04-20", returnDate: "2026-04-19" })
+    ).rejects.toThrow(/Return date must be on or after arrival date/i);
 
     const paged = (await service.findAll(undefined, { page: 1, pageSize: 1 })) as {
       items?: unknown[];
@@ -325,54 +324,38 @@ async function runGroupsContract(adapter: ContractAdapter): Promise<void> {
       page?: number;
       pageSize?: number;
     };
-    assert.equal(Array.isArray(paged.items), true, `${adapter.name}: pagination returns items`);
-    assert.equal(paged.total, 2, `${adapter.name}: pagination returns total`);
-    assert.equal(paged.page, 1, `${adapter.name}: pagination returns page`);
-    assert.equal(paged.pageSize, 1, `${adapter.name}: pagination returns pageSize`);
+    expect(Array.isArray(paged.items)).toBe(true);
+    expect(paged.total).toBe(2);
+    expect(paged.page).toBe(1);
+    expect(paged.pageSize).toBe(1);
 
     const searched = await service.findAll("contract alpha updated");
-    assert.equal(getItems(searched).length, 1, `${adapter.name}: search uses normalized document`);
+    expect(getItems(searched).length).toBe(1);
 
     const activeOnly = await service.findAll(undefined, { activeOnly: true });
-    assert.deepEqual(
+    expect(
       getItems(activeOnly).map((group) => (group as { code?: string }).code),
-      ["CTR-ALPHA"],
-      `${adapter.name}: activeOnly excludes inactive groups`,
-    );
+    ).toEqual(["CTR-ALPHA"]);
 
     const logs = await service.listAuditLogs("CTR-ALPHA");
-    assert.equal(
+    expect(
       logs.some((entry) => entry.action === "group.created"),
-      true,
-      `${adapter.name}: create audit log is written`,
-    );
-    assert.equal(
+    ).toBe(true);
+    expect(
       logs.some((entry) => entry.action === "group.updated"),
-      true,
-      `${adapter.name}: update audit log is written`,
-    );
+    ).toBe(true);
   } finally {
     restore();
   }
 }
 
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
-
-async function main(): Promise<void> {
+describe("GroupsAdapterContract", () => {
   const adapters: ContractAdapter[] = [
     { name: "memory", createHarness: createMemoryHarness },
     { name: "prisma", createHarness: createPrismaHarness },
   ];
 
   for (const adapter of adapters) {
-    await runCase(`groups adapter contract (${adapter.name})`, () => runGroupsContract(adapter));
+    runCase(`groups adapter contract (${adapter.name})`, () => runGroupsContract(adapter));
   }
-}
-
-void main().catch((error: unknown) => {
-  console.error("Groups adapter contract test failed:", error);
-  process.exitCode = 1;
 });

@@ -1,30 +1,26 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import { validateEnvironment } from "./env.validation";
 
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
-}
+describe("EnvironmentValidation", () => {
+  runCase("converts trust proxy boolean", () => {
+    const validated = validateEnvironment({
+      TRUST_PROXY: "true",
+    });
 
-function testConvertsTrustedProxyBoolean(): void {
-  const validated = validateEnvironment({
-    TRUST_PROXY: "true",
+    expect(validated.TRUST_PROXY).toBe(true);
   });
 
-  assert.equal(validated.TRUST_PROXY, true);
-}
+  runCase("converts auth cookie secure boolean", () => {
+    const validated = validateEnvironment({
+      AUTH_COOKIE_SECURE: "false",
+    });
 
-function testConvertsAuthCookieSecureBoolean(): void {
-  const validated = validateEnvironment({
-    AUTH_COOKIE_SECURE: "false",
+    expect(validated.AUTH_COOKIE_SECURE).toBe(false);
   });
 
-  assert.equal(validated.AUTH_COOKIE_SECURE, false);
-}
-
-function testProductionRequiresCorsOrigins(): void {
-  assert.throws(
-    () =>
+  runCase("requires cors origins in production", () => {
+    expect(() =>
       validateEnvironment({
         NODE_ENV: "production",
         PORT: "3001",
@@ -34,23 +30,19 @@ function testProductionRequiresCorsOrigins(): void {
         CORS_ORIGINS: "   ",
         AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
       }),
-    /CORS_ORIGINS is required in production/i,
-  );
-}
+    ).toThrow(/CORS_ORIGINS is required in production/i);
+  });
 
-function testRejectsWildcardCorsOrigins(): void {
-  assert.throws(
-    () =>
+  runCase("rejects wildcard cors origins", () => {
+    expect(() =>
       validateEnvironment({
         CORS_ORIGINS: "*",
       }),
-    /cannot contain '\*'/i,
-  );
-}
+    ).toThrow(/cannot contain '\*'/i);
+  });
 
-function testProductionRejectsBootstrapDefaultUsers(): void {
-  assert.throws(
-    () =>
+  runCase("rejects bootstrap in production", () => {
+    expect(() =>
       validateEnvironment({
         NODE_ENV: "production",
         PORT: "3001",
@@ -60,13 +52,11 @@ function testProductionRejectsBootstrapDefaultUsers(): void {
         CORS_ORIGINS: "https://app.example.com",
         AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
       }),
-    /AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production/i,
-  );
-}
+    ).toThrow(/AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production/i);
+  });
 
-function testPrismaBootstrapRequiresExplicitPasswords(): void {
-  assert.throws(
-    () =>
+  runCase("requires bootstrap passwords in prisma mode", () => {
+    expect(() =>
       validateEnvironment({
         NODE_ENV: "development",
         PORT: "3001",
@@ -76,20 +66,6 @@ function testPrismaBootstrapRequiresExplicitPasswords(): void {
         DEV_AUTH_SUPERADMIN_PASSWORD: "BootstrapSuper#2026",
         DEV_AUTH_ADMIN_PASSWORD: "   ",
       }),
-    /DEV_AUTH_SUPERADMIN_PASSWORD and DEV_AUTH_ADMIN_PASSWORD are required/i,
-  );
-}
-
-async function main(): Promise<void> {
-  await runCase("env validation converts trust proxy boolean", testConvertsTrustedProxyBoolean);
-  await runCase("env validation converts auth cookie secure boolean", testConvertsAuthCookieSecureBoolean);
-  await runCase("env validation requires cors origins in production", testProductionRequiresCorsOrigins);
-  await runCase("env validation rejects wildcard cors origins", testRejectsWildcardCorsOrigins);
-  await runCase("env validation rejects bootstrap in production", testProductionRejectsBootstrapDefaultUsers);
-  await runCase("env validation requires bootstrap passwords in prisma mode", testPrismaBootstrapRequiresExplicitPasswords);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Environment validation test failed:", error);
-  process.exitCode = 1;
+    ).toThrow(/DEV_AUTH_SUPERADMIN_PASSWORD and DEV_AUTH_ADMIN_PASSWORD are required/i);
+  });
 });

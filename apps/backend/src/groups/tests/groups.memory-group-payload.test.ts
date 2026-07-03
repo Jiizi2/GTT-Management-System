@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../../test/run-case";
 import {
   AgreementApprovalStatus,
   AgreementCity,
@@ -140,157 +141,136 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
   };
 }
 
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
-}
+describe("GroupsMemoryGroupPayload", () => {
+  runCase("itinerary title helper branches", () => {
+    expect(
+      resolveItineraryTitle({
+        title: "  Explicit Title ",
+        category: "Arrival",
+      }),
+    ).toBe("Explicit Title");
 
-function testResolveItineraryTitleBranches(): void {
-  assert.equal(
-    resolveItineraryTitle({
-      title: "  Explicit Title ",
-      category: "Arrival",
-    }),
-    "Explicit Title",
-  );
+    expect(
+      resolveItineraryTitle({
+        category: "Arrival schedule",
+        fromLocation: "JED",
+        toLocation: "Makkah",
+      }),
+    ).toBe("Landing at JED and heading to Makkah");
 
-  assert.equal(
-    resolveItineraryTitle({
-      category: "Arrival schedule",
-      fromLocation: "JED",
-      toLocation: "Makkah",
-    }),
-    "Landing at JED and heading to Makkah",
-  );
+    expect(
+      resolveItineraryTitle({
+        category: "City Tour",
+        fromLocation: "Hotel",
+        toLocation: "Quba",
+        cityTourCity: "Madinah",
+      }),
+    ).toBe("City Tour in Madinah: Hotel -> Quba");
 
-  assert.equal(
-    resolveItineraryTitle({
-      category: "City Tour",
-      fromLocation: "Hotel",
-      toLocation: "Quba",
-      cityTourCity: "Madinah",
-    }),
-    "City Tour in Madinah: Hotel -> Quba",
-  );
+    expect(
+      resolveItineraryTitle({
+        category: "Unknown Category",
+        fromLocation: "",
+        toLocation: "",
+      }),
+    ).toBe("Unknown Category");
 
-  assert.equal(
-    resolveItineraryTitle({
-      category: "Unknown Category",
-      fromLocation: "",
-      toLocation: "",
-    }),
-    "Unknown Category",
-  );
+    expect(
+      resolveItineraryTitle({
+        category: "   ",
+        fromLocation: "",
+        toLocation: "",
+      }),
+    ).toBe("Activity detail pending");
 
-  assert.equal(
-    resolveItineraryTitle({
-      category: "   ",
-      fromLocation: "",
-      toLocation: "",
-    }),
-    "Activity detail pending",
-  );
+    expect(formatRouteSummary("departure", "Madinah", "MED")).toBe("Depart from Madinah to MED");
+    expect(formatRouteSummary("city-tour", "Lobby", "Quba")).toBe("Lobby -> Quba");
+  });
 
-  assert.equal(formatRouteSummary("departure", "Madinah", "MED"), "Depart from Madinah to MED");
-  assert.equal(formatRouteSummary("city-tour", "Lobby", "Quba"), "Lobby -> Quba");
-}
+  runCase("normalization", () => {
+    const fields = buildMemoryGroupPayloadFields(createPayload());
+    const timeline = fields.timeline ?? [];
+    const notes = fields.notes ?? [];
+    expect(fields.name).toBe("Memory Group");
+    expect(fields.status).toBe("Active");
+    expect(fields.packageName).toBe("Standard Gold");
+    expect(fields.arrivalDate).toBe("2026-04-10");
+    expect(fields.returnDate).toBe("2026-04-18");
+    expect(fields.totalBuses).toBe(2);
 
-function testBuildMemoryGroupPayloadFieldsNormalizationAndDefaults(): void {
-  const fields = buildMemoryGroupPayloadFields(createPayload());
-  const timeline = fields.timeline ?? [];
-  const notes = fields.notes ?? [];
-  assert.equal(fields.name, "Memory Group");
-  assert.equal(fields.status, "Active");
-  assert.equal(fields.packageName, "Standard Gold");
-  assert.equal(fields.arrivalDate, "2026-04-10");
-  assert.equal(fields.returnDate, "2026-04-18");
-  assert.equal(fields.totalBuses, 2);
+    expect(timeline.length).toBe(2);
+    expect(timeline[0].sortOrder).toBe(0);
+    expect(timeline[1].sortOrder).toBe(9);
+    expect(timeline[0].nextActivity).toBe("Check in");
 
-  assert.equal(timeline.length, 2);
-  assert.equal(timeline[0].sortOrder, 0);
-  assert.equal(timeline[1].sortOrder, 9);
-  assert.equal(timeline[0].nextActivity, "Check in");
+    expect(fields.itinerary.length).toBe(2);
+    expect(fields.itinerary[0].sortOrder).toBe(0);
+    expect(fields.itinerary[1].sortOrder).toBe(7);
+    expect(fields.itinerary[0].category).toBe("Arrival");
+    expect(fields.itinerary[0].title).toBe("Landing at JED and heading to Makkah");
+    expect(fields.itinerary[1].title).toBe("City Tour in Madinah: Lobby -> Quba");
+    expect(fields.itinerary[1].transferByTrain).toBe(true);
+    expect(fields.itinerary[1].trainDepartureTime).toBe("09:00");
+    expect(fields.itinerary[1].destinationPickupTime).toBe("10:10");
+    expect(fields.itinerary[1].hotelPickupRequestTime).toBe("07:45");
 
-  assert.equal(fields.itinerary.length, 2);
-  assert.equal(fields.itinerary[0].sortOrder, 0);
-  assert.equal(fields.itinerary[1].sortOrder, 7);
-  assert.equal(fields.itinerary[0].category, "Arrival");
-  assert.equal(fields.itinerary[0].title, "Landing at JED and heading to Makkah");
-  assert.equal(fields.itinerary[1].title, "City Tour in Madinah: Lobby -> Quba");
-  assert.equal(fields.itinerary[1].transferByTrain, true);
-  assert.equal(fields.itinerary[1].trainDepartureTime, "09:00");
-  assert.equal(fields.itinerary[1].destinationPickupTime, "10:10");
-  assert.equal(fields.itinerary[1].hotelPickupRequestTime, "07:45");
+    expect(notes.length).toBe(2);
+    expect(notes[0].sortOrder).toBe(0);
+    expect(notes[1].sortOrder).toBe(9);
+    expect(notes[0].text).toBe("Note A");
 
-  assert.equal(notes.length, 2);
-  assert.equal(notes[0].sortOrder, 0);
-  assert.equal(notes[1].sortOrder, 9);
-  assert.equal(notes[0].text, "Note A");
+    expect(fields.visaSetup).toBeTruthy();
+    expect(fields.visaSetup?.visaStatus).toBe(VisaStatus.PENDING);
+    expect(fields.visaSetup?.issuedDate).toBe("2026-04-01");
+    expect(fields.visaSetup?.syarikah).toBe("Provider Test");
+    expect(fields.visaSetup?.paymentStatus).toBe(VisaPaymentStatus.PARTIAL);
+    expect(fields.visaSetup?.hotelAgreements.length).toBe(1);
+    expect(fields.visaSetup?.hotelAgreements[0].hotelName).toBe("Swissotel");
+    expect(fields.visaSetup?.raudhahAppointments[0].status).toBe(GroupRaudhahStatus.AFTER);
+    expect(fields.visaSetup?.raudhahAppointments[0].tasrehPrinted).toBe(true);
 
-  assert.ok(fields.visaSetup);
-  assert.equal(fields.visaSetup?.visaStatus, VisaStatus.PENDING);
-  assert.equal(fields.visaSetup?.issuedDate, "2026-04-01");
-  assert.equal(fields.visaSetup?.syarikah, "Provider Test");
-  assert.equal(fields.visaSetup?.paymentStatus, VisaPaymentStatus.PARTIAL);
-  assert.equal(fields.visaSetup?.hotelAgreements.length, 1);
-  assert.equal(fields.visaSetup?.hotelAgreements[0].hotelName, "Swissotel");
-  assert.equal(fields.visaSetup?.raudhahAppointments[0].status, GroupRaudhahStatus.AFTER);
-  assert.equal(fields.visaSetup?.raudhahAppointments[0].tasrehPrinted, true);
+    expect(fields.checklistAssignments.length).toBe(1);
+    expect(fields.checklistAssignments[0].activity).toBe("Arrival");
+    expect(fields.checklistAssignments[0].tripLabel).toBe("Airport Pickup");
+    expect(fields.checklistAssignments[0].scheduledTime).toBe("08:30");
+    expect(fields.checklistAssignments[0].drivers.length).toBe(1);
+    expect(fields.checklistAssignments[0].drivers[0].slotNumber).toBe(1);
+    expect(fields.checklistAssignments[0].drivers[0].name).toBe("Driver A");
+  });
 
-  assert.equal(fields.checklistAssignments.length, 1);
-  assert.equal(fields.checklistAssignments[0].activity, "Arrival");
-  assert.equal(fields.checklistAssignments[0].tripLabel, "Airport Pickup");
-  assert.equal(fields.checklistAssignments[0].scheduledTime, "08:30");
-  assert.equal(fields.checklistAssignments[0].drivers.length, 1);
-  assert.equal(fields.checklistAssignments[0].drivers[0].slotNumber, 1);
-  assert.equal(fields.checklistAssignments[0].drivers[0].name, "Driver A");
-}
+  runCase("defaults and invalid date", () => {
+    const minimal = buildMemoryGroupPayloadFields(
+      createPayload({
+        tone: undefined,
+        totalBuses: undefined,
+        musyrif: undefined,
+        nextActivity: undefined,
+        timeline: undefined,
+        itinerary: undefined,
+        notes: undefined,
+        visaSetup: undefined,
+        checklistAssignments: undefined,
+      }),
+    );
+    const minimalTimeline = minimal.timeline ?? [];
+    const minimalNotes = minimal.notes ?? [];
 
-function testBuildMemoryGroupPayloadFieldsFallbackDefaultsAndInvalidDate(): void {
-  const minimal = buildMemoryGroupPayloadFields(
-    createPayload({
-      tone: undefined,
-      totalBuses: undefined,
-      musyrif: undefined,
-      nextActivity: undefined,
-      timeline: undefined,
-      itinerary: undefined,
-      notes: undefined,
-      visaSetup: undefined,
-      checklistAssignments: undefined,
-    }),
-  );
-  const minimalTimeline = minimal.timeline ?? [];
-  const minimalNotes = minimal.notes ?? [];
+    expect(minimal.tone).toBe(GroupTone.ACTIVE);
+    expect(minimal.totalBuses).toBeNull();
+    expect(minimal.musyrif).toBeUndefined();
+    expect(minimal.nextActivity).toBeUndefined();
+    expect(minimalTimeline.length).toBe(0);
+    expect(minimal.itinerary.length).toBe(0);
+    expect(minimalNotes.length).toBe(0);
+    expect(minimal.visaSetup).toBeUndefined();
+    expect(minimal.checklistAssignments.length).toBe(0);
 
-  assert.equal(minimal.tone, GroupTone.ACTIVE);
-  assert.equal(minimal.totalBuses, null);
-  assert.equal(minimal.musyrif, undefined);
-  assert.equal(minimal.nextActivity, undefined);
-  assert.equal(minimalTimeline.length, 0);
-  assert.equal(minimal.itinerary.length, 0);
-  assert.equal(minimalNotes.length, 0);
-  assert.equal(minimal.visaSetup, undefined);
-  assert.equal(minimal.checklistAssignments.length, 0);
-
-  assert.throws(
-    () =>
+    expect(() =>
       buildMemoryGroupPayloadFields(
         createPayload({
           arrivalDate: "invalid-date",
         }),
       ),
-    /Invalid ISO date value/i,
-  );
-}
-
-async function main(): Promise<void> {
-  await runCase("groups itinerary title helper branches", testResolveItineraryTitleBranches);
-  await runCase("groups memory payload normalization", testBuildMemoryGroupPayloadFieldsNormalizationAndDefaults);
-  await runCase("groups memory payload defaults and invalid date", testBuildMemoryGroupPayloadFieldsFallbackDefaultsAndInvalidDate);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Groups memory payload test failed:", error);
-  process.exitCode = 1;
+    ).toThrow(/Invalid ISO date value/i);
+  });
 });

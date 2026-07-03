@@ -1,4 +1,6 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
+import { withEnv } from "../test/with-env";
 import { createHmac } from "node:crypto";
 import {
   ConflictException,
@@ -52,45 +54,6 @@ type PrismaMockState = {
 type PrismaMock = PrismaService & {
   __state: PrismaMockState;
 };
-
-async function withEnv<T>(
-  overrides: Record<string, string | undefined>,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const previousValues = new Map<string, string | undefined>();
-  for (const [key, value] of Object.entries(overrides)) {
-    previousValues.set(key, process.env[key]);
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-
-  try {
-    return await fn();
-  } finally {
-    for (const [key, previousValue] of previousValues.entries()) {
-      if (previousValue === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = previousValue;
-      }
-    }
-  }
-}
-
-async function assertRejectsWithMessage(
-  fn: () => Promise<unknown>,
-  expectedType: new (...args: any[]) => Error,
-  messageRegex: RegExp,
-): Promise<void> {
-  await assert.rejects(fn, (error: unknown) => {
-    assert.equal(error instanceof expectedType, true);
-    assert.match((error as Error).message, messageRegex);
-    return true;
-  });
-}
 
 function selectFields<T extends object>(
   record: T,
@@ -324,599 +287,529 @@ function createSignature(unsignedToken: string, secret: string): string {
   return createHmac("sha256", secret).update(unsignedToken, "utf8").digest("base64url");
 }
 
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
+describe("AuthService (Prisma)", () => {
+  runCase("prisma login and managed user CRUD", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const prisma = createPrismaServiceMock({
+          users: [
+            createPrismaUser({
+              id: "usr-super",
+              name: "Super Admin",
+              email: "super.admin@example.com",
+              username: "super.admin",
+              role: "SUPER_ADMIN",
+              passwordHash: hashAuthPassword("Super#2026"),
+            }),
+            createPrismaUser({
+              id: "usr-admin",
+              name: "Admin User",
+              email: "admin.user@example.com",
+              username: "admin.user",
+              role: "ADMIN",
+              passwordHash: hashAuthPassword("Admin#2026"),
+            }),
+            createPrismaUser({
+              id: "usr-finance",
+              name: "Finance User",
+              email: "finance.user@example.com",
+              username: "finance.user",
+              role: "FINANCE_MANAGER",
+              passwordHash: hashAuthPassword("Finance#2026"),
+            }),
+            createPrismaUser({
+              id: "usr-existing",
+              name: "Existing New User",
+              email: "existing.new.user@example.com",
+              username: "new.user",
+              role: "CUSTOMER_SUPPORT",
+              passwordHash: null,
+            }),
+          ],
+        });
 
-async function testPrismaLoginAndManagedUserCrudFlow(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const prisma = createPrismaServiceMock({
-        users: [
-          createPrismaUser({
-            id: "usr-super",
-            name: "Super Admin",
-            email: "super.admin@example.com",
-            username: "super.admin",
-            role: "SUPER_ADMIN",
-            passwordHash: hashAuthPassword("Super#2026"),
-          }),
-          createPrismaUser({
-            id: "usr-admin",
-            name: "Admin User",
-            email: "admin.user@example.com",
-            username: "admin.user",
-            role: "ADMIN",
-            passwordHash: hashAuthPassword("Admin#2026"),
-          }),
-          createPrismaUser({
-            id: "usr-finance",
-            name: "Finance User",
-            email: "finance.user@example.com",
-            username: "finance.user",
-            role: "FINANCE_MANAGER",
-            passwordHash: hashAuthPassword("Finance#2026"),
-          }),
-          createPrismaUser({
-            id: "usr-existing",
-            name: "Existing New User",
-            email: "existing.new.user@example.com",
-            username: "new.user",
-            role: "CUSTOMER_SUPPORT",
-            passwordHash: null,
-          }),
-        ],
-      });
+        const service = new AuthService(prisma);
+        const loginResponse = await service.login({
+          identifier: "  ADMIN.USER@EXAMPLE.COM  ",
+          password: "Admin#2026",
+          rememberSession: true,
+        });
 
-      const service = new AuthService(prisma);
-      const loginResponse = await service.login({
-        identifier: "  ADMIN.USER@EXAMPLE.COM  ",
-        password: "Admin#2026",
-        rememberSession: true,
-      });
+        expect(loginResponse.user.accessTier).toBe("admin");
+        expect(loginResponse.rememberSession).toBe(true);
+        expect(loginResponse.tokenType).toBe("Bearer");
+        expect(loginResponse.user.email).toBe("admin.user@example.com");
 
-      assert.equal(loginResponse.user.accessTier, "admin");
-      assert.equal(loginResponse.rememberSession, true);
-      assert.equal(loginResponse.tokenType, "Bearer");
-      assert.equal(loginResponse.user.email, "admin.user@example.com");
+        const managedUsers = await service.listManagedUsers();
+        expect(managedUsers.length).toBe(4);
+        expect(managedUsers[0].name).toBe("Admin User");
+        expect(managedUsers.some((entry) => entry.roleId === "finance-manager")).toBe(true);
+        expect(managedUsers.some((entry) => entry.hasPassword === false)).toBe(true);
 
-      const managedUsers = await service.listManagedUsers();
-      assert.equal(managedUsers.length, 4);
-      assert.equal(managedUsers[0].name, "Admin User");
-      assert.equal(managedUsers.some((entry) => entry.roleId === "finance-manager"), true);
-      assert.equal(managedUsers.some((entry) => entry.hasPassword === false), true);
+        const created = await service.createManagedUser({
+          name: "  New User  ",
+          email: "New.User@example.com",
+          roleId: "customer-support",
+        });
+        expect(created.name).toBe("New User");
+        expect(created.email).toBe("new.user@example.com");
+        expect(created.roleId).toBe("customer-support");
+        expect(created.hasPassword).toBe(false);
+        expect(
+          prisma.__state.users.some((entry) => entry.username === "new.user.1"),
+        ).toBe(true);
 
-      const created = await service.createManagedUser({
-        name: "  New User  ",
-        email: "New.User@example.com",
-        roleId: "customer-support",
-      });
-      assert.equal(created.name, "New User");
-      assert.equal(created.email, "new.user@example.com");
-      assert.equal(created.roleId, "customer-support");
-      assert.equal(created.hasPassword, false);
-      assert.equal(
-        prisma.__state.users.some((entry) => entry.username === "new.user.1"),
-        true,
-      );
+        const updated = await service.updateManagedUser(created.id, {
+          name: "  New User Updated  ",
+          email: "new.user.updated@example.com",
+          roleId: "admin",
+        });
+        expect(updated.name).toBe("New User Updated");
+        expect(updated.email).toBe("new.user.updated@example.com");
+        expect(updated.roleId).toBe("admin");
 
-      const updated = await service.updateManagedUser(created.id, {
-        name: "  New User Updated  ",
-        email: "new.user.updated@example.com",
-        roleId: "admin",
-      });
-      assert.equal(updated.name, "New User Updated");
-      assert.equal(updated.email, "new.user.updated@example.com");
-      assert.equal(updated.roleId, "admin");
+        await service.deleteManagedUser(created.id);
+        expect(
+          prisma.__state.users.some((entry) => entry.id === created.id),
+        ).toBe(false);
+        expect(prisma.__state.findUniqueCalls > 0).toBe(true);
+      },
+    );
+  });
 
-      await service.deleteManagedUser(created.id);
-      assert.equal(
-        prisma.__state.users.some((entry) => entry.id === created.id),
-        false,
-      );
-      assert.equal(prisma.__state.findUniqueCalls > 0, true);
-    },
-  );
-}
+  runCase("prisma managed user password provisioning", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const prisma = createPrismaServiceMock({
+          users: [
+            createPrismaUser({
+              id: "usr-super",
+              name: "Super Admin",
+              email: "super.admin@example.com",
+              username: "super.admin",
+              role: "SUPER_ADMIN",
+              passwordHash: hashAuthPassword("Super#2026"),
+            }),
+            createPrismaUser({
+              id: "usr-operator",
+              name: "Operator Admin",
+              email: "operator.admin@example.com",
+              username: "operator.admin",
+              role: "ADMIN",
+              passwordHash: null,
+            }),
+          ],
+        });
 
-async function testPrismaManagedUserPasswordProvisioningFlow(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const prisma = createPrismaServiceMock({
-        users: [
-          createPrismaUser({
-            id: "usr-super",
-            name: "Super Admin",
-            email: "super.admin@example.com",
-            username: "super.admin",
-            role: "SUPER_ADMIN",
-            passwordHash: hashAuthPassword("Super#2026"),
-          }),
-          createPrismaUser({
-            id: "usr-operator",
-            name: "Operator Admin",
-            email: "operator.admin@example.com",
-            username: "operator.admin",
-            role: "ADMIN",
-            passwordHash: null,
-          }),
-        ],
-      });
+        const service = new AuthService(prisma);
+        const created = await service.createManagedUser({
+          name: "  Access Admin  ",
+          email: "Access.Admin@example.com",
+          roleId: "admin",
+          password: "AccessAdmin#2026",
+        });
+        expect(created.hasPassword).toBe(true);
 
-      const service = new AuthService(prisma);
-      const created = await service.createManagedUser({
-        name: "  Access Admin  ",
-        email: "Access.Admin@example.com",
-        roleId: "admin",
-        password: "AccessAdmin#2026",
-      });
-      assert.equal(created.hasPassword, true);
+        const createdLogin = await service.login({
+          identifier: "access.admin@example.com",
+          password: "AccessAdmin#2026",
+        });
+        expect(createdLogin.user.accessTier).toBe("admin");
 
-      const createdLogin = await service.login({
-        identifier: "access.admin@example.com",
-        password: "AccessAdmin#2026",
-      });
-      assert.equal(createdLogin.user.accessTier, "admin");
+        const reset = await service.setManagedUserPassword("usr-operator", "Operator#2026");
+        expect(reset.hasPassword).toBe(true);
 
-      const reset = await service.setManagedUserPassword("usr-operator", "Operator#2026");
-      assert.equal(reset.hasPassword, true);
+        const resetLogin = await service.login({
+          identifier: "operator.admin@example.com",
+          password: "Operator#2026",
+        });
+        expect(resetLogin.user.accessTier).toBe("admin");
+      },
+    );
+  });
 
-      const resetLogin = await service.login({
-        identifier: "operator.admin@example.com",
-        password: "Operator#2026",
-      });
-      assert.equal(resetLogin.user.accessTier, "admin");
-    },
-  );
-}
+  runCase("prisma login upgrades legacy password hash", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const legacyHash = createLegacyScryptPasswordHashForTest("Admin#2026");
+        const prisma = createPrismaServiceMock({
+          users: [
+            createPrismaUser({
+              id: "usr-admin",
+              name: "Admin User",
+              email: "admin.user@example.com",
+              username: "admin.user",
+              role: "ADMIN",
+              passwordHash: legacyHash,
+            }),
+          ],
+        });
 
-async function testPrismaLoginUpgradesLegacyPasswordHash(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const legacyHash = createLegacyScryptPasswordHashForTest("Admin#2026");
-      const prisma = createPrismaServiceMock({
-        users: [
-          createPrismaUser({
-            id: "usr-admin",
-            name: "Admin User",
-            email: "admin.user@example.com",
-            username: "admin.user",
-            role: "ADMIN",
-            passwordHash: legacyHash,
-          }),
-        ],
-      });
+        const service = new AuthService(prisma);
+        const loginResponse = await service.login({
+          identifier: "admin.user@example.com",
+          password: "Admin#2026",
+        });
 
-      const service = new AuthService(prisma);
-      const loginResponse = await service.login({
-        identifier: "admin.user@example.com",
-        password: "Admin#2026",
-      });
+        expect(loginResponse.user.accessTier).toBe("admin");
+        expect(prisma.__state.updateCalls).toBe(1);
 
-      assert.equal(loginResponse.user.accessTier, "admin");
-      assert.equal(prisma.__state.updateCalls, 1);
+        const upgradedHash = prisma.__state.users[0]?.passwordHash ?? "";
+        expect(upgradedHash).not.toBe(legacyHash);
+        expect(upgradedHash).toMatch(/^\$2[aby]\$\d{2}\$/);
+        expect(verifyAuthPassword("Admin#2026", upgradedHash)).toBe(true);
+      },
+    );
+  });
 
-      const upgradedHash = prisma.__state.users[0]?.passwordHash ?? "";
-      assert.notEqual(upgradedHash, legacyHash);
-      assert.match(upgradedHash, /^\$2[aby]\$\d{2}\$/);
-      assert.equal(verifyAuthPassword("Admin#2026", upgradedHash), true);
-    },
-  );
-}
+  runCase("prisma login tolerates legacy password rehash failure", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const legacyHash = createLegacyScryptPasswordHashForTest("Admin#2026");
+        const prisma = createPrismaServiceMock({
+          failUpdateOnce: true,
+          users: [
+            createPrismaUser({
+              id: "usr-admin",
+              name: "Admin User",
+              email: "admin.user@example.com",
+              username: "admin.user",
+              role: "ADMIN",
+              passwordHash: legacyHash,
+            }),
+          ],
+        });
 
-async function testPrismaLoginStillSucceedsWhenLegacyHashUpgradeFails(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const legacyHash = createLegacyScryptPasswordHashForTest("Admin#2026");
-      const prisma = createPrismaServiceMock({
-        failUpdateOnce: true,
-        users: [
-          createPrismaUser({
-            id: "usr-admin",
-            name: "Admin User",
-            email: "admin.user@example.com",
-            username: "admin.user",
-            role: "ADMIN",
-            passwordHash: legacyHash,
-          }),
-        ],
-      });
+        const service = new AuthService(prisma);
+        const loginResponse = await service.login({
+          identifier: "admin.user@example.com",
+          password: "Admin#2026",
+        });
 
-      const service = new AuthService(prisma);
-      const loginResponse = await service.login({
-        identifier: "admin.user@example.com",
-        password: "Admin#2026",
-      });
+        expect(loginResponse.user.accessTier).toBe("admin");
+        expect(prisma.__state.updateCalls).toBe(1);
+        expect(prisma.__state.users[0]?.passwordHash).toBe(legacyHash);
+      },
+    );
+  });
 
-      assert.equal(loginResponse.user.accessTier, "admin");
-      assert.equal(prisma.__state.updateCalls, 1);
-      assert.equal(prisma.__state.users[0]?.passwordHash, legacyHash);
-    },
-  );
-}
+  runCase("prisma conflict and protection branches", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const prisma = createPrismaServiceMock({
+          users: [
+            createPrismaUser({
+              id: "usr-super",
+              name: "Solo Super Admin",
+              email: "solo.super@example.com",
+              username: "solo.super",
+              role: "SUPER_ADMIN",
+              passwordHash: hashAuthPassword("Super#2026"),
+            }),
+            createPrismaUser({
+              id: "usr-admin",
+              name: "Admin User",
+              email: "admin.user@example.com",
+              username: "admin.user",
+              role: "ADMIN",
+              passwordHash: hashAuthPassword("Admin#2026"),
+            }),
+            createPrismaUser({
+              id: "usr-finance",
+              name: "Finance User",
+              email: "finance.user@example.com",
+              username: "finance.user",
+              role: "FINANCE_MANAGER",
+              passwordHash: hashAuthPassword("Finance#2026"),
+            }),
+          ],
+        });
 
-async function testPrismaConflictAndProtectionBranches(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const prisma = createPrismaServiceMock({
-        users: [
-          createPrismaUser({
-            id: "usr-super",
-            name: "Solo Super Admin",
-            email: "solo.super@example.com",
-            username: "solo.super",
-            role: "SUPER_ADMIN",
-            passwordHash: hashAuthPassword("Super#2026"),
-          }),
-          createPrismaUser({
-            id: "usr-admin",
-            name: "Admin User",
-            email: "admin.user@example.com",
-            username: "admin.user",
-            role: "ADMIN",
-            passwordHash: hashAuthPassword("Admin#2026"),
-          }),
-          createPrismaUser({
-            id: "usr-finance",
-            name: "Finance User",
-            email: "finance.user@example.com",
-            username: "finance.user",
-            role: "FINANCE_MANAGER",
-            passwordHash: hashAuthPassword("Finance#2026"),
-          }),
-        ],
-      });
+        const service = new AuthService(prisma);
 
-      const service = new AuthService(prisma);
-
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.login({
             identifier: "finance.user@example.com",
             password: "Finance#2026",
           }),
-        UnauthorizedException,
-        /not allowed/i,
-      );
+        ).rejects.toThrow(/not allowed/i);
 
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.login({
             identifier: "admin.user@example.com",
             password: "wrong-password",
           }),
-        UnauthorizedException,
-        /invalid username\/email or password/i,
-      );
+        ).rejects.toThrow(/invalid username\/email or password/i);
 
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.createManagedUser({
             name: " ",
             email: " ",
             roleId: "admin",
           }),
-        ConflictException,
-        /name and email are required/i,
-      );
+        ).rejects.toThrow(/name and email are required/i);
 
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.createManagedUser({
             name: "Duplicate",
             email: "ADMIN.USER@EXAMPLE.COM",
             roleId: "admin",
           }),
-        ConflictException,
-        /already used by another user/i,
-      );
+        ).rejects.toThrow(/already used by another user/i);
 
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.updateManagedUser("missing-id", {
             name: "Missing",
             email: "missing@example.com",
             roleId: "admin",
           }),
-        NotFoundException,
-        /not found/i,
-      );
+        ).rejects.toThrow(/not found/i);
 
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.updateManagedUser("usr-admin", {
             name: "Admin Duplicate",
             email: "solo.super@example.com",
             roleId: "admin",
           }),
-        ConflictException,
-        /already used by another user/i,
-      );
+        ).rejects.toThrow(/already used by another user/i);
 
-      await assertRejectsWithMessage(
-        () =>
+        await expect(
           service.updateManagedUser("usr-super", {
             name: "Super Demoted",
             email: "solo.super@example.com",
             roleId: "admin",
           }),
-        ConflictException,
-        /at least one super admin must remain/i,
-      );
+        ).rejects.toThrow(/at least one super admin must remain/i);
 
-      await assertRejectsWithMessage(
-        () => service.deleteManagedUser("usr-super"),
-        ConflictException,
-        /at least one super admin must remain/i,
-      );
+        await expect(service.deleteManagedUser("usr-super")).rejects.toThrow(
+          /at least one super admin must remain/i,
+        );
 
-      await assertRejectsWithMessage(
-        () => service.deleteManagedUser("missing-id"),
-        NotFoundException,
-        /not found/i,
-      );
-    },
-  );
-}
+        await expect(service.deleteManagedUser("missing-id")).rejects.toThrow(
+          /not found/i,
+        );
+      },
+    );
+  });
 
-async function testPrismaBootstrapAndRetryAfterFailure(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
-      NODE_ENV: "test",
-      DEV_AUTH_SUPERADMIN_PASSWORD: undefined,
-      DEV_AUTH_ADMIN_PASSWORD: undefined,
-    },
-    async () => {
-      const prisma = createPrismaServiceMock();
-      const service = new AuthService(prisma);
+  runCase("prisma bootstrap and retry", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
+        NODE_ENV: "test",
+        DEV_AUTH_SUPERADMIN_PASSWORD: undefined,
+        DEV_AUTH_ADMIN_PASSWORD: undefined,
+      },
+      async () => {
+        const prisma = createPrismaServiceMock();
+        const service = new AuthService(prisma);
 
-      await assertRejectsWithMessage(
-        () => service.listManagedUsers(),
-        Error,
-        /DEV_AUTH_SUPERADMIN_PASSWORD.*DEV_AUTH_ADMIN_PASSWORD/i,
-      );
-      assert.equal(prisma.__state.createCalls, 0);
-    },
-  );
+        await expect(service.listManagedUsers()).rejects.toThrow(
+          /DEV_AUTH_SUPERADMIN_PASSWORD.*DEV_AUTH_ADMIN_PASSWORD/i,
+        );
+        expect(prisma.__state.createCalls).toBe(0);
+      },
+    );
 
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
-      DEV_AUTH_SUPERADMIN_PASSWORD: "BootstrapSuper#2026",
-      DEV_AUTH_ADMIN_PASSWORD: "BootstrapAdmin#2026",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const prisma = createPrismaServiceMock();
-      const service = new AuthService(prisma);
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
+        DEV_AUTH_SUPERADMIN_PASSWORD: "BootstrapSuper#2026",
+        DEV_AUTH_ADMIN_PASSWORD: "BootstrapAdmin#2026",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const prisma = createPrismaServiceMock();
+        const service = new AuthService(prisma);
 
-      const firstList = await service.listManagedUsers();
-      assert.equal(firstList.length, 2);
-      assert.equal(prisma.__state.createCalls, 2);
+        const firstList = await service.listManagedUsers();
+        expect(firstList.length).toBe(2);
+        expect(prisma.__state.createCalls).toBe(2);
 
-      const secondList = await service.listManagedUsers();
-      assert.equal(secondList.length, 2);
-      assert.equal(prisma.__state.createCalls, 2);
+        const secondList = await service.listManagedUsers();
+        expect(secondList.length).toBe(2);
+        expect(prisma.__state.createCalls).toBe(2);
 
-      const failingPrisma = createPrismaServiceMock({ failCreateOnce: true });
-      const failingService = new AuthService(failingPrisma);
+        const failingPrisma = createPrismaServiceMock({ failCreateOnce: true });
+        const failingService = new AuthService(failingPrisma);
 
-      await assertRejectsWithMessage(
-        () => failingService.listManagedUsers(),
-        Error,
-        /bootstrap failure/i,
-      );
+        await expect(failingService.listManagedUsers()).rejects.toThrow(
+          /bootstrap failure/i,
+        );
 
-      const recoveredList = await failingService.listManagedUsers();
-      assert.equal(recoveredList.length, 2);
-      assert.equal(failingPrisma.__state.createCalls, 3);
-    },
-  );
-}
+        const recoveredList = await failingService.listManagedUsers();
+        expect(recoveredList.length).toBe(2);
+        expect(failingPrisma.__state.createCalls).toBe(3);
+      },
+    );
+  });
 
-async function testTokenValidationAndEnvironmentGuards(): Promise<void> {
-  await withEnv(
-    {
-      DATA_SOURCE: "memory",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const service = new AuthService({} as PrismaService);
-      const validLogin = await service.login({
-        identifier: "dev.superadmin",
-        password: "DevSuperAdmin#2026",
-      });
-      assert.equal(validLogin.tokenType, "Bearer");
+  runCase("token validation and environment guards", async () => {
+    await withEnv(
+      {
+        DATA_SOURCE: "memory",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const service = new AuthService({} as PrismaService);
+        const validLogin = await service.login({
+          identifier: "dev.superadmin",
+          password: "DevSuperAdmin#2026",
+        });
+        expect(validLogin.tokenType).toBe("Bearer");
 
-      assert.throws(() => service.verifyAccessToken("invalid-token"), (error: unknown) => {
-        assert.equal(error instanceof UnauthorizedException, true);
-        assert.match((error as Error).message, /invalid access token format/i);
-        return true;
-      });
+        expect(() => service.verifyAccessToken("invalid-token")).toThrow(
+          /invalid access token format/i,
+        );
 
-      const encodedHeader = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" }), "utf8").toString("base64url");
-      const invalidPayload = "%%%";
-      const invalidPayloadToken = `${encodedHeader}.${invalidPayload}.${createSignature(
-        `${encodedHeader}.${invalidPayload}`,
-        "unit-test-secret",
-      )}`;
-      assert.throws(() => service.verifyAccessToken(invalidPayloadToken), (error: unknown) => {
-        assert.equal(error instanceof UnauthorizedException, true);
-        assert.match((error as Error).message, /invalid access token payload/i);
-        return true;
-      });
+        const encodedHeader = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" }), "utf8").toString("base64url");
+        const invalidPayload = "%%%";
+        const invalidPayloadToken = `${encodedHeader}.${invalidPayload}.${createSignature(
+          `${encodedHeader}.${invalidPayload}`,
+          "unit-test-secret",
+        )}`;
+        expect(() => service.verifyAccessToken(invalidPayloadToken)).toThrow(
+          /invalid access token payload/i,
+        );
 
-      const encodedStringHeader = Buffer.from(JSON.stringify("not-an-object"), "utf8").toString("base64url");
-      const encodedMinimalPayload = Buffer.from(
-        JSON.stringify({
-          id: "id-1",
-          name: "Name",
-          username: "username",
-          email: "email@example.com",
-          accessTier: "admin",
-          exp: Math.floor(Date.now() / 1000) + 60,
-        }),
-        "utf8",
-      ).toString("base64url");
-      const invalidHeaderToken = `${encodedStringHeader}.${encodedMinimalPayload}.${createSignature(
-        `${encodedStringHeader}.${encodedMinimalPayload}`,
-        "unit-test-secret",
-      )}`;
-      assert.throws(() => service.verifyAccessToken(invalidHeaderToken), (error: unknown) => {
-        assert.equal(error instanceof UnauthorizedException, true);
-        assert.match((error as Error).message, /invalid access token header/i);
-        return true;
-      });
-
-      const encodedInvalidClaimsPayload = Buffer.from(
-        JSON.stringify({
-          id: "id-1",
-          name: "Name",
-          username: "username",
-          email: "email@example.com",
-          accessTier: "admin",
-          exp: -100,
-        }),
-        "utf8",
-      ).toString("base64url");
-      const invalidClaimsToken = `${encodedHeader}.${encodedInvalidClaimsPayload}.${createSignature(
-        `${encodedHeader}.${encodedInvalidClaimsPayload}`,
-        "unit-test-secret",
-      )}`;
-      assert.throws(() => service.verifyAccessToken(invalidClaimsToken), (error: unknown) => {
-        assert.equal(error instanceof UnauthorizedException, true);
-        assert.match((error as Error).message, /invalid access token claims/i);
-        return true;
-      });
-    },
-  );
-
-  await withEnv(
-    {
-      DATA_SOURCE: "memory",
-      AUTH_SECRET: undefined,
-      NODE_ENV: "production",
-    },
-    async () => {
-      assert.throws(
-        () => new AuthService({} as PrismaService),
-        (error: unknown) => {
-          assert.match((error as Error).message, /AUTH_SECRET is required in production/i);
-          return true;
-        },
-      );
-    },
-  );
-
-  await withEnv(
-    {
-      DATA_SOURCE: "prisma",
-      AUTH_SECRET: "unit-test-secret",
-      AUTH_BOOTSTRAP_DEFAULT_USERS: undefined,
-      DEV_AUTH_SUPERADMIN_PASSWORD: "UnusedSuper#2026",
-      DEV_AUTH_ADMIN_PASSWORD: "UnusedAdmin#2026",
-      NODE_ENV: "test",
-    },
-    async () => {
-      const prisma = createPrismaServiceMock({
-        users: [
-          createPrismaUser({
-            id: "usr-admin",
-            name: "Admin User",
-            email: "admin.user@example.com",
-            username: "admin.user",
-            role: "ADMIN",
-            passwordHash: hashAuthPassword("Admin#2026"),
+        const encodedStringHeader = Buffer.from(JSON.stringify("not-an-object"), "utf8").toString("base64url");
+        const encodedMinimalPayload = Buffer.from(
+          JSON.stringify({
+            id: "id-1",
+            name: "Name",
+            username: "username",
+            email: "email@example.com",
+            accessTier: "admin",
+            exp: Math.floor(Date.now() / 1000) + 60,
           }),
-        ],
-      });
+          "utf8",
+        ).toString("base64url");
+        const invalidHeaderToken = `${encodedStringHeader}.${encodedMinimalPayload}.${createSignature(
+          `${encodedStringHeader}.${encodedMinimalPayload}`,
+          "unit-test-secret",
+        )}`;
+        expect(() => service.verifyAccessToken(invalidHeaderToken)).toThrow(
+          /invalid access token header/i,
+        );
 
-      const service = new AuthService(prisma);
-      const response = await service.login({
-        identifier: "admin.user@example.com",
-        password: "Admin#2026",
-      });
-      assert.equal(response.user.accessTier, "admin");
-      assert.equal(prisma.__state.findUniqueCalls, 0);
-      assert.equal(prisma.__state.createCalls, 0);
-    },
-  );
+        const encodedInvalidClaimsPayload = Buffer.from(
+          JSON.stringify({
+            id: "id-1",
+            name: "Name",
+            username: "username",
+            email: "email@example.com",
+            accessTier: "admin",
+            exp: -100,
+          }),
+          "utf8",
+        ).toString("base64url");
+        const invalidClaimsToken = `${encodedHeader}.${encodedInvalidClaimsPayload}.${createSignature(
+          `${encodedHeader}.${encodedInvalidClaimsPayload}`,
+          "unit-test-secret",
+        )}`;
+        expect(() => service.verifyAccessToken(invalidClaimsToken)).toThrow(
+          /invalid access token claims/i,
+        );
+      },
+    );
 
-  await withEnv(
-    {
-      DATA_SOURCE: "memory",
-      AUTH_SECRET: undefined,
-      NODE_ENV: "development",
-    },
-    async () => {
-      const service = new AuthService({} as PrismaService);
-      const response = await service.login({
-        identifier: "dev.admin",
-        password: "DevAdmin#2026",
-      });
-      assert.equal(response.user.accessTier, "admin");
-    },
-  );
-}
+    await withEnv(
+      {
+        DATA_SOURCE: "memory",
+        AUTH_SECRET: undefined,
+        NODE_ENV: "production",
+      },
+      async () => {
+        expect(() => new AuthService({} as PrismaService)).toThrow(
+          /AUTH_SECRET is required in production/i,
+        );
+      },
+    );
 
-async function main(): Promise<void> {
-  await runCase("auth prisma login and managed user CRUD", testPrismaLoginAndManagedUserCrudFlow);
-  await runCase(
-    "auth prisma managed user password provisioning",
-    testPrismaManagedUserPasswordProvisioningFlow,
-  );
-  await runCase(
-    "auth prisma login upgrades legacy password hash",
-    testPrismaLoginUpgradesLegacyPasswordHash,
-  );
-  await runCase(
-    "auth prisma login tolerates legacy password rehash failure",
-    testPrismaLoginStillSucceedsWhenLegacyHashUpgradeFails,
-  );
-  await runCase("auth prisma conflict and protection branches", testPrismaConflictAndProtectionBranches);
-  await runCase("auth prisma bootstrap and retry", testPrismaBootstrapAndRetryAfterFailure);
-  await runCase("auth token validation and environment guards", testTokenValidationAndEnvironmentGuards);
-}
+    await withEnv(
+      {
+        DATA_SOURCE: "prisma",
+        AUTH_SECRET: "unit-test-secret",
+        AUTH_BOOTSTRAP_DEFAULT_USERS: undefined,
+        DEV_AUTH_SUPERADMIN_PASSWORD: "UnusedSuper#2026",
+        DEV_AUTH_ADMIN_PASSWORD: "UnusedAdmin#2026",
+        NODE_ENV: "test",
+      },
+      async () => {
+        const prisma = createPrismaServiceMock({
+          users: [
+            createPrismaUser({
+              id: "usr-admin",
+              name: "Admin User",
+              email: "admin.user@example.com",
+              username: "admin.user",
+              role: "ADMIN",
+              passwordHash: hashAuthPassword("Admin#2026"),
+            }),
+          ],
+        });
 
-void main().catch((error: unknown) => {
-  console.error("Auth service prisma test failed:", error);
-  process.exitCode = 1;
+        const service = new AuthService(prisma);
+        const response = await service.login({
+          identifier: "admin.user@example.com",
+          password: "Admin#2026",
+        });
+        expect(response.user.accessTier).toBe("admin");
+        expect(prisma.__state.findUniqueCalls).toBe(0);
+        expect(prisma.__state.createCalls).toBe(0);
+      },
+    );
+
+    await withEnv(
+      {
+        DATA_SOURCE: "memory",
+        AUTH_SECRET: undefined,
+        NODE_ENV: "development",
+      },
+      async () => {
+        const service = new AuthService({} as PrismaService);
+        const response = await service.login({
+          identifier: "dev.admin",
+          password: "DevAdmin#2026",
+        });
+        expect(response.user.accessTier).toBe("admin");
+      },
+    );
+  });
 });

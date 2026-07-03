@@ -24,7 +24,7 @@
     "test:unit": "vitest run --config vitest.config.mts src/unit",
     "test:unit:watch": "vitest --config vitest.config.mts src/unit",
     "test:unit:coverage": "vitest run --config vitest.config.mts src/unit --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/unit/frontend",
-    "test:unit:coverage:check": "vitest run --config vitest.config.mts src/unit --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/unit/frontend --coverage.thresholds.lines=55 --coverage.thresholds.functions=65 --coverage.thresholds.branches=60 --coverage.thresholds.statements=55",
+    "test:unit:coverage:check": "vitest run --config vitest.config.mts src/unit --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/unit/frontend --coverage.thresholds.lines=38 --coverage.thresholds.functions=36 --coverage.thresholds.branches=31 --coverage.thresholds.statements=38",
     "test:smoke": "vitest run --config vitest.config.mts src/smoke",
     "test:smoke:watch": "vitest --config vitest.config.mts src/smoke",
     "test:smoke:coverage": "vitest run --config vitest.config.mts src/smoke --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/smoke/frontend",

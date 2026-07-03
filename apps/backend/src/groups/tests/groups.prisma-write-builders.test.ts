@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../../test/run-case";
 import {
   AgreementApprovalStatus,
   AgreementCity,
@@ -6,7 +7,6 @@ import {
   GroupRaudhahStatus,
   GroupLifecycleStatus,
   GroupTone,
-  Prisma,
   VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
@@ -36,255 +36,241 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
   };
 }
 
-async function runCase(name: string, fn: () => void | Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
+describe("GroupsPrismaWriteBuilders", () => {
+  runCase("prisma write builder total buses behavior", () => {
+    const payload = createPayload({ totalBuses: undefined });
+    const createData = buildGroupCreateData(payload, "G-900");
+    const replaceData = buildGroupReplaceData(payload, "G-900");
 
-function testTotalBusesCreateVsReplaceBehavior(): void {
-  const payload = createPayload({ totalBuses: undefined });
-  const createData = buildGroupCreateData(payload, "G-900");
-  const replaceData = buildGroupReplaceData(payload, "G-900");
+    expect((createData as { totalBuses?: number }).totalBuses).toBe(undefined);
+    expect((replaceData as { totalBuses: number | null }).totalBuses).toBe(null);
+  });
 
-  assert.equal((createData as { totalBuses?: number }).totalBuses, undefined);
-  assert.equal((replaceData as { totalBuses: number | null }).totalBuses, null);
-}
-
-function testTrimAndDefaultMappings(): void {
-  const payload = createPayload({
-    musyrif: {
-      name: " Ust. Trim ",
-      phone: " 0812 ",
-      avatar: " https://example.com/a.png ",
-    },
-    nextActivity: {
-      title: " Arrival ",
-      dateLabel: " 10 Apr ",
-      timeLabel: " 08:00 ",
-      icon: " flight_land ",
-    },
-    itinerary: [
-      {
-        sortOrder: 3,
+  runCase("prisma write builder trim/default mappings", () => {
+    const payload = createPayload({
+      musyrif: {
+        name: " Ust. Trim ",
+        phone: " 0812 ",
+        avatar: " https://example.com/a.png ",
+      },
+      nextActivity: {
+        title: " Arrival ",
         dateLabel: " 10 Apr ",
-        yearLabel: " 2026 ",
-        category: " Arrival ",
-        title: " Jeddah Arrival ",
-        meta: " 08:00 | JED ",
+        timeLabel: " 08:00 ",
         icon: " flight_land ",
-        isoDate: "2026-04-10",
-        time: " 08:00 ",
       },
-    ],
-    notes: [
-      {
-        sortOrder: 0,
-        text: " first note ",
-        pinned: true,
-      },
-    ],
-    visaSetup: {
-      syarikah: " Nusuk ",
-      busStatus: VisaBusStatus.VISA_PLUS,
-      hotelAgreements: [
+      itinerary: [
         {
-          city: AgreementCity.MAKKAH,
-          sourceDraftId: " draft-builder-1 ",
-          hotelName: " Makkah Hotel ",
-          agreementNumber: " AG-101 ",
-          pax: 45,
-          stayStart: "2026-04-10",
-          stayEnd: "2026-04-12",
+          sortOrder: 3,
+          dateLabel: " 10 Apr ",
+          yearLabel: " 2026 ",
+          category: " Arrival ",
+          title: " Jeddah Arrival ",
+          meta: " 08:00 | JED ",
+          icon: " flight_land ",
+          isoDate: "2026-04-10",
+          time: " 08:00 ",
         },
       ],
-      raudhahAppointments: [
+      notes: [
         {
-          date: "2026-04-11",
+          sortOrder: 0,
+          text: " first note ",
+          pinned: true,
         },
       ],
-    },
-    checklistAssignments: [
-      {
-        tripDate: "2026-04-10",
-        activity: " Arrival Transfer ",
-        tripLabel: " Arrival Day ",
-        requiredBusCount: 1,
-        scheduledTime: " 08:00 ",
-        drivers: [
+      visaSetup: {
+        syarikah: " Nusuk ",
+        busStatus: VisaBusStatus.VISA_PLUS,
+        hotelAgreements: [
           {
-            name: " Driver One ",
-            phone: " 08123 ",
-            plateNumber: " B 1234 CD ",
+            city: AgreementCity.MAKKAH,
+            sourceDraftId: " draft-builder-1 ",
+            hotelName: " Makkah Hotel ",
+            agreementNumber: " AG-101 ",
+            pax: 45,
+            stayStart: "2026-04-10",
+            stayEnd: "2026-04-12",
+          },
+        ],
+        raudhahAppointments: [
+          {
+            date: "2026-04-11",
           },
         ],
       },
-    ],
-  });
-
-  const createData = buildGroupCreateData(payload, "G-TRIM");
-  const createDataAny = createData as any;
-
-  assert.equal(createDataAny.name, "Builder Test Group");
-  assert.equal(createDataAny.status, "Active");
-  assert.equal(createDataAny.lifecycleStatus, GroupLifecycleStatus.ACTIVE);
-  assert.equal(createDataAny.packageName, "Standard Gold");
-  assert.equal(
-    createDataAny.searchDocument,
-    "g trim gtrim builder test group buildertestgroup active standard gold standardgold",
-  );
-  assert.equal((createDataAny.arrivalDate as Date).toISOString().slice(0, 10), "2026-04-10");
-  assert.equal((createDataAny.returnDate as Date).toISOString().slice(0, 10), "2026-04-18");
-  assert.equal(createDataAny.musyrif.create.name, "Ust. Trim");
-  assert.equal(createDataAny.nextActivity.create.title, "Arrival");
-  assert.equal(createDataAny.itinerary.create[0].title, "Jeddah Arrival");
-  assert.equal(createDataAny.notes.create[0].text, "first note");
-
-  const itineraryIsoDate = createDataAny.itinerary.create[0].isoDate as Date;
-  assert.equal(itineraryIsoDate.toISOString().slice(0, 10), "2026-04-10");
-
-  const visaSetup = createDataAny.visaSetup.create;
-  assert.equal(visaSetup.visaStatus, VisaStatus.DRAFT);
-  assert.equal(visaSetup.issuedDate, null);
-  assert.equal(visaSetup.busStatus, VisaBusStatus.VISA_PLUS);
-  assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.UNPAID);
-  assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MAKKAH);
-  assert.equal(visaSetup.hotelAgreements.create[0].sourceDraftId, "draft-builder-1");
-  assert.equal(visaSetup.hotelAgreements.create[0].status, AgreementApprovalStatus.WAITING);
-  assert.equal(visaSetup.raudhahAppointments.create[0].status, GroupRaudhahStatus.FREE);
-  assert.equal(visaSetup.hotelAgreements.create[0].hotelName, "Makkah Hotel");
-
-  const checklist = createDataAny.checklistAssignments.create[0];
-  assert.equal(checklist.activity, "Arrival Transfer");
-  assert.equal(checklist.status, ChecklistAssignmentStatus.NOT_COMPLETE);
-  assert.equal(checklist.drivers.create[0].slotNumber, 1);
-  assert.equal(checklist.drivers.create[0].name, "Driver One");
-}
-
-function testItineraryTitleFallbackWithoutExplicitTitle(): void {
-  const payload = createPayload({
-    itinerary: [
-      {
-        sortOrder: 0,
-        dateLabel: " 11 Apr ",
-        yearLabel: " 2026 ",
-        category: " Transfer ",
-        meta: " 09:00 | Route 40 ",
-        icon: " airport_shuttle ",
-        isoDate: "2026-04-11",
-        time: " 09:00 ",
-        fromLocation: " Makkah Hotel ",
-        toLocation: " Madinah Hotel ",
-      },
-    ],
-  });
-
-  const createData = buildGroupCreateData(payload, "G-TITLE");
-  const createDataAny = createData as any;
-
-  assert.equal(createDataAny.itinerary.create[0].title, "Transfer from Makkah Hotel to Madinah Hotel");
-}
-
-function testExplicitStatusesAreRespected(): void {
-  const payload = createPayload({
-    status: "Entry Only",
-    lifecycleStatus: GroupLifecycleStatus.ENTRY_ONLY,
-    tone: GroupTone.INACTIVE,
-    visaSetup: {
-      visaStatus: VisaStatus.ISSUED,
-      issuedDate: "2026-04-14",
-      syarikah: "Provider",
-      paymentStatus: VisaPaymentStatus.PAID,
-      hotelAgreements: [
+      checklistAssignments: [
         {
-          city: AgreementCity.MADINAH,
-          hotelName: "Madinah Hotel",
-          agreementNumber: "AG-MAD-01",
-          pax: 45,
-          status: AgreementApprovalStatus.APPROVED,
-          stayStart: "2026-04-15",
-          stayEnd: "2026-04-18",
+          tripDate: "2026-04-10",
+          activity: " Arrival Transfer ",
+          tripLabel: " Arrival Day ",
+          requiredBusCount: 1,
+          scheduledTime: " 08:00 ",
+          drivers: [
+            {
+              name: " Driver One ",
+              phone: " 08123 ",
+              plateNumber: " B 1234 CD ",
+            },
+          ],
         },
       ],
-      raudhahAppointments: [
+    });
+
+    const createData = buildGroupCreateData(payload, "G-TRIM");
+    const createDataAny = createData as any;
+
+    expect(createDataAny.name).toBe("Builder Test Group");
+    expect(createDataAny.status).toBe("Active");
+    expect(createDataAny.lifecycleStatus).toBe(GroupLifecycleStatus.ACTIVE);
+    expect(createDataAny.packageName).toBe("Standard Gold");
+    expect(
+      createDataAny.searchDocument,
+    ).toBe(
+      "g trim gtrim builder test group buildertestgroup active standard gold standardgold",
+    );
+    expect((createDataAny.arrivalDate as Date).toISOString().slice(0, 10)).toBe("2026-04-10");
+    expect((createDataAny.returnDate as Date).toISOString().slice(0, 10)).toBe("2026-04-18");
+    expect(createDataAny.musyrif.create.name).toBe("Ust. Trim");
+    expect(createDataAny.nextActivity.create.title).toBe("Arrival");
+    expect(createDataAny.itinerary.create[0].title).toBe("Jeddah Arrival");
+    expect(createDataAny.notes.create[0].text).toBe("first note");
+
+    const itineraryIsoDate = createDataAny.itinerary.create[0].isoDate as Date;
+    expect(itineraryIsoDate.toISOString().slice(0, 10)).toBe("2026-04-10");
+
+    const visaSetup = createDataAny.visaSetup.create;
+    expect(visaSetup.visaStatus).toBe(VisaStatus.DRAFT);
+    expect(visaSetup.issuedDate).toBe(null);
+    expect(visaSetup.busStatus).toBe(VisaBusStatus.VISA_PLUS);
+    expect(visaSetup.paymentStatus).toBe(VisaPaymentStatus.UNPAID);
+    expect(visaSetup.hotelAgreements.create[0].city).toBe(AgreementCity.MAKKAH);
+    expect(visaSetup.hotelAgreements.create[0].sourceDraftId).toBe("draft-builder-1");
+    expect(visaSetup.hotelAgreements.create[0].status).toBe(AgreementApprovalStatus.WAITING);
+    expect(visaSetup.raudhahAppointments.create[0].status).toBe(GroupRaudhahStatus.FREE);
+    expect(visaSetup.hotelAgreements.create[0].hotelName).toBe("Makkah Hotel");
+
+    const checklist = createDataAny.checklistAssignments.create[0];
+    expect(checklist.activity).toBe("Arrival Transfer");
+    expect(checklist.status).toBe(ChecklistAssignmentStatus.NOT_COMPLETE);
+    expect(checklist.drivers.create[0].slotNumber).toBe(1);
+    expect(checklist.drivers.create[0].name).toBe("Driver One");
+  });
+
+  runCase("prisma write builder title fallback", () => {
+    const payload = createPayload({
+      itinerary: [
         {
-          date: "2026-04-16",
-          status: GroupRaudhahStatus.BEFORE,
+          sortOrder: 0,
+          dateLabel: " 11 Apr ",
+          yearLabel: " 2026 ",
+          category: " Transfer ",
+          meta: " 09:00 | Route 40 ",
+          icon: " airport_shuttle ",
+          isoDate: "2026-04-11",
+          time: " 09:00 ",
+          fromLocation: " Makkah Hotel ",
+          toLocation: " Madinah Hotel ",
         },
       ],
-    },
-    checklistAssignments: [
-      {
-        tripDate: "2026-04-15",
-        activity: "Activity",
-        tripLabel: "Trip",
-        requiredBusCount: 2,
-        scheduledTime: "09:00",
-        status: ChecklistAssignmentStatus.ASSIGNED,
-        drivers: [
+    });
+
+    const createData = buildGroupCreateData(payload, "G-TITLE");
+    const createDataAny = createData as any;
+
+    expect(createDataAny.itinerary.create[0].title).toBe("Transfer from Makkah Hotel to Madinah Hotel");
+  });
+
+  runCase("prisma write builder explicit status mappings", () => {
+    const payload = createPayload({
+      status: "Entry Only",
+      lifecycleStatus: GroupLifecycleStatus.ENTRY_ONLY,
+      tone: GroupTone.INACTIVE,
+      visaSetup: {
+        visaStatus: VisaStatus.ISSUED,
+        issuedDate: "2026-04-14",
+        syarikah: "Provider",
+        paymentStatus: VisaPaymentStatus.PAID,
+        hotelAgreements: [
           {
-            slotNumber: 4,
-            name: "Driver",
-            phone: "08123",
-            plateNumber: "B 1 CD",
-            isVerified: true,
+            city: AgreementCity.MADINAH,
+            hotelName: "Madinah Hotel",
+            agreementNumber: "AG-MAD-01",
+            pax: 45,
+            status: AgreementApprovalStatus.APPROVED,
+            stayStart: "2026-04-15",
+            stayEnd: "2026-04-18",
+          },
+        ],
+        raudhahAppointments: [
+          {
+            date: "2026-04-16",
+            status: GroupRaudhahStatus.BEFORE,
           },
         ],
       },
-    ],
+      checklistAssignments: [
+        {
+          tripDate: "2026-04-15",
+          activity: "Activity",
+          tripLabel: "Trip",
+          requiredBusCount: 2,
+          scheduledTime: "09:00",
+          status: ChecklistAssignmentStatus.ASSIGNED,
+          drivers: [
+            {
+              slotNumber: 4,
+              name: "Driver",
+              phone: "08123",
+              plateNumber: "B 1 CD",
+              isVerified: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    const createData = buildGroupCreateData(payload, "G-STATE");
+    const createDataAny = createData as any;
+    const visaSetup = createDataAny.visaSetup.create;
+
+    expect(createDataAny.status).toBe("Entry Only");
+    expect(createDataAny.lifecycleStatus).toBe(GroupLifecycleStatus.ENTRY_ONLY);
+    expect(createDataAny.tone).toBe(GroupTone.INACTIVE);
+    expect(visaSetup.visaStatus).toBe(VisaStatus.ISSUED);
+    expect((visaSetup.issuedDate as Date).toISOString().slice(0, 10)).toBe("2026-04-14");
+    expect(visaSetup.paymentStatus).toBe(VisaPaymentStatus.PAID);
+    expect(visaSetup.hotelAgreements.create[0].status).toBe(AgreementApprovalStatus.APPROVED);
+    expect(visaSetup.hotelAgreements.create[0].city).toBe(AgreementCity.MADINAH);
+    expect(visaSetup.raudhahAppointments.create[0].status).toBe(GroupRaudhahStatus.BEFORE);
+    expect(createDataAny.checklistAssignments.create[0].status).toBe(ChecklistAssignmentStatus.ASSIGNED);
+    expect(createDataAny.checklistAssignments.create[0].drivers.create[0].slotNumber).toBe(4);
+    expect(createDataAny.checklistAssignments.create[0].drivers.create[0].isVerified).toBe(true);
   });
 
-  const createData = buildGroupCreateData(payload, "G-STATE");
-  const createDataAny = createData as any;
-  const visaSetup = createDataAny.visaSetup.create;
+  runCase("prisma write builder replace nullifies checklist itinerary links", () => {
+    const payload = createPayload({
+      checklistAssignments: [
+        {
+          itineraryItemId: "legacy-itinerary-id",
+          tripDate: "2026-04-15",
+          activity: "Activity",
+          tripLabel: "Trip",
+          requiredBusCount: 1,
+          scheduledTime: "09:00",
+        },
+      ],
+    });
 
-  assert.equal(createDataAny.status, "Entry Only");
-  assert.equal(createDataAny.lifecycleStatus, GroupLifecycleStatus.ENTRY_ONLY);
-  assert.equal(createDataAny.tone, GroupTone.INACTIVE);
-  assert.equal(visaSetup.visaStatus, VisaStatus.ISSUED);
-  assert.equal((visaSetup.issuedDate as Date).toISOString().slice(0, 10), "2026-04-14");
-  assert.equal(visaSetup.paymentStatus, VisaPaymentStatus.PAID);
-  assert.equal(visaSetup.hotelAgreements.create[0].status, AgreementApprovalStatus.APPROVED);
-  assert.equal(visaSetup.hotelAgreements.create[0].city, AgreementCity.MADINAH);
-  assert.equal(visaSetup.raudhahAppointments.create[0].status, GroupRaudhahStatus.BEFORE);
-  assert.equal(createDataAny.checklistAssignments.create[0].status, ChecklistAssignmentStatus.ASSIGNED);
-  assert.equal(createDataAny.checklistAssignments.create[0].drivers.create[0].slotNumber, 4);
-  assert.equal(createDataAny.checklistAssignments.create[0].drivers.create[0].isVerified, true);
-}
+    const createData = buildGroupCreateData(payload, "G-LINKS") as any;
+    const replaceData = buildGroupReplaceData(payload, "G-LINKS") as any;
 
-function testReplaceNullifiesChecklistItineraryLinks(): void {
-  const payload = createPayload({
-    checklistAssignments: [
-      {
-        itineraryItemId: "legacy-itinerary-id",
-        tripDate: "2026-04-15",
-        activity: "Activity",
-        tripLabel: "Trip",
-        requiredBusCount: 1,
-        scheduledTime: "09:00",
-      },
-    ],
+    expect(createData.checklistAssignments.create[0].itineraryItemId).toBe("legacy-itinerary-id");
+    expect(replaceData.checklistAssignments.create[0].itineraryItemId).toBe(null);
+    expect(
+      replaceData.searchDocument,
+    ).toBe(
+      "g links glinks builder test group buildertestgroup active standard gold standardgold",
+    );
   });
-
-  const createData = buildGroupCreateData(payload, "G-LINKS") as any;
-  const replaceData = buildGroupReplaceData(payload, "G-LINKS") as any;
-
-  assert.equal(createData.checklistAssignments.create[0].itineraryItemId, "legacy-itinerary-id");
-  assert.equal(replaceData.checklistAssignments.create[0].itineraryItemId, null);
-  assert.equal(
-    replaceData.searchDocument,
-    "g links glinks builder test group buildertestgroup active standard gold standardgold",
-  );
-}
-
-async function main(): Promise<void> {
-  await runCase("prisma write builder total buses behavior", testTotalBusesCreateVsReplaceBehavior);
-  await runCase("prisma write builder trim/default mappings", testTrimAndDefaultMappings);
-  await runCase("prisma write builder title fallback", testItineraryTitleFallbackWithoutExplicitTitle);
-  await runCase("prisma write builder explicit status mappings", testExplicitStatusesAreRespected);
-  await runCase("prisma write builder replace nullifies checklist itinerary links", testReplaceNullifiesChecklistItineraryLinks);
-}
-
-main().catch((error: unknown) => {
-  console.error("Prisma write builder test failed:", error);
-  throw error;
 });

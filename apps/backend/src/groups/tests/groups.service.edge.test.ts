@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../../test/run-case";
 import {
   BadRequestException,
   ConflictException,
@@ -53,273 +54,229 @@ function createGroupPayload(overrides: Partial<CreateGroupDto> = {}): CreateGrou
   };
 }
 
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
+describe("GroupsServiceEdge", () => {
+  runCase("groups replace/update conflict and date guards", async () => {
+    const { service, restore } = await createMemoryService();
 
-async function testReplaceAndUpdateConflictAndDateGuards(): Promise<void> {
-  const { service, restore } = await createMemoryService();
+    try {
+      await service.create(
+        createGroupPayload({
+          code: "EDGE-701",
+          name: "Group A",
+        }),
+      );
+      await service.create(
+        createGroupPayload({
+          code: "EDGE-702",
+          name: "Group B",
+        }),
+      );
 
-  try {
-    await service.create(
-      createGroupPayload({
-        code: "EDGE-701",
-        name: "Group A",
-      }),
-    );
-    await service.create(
-      createGroupPayload({
-        code: "EDGE-702",
-        name: "Group B",
-      }),
-    );
+      await expect(
+        () =>
+          service.replace(
+            "EDGE-701",
+            createGroupPayload({
+              code: "EDGE-702",
+            }),
+          ),
+      ).rejects.toThrow(ConflictException);
 
-    await assert.rejects(
-      () =>
-        service.replace(
-          "EDGE-701",
-          createGroupPayload({
+      await expect(
+        () =>
+          service.update("EDGE-701", {
             code: "EDGE-702",
           }),
-        ),
-      (error: unknown) => {
-        assert.equal(error instanceof ConflictException, true);
-        assert.match((error as Error).message, /already exists/i);
-        return true;
-      },
-    );
+      ).rejects.toThrow(ConflictException);
 
-    await assert.rejects(
-      () =>
-        service.update("EDGE-701", {
-          code: "EDGE-702",
-        }),
-      (error: unknown) => {
-        assert.equal(error instanceof ConflictException, true);
-        assert.match((error as Error).message, /already exists/i);
-        return true;
-      },
-    );
+      await expect(
+        () =>
+          service.replace(
+            "EDGE-MISSING",
+            createGroupPayload({
+              code: "EDGE-799",
+            }),
+          ),
+      ).rejects.toThrow(NotFoundException);
 
-    await assert.rejects(
-      () =>
-        service.replace(
-          "EDGE-MISSING",
-          createGroupPayload({
-            code: "EDGE-799",
+      await expect(
+        () =>
+          service.replace(
+            "EDGE-701",
+            createGroupPayload({
+              code: "EDGE-701",
+              arrivalDate: "2026-04-20",
+              returnDate: "2026-04-19",
+            }),
+          ),
+      ).rejects.toThrow(/Return date must be on or after arrival date/i);
+
+      await expect(
+        () =>
+          service.update("EDGE-701", {
+            arrivalDate: "2026-04-22",
+            returnDate: "2026-04-18",
           }),
-        ),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match((error as Error).message, /not found/i);
-        return true;
-      },
-    );
+      ).rejects.toThrow(/Return date must be on or after arrival date/i);
+    } finally {
+      restore();
+    }
+  });
 
-    await assert.rejects(
-      () =>
-        service.replace(
-          "EDGE-701",
-          createGroupPayload({
-            code: "EDGE-701",
-            arrivalDate: "2026-04-20",
-            returnDate: "2026-04-19",
+  runCase("groups checklist capacity and reset matching", async () => {
+    const { service, restore } = await createMemoryService();
+
+    try {
+      await service.create(
+        createGroupPayload({
+          code: "EDGE-801",
+          name: "Checklist Edge",
+        }),
+      );
+
+      await service.confirmChecklistDriver("EDGE-801", {
+        tripDate: "2026-04-15",
+        activity: "Arrival",
+        tripLabel: "Jeddah Arrival",
+        requiredBusCount: 2,
+        scheduledTime: "09:00",
+        driver: {
+          name: "Driver A",
+          phone: "081111",
+          plateNumber: "B 1001 AA",
+        },
+      });
+
+      const afterSecondDriver = await service.confirmChecklistDriver("EDGE-801", {
+        tripDate: "2026-04-15",
+        activity: "Arrival",
+        tripLabel: "Jeddah Arrival",
+        requiredBusCount: 2,
+        scheduledTime: "09:00",
+        driver: {
+          name: "Driver B",
+          phone: "082222",
+          plateNumber: "B 2002 BB",
+        },
+      });
+      expect(afterSecondDriver.status).toBe("ASSIGNED");
+      expect(afterSecondDriver.drivers.length).toBe(2);
+
+      const afterThirdAttempt = await service.confirmChecklistDriver("EDGE-801", {
+        tripDate: "2026-04-15",
+        activity: "Arrival",
+        tripLabel: "Jeddah Arrival",
+        requiredBusCount: 2,
+        scheduledTime: "09:00",
+        driver: {
+          name: "Driver C",
+          phone: "083333",
+          plateNumber: "B 3003 CC",
+        },
+      });
+      expect(afterThirdAttempt.drivers.length).toBe(2);
+      expect(afterThirdAttempt.drivers.some((driver) => driver.name === "Driver C")).toBe(false);
+
+      const resetResult = await service.resetChecklistDriver("EDGE-801", {
+        tripDate: "2026-04-15",
+        scheduledTime: "09:00",
+        activity: "arrival",
+      });
+      expect(resetResult.status).toBe("NOT_COMPLETE");
+      expect(resetResult.drivers.length).toBe(0);
+
+      await expect(
+        () =>
+          service.resetChecklistDriver("EDGE-801", {
+            tripDate: "2026-04-15",
+            scheduledTime: "11:00",
           }),
-        ),
-      (error: unknown) => {
-        assert.equal(error instanceof BadRequestException, true);
-        assert.match((error as Error).message, /Return date must be on or after arrival date/i);
-        return true;
-      },
-    );
+      ).rejects.toThrow(NotFoundException);
+    } finally {
+      restore();
+    }
+  });
 
-    await assert.rejects(
-      () =>
-        service.update("EDGE-701", {
-          arrivalDate: "2026-04-22",
-          returnDate: "2026-04-18",
+  runCase("groups audit log filtering and pagination bounds", async () => {
+    const { service, restore } = await createMemoryService();
+
+    try {
+      await service.create(
+        createGroupPayload({
+          code: "EDGE-901",
+          name: "Audit Group",
         }),
-      (error: unknown) => {
-        assert.equal(error instanceof BadRequestException, true);
-        assert.match((error as Error).message, /Return date must be on or after arrival date/i);
-        return true;
-      },
-    );
-  } finally {
-    restore();
-  }
-}
+      );
+      await service.update("EDGE-901", {
+        name: "Audit Group Updated",
+      });
+      await service.confirmChecklistDriver("EDGE-901", {
+        tripDate: "2026-04-16",
+        activity: "Departure",
+        tripLabel: "Departure to airport",
+        requiredBusCount: 1,
+        scheduledTime: "18:00",
+        driver: {
+          name: "Driver Audit",
+          phone: "089999",
+          plateNumber: "B 9090 ZZ",
+        },
+      });
 
-async function testChecklistCapacityNoOverfillAndResetMatching(): Promise<void> {
-  const { service, restore } = await createMemoryService();
+      const limitedLogs = await service.listAuditLogs(undefined, 2);
+      expect(limitedLogs.length).toBe(2);
 
-  try {
-    await service.create(
-      createGroupPayload({
-        code: "EDGE-801",
-        name: "Checklist Edge",
-      }),
-    );
+      const groupLogs = await service.listAuditLogs("edge-901");
+      expect(groupLogs.length >= 3).toBe(true);
+      expect(groupLogs.every((entry) => entry.groupCode === "EDGE-901")).toBe(true);
 
-    await service.confirmChecklistDriver("EDGE-801", {
-      tripDate: "2026-04-15",
-      activity: "Arrival",
-      tripLabel: "Jeddah Arrival",
-      requiredBusCount: 2,
-      scheduledTime: "09:00",
-      driver: {
-        name: "Driver A",
-        phone: "081111",
-        plateNumber: "B 1001 AA",
-      },
-    });
+      const unknownLogs = await service.listAuditLogs("EDGE-UNKNOWN");
+      expect(unknownLogs.length).toBe(0);
 
-    const afterSecondDriver = await service.confirmChecklistDriver("EDGE-801", {
-      tripDate: "2026-04-15",
-      activity: "Arrival",
-      tripLabel: "Jeddah Arrival",
-      requiredBusCount: 2,
-      scheduledTime: "09:00",
-      driver: {
-        name: "Driver B",
-        phone: "082222",
-        plateNumber: "B 2002 BB",
-      },
-    });
-    assert.equal(afterSecondDriver.status, "ASSIGNED");
-    assert.equal(afterSecondDriver.drivers.length, 2);
+      const noLimitWhenInvalid = await service.listAuditLogs("EDGE-901", -1);
+      expect(noLimitWhenInvalid.length).toBe(groupLogs.length);
 
-    const afterThirdAttempt = await service.confirmChecklistDriver("EDGE-801", {
-      tripDate: "2026-04-15",
-      activity: "Arrival",
-      tripLabel: "Jeddah Arrival",
-      requiredBusCount: 2,
-      scheduledTime: "09:00",
-      driver: {
-        name: "Driver C",
-        phone: "083333",
-        plateNumber: "B 3003 CC",
-      },
-    });
-    assert.equal(afterThirdAttempt.drivers.length, 2);
-    assert.equal(afterThirdAttempt.drivers.some((driver) => driver.name === "Driver C"), false);
-
-    const resetResult = await service.resetChecklistDriver("EDGE-801", {
-      tripDate: "2026-04-15",
-      scheduledTime: "09:00",
-      activity: "arrival",
-    });
-    assert.equal(resetResult.status, "NOT_COMPLETE");
-    assert.equal(resetResult.drivers.length, 0);
-
-    await assert.rejects(
-      () =>
-        service.resetChecklistDriver("EDGE-801", {
-          tripDate: "2026-04-15",
-          scheduledTime: "11:00",
+      await service.create(
+        createGroupPayload({
+          code: "EDGE-902",
+          name: "Paged Group 2",
         }),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match((error as Error).message, /Checklist assignment/i);
-        return true;
-      },
-    );
-  } finally {
-    restore();
-  }
-}
+      );
+      await service.create(
+        createGroupPayload({
+          code: "EDGE-903",
+          name: "Paged Group 3",
+        }),
+      );
 
-async function testAuditLogFilteringAndPaginationBounds(): Promise<void> {
-  const { service, restore } = await createMemoryService();
+      const normalizedPage = (await service.findAll(undefined, {
+        page: 0,
+        pageSize: 1000,
+      })) as {
+        items: unknown[];
+        total: number;
+        page: number;
+        pageSize: number;
+      };
+      expect(normalizedPage.page).toBe(1);
+      expect(normalizedPage.pageSize).toBe(100);
+      expect(normalizedPage.total).toBe(3);
 
-  try {
-    await service.create(
-      createGroupPayload({
-        code: "EDGE-901",
-        name: "Audit Group",
-      }),
-    );
-    await service.update("EDGE-901", {
-      name: "Audit Group Updated",
-    });
-    await service.confirmChecklistDriver("EDGE-901", {
-      tripDate: "2026-04-16",
-      activity: "Departure",
-      tripLabel: "Departure to airport",
-      requiredBusCount: 1,
-      scheduledTime: "18:00",
-      driver: {
-        name: "Driver Audit",
-        phone: "089999",
-        plateNumber: "B 9090 ZZ",
-      },
-    });
-
-    const limitedLogs = await service.listAuditLogs(undefined, 2);
-    assert.equal(limitedLogs.length, 2);
-
-    const groupLogs = await service.listAuditLogs("edge-901");
-    assert.equal(groupLogs.length >= 3, true);
-    assert.equal(groupLogs.every((entry) => entry.groupCode === "EDGE-901"), true);
-
-    const unknownLogs = await service.listAuditLogs("EDGE-UNKNOWN");
-    assert.equal(unknownLogs.length, 0);
-
-    const noLimitWhenInvalid = await service.listAuditLogs("EDGE-901", -1);
-    assert.equal(noLimitWhenInvalid.length, groupLogs.length);
-
-    await service.create(
-      createGroupPayload({
-        code: "EDGE-902",
-        name: "Paged Group 2",
-      }),
-    );
-    await service.create(
-      createGroupPayload({
-        code: "EDGE-903",
-        name: "Paged Group 3",
-      }),
-    );
-
-    const normalizedPage = (await service.findAll(undefined, {
-      page: 0,
-      pageSize: 1000,
-    })) as {
-      items: unknown[];
-      total: number;
-      page: number;
-      pageSize: number;
-    };
-    assert.equal(normalizedPage.page, 1);
-    assert.equal(normalizedPage.pageSize, 100);
-    assert.equal(normalizedPage.total, 3);
-
-    const pageTwo = (await service.findAll(undefined, {
-      page: 2,
-      pageSize: 2,
-    })) as {
-      items: unknown[];
-      total: number;
-      page: number;
-      pageSize: number;
-    };
-    assert.equal(pageTwo.page, 2);
-    assert.equal(pageTwo.pageSize, 2);
-    assert.equal(pageTwo.items.length, 1);
-    assert.equal(pageTwo.total, 3);
-  } finally {
-    restore();
-  }
-}
-
-async function main(): Promise<void> {
-  await runCase("groups replace/update conflict and date guards", testReplaceAndUpdateConflictAndDateGuards);
-  await runCase("groups checklist capacity and reset matching", testChecklistCapacityNoOverfillAndResetMatching);
-  await runCase("groups audit log filtering and pagination bounds", testAuditLogFilteringAndPaginationBounds);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Groups edge test failed:", error);
-  process.exitCode = 1;
+      const pageTwo = (await service.findAll(undefined, {
+        page: 2,
+        pageSize: 2,
+      })) as {
+        items: unknown[];
+        total: number;
+        page: number;
+        pageSize: number;
+      };
+      expect(pageTwo.page).toBe(2);
+      expect(pageTwo.pageSize).toBe(2);
+      expect(pageTwo.items.length).toBe(1);
+      expect(pageTwo.total).toBe(3);
+    } finally {
+      restore();
+    }
+  });
 });

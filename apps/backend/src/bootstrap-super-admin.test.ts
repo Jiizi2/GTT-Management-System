@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "./test/run-case";
 import {
   buildBootstrapSuperAdminHelpText,
   deriveBootstrapUsername,
@@ -6,48 +7,43 @@ import {
   resolveBootstrapSuperAdminInput,
 } from "./bootstrap-super-admin";
 
-async function runCase(name: string, fn: () => void | Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
+describe("BootstrapSuperAdmin", () => {
+  runCase("parses options", () => {
+    const parsed = parseBootstrapSuperAdminOptions([
+      "--name",
+      "Owner",
+      "--email=owner@example.com",
+      "--password",
+      "StrongPassword#2026",
+      "--username=owner.root",
+    ]);
 
-function testParsesInlineAndPositionalOptions(): void {
-  const parsed = parseBootstrapSuperAdminOptions([
-    "--name",
-    "Owner",
-    "--email=owner@example.com",
-    "--password",
-    "StrongPassword#2026",
-    "--username=owner.root",
-  ]);
-
-  assert.equal(parsed.name, "Owner");
-  assert.equal(parsed.email, "owner@example.com");
-  assert.equal(parsed.password, "StrongPassword#2026");
-  assert.equal(parsed.username, "owner.root");
-}
-
-function testDerivesUsernameFromEmailLocalPart(): void {
-  assert.equal(deriveBootstrapUsername("Owner Name"), "owner.name");
-  assert.equal(deriveBootstrapUsername("___"), "user");
-}
-
-function testResolvesInputWithEnvFallbacks(): void {
-  const resolved = resolveBootstrapSuperAdminInput([], {
-    BOOTSTRAP_SUPERADMIN_NAME: "Initial Owner",
-    BOOTSTRAP_SUPERADMIN_EMAIL: "Owner@Example.com",
-    BOOTSTRAP_SUPERADMIN_PASSWORD: "StrongPassword#2026",
+    expect(parsed.name).toBe("Owner");
+    expect(parsed.email).toBe("owner@example.com");
+    expect(parsed.password).toBe("StrongPassword#2026");
+    expect(parsed.username).toBe("owner.root");
   });
 
-  assert.ok(resolved);
-  assert.equal(resolved?.name, "Initial Owner");
-  assert.equal(resolved?.email, "owner@example.com");
-  assert.equal(resolved?.username, "owner");
-}
+  runCase("derives usernames", () => {
+    expect(deriveBootstrapUsername("Owner Name")).toBe("owner.name");
+    expect(deriveBootstrapUsername("___")).toBe("user");
+  });
 
-function testRejectsTooShortPassword(): void {
-  assert.throws(
-    () =>
+  runCase("resolves env fallbacks", () => {
+    const resolved = resolveBootstrapSuperAdminInput([], {
+      BOOTSTRAP_SUPERADMIN_NAME: "Initial Owner",
+      BOOTSTRAP_SUPERADMIN_EMAIL: "Owner@Example.com",
+      BOOTSTRAP_SUPERADMIN_PASSWORD: "StrongPassword#2026",
+    });
+
+    expect(resolved).toBeTruthy();
+    expect(resolved?.name).toBe("Initial Owner");
+    expect(resolved?.email).toBe("owner@example.com");
+    expect(resolved?.username).toBe("owner");
+  });
+
+  runCase("rejects short password", () => {
+    expect(() =>
       resolveBootstrapSuperAdminInput([
         "--name",
         "Owner",
@@ -56,40 +52,23 @@ function testRejectsTooShortPassword(): void {
         "--password",
         "short",
       ]),
-    /at least 12 characters/i,
-  );
-}
+    ).toThrow(/at least 12 characters/i);
+  });
 
-function testRejectsMissingRequiredValues(): void {
-  assert.throws(
-    () =>
+  runCase("rejects missing values", () => {
+    expect(() =>
       resolveBootstrapSuperAdminInput([
         "--name",
         "Owner",
         "--password",
         "StrongPassword#2026",
       ]),
-    /email is required/i,
-  );
-}
+    ).toThrow(/email is required/i);
+  });
 
-function testHelpTextIsReturnedForHelpFlag(): void {
-  const resolved = resolveBootstrapSuperAdminInput(["--help"]);
-  assert.equal(resolved, null);
-  assert.match(buildBootstrapSuperAdminHelpText(), /Bootstrap the first persistent super-admin/i);
-}
-
-async function main(): Promise<void> {
-  await runCase("bootstrap super-admin parses options", testParsesInlineAndPositionalOptions);
-  await runCase("bootstrap super-admin derives usernames", testDerivesUsernameFromEmailLocalPart);
-  await runCase("bootstrap super-admin resolves env fallbacks", testResolvesInputWithEnvFallbacks);
-  await runCase("bootstrap super-admin rejects short password", testRejectsTooShortPassword);
-  await runCase("bootstrap super-admin rejects missing values", testRejectsMissingRequiredValues);
-  await runCase("bootstrap super-admin supports help flag", testHelpTextIsReturnedForHelpFlag);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Bootstrap super-admin test failed:", error);
-  process.exitCode = 1;
+  runCase("supports help flag", () => {
+    const resolved = resolveBootstrapSuperAdminInput(["--help"]);
+    expect(resolved).toBeNull();
+    expect(buildBootstrapSuperAdminHelpText()).toMatch(/Bootstrap the first persistent super-admin/i);
+  });
 });
-
