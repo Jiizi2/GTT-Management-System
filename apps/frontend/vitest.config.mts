@@ -1,6 +1,9 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  esbuild: {
+    jsx: "automatic",
+  },
   test: {
     environment: "node",
     fileParallelism: false,
@@ -18,4 +21,7 @@ export default defineConfig({
       },
     },
   },
+  // Component test configuration
+  // Run with: npm run test:component
+  // Uses jsdom environment for DOM simulation
 });

@@ -28,6 +28,9 @@
     "test:smoke": "vitest run --config vitest.config.mts src/smoke",
     "test:smoke:watch": "vitest --config vitest.config.mts src/smoke",
     "test:smoke:coverage": "vitest run --config vitest.config.mts src/smoke --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/smoke/frontend",
+    "test:component": "vitest run --config vitest.component.config.mts src/components",
+    "test:component:watch": "vitest --config vitest.component.config.mts src/components",
+    "test:component:coverage": "vitest run --config vitest.component.config.mts src/components --coverage.enabled",
     "test": "npm run test:unit",
     "test:e2e": "playwright test"
   },
@@ -43,6 +46,9 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.4",
@@ -50,6 +56,7 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.5.0",
+    "jsdom": "^22.1.0",
     "postcss": "^8.5.6",
     "prettier": "^3.8.2",
     "tailwindcss": "^3.4.17",
