@@ -33,6 +33,15 @@ function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Onl
   return group?.visaSetup?.busStatus === "Visa+" ? "Visa+" : "Visa Only";
 }
 
+function formatSyarikahName(syarikah: string | undefined): string {
+  if (!syarikah) return "-";
+  const trimmed = syarikah.trim();
+  if (!trimmed) return "-";
+  // Ambil kata pertama jika lebih dari 1 kata
+  const words = trimmed.split(/\s+/);
+  return words[0] || "-";
+}
+
 function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval", isDarkMode: boolean): string {
   if (status === "Approved") {
     return isDarkMode
@@ -45,21 +54,7 @@ function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval"
     : "border-amber-200 bg-amber-100 text-amber-800";
 }
 
-function getRaudhahStatusClasses(status: GroupRaudhahStatus, isDarkMode: boolean): string {
-  if (status === "After") {
-    return isDarkMode
-      ? "border-primary/30 bg-primary/14 text-primary"
-      : "border-emerald-200 bg-emerald-100 text-emerald-800";
-  }
 
-  if (status === "Before") {
-    return isDarkMode
-      ? "border-secondary/35 bg-secondary/16 text-secondary"
-      : "border-amber-200 bg-amber-100 text-amber-800";
-  }
-
-  return "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]";
-}
 
 function toAgreementStatusSelectValue(status: AgreementApprovalStatus): "approved" | "waiting" {
   return status === "Approved" ? "approved" : "waiting";
@@ -177,7 +172,7 @@ type VisaRowGroup = {
   followerRows: VisaTrackingRow[];
 };
 
-const desktopTableGridTemplate = "minmax(0, 0.9fr) minmax(0, 1.12fr) minmax(0, 0.64fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.72fr) minmax(0, 0.72fr) minmax(0, 0.62fr) minmax(0, 0.66fr)";
+const desktopTableGridTemplate = "minmax(0, 0.9fr) minmax(0, 1.12fr) minmax(0, 0.64fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.72fr) minmax(0, 0.62fr) minmax(0, 0.8fr) minmax(0, 0.66fr)";
 
 function getVisaRowGroupKey(rowGroup: VisaRowGroup): string {
   return rowGroup.mainRow.id || rowGroup.mainRow.groupCode;
@@ -292,6 +287,16 @@ export function VisaTrackingScreen({
       return hasMissingHotelAllocation(row);
     }
 
+    if (activeFilter === "visa-only") {
+      const group = groupByCode.get(row.groupCode);
+      return resolveVisaTypeLabel(group) === "Visa Only";
+    }
+
+    if (activeFilter === "visa-plus") {
+      const group = groupByCode.get(row.groupCode);
+      return resolveVisaTypeLabel(group) === "Visa+";
+    }
+
     return row.paymentStatus !== "Paid";
   };
 
@@ -337,6 +342,14 @@ export function VisaTrackingScreen({
   const notIssuedCount = visaRows.filter((row) => row.visaStatus !== "Issued").length;
   const missingHotelCount = visaRows.filter((row) => hasMissingHotelAllocation(row)).length;
   const unpaidCount = visaRows.filter((row) => row.paymentStatus !== "Paid").length;
+  const visaOnlyCount = visaRows.filter((row) => {
+    const group = groupByCode.get(row.groupCode);
+    return resolveVisaTypeLabel(group) === "Visa Only";
+  }).length;
+  const visaPlusCount = visaRows.filter((row) => {
+    const group = groupByCode.get(row.groupCode);
+    return resolveVisaTypeLabel(group) === "Visa+";
+  }).length;
   const issuedPaxCount = useMemo(() => {
     return visaRows
       .filter((row) => row.visaStatus === "Issued")
@@ -518,9 +531,7 @@ export function VisaTrackingScreen({
     const visaTypeLabel = resolveVisaTypeLabel(group);
     const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
 
-    const raudhahEntries = resolveRaudhahEntries(row, group);
-    const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
-    const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
+
 
     return (
       <article
@@ -572,38 +583,10 @@ export function VisaTrackingScreen({
             {renderAgreementCell(row, "madinah", "mobile")}
           </div>
 
-          <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Raudhah Entry Date
-            </p>
-            {raudhahEntries.length > 0 ? (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {visibleRaudhahEntries.map((entry) => (
-                  <span
-                    key={`${row.id}-mobile-raudhah-${entry.key}`}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none ${getRaudhahStatusClasses(
-                      entry.status,
-                      isDarkMode,
-                    )}`}
-                  >
-                    <span>{entry.dateLabel}</span>
-                    <span aria-hidden="true">|</span>
-                    <span>{entry.status}</span>
-                  </span>
-                ))}
-                {hiddenRaudhahEntriesCount > 0 ? (
-                  <span className="inline-flex rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-700">
-                    +{hiddenRaudhahEntriesCount}
-                  </span>
-                ) : null}
-              </div>
-            ) : (
-              <small className="mt-1 block text-xs text-slate-500">Not set yet</small>
-            )}
-          </div>
+
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-surface-container-lowest p-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
             <div className="mt-1 flex flex-col gap-1">
@@ -628,6 +611,21 @@ export function VisaTrackingScreen({
                 className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
               >
                 {visaTypeLabel}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-surface-container-lowest p-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Syarikah</p>
+            <div className="mt-1 flex flex-col gap-1">
+              <Badge
+                status="neutral"
+                className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
+                title={group?.visaSetup?.syarikah || "-"}
+              >
+                <span className="truncate max-w-[120px]">
+                  {formatSyarikahName(group?.visaSetup?.syarikah)}
+                </span>
               </Badge>
             </div>
           </div>
@@ -680,9 +678,7 @@ export function VisaTrackingScreen({
     const visaTypeLabel = resolveVisaTypeLabel(group);
     const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
     
-    const raudhahEntries = resolveRaudhahEntries(row, group);
-    const visibleRaudhahEntries = raudhahEntries.slice(0, 2);
-    const hiddenRaudhahEntriesCount = Math.max(0, raudhahEntries.length - visibleRaudhahEntries.length);
+
 
     return (
       <article
@@ -725,33 +721,7 @@ export function VisaTrackingScreen({
           {renderAgreementCell(row, "madinah", "desktop")}
         </div>
 
-        <div className="min-w-0 space-y-0.5 justify-self-center py-1 text-center">
-          {raudhahEntries.length > 0 ? (
-            <div className="flex flex-wrap justify-center gap-1">
-              {visibleRaudhahEntries.map((entry) => (
-                <span
-                  key={`${row.id}-desktop-raudhah-${entry.key}`}
-                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold leading-none ${getRaudhahStatusClasses(
-                    entry.status,
-                    isDarkMode,
-                  )}`}
-                  title={`${entry.dateLabel} - ${entry.status}`}
-                >
-                  <span>{entry.dateLabel}</span>
-                  <span aria-hidden="true">|</span>
-                  <span>{entry.status}</span>
-                </span>
-              ))}
-              {hiddenRaudhahEntriesCount > 0 ? (
-                <span className="inline-flex rounded-full border border-slate-300 bg-slate-200 px-3 py-1.5 text-xs font-bold leading-none text-slate-700">
-                  +{hiddenRaudhahEntriesCount}
-                </span>
-              ) : null}
-            </div>
-          ) : (
-            <small className="text-[11px] text-slate-500">Not set</small>
-          )}
-        </div>
+
 
         <div className="flex min-w-0 flex-col gap-1 justify-self-center py-1">
           <Badge
@@ -772,6 +742,18 @@ export function VisaTrackingScreen({
             className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
           >
             {visaTypeLabel}
+          </Badge>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-self-center py-1">
+          <Badge
+            status="neutral"
+            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
+            title={group?.visaSetup?.syarikah || "-"}
+          >
+            <span className="truncate max-w-[120px]">
+              {formatSyarikahName(group?.visaSetup?.syarikah)}
+            </span>
           </Badge>
         </div>
 
@@ -865,23 +847,27 @@ export function VisaTrackingScreen({
       />
 
       <section className="flex flex-wrap items-center gap-2" aria-label="Visa tracking filters">
-        <div className="relative flex items-center bg-slate-100 dark:bg-surface-container-high/65 p-1 rounded-xl w-full sm:w-[560px] h-9">
+        <div className="relative flex items-center bg-slate-100 dark:bg-surface-container-high/65 p-1 rounded-xl w-full sm:w-[720px] h-9">
           {/* Sliding background indicator */}
           <div
             className="absolute top-1 bottom-1 bg-white dark:bg-surface-container-lowest rounded-lg shadow-sm transition-all duration-200 ease-out"
             style={{
-              width: "calc(25% - 6px)",
+              width: "calc(16.666% - 5px)",
               left:
                 activeFilter === "all"
                   ? "3px"
                   : activeFilter === "not-issued"
-                  ? "calc(25% + 3px)"
+                  ? "calc(16.666% + 2px)"
                   : activeFilter === "missing-hotel"
-                  ? "calc(50% + 3px)"
-                  : "calc(75% + 3px)",
+                  ? "calc(33.333% + 2px)"
+                  : activeFilter === "visa-only"
+                  ? "calc(50% + 2px)"
+                  : activeFilter === "visa-plus"
+                  ? "calc(66.666% + 2px)"
+                  : "calc(83.333% + 2px)",
             }}
           />
-          {(["all", "not-issued", "missing-hotel", "unpaid"] as VisaFilterId[]).map((filter) => {
+          {(["all", "not-issued", "missing-hotel", "visa-only", "visa-plus", "unpaid"] as VisaFilterId[]).map((filter) => {
             const isActive = activeFilter === filter;
             let label = "";
             let count = 0;
@@ -894,6 +880,12 @@ export function VisaTrackingScreen({
             } else if (filter === "missing-hotel") {
               label = "Missing Hotel";
               count = missingHotelCount;
+            } else if (filter === "visa-only") {
+              label = "Visa Only";
+              count = visaOnlyCount;
+            } else if (filter === "visa-plus") {
+              label = "Visa+";
+              count = visaPlusCount;
             } else {
               label = "Unpaid";
               count = unpaidCount;
@@ -916,6 +908,10 @@ export function VisaTrackingScreen({
                     ? "Pending"
                     : filter === "missing-hotel"
                     ? "No Hotel"
+                    : filter === "visa-only"
+                    ? "Visa Only"
+                    : filter === "visa-plus"
+                    ? "Visa+"
                     : "Unpaid"}{" "}
                   ({count})
                 </span>
@@ -1036,9 +1032,9 @@ export function VisaTrackingScreen({
                   <div className="text-center">Total Pax</div>
                   <div>Makkah Agreement</div>
                   <div>Madinah Agreement</div>
-                  <div className="text-center">Raudhah</div>
                   <div className="text-center">Visa Status</div>
                   <div className="text-center">Visa Type</div>
+                  <div className="text-center">Syarikah</div>
                   <div className="text-center">Actions</div>
                 </div>
 

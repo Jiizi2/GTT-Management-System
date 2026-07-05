@@ -54,6 +54,62 @@
 - **Coverage:** 64.11% statements, 55.26% branches, 61.56% functions, 64.29% lines
 - **Threshold:** ✅ Lines 60%, ✅ Functions 60%, ⚠️ Branches 55%, ✅ Statements 60%
 
+### Sprint 2 (Juli 2026)
+
+#### 5. Refactor group-detail-modals.tsx
+- **File:** `apps/frontend/src/components/group-detail-modals.tsx`
+- **Status:** ✅ Selesai
+- **Perubahan:**
+  - **Struktur folder baru:**
+    ```
+    group-detail-modals/
+    ├── __tests__/ (8 test files)
+    ├── helpers/ (schedule-helpers.ts)
+    ├── schemas/ (3 schema files)
+    ├── shared/ (4 shared components)
+    ├── DeleteConfirmModal.tsx
+    ├── DeleteGroupModal.tsx
+    ├── EditScheduleModal.tsx
+    ├── GroupEditModal.tsx
+    ├── MusyrifModal.tsx
+    ├── NoteModal.tsx
+    ├── ScheduleModal.tsx
+    ├── UnlinkGroupConfirmModal.tsx
+    └── index.ts
+    ```
+  - **Shared Components:**
+    - `ModalPortal.tsx` - Portal wrapper untuk modal
+    - `ModalShell.tsx` - Shell container dengan focus trap
+    - `ModalHeader.tsx` - Header dengan close button
+    - `ModalFooter.tsx` - Footer dengan action buttons
+  - **Schemas:**
+    - `group-edit.schema.ts` - Validasi form edit group
+    - `musyrif.schema.ts` - Validasi form musyrif
+    - `note.schema.ts` - Validasi form note
+  - **Helpers:**
+    - `schedule-helpers.ts` - Utility functions untuk schedule modal
+  - **JSDoc Documentation:** Semua modal components sudah memiliki dokumentasi lengkap
+  - **Coverage Improvement:**
+    - **Before:** 22.97% statements, 9.62% branches, 19.51% functions, 22.83% lines
+    - **After:** 77.92% statements, 78.6% branches, 57.31% functions, 77.62% lines
+  - **Test Coverage:** 254 tests untuk semua modal components
+  - **Catatan:** Threshold branches bisa dinaikkan ke 55% karena coverage sudah memadai
+
+#### 6. Coverage Threshold Component Tests (Updated)
+- **File:** `apps/frontend/vitest.component.config.mts`
+- **Status:** ✅ Diupdate lagi
+- **Perubahan:**
+  - Lines: 60% → **60%** (tetap)
+  - Functions: 60% → **60%** (tetap)
+  - Branches: 55% → **55%** (tetap)
+  - Statements: 60% → **60%** (tetap)
+- **Hasil:** 590 tests passing, semua threshold terpenuhi
+- **Final Coverage:**
+  - Statements: 78.28%
+  - Branches: 74%
+  - Functions: 67.53%
+  - Lines: 78.79%
+
 ---
 
 ## 🏗️ Gambaran Umum
@@ -234,23 +290,48 @@ DATA_SOURCE=prisma   → production dengan PostgreSQL
 
 ## 🔍 Branch `refactor/testing-setup` Review
 
-### Perubahan
+### Sprint 1 - Initial Testing Setup
 
 | File | Perubahan | Status |
 |---|---|---|
-| `vitest.component.config.mts` | Config baru: jsdom, globals, setupFiles, coverage | Lengkap |
-| `vitest.config.mts` | Tambah `esbuild.jsx: "automatic"` | OK |
-| `package.json` (frontend) | Tambah `@testing-library/*`, `jsdom`, scripts | OK |
-| `package.json` (root) | Tambah `jsdom` | OK |
-| `src/test/setup.ts` | Test setup file | Baru |
-| `src/test/*.ts` | 5 test utility helpers | Bagus |
-| `src/components/*.test.tsx` | 7 component test files | Bagus |
+| `vitest.component.config.mts` | Config baru: jsdom, globals, setupFiles, coverage | ✅ Selesai |
+| `vitest.config.mts` | Tambah `esbuild.jsx: "automatic"` | ✅ Selesai |
+| `package.json` (frontend) | Tambah `@testing-library/*`, `jsdom`, scripts | ✅ Selesai |
+| `package.json` (root) | Tambah `jsdom` | ✅ Selesai |
+| `src/test/setup.ts` | Test setup file | ✅ Selesai |
+| `src/test/*.ts` | 5 test utility helpers | ✅ Selesai |
+| `src/components/*.test.tsx` | 13 component test files (336 tests) | ✅ Selesai |
+| `.env.example` | Environment variables documentation | ✅ Selesai |
+| `apps/backend/src/index.ts` | Removed (dead code) | ✅ Selesai |
 
-### Rekomendasi Sebelum Merge
+### Sprint 2 - Refactor group-detail-modals
 
-1. Naikkan coverage thresholds: `lines: 50, functions: 45, branches: 40`
-2. Pastikan `npm run test:component` jalan tanpa error
-3. Pertimbangkan upgrade jsdom ke `^26.x`
+| File | Perubahan | Status |
+|---|---|---|
+| `group-detail-modals/` | Split into 8 modal components | ✅ Selesai |
+| `group-detail-modals/shared/` | 4 shared components | ✅ Selesai |
+| `group-detail-modals/schemas/` | 3 validation schemas | ✅ Selesai |
+| `group-detail-modals/helpers/` | Helper functions | ✅ Selesai |
+| `group-detail-modals/__tests__/` | 8 test files (254 tests) | ✅ Selesai |
+| All modal components | Added JSDoc documentation | ✅ Selesai |
+
+### Hasil Akhir
+
+**Coverage Improvement:**
+- **Before Sprint 1:** Lines 30%, Functions 25%, Branches 20%, Statements 30%
+- **After Sprint 1:** Lines 64.29%, Functions 61.56%, Branches 55.26%, Statements 64.11%
+- **After Sprint 2:** Lines 78.79%, Functions 67.53%, Branches 74%, Statements 78.28%
+
+**Test Count:**
+- Sprint 1: 336 component tests
+- Sprint 2: 254 modal tests
+- **Total: 590 component tests (all passing)**
+
+**Threshold Achievement:**
+- ✅ Lines: 78.79% (threshold: 60%)
+- ✅ Functions: 67.53% (threshold: 60%)
+- ✅ Branches: 74% (threshold: 55%)
+- ✅ Statements: 78.28% (threshold: 60%)
 
 ---
 
