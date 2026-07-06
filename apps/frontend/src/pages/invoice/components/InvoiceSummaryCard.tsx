@@ -6,7 +6,7 @@ import {
   formatNumberInput,
   getStatusClasses,
   resolveInvoiceOutstandingBalanceLabel,
-} from "../../invoice-page-shared";
+} from "../helpers/invoice-page-shared";
 
 export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
   usdToIdr,

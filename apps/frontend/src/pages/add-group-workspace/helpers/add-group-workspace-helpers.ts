@@ -6,7 +6,7 @@ import type {
   NewGroupItineraryDraft,
   NextActivity,
   TimelineItem,
-} from "../shared/app-domain.js";
+} from "../../../shared/app-domain.js";
 import {
   buildTransferTrainSummary,
   formatRouteSummary,
@@ -19,7 +19,7 @@ import {
   isTransferActivityType,
   normalizeAgreementCityKey,
   shiftIsoDate,
-} from "../shared/app-domain.js";
+} from "../../../shared/app-domain.js";
 
 export type BaseTripDraft = InputItineraryFormState & {
   id: string;

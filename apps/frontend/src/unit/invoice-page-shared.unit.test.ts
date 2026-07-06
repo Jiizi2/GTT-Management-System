@@ -7,7 +7,7 @@ import {
   resolveInvoiceOutstandingBalanceLabel,
   resolveBankAccountLabel,
   defaultBankDisbursementOptions,
-} from "../pages/invoice-page-shared.js";
+} from "../pages/invoice/helpers/invoice-page-shared.js";
 import { runCase } from "../test/run-case.js";
 
 describe("invoice-page-shared", () => {

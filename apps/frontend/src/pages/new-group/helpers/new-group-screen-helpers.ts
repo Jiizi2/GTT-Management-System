@@ -9,7 +9,7 @@ import type {
   NewGroupItineraryDraft,
   NewGroupRaudhahFormState,
   VisaStatus,
-} from "../shared/app-domain.js";
+} from "../../../shared/app-domain.js";
 import {
   formatScheduleDate,
   formatScheduleTime,
@@ -19,7 +19,7 @@ import {
   musyrifAvatar,
   resolveVisaAgreementNumber,
   shiftIsoDate,
-} from "../shared/app-domain.js";
+} from "../../../shared/app-domain.js";
 
 type AgreementDateRange = {
   startIso: string;
@@ -557,7 +557,7 @@ export function buildNewGroupPayload({
   const draftPackageName = itineraryDraft?.packageName?.trim() || "";
   const resolvedSyarikahName = syarikahName.trim() || "Not assigned";
   const defaultPrimaryNote = "Itinerary drafted by operator and ready for operations review.";
-  const itineraryPrimaryNote = itineraryDraft?.notes?.map((note) => note.trim()).find(Boolean) ?? "";
+  const itineraryPrimaryNote = itineraryDraft?.notes?.map((note: string) => note.trim()).find(Boolean) ?? "";
   const notes = [
     itineraryPrimaryNote || defaultPrimaryNote,
     `Syarikah provider: ${resolvedSyarikahName}.`,

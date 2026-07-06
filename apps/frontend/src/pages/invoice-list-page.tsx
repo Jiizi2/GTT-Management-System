@@ -34,7 +34,7 @@ import {
   type InvoiceClientOption,
   type InvoiceRow,
   type InvoiceWorkspaceInitialData,
-} from "./invoice-page-shared";
+} from "./invoice/helpers/invoice-page-shared";
 
 const LazyCreateInvoiceWorkspace = lazy(async () => ({
   default: (await import("./invoice-page")).CreateInvoiceWorkspace,

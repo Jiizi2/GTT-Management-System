@@ -6,7 +6,7 @@ import { ManualScheduleModal } from "./add-group-workspace/components/ManualSche
 import { BaseTripSection } from "./add-group-workspace/components/BaseTripSection";
 import { useAddGroupWorkspaceForm } from "./add-group-workspace/hooks/use-add-group-workspace-form";
 import type { GroupData, ItineraryPrefill, NewGroupItineraryDraft } from "../shared/app-domain";
-import type { ItinerarySectionMode } from "./add-group-workspace-helpers";
+import type { ItinerarySectionMode } from "./add-group-workspace/helpers/add-group-workspace-helpers";
 
 export function InputItineraryScreen({
   onSaveGroup,

@@ -17,7 +17,7 @@ import {
   shouldUseSaudiCityDropdown,
   type BaseTripDraft,
   type ItinerarySectionMode,
-} from "../../add-group-workspace-helpers";
+} from "../helpers/add-group-workspace-helpers";
 import type {
   GroupData,
   InputItineraryFormState,

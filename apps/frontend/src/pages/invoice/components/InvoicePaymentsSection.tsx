@@ -6,7 +6,7 @@ import {
   calculateSubtotalInCurrency,
   formatNumberInput,
   parseNumberInput,
-} from "../../invoice-page-shared";
+} from "../helpers/invoice-page-shared";
 
 export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
   usdToIdr,

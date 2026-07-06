@@ -20,7 +20,7 @@ import {
   type InvoiceStatusOption,
   type InvoiceRow,
   type InvoiceStatus,
-} from "../../invoice-page-shared";
+} from "../helpers/invoice-page-shared";
 
 export const invoiceDraftItemSchema = z.object({
   id: z.string(),

@@ -19,7 +19,7 @@ import {
   type SelectOption,
   type InvoiceStatusOption,
   type InvoiceRow,
-} from "./invoice-page-shared";
+} from "./invoice/helpers/invoice-page-shared";
 import type { GroupData } from "../shared/app-domain";
 
 export function CreateInvoiceWorkspace({

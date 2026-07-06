@@ -21,7 +21,7 @@ import {
   buildNewGroupPayload,
   getAgreementSaveValidationError,
   validateConnectedAgreementDates,
-} from "../../new-group-screen-helpers";
+} from "../helpers/new-group-screen-helpers";
 import type { NewGroupScreenFormValues } from "../new-group-types";
 
 const { createNewGroupAgreementForm, createNewGroupRaudhahForm, getMinimumBusCountForPax, resolveVisaAgreementNumber } = Domain;

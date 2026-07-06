@@ -1,5 +1,5 @@
-import { formatLocalIsoDate, type GroupData } from "../shared/app-domain";
-import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from "../hooks/use-invoice-backend";
+import { formatLocalIsoDate, type GroupData } from "../../../shared/app-domain";
+import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from "../../../hooks/use-invoice-backend";
 
 export type InvoiceStatus = BackendInvoiceRow["status"];
 export type InvoiceRow = BackendInvoiceRow;
@@ -333,7 +333,7 @@ export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number, re
 
 export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorkspaceInitialData {
   const items: InvoiceDraftItem[] = Array.isArray(row.items)
-    ? row.items.map((item, index) => ({
+    ? row.items.map((item: BackendInvoiceItem, index: number) => ({
         id: `line-${index + 1}`,
         description: item.description.trim(),
         pax: Math.max(0, Math.round(item.pax)),
@@ -436,7 +436,7 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   if (notesRaw.includes("[KeepValasTotal:USD]")) keepValasCurrency = "USD";
   else if (notesRaw.includes("[KeepValasTotal:SAR]")) keepValasCurrency = "SAR";
   else if (notesRaw.includes("[KeepValasTotal]")) {
-    const valas = row.items?.find((item) => item.currency !== "IDR")?.currency;
+    const valas = row.items?.find((item: BackendInvoiceItem) => item.currency !== "IDR")?.currency;
     keepValasCurrency = valas || "IDR";
   }
 
@@ -470,7 +470,7 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   const items = row.items || [];
   let targetSubtotal = 0;
   if (items.length > 0) {
-    targetSubtotal = items.reduce((sum, item) => {
+    targetSubtotal = items.reduce((sum: number, item: BackendInvoiceItem) => {
       if (item.currency === keepValasCurrency) {
         return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
       }
@@ -524,7 +524,7 @@ export async function viewInvoicePdfFromRow({
           },
         ];
   const totals = resolveInvoiceDisplayTotals(row);
-  const { exportInvoicePdf } = await import("./invoice-export");
+  const { exportInvoicePdf } = await import("../../invoice-export");
 
   const notesRaw = row.notes ?? "";
   const bankMatch = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
@@ -643,7 +643,7 @@ export function convertToIdr({
 }
 
 export function resolveDraftItemTotals(
-  item: Pick<InvoiceDraftItem, "pax" | "unitPrice" | "currency">,
+  item: { pax: number; unitPrice: number; currency: "IDR" | "USD" | "SAR" },
   usdToIdr: number,
   sarToIdr: number,
 ): { totalPrice: number; totalPriceIdr: number } {

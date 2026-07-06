@@ -5,7 +5,7 @@ import {
   buildInvoicePayload,
   deriveInvoiceState,
   type InvoiceDraftItem,
-} from "../pages/invoice-page-shared.js";
+} from "../pages/invoice/helpers/invoice-page-shared.js";
 
 describe("invoice payload contract alignment", () => {
   const mockClients = [

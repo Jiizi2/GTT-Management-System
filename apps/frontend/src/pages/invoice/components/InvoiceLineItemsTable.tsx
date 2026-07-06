@@ -6,7 +6,7 @@ import {
   formatIdr,
   parseNumberInput,
   formatNumberInput,
-} from "../../invoice-page-shared";
+} from "../helpers/invoice-page-shared";
 import type { GroupData } from "../../../shared/app-domain";
 
 export const InvoiceLineItemsTable = memo(function InvoiceLineItemsTable({

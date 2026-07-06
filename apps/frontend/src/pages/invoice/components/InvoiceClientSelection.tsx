@@ -1,7 +1,7 @@
 import { useFormContext, Controller } from "react-hook-form";
 import { SereneSelect } from "../../../components/serene-select";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../../../components/form-accessibility";
-import { MANUAL_CLIENT_OPTION_ID, type InvoiceClientOption } from "../../invoice-page-shared";
+import { MANUAL_CLIENT_OPTION_ID, type InvoiceClientOption } from "../helpers/invoice-page-shared";
 import type { GroupData } from "../../../shared/app-domain";
 
 export function InvoiceClientSelection({

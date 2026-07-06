@@ -8,7 +8,7 @@ import {
   getScheduleTypeOption,
   isTransferActivityType,
 } from "../../../shared/app-domain";
-import { shouldUseSaudiCityDropdown } from "../../add-group-workspace-helpers";
+import { shouldUseSaudiCityDropdown } from "../helpers/add-group-workspace-helpers";
 import type { ManualScheduleFormValues } from "../hooks/use-add-group-workspace-form";
 
 interface ManualScheduleModalProps {

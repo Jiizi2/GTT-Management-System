@@ -10,7 +10,7 @@ import {
   shouldShowFridayCityTourWarning,
   type InputItineraryFormState,
 } from "../../../shared/app-domain";
-import { isBaseTripDraftInvalid, shouldUseSaudiCityDropdown, type BaseTripDraft } from "../../add-group-workspace-helpers";
+import { isBaseTripDraftInvalid, shouldUseSaudiCityDropdown, type BaseTripDraft } from "../helpers/add-group-workspace-helpers";
 
 interface BaseTripSectionProps {
   isBaseTripFormVisible: boolean;
