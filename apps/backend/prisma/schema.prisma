@@ -163,6 +163,7 @@ model Group {
 
   @@index([createdAt])
   @@index([lifecycleStatus])
+  @@index([searchDocument, lifecycleStatus])
 }
 
 model GroupAuditLog {
@@ -217,6 +218,7 @@ model Invoice {
   @@index([dueDate])
   @@index([clientId, dueDate])
   @@index([groupId])
+  @@index([status, dueDate(sort: Desc)])
 }
 
 model InvoiceItem {
@@ -233,6 +235,7 @@ model InvoiceItem {
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+  @@index([invoiceId, description])
 }
 
 model Musyrif {
