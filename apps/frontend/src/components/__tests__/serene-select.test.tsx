@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SereneSelect } from './serene-select';
+import { SereneSelect } from '../serene-select';
 
 describe('SereneSelect', () => {
   const options = [

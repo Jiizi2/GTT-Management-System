@@ -18,7 +18,7 @@ describe('DeleteConfirmModal', () => {
     title: 'Arrival at Jeddah Airport',
     category: 'Arrival',
     description: 'Group arrives at King Abdulaziz International Airport',
-  };
+  } as any;
 
   beforeEach(() => {
     vi.clearAllMocks();

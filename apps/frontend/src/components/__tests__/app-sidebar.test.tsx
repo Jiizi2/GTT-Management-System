@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { AppSidebar } from './app-sidebar';
+import { AppSidebar } from '../app-sidebar';
 
 // Mock useModalFocusTrap
-vi.mock('./use-modal-focus-trap', () => ({
+vi.mock('../use-modal-focus-trap', () => ({
   useModalFocusTrap: () => ({ current: null }),
 }));
 

@@ -5,7 +5,7 @@ import {
   getFieldDescribedBy,
   getFieldAriaInvalid,
   FieldErrorMessage,
-} from './form-accessibility';
+} from '../form-accessibility';
 
 describe('form-accessibility', () => {
   describe('getFieldErrorId', () => {

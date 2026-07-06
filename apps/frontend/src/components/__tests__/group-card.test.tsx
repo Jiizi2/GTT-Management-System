@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GroupCard } from './group-card';
-import type { GroupData } from '../shared/app-domain';
+import { GroupCard } from '../group-card';
+import type { GroupData, ItineraryItem } from '../../shared/app-domain';
 
 // Mock the domain functions
-vi.mock('../shared/app-domain', async () => {
-  const actual = await vi.importActual('../shared/app-domain');
+vi.mock('../../shared/app-domain', async () => {
+  const actual = await vi.importActual('../../shared/app-domain');
   return {
     ...actual,
     resolveGroupCompleteness: vi.fn(() => ({
@@ -36,11 +36,11 @@ describe('GroupCard', () => {
     pax: 30,
     totalBuses: 2,
     packageName: 'Umrah Premium',
+    durationDays: 10,
     arrivalDate: '2026-04-15',
     returnDate: '2026-04-25',
     itinerary: [
       {
-        id: 'itin-1',
         date: '15 Apr',
         year: '2026',
         category: 'arrival',
@@ -50,31 +50,35 @@ describe('GroupCard', () => {
         time: '08:00',
         meta: '08:00 | Flight SV123',
         highlighted: false,
-        fromHotel: '',
-        toHotel: '',
-        cityTourCity: '',
-        busCount: 0,
-        trainTransfer: null,
-      },
+        icon: 'flight_land',
+      } as ItineraryItem,
     ],
     visaSetup: {
-      status: 'Issued',
+      visaStatus: 'Issued',
       paymentStatus: 'Paid',
       syarikah: 'Al-Tayyar',
       busStatus: 'Visa+',
-      hotels: {
-        makkah: [],
-        madinah: [],
-      },
+      makkahHotels: [],
+      madinahHotels: [],
+      raudhahAppointments: [],
     },
     nextActivity: {
       title: 'Arrival in Jeddah',
-      scheduledAt: '2026-04-15T08:00:00',
+      date: '2026-04-15',
+      time: '08:00',
+      icon: 'flight_land',
     },
-    musyrif: null,
+    musyrif: {
+      name: 'Test Musyrif',
+      phone: '12345',
+      avatar: '',
+    },
     notes: [],
-    timeline: [],
-    checklist: [],
+    timeline: [
+      { date: '15 Apr', title: 'Arrival' },
+      { date: '25 Apr', title: 'Return' },
+    ],
+    checklistAssignments: [],
   };
 
   it('renders group card with basic info', () => {

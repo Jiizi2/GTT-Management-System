@@ -10,16 +10,16 @@ import {
   GroupEditModal,
   ScheduleModal,
   EditScheduleModal,
-} from './group-detail-modals';
-import type { ItineraryItem } from '../shared/app-domain';
+} from '../group-detail-modals';
+import type { ItineraryItem } from '../../shared/app-domain';
 
 // Mock hooks
-vi.mock('../hooks/use-saudi-city-options', () => ({
+vi.mock('../../hooks/use-saudi-city-options', () => ({
   useSaudiCityOptions: () => ['Makkah', 'Madinah', 'Jeddah'],
 }));
 
 // Mock only the hooks that make API calls
-vi.mock('../hooks/use-saudi-city-options', () => ({
+vi.mock('../../hooks/use-saudi-city-options', () => ({
   useSaudiCityOptions: () => ['Makkah', 'Madinah', 'Jeddah'],
 }));
 

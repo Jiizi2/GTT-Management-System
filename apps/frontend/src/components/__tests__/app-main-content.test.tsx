@@ -1,78 +1,78 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { AppMainContent } from './app-main-content';
-import type { AppController } from '../hooks/use-app-controller';
+import { AppMainContent } from '../app-main-content';
+import type { AppController } from '../../hooks/use-app-controller';
 
 // Mock all lazy-loaded pages to avoid loading real implementations
-vi.mock('../pages/new-group-screen', () => ({
+vi.mock('../../pages/new-group-screen', () => ({
   AddGroupWorkspaceScreen: () => <div data-testid="new-group-screen">New Group</div>,
 }));
 
-vi.mock('../pages/checklist-page', () => ({
+vi.mock('../../pages/checklist-page', () => ({
   ChecklistScreen: () => <div data-testid="checklist-screen">Checklist</div>,
 }));
 
-vi.mock('../pages/agreement-inbox-page', () => ({
+vi.mock('../../pages/agreement-inbox-page', () => ({
   AgreementInboxScreen: () => <div data-testid="agreement-inbox-screen">Agreement Inbox</div>,
 }));
 
-vi.mock('../pages/invoice-list-page', () => ({
+vi.mock('../../pages/invoice-list-page', () => ({
   InvoiceScreen: () => <div data-testid="invoice-screen">Invoice</div>,
 }));
 
-vi.mock('../pages/group-detail-page', () => ({
+vi.mock('../../pages/group-detail-page', () => ({
   GroupDetail: () => <div data-testid="group-detail-screen">Group Detail</div>,
 }));
 
-vi.mock('../pages/group-itinerary-builder-page', () => ({
+vi.mock('../../pages/group-itinerary-builder-page', () => ({
   GroupItineraryBuilderPage: () => <div data-testid="itinerary-builder-screen">Itinerary Builder</div>,
 }));
 
-vi.mock('../pages/overview-page', () => ({
+vi.mock('../../pages/overview-page', () => ({
   OverviewScreen: () => <div data-testid="overview-screen">Overview</div>,
 }));
 
-vi.mock('../pages/manage-role-page', () => ({
+vi.mock('../../pages/manage-role-page', () => ({
   UserManagementScreen: () => <div data-testid="user-management-screen">User Management</div>,
 }));
 
-vi.mock('../pages/placeholder-page', () => ({
+vi.mock('../../pages/placeholder-page', () => ({
   PlaceholderScreen: ({ title }: { title: string }) => (
     <div data-testid="placeholder-screen">{title}</div>
   ),
 }));
 
-vi.mock('../pages/profile-page', () => ({
+vi.mock('../../pages/profile-page', () => ({
   ProfileScreen: () => <div data-testid="profile-screen">Profile</div>,
 }));
 
-vi.mock('../pages/master-data-page', () => ({
+vi.mock('../../pages/master-data-page', () => ({
   MasterDataScreen: () => <div data-testid="master-data-screen">Master Data</div>,
 }));
 
-vi.mock('../pages/raudhah-reminder-page', () => ({
+vi.mock('../../pages/raudhah-reminder-page', () => ({
   RaudhahReminderScreen: () => <div data-testid="raudhah-reminder-screen">Raudhah Reminder</div>,
 }));
 
-vi.mock('../pages/visa-detail-page', () => ({
+vi.mock('../../pages/visa-detail-page', () => ({
   VisaTrackingDetailScreen: () => <div data-testid="visa-detail-screen">Visa Detail</div>,
 }));
 
-vi.mock('../pages/visa-tracking-page', () => ({
+vi.mock('../../pages/visa-tracking-page', () => ({
   VisaTrackingScreen: () => <div data-testid="visa-tracking-screen">Visa Tracking</div>,
 }));
 
 // Mock shared modules
-vi.mock('../shared/app-domain', async (importOriginal) => {
+vi.mock('../../shared/app-domain', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as any),
     buildVisaTrackingRowsFromGroups: vi.fn(() => []),
   };
 });
 
-vi.mock('../shared/app-route', () => ({
+vi.mock('../../shared/app-route', () => ({
   buildDashboardPath: vi.fn((path: string) => `/dashboard/${path}`),
 }));
 
@@ -163,7 +163,7 @@ describe('AppMainContent', () => {
 
   it('renders placeholder when group not found on /groups/:groupCode', async () => {
     const controller = createMockController({
-      activeNav: 'groups',
+      activeNav: 'overview',
       selectedGroupCode: 'GRP001',
       selectedGroup: null,
     });
@@ -182,7 +182,7 @@ describe('AppMainContent', () => {
 
   it('renders group detail when group exists on /groups/:groupCode', async () => {
     const controller = createMockController({
-      activeNav: 'groups',
+      activeNav: 'overview',
       selectedGroupCode: 'GRP001',
       selectedGroup: {
         id: '1',
@@ -194,15 +194,19 @@ describe('AppMainContent', () => {
         pax: 30,
         totalBuses: 2,
         packageName: 'Umrah Package',
+        durationDays: 10,
         arrivalDate: '2026-04-15',
         returnDate: '2026-04-25',
         itinerary: [],
         visaSetup: undefined,
-        nextActivity: { title: '', scheduledAt: '' },
-        musyrif: null,
+        nextActivity: { title: '', date: '2026-04-15', time: '08:00', icon: 'flight_land' },
+        musyrif: { name: 'Test Musyrif', phone: '12345', avatar: '' },
         notes: [],
-        timeline: [],
-        checklist: [],
+        timeline: [
+          { date: '15 Apr', title: 'Arrival' },
+          { date: '25 Apr', title: 'Return' }
+        ],
+        checklistAssignments: [],
       },
     });
 

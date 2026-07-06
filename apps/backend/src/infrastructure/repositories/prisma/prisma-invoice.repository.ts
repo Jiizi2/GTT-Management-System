@@ -567,8 +567,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   }
 
   private resolvePrismaInvoiceInlineDownPayment(invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment): number | null {
-    if ("downPaymentIdr" in invoice && typeof (invoice as any).downPaymentIdr === "number") {
-      return (invoice as any).downPaymentIdr;
+    if ("downPaymentIdr" in invoice && invoice.downPaymentIdr !== null && invoice.downPaymentIdr !== undefined) {
+      return Number(invoice.downPaymentIdr);
     }
     return null;
   }

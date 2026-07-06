@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { VisaStatusModal, PaymentStatusModal, SyarikahModal, VisaTypeModal } from './visa-detail-modals';
+import { VisaStatusModal, PaymentStatusModal, SyarikahModal, VisaTypeModal } from '../visa-detail-modals';
 
 // Mock useModalFocusTrap
-vi.mock('./use-modal-focus-trap', () => ({
+vi.mock('../use-modal-focus-trap', () => ({
   useModalFocusTrap: () => ({ current: null }),
 }));
 

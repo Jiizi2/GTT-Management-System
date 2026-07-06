@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MobileNav } from './mobile-nav';
+import { MobileNav } from '../mobile-nav';
 
 describe('MobileNav', () => {
   const defaultProps = {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useModalFocusTrap } from './use-modal-focus-trap';
+import { useModalFocusTrap } from '../use-modal-focus-trap';
 import { useState } from 'react';
 
 // jsdom has no layout engine, so offsetParent is always null.

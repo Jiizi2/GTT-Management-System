@@ -13,5 +13,21 @@
     "strictPropertyInitialization": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules", "src/**/*.test.ts", "src/test/**/*.ts", "test/**/*.ts"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    "src/test/**/*",
+    "test/**/*",
+    "src/auth/**/*.test.ts",
+    "src/config/**/*.test.ts",
+    "src/http/**/*.test.ts",
+    "src/master-data/**/*.test.ts",
+    "src/prisma/**/*.test.ts",
+    "src/runtime-maintenance/**/*.test.ts",
+    "src/throttling/**/*.test.ts",
+    "src/groups/tests/**/*",
+    "src/invoices/**/*.test.ts",
+    "src/bootstrap-super-admin.test.ts",
+    "src/runtime-config.test.ts"
+  ]
 }

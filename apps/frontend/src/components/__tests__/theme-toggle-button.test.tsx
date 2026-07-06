@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ThemeToggleButton } from './theme-toggle-button';
+import { ThemeToggleButton } from '../theme-toggle-button';
 
 const mockToggleTheme = vi.fn();
 let mockTheme: 'light' | 'dark' = 'light';
 
-vi.mock('../theme/theme-provider', () => ({
+vi.mock('../../theme/theme-provider', () => ({
   useThemeMode: () => ({
     theme: mockTheme,
     toggleTheme: mockToggleTheme,

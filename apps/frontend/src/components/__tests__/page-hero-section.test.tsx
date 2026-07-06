@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { PageHeroSection } from './page-hero-section';
+import { PageHeroSection } from '../page-hero-section';
 
 describe('PageHeroSection', () => {
   it('renders eyebrow text', () => {

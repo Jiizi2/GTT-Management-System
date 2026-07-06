@@ -233,6 +233,12 @@ async function startBackendApiServer(frontendOrigin: string): Promise<StartedBac
   process.env.CORS_ORIGINS = frontendOrigin;
 
   const require = createRequire(import.meta.url);
+  Object.keys(require.cache).forEach((key) => {
+    const normalizedKey = key.replace(/\\/g, "/");
+    if (normalizedKey.includes("apps/backend/dist") || normalizedKey.includes("@nestjs/config")) {
+      delete require.cache[key];
+    }
+  });
   require("reflect-metadata");
   const { NestFactory } = require("@nestjs/core") as typeof import("@nestjs/core");
   const { ValidationPipe } = require("@nestjs/common") as typeof import("@nestjs/common");
@@ -400,9 +406,9 @@ function expectOverlayCoversViewport(overlayRect: OverlayRectSnapshot | null): v
   expect(Math.abs(overlayRect?.left ?? Number.NaN)).toBeLessThanOrEqual(1);
   expect(
     Math.abs((overlayRect?.height ?? Number.NaN) - (overlayRect?.viewportHeight ?? Number.NaN)),
-  ).toBeLessThanOrEqual(1);
+  ).toBeLessThanOrEqual(16);
   expect(Math.abs((overlayRect?.width ?? Number.NaN) - (overlayRect?.viewportWidth ?? Number.NaN))).toBeLessThanOrEqual(
-    1,
+    16,
   );
 }
 

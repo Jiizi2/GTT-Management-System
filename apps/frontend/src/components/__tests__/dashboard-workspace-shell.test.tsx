@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DashboardWorkspaceShell } from './dashboard-workspace-shell';
-import type { AuthSession } from '../shared/auth-session';
-import { useAppController } from '../hooks/use-app-controller';
+import { DashboardWorkspaceShell } from '../dashboard-workspace-shell';
+import type { AuthSession } from '../../shared/auth-session';
+import { useAppController } from '../../hooks/use-app-controller';
 
 
 const mockController = {
@@ -53,11 +53,11 @@ const mockController = {
   handleSaveGroupIdentity: vi.fn(),
 };
 
-vi.mock('../hooks/use-app-controller', () => ({
+vi.mock('../../hooks/use-app-controller', () => ({
   useAppController: vi.fn(() => mockController),
 }));
 
-vi.mock('./app-sidebar', () => ({
+vi.mock('../app-sidebar', () => ({
   AppSidebar: ({ activeNav, onLogout, onNavigate, onToggleCollapse }: any) => (
     <div data-testid="app-sidebar" data-active-nav={activeNav}>
       <button onClick={onLogout}>Logout</button>
@@ -67,11 +67,11 @@ vi.mock('./app-sidebar', () => ({
   ),
 }));
 
-vi.mock('./app-main-content', () => ({
+vi.mock('../app-main-content', () => ({
   AppMainContent: () => <div data-testid="app-main-content">Main Content</div>,
 }));
 
-vi.mock('./mobile-nav', () => ({
+vi.mock('../mobile-nav', () => ({
   MobileNav: ({ isActionsOpen, onToggleActions }: any) => (
     <div data-testid="mobile-nav" data-actions-open={isActionsOpen}>
       <button onClick={onToggleActions}>Toggle Actions</button>
@@ -79,7 +79,7 @@ vi.mock('./mobile-nav', () => ({
   ),
 }));
 
-vi.mock('./mobile-quick-actions-sheet', () => ({
+vi.mock('../mobile-quick-actions-sheet', () => ({
   MobileQuickActionsSheet: ({ open, onClose }: any) =>
     open ? (
       <div data-testid="mobile-quick-actions-sheet">
@@ -88,7 +88,7 @@ vi.mock('./mobile-quick-actions-sheet', () => ({
     ) : null,
 }));
 
-vi.mock('./theme-toggle-button', () => ({
+vi.mock('../theme-toggle-button', () => ({
   ThemeToggleButton: ({ variant }: any) => (
     <div data-testid="theme-toggle-button" data-variant={variant}>
       Theme Toggle

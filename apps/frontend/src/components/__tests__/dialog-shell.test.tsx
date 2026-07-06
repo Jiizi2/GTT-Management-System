@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DialogShell } from './dialog-shell';
+import { DialogShell } from '../dialog-shell';
 
 // Mock useModalFocusTrap to return a simple ref
-vi.mock('./use-modal-focus-trap', () => ({
+vi.mock('../use-modal-focus-trap', () => ({
   useModalFocusTrap: () => ({ current: null }),
 }));
 
