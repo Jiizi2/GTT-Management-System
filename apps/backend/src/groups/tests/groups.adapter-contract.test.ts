@@ -6,6 +6,7 @@ import { GroupsService } from "../application/groups.service";
 import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
 import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
 import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
+import type { CreateGroupDto } from "../dto/create-group.dto";
 
 type ContractGroupRecord = {
   id: string;

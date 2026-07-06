@@ -149,7 +149,7 @@ describe("GroupsServicePrismaListChecklist", () => {
     }
 
     {
-      let summaryFindManyArgs: Record<string, unknown> | null = null;
+      let summaryFindManyArgs: any = null;
       const prismaMock = {
         group: {
           findMany: async (args: Record<string, unknown>) => {
@@ -178,7 +178,7 @@ describe("GroupsServicePrismaListChecklist", () => {
     }
 
     {
-      let searchFindManyArgs: Record<string, unknown> | null = null;
+      let searchFindManyArgs: any = null;
       const prismaMock = {
         group: {
           findMany: async (args: Record<string, unknown>) => {
@@ -227,7 +227,7 @@ describe("GroupsServicePrismaListChecklist", () => {
 
     {
       let countWhere: unknown;
-      let findManyArgs: Record<string, unknown> | null = null;
+      let findManyArgs: any = null;
       const prismaMock = {
         group: {
           count: async (args: Record<string, unknown>) => {
@@ -382,8 +382,8 @@ describe("GroupsServicePrismaListChecklist", () => {
 
   runCase("groups prisma confirm checklist driver paths", async () => {
     {
-      let assignmentCreatePayload: Record<string, unknown> | null = null;
-      let statusUpdatePayload: Record<string, unknown> | null = null;
+      let assignmentCreatePayload: any = null;
+      let statusUpdatePayload: any = null;
       let checklistDriverCreateCalls = 0;
       let lockCalls = 0;
 
@@ -695,7 +695,7 @@ describe("GroupsServicePrismaListChecklist", () => {
     }
 
     {
-      let findFirstArgs: Record<string, unknown> | null = null;
+      let findFirstArgs: any = null;
       let deletedAssignmentId: string | null = null;
       const prismaMock = {
         group: {
@@ -786,7 +786,7 @@ describe("GroupsServicePrismaListChecklist", () => {
     }
 
     {
-      let findFirstArgs: Record<string, unknown> | null = null;
+      let findFirstArgs: any = null;
       const prismaMock = {
         group: {
           findFirst: async () => ({
@@ -851,7 +851,7 @@ describe("GroupsServicePrismaListChecklist", () => {
   });
 
   runCase("groups prisma checklist audit logs use group code identity", async () => {
-    let auditCreateArgs: Record<string, unknown> | null = null;
+    let auditCreateArgs: any = null;
     let assignmentStatus: ChecklistAssignmentStatus = ChecklistAssignmentStatus.NOT_COMPLETE;
 
     const prismaMock = {
@@ -987,7 +987,7 @@ describe("GroupsServicePrismaListChecklist", () => {
   });
 
   runCase("groups prisma listAuditLogs reads persistent entries", async () => {
-    let findManyArgs: Record<string, unknown> | null = null;
+    let findManyArgs: any = null;
     const prismaMock = {
       groupAuditLog: {
         create: async () => ({}),

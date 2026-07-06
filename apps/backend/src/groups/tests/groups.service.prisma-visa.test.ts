@@ -52,7 +52,7 @@ function createGroupFindFirstMock() {
 
 describe("GroupsServicePrismaVisa", () => {
   runCase("groups prisma add visa hotel agreement", async () => {
-    let createdPayload: Record<string, unknown> | null = null;
+    let createdPayload: any = null;
     const prismaMock = {
       group: {
         findFirst: createGroupFindFirstMock(),
@@ -117,7 +117,7 @@ describe("GroupsServicePrismaVisa", () => {
   });
 
   runCase("groups prisma update visa hotel agreement", async () => {
-    let updatedPayload: Record<string, unknown> | null = null;
+    let updatedPayload: any = null;
     const prismaMock = {
       group: {
         findFirst: createGroupFindFirstMock(),

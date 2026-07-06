@@ -91,7 +91,7 @@ function createGroupPayload(overrides: Partial<CreateGroupDto> = {}): CreateGrou
 describe("GroupsServicePrismaCrud", () => {
   runCase("groups prisma create success and conflict guard", async () => {
     {
-      let createPayload: Record<string, unknown> | null = null;
+      let createPayload: any = null;
       let hotelDraftUpdateManyCalls = 0;
       const tx = {
         group: {
@@ -166,7 +166,7 @@ describe("GroupsServicePrismaCrud", () => {
     }
 
     {
-      let createPayload: Record<string, unknown> | null = null;
+      let createPayload: any = null;
       const tx = {
         group: {
           create: async (args: Record<string, unknown>) => {
@@ -497,7 +497,7 @@ describe("GroupsServicePrismaCrud", () => {
 
   runCase("groups prisma update success and guards", async () => {
     {
-      let updatedPayload: Record<string, unknown> | null = null;
+      let updatedPayload: any = null;
       const currentGroup: PrismaGroupRecord = {
         id: "grp-1",
         code: "GRP-OLD",
@@ -568,7 +568,7 @@ describe("GroupsServicePrismaCrud", () => {
     }
 
     {
-      let updatedPayload: Record<string, unknown> | null = null;
+      let updatedPayload: any = null;
       const currentGroup: PrismaGroupRecord = {
         id: "grp-1",
         code: "GRP-OLD",
@@ -747,7 +747,7 @@ describe("GroupsServicePrismaCrud", () => {
   runCase("groups prisma remove success and not-found guards", async () => {
     {
       let deletedGroupId: string | null = null;
-      let auditCreateArgs: Record<string, unknown> | null = null;
+      let auditCreateArgs: any = null;
       const existingGroup: PrismaGroupRecord = {
         id: "grp-1",
         code: "GRP-REMOVE",

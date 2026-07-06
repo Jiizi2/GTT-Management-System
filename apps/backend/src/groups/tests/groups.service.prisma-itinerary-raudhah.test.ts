@@ -96,7 +96,7 @@ describe("GroupsServicePrismaItineraryRaudhah", () => {
   runCase("groups prisma add itinerary retry and conflict guards", async () => {
     {
       let createCalls = 0;
-      let createdPayload: Record<string, unknown> | null = null;
+      let createdPayload: any = null;
       const prismaMock = {
         group: {
           findFirst: createGroupFindFirstMock(),
@@ -280,7 +280,7 @@ describe("GroupsServicePrismaItineraryRaudhah", () => {
     }
 
     {
-      let updatedPayload: Record<string, unknown> | null = null;
+      let updatedPayload: any = null;
       const prismaMock = {
         group: {
           findFirst: createGroupFindFirstMock(),
@@ -385,7 +385,7 @@ describe("GroupsServicePrismaItineraryRaudhah", () => {
 
   runCase("groups prisma upsert raudhah appointment paths", async () => {
     {
-      let updatePayload: Record<string, unknown> | null = null;
+      let updatePayload: any = null;
       const prismaMock = {
         group: {
           findFirst: createGroupFindFirstMock(),
@@ -426,7 +426,7 @@ describe("GroupsServicePrismaItineraryRaudhah", () => {
     }
 
     {
-      let createPayload: Record<string, unknown> | null = null;
+      let createPayload: any = null;
       const prismaMock = {
         group: {
           findFirst: createGroupFindFirstMock(),

@@ -12,6 +12,7 @@ import { HotelAgreementDraftsService } from "../application/hotel-agreement-draf
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
 import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
+import { MemoryHotelAgreementDraftRepository } from "../../infrastructure/repositories/memory/memory-hotel-agreement-draft.repository";
 
 async function createMemoryServices(): Promise<{
   groupsService: GroupsService;
@@ -22,7 +23,7 @@ async function createMemoryServices(): Promise<{
   process.env.DATA_SOURCE = "memory";
   const groupsService = new GroupsService(new MemoryGroupRepository(new GroupMemoryStore()));
   const draftsService = new HotelAgreementDraftsService(
-    {} as PrismaService,
+    new MemoryHotelAgreementDraftRepository(groupsService),
     groupsService,
   );
 
@@ -280,7 +281,7 @@ describe("HotelAgreementDrafts", () => {
       // Manipulate createdAt to be 25 hours ago
       const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
       const memoryDrafts = draftsService["memoryDrafts"];
-      const draftInMemory = memoryDrafts.find((d) => d.id === created.id);
+      const draftInMemory = memoryDrafts.find((d: any) => d.id === created.id);
       if (draftInMemory) {
         draftInMemory.createdAt = twentyFiveHoursAgo;
         draftInMemory.updatedAt = twentyFiveHoursAgo;
@@ -290,7 +291,9 @@ describe("HotelAgreementDrafts", () => {
       const allDrafts = (await draftsService.findAll()) as Array<{ id: string; status: string }>;
       const found = allDrafts.find((d) => d.id === created.id);
       expect(found).toBeTruthy();
-      expect(found.status).toBe(AgreementApprovalStatus.REJECTED);
+      if (found) {
+        expect(found.status).toBe(AgreementApprovalStatus.REJECTED);
+      }
 
       // Verify assign throws error
       await expect(
