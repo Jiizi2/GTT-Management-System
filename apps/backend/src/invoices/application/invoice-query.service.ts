@@ -31,11 +31,37 @@ export class InvoiceQueryService {
     }
   }
 
-  get memoryStore() {
+  get memoryStore(): InvoiceMemoryStore | undefined {
     if (this.invoiceRepo && "memoryStore" in this.invoiceRepo) {
       return (this.invoiceRepo as any).memoryStore;
     }
     return undefined;
+  }
+
+  get prismaInvoiceDownPaymentColumnState(): boolean | null {
+    if (this.invoiceRepo && "prismaInvoiceDownPaymentColumnState" in this.invoiceRepo) {
+      return (this.invoiceRepo as any).prismaInvoiceDownPaymentColumnState;
+    }
+    return null;
+  }
+
+  set prismaInvoiceDownPaymentColumnState(value: boolean | null) {
+    if (this.invoiceRepo && "prismaInvoiceDownPaymentColumnState" in this.invoiceRepo) {
+      (this.invoiceRepo as any).prismaInvoiceDownPaymentColumnState = value;
+    }
+  }
+
+  get prismaInvoiceRecipientNameColumnState(): boolean | null {
+    if (this.invoiceRepo && "prismaInvoiceRecipientNameColumnState" in this.invoiceRepo) {
+      return (this.invoiceRepo as any).prismaInvoiceRecipientNameColumnState;
+    }
+    return null;
+  }
+
+  set prismaInvoiceRecipientNameColumnState(value: boolean | null) {
+    if (this.invoiceRepo && "prismaInvoiceRecipientNameColumnState" in this.invoiceRepo) {
+      (this.invoiceRepo as any).prismaInvoiceRecipientNameColumnState = value;
+    }
   }
 
   async listClients(): Promise<InvoiceClientListItem[]> {

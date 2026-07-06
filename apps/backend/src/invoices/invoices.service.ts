@@ -13,25 +13,25 @@ export class InvoicesService implements OnModuleInit {
     @Inject(InvoiceCommandService) private readonly commandService: InvoiceCommandService,
   ) {}
   get memoryInvoiceClients() {
-    return (this.commandService as any).memoryStore.clients;
+    return this.commandService.memoryStore?.clients ?? [];
   }
 
   get memoryInvoices() {
-    return (this.commandService as any).memoryStore.invoices;
+    return this.commandService.memoryStore?.invoices ?? [];
   }
 
   get prismaInvoiceDownPaymentColumnState() {
-    return (this.queryService as any).prismaInvoiceDownPaymentColumnState;
+    return this.queryService.prismaInvoiceDownPaymentColumnState;
   }
   set prismaInvoiceDownPaymentColumnState(value: boolean | null) {
-    (this.queryService as any).prismaInvoiceDownPaymentColumnState = value;
+    this.queryService.prismaInvoiceDownPaymentColumnState = value;
   }
 
   get prismaInvoiceRecipientNameColumnState() {
-    return (this.queryService as any).prismaInvoiceRecipientNameColumnState;
+    return this.queryService.prismaInvoiceRecipientNameColumnState;
   }
   set prismaInvoiceRecipientNameColumnState(value: boolean | null) {
-    (this.queryService as any).prismaInvoiceRecipientNameColumnState = value;
+    this.queryService.prismaInvoiceRecipientNameColumnState = value;
   }
 
   async onModuleInit(): Promise<void> {

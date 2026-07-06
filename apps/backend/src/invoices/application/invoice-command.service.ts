@@ -31,7 +31,7 @@ export class InvoiceCommandService {
     }
   }
 
-  get memoryStore() {
+  get memoryStore(): InvoiceMemoryStore | undefined {
     if (this.invoiceRepo && "memoryStore" in this.invoiceRepo) {
       return (this.invoiceRepo as any).memoryStore;
     }
