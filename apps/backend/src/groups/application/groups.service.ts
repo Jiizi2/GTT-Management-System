@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { GroupLifecycleStatus, GroupTone, Prisma } from "@prisma/client";
-import { resolveConfiguredDataSource } from "../../config/app-config";
+import { GroupLifecycleStatus, GroupTone } from "@prisma/client";
 import { createStructuredLogger } from "../../logging/create-structured-logger";
-import { PrismaService } from "../../prisma/prisma.service";
 import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
 import type { CreateGroupIdentityDto } from "../dto/create-group-identity.dto";
 import type { CreateGroupDto } from "../dto/create-group.dto";
@@ -18,9 +15,7 @@ import type { UpdateGroupDto } from "../dto/update-group.dto";
 import {
   extractGroupCode,
   extractGroupId,
-  sanitizeAuditPayloadValue,
 } from "../infrastructure/groups.audit";
-import { createDefaultMemoryGroups } from "../infrastructure/groups.memory-store";
 import type {
   ChecklistAssignmentSyncResult,
   FindAllOptions,
@@ -32,32 +27,37 @@ import type {
 import { GroupsCommandService } from "./groups-command.service";
 import { GroupsQueryService } from "./groups-query.service";
 
+import { ConfigService } from "@nestjs/config";
+import { resolveConfiguredDataSource } from "../../config/app-config";
+import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
+import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
+import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
+import { GroupRepository } from "../../domain/repositories/group.repository";
+
 @Injectable()
 export class GroupsService {
-  private readonly dataSource: "memory" | "prisma";
-  private readonly memoryGroups: MemoryGroupRecord[] =
-    createDefaultMemoryGroups();
-  private readonly auditLogs: MemoryAuditLog[] = [];
+  public readonly dataSource: "memory" | "prisma";
   private readonly logger = createStructuredLogger(GroupsService.name);
   private readonly queryService: GroupsQueryService;
   private readonly commandService: GroupsCommandService;
 
   constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject("GroupRepository") private groupRepo: GroupRepository,
     private readonly configService?: ConfigService,
   ) {
     this.dataSource = resolveConfiguredDataSource(this.configService);
-    this.queryService = new GroupsQueryService(
-      this.prisma,
-      this.dataSource,
-      this.memoryGroups,
-      this.auditLogs,
-    );
-    this.commandService = new GroupsCommandService(
-      this.prisma,
-      this.dataSource,
-      this.memoryGroups,
-    );
+
+    if (!this.groupRepo || typeof this.groupRepo.findAll !== "function") {
+      const resolvedPrisma = this.groupRepo as any;
+      if (this.dataSource === "prisma") {
+        this.groupRepo = new PrismaGroupRepository(resolvedPrisma);
+      } else {
+        this.groupRepo = new MemoryGroupRepository(new GroupMemoryStore());
+      }
+    }
+
+    this.queryService = new GroupsQueryService(this.groupRepo);
+    this.commandService = new GroupsCommandService(this.groupRepo);
   }
 
   async findAll(
@@ -496,49 +496,6 @@ export class GroupsService {
     group: unknown,
     payload: Record<string, unknown>,
   ): Promise<void> {
-    if (this.dataSource === "prisma") {
-      await this.writeAuditLogWithPrisma(action, entity, group, payload);
-      return;
-    }
-
-    this.pushAuditLog(action, entity, extractGroupCode(group), payload);
-  }
-
-  private async writeAuditLogWithPrisma(
-    action: string,
-    entity: string,
-    group: unknown,
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    await this.prisma.groupAuditLog.create({
-      data: {
-        groupId: extractGroupId(group),
-        groupCode: extractGroupCode(group),
-        action,
-        entity,
-        payload: sanitizeAuditPayloadValue(payload) as Prisma.InputJsonValue,
-      },
-    });
-  }
-
-  private pushAuditLog(
-    action: string,
-    entity: string,
-    groupCode: string | undefined,
-    payload: Record<string, unknown>,
-  ): void {
-    const entry: MemoryAuditLog = {
-      id: randomUUID(),
-      action,
-      entity,
-      groupCode: groupCode?.trim().toUpperCase(),
-      payload,
-      createdAt: new Date().toISOString(),
-    };
-
-    this.auditLogs.unshift(entry);
-    if (this.auditLogs.length > 500) {
-      this.auditLogs.length = 500;
-    }
+    await this.groupRepo.writeAuditLog(action, entity, payload, group);
   }
 }
