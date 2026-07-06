@@ -29,9 +29,6 @@ import { GroupsQueryService } from "./groups-query.service";
 
 import { ConfigService } from "@nestjs/config";
 import { resolveConfiguredDataSource } from "../../config/app-config";
-import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
-import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
-import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
 import { GroupRepository } from "../../domain/repositories/group.repository";
 
 @Injectable()
@@ -42,19 +39,10 @@ export class GroupsService {
   private readonly commandService: GroupsCommandService;
 
   constructor(
-    @Inject("GroupRepository") private groupRepo: GroupRepository,
+    @Inject("GroupRepository") private readonly groupRepo: GroupRepository,
     private readonly configService?: ConfigService,
   ) {
     this.dataSource = resolveConfiguredDataSource(this.configService);
-
-    if (!this.groupRepo || typeof this.groupRepo.findAll !== "function") {
-      const resolvedPrisma = this.groupRepo as any;
-      if (this.dataSource === "prisma") {
-        this.groupRepo = new PrismaGroupRepository(resolvedPrisma);
-      } else {
-        this.groupRepo = new MemoryGroupRepository(new GroupMemoryStore());
-      }
-    }
 
     this.queryService = new GroupsQueryService(this.groupRepo);
     this.commandService = new GroupsCommandService(this.groupRepo);

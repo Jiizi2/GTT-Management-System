@@ -8,11 +8,13 @@ import {
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
+import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
+import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {
   const previous = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
-  const service = new GroupsService({} as PrismaService);
+  const service = new GroupsService(new MemoryGroupRepository(new GroupMemoryStore()));
 
   const existingGroups = await service.findAll();
   if (Array.isArray(existingGroups)) {

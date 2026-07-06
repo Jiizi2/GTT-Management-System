@@ -4,6 +4,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import { GroupRaudhahStatus, Prisma } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
+import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
 
 function createPrismaGroupsService(prismaMock: PrismaService): { service: GroupsService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;
@@ -13,7 +14,7 @@ function createPrismaGroupsService(prismaMock: PrismaService): { service: Groups
     create: async () => ({}),
     findMany: async () => [],
   };
-  const service = new GroupsService(prismaMock);
+  const service = new GroupsService(new PrismaGroupRepository(prismaMock));
 
   return {
     service,

@@ -10,6 +10,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
 import { HotelAgreementDraftsService } from "../application/hotel-agreement-drafts.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
+import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
+import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
 
 async function createMemoryServices(): Promise<{
   groupsService: GroupsService;
@@ -18,7 +20,7 @@ async function createMemoryServices(): Promise<{
 }> {
   const previous = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
-  const groupsService = new GroupsService({} as PrismaService);
+  const groupsService = new GroupsService(new MemoryGroupRepository(new GroupMemoryStore()));
   const draftsService = new HotelAgreementDraftsService(
     {} as PrismaService,
     groupsService,

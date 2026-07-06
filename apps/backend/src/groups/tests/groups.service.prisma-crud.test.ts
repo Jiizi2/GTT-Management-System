@@ -5,6 +5,7 @@ import { AgreementCity, GroupLifecycleStatus, Prisma } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
+import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
 
 type PrismaGroupRecord = {
   id: string;
@@ -29,7 +30,7 @@ function createPrismaGroupsService(prismaMock: PrismaService): { service: Groups
     create: async () => ({}),
     findMany: async () => [],
   };
-  const service = new GroupsService(prismaMock);
+  const service = new GroupsService(new PrismaGroupRepository(prismaMock));
 
   return {
     service,

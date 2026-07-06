@@ -4,6 +4,7 @@ import { NotFoundException } from "@nestjs/common";
 import { AgreementApprovalStatus, AgreementCity } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
+import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
 
 function createPrismaService(prismaMock: PrismaService): {
   service: GroupsService;
@@ -16,7 +17,7 @@ function createPrismaService(prismaMock: PrismaService): {
     create: async () => ({}),
     findMany: async () => [],
   };
-  const service = new GroupsService(prismaMock);
+  const service = new GroupsService(new PrismaGroupRepository(prismaMock));
 
   return {
     service,

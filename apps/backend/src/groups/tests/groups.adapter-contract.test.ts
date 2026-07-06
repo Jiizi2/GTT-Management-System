@@ -2,8 +2,10 @@ import { describe, expect } from "vitest";
 import { runCase } from "../../test/run-case";
 import { GroupLifecycleStatus, GroupTone } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
-import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
+import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
+import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
+import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
 
 type ContractGroupRecord = {
   id: string;
@@ -80,7 +82,7 @@ function restoreDataSource(previous: string | undefined): void {
 async function createMemoryHarness(): Promise<ContractHarness> {
   const previous = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
-  const service = new GroupsService({} as PrismaService);
+  const service = new GroupsService(new MemoryGroupRepository(new GroupMemoryStore()));
 
   const existingGroups = await service.findAll();
   if (Array.isArray(existingGroups)) {
@@ -255,7 +257,7 @@ async function createPrismaHarness(): Promise<ContractHarness> {
   process.env.DATA_SOURCE = "prisma";
 
   return {
-    service: new GroupsService(createContractPrismaService()),
+    service: new GroupsService(new PrismaGroupRepository(createContractPrismaService())),
     restore: () => restoreDataSource(previous),
   };
 }
