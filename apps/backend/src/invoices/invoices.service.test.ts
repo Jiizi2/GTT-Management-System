@@ -3,6 +3,11 @@ import { BadRequestException, ConflictException, NotFoundException } from "@nest
 import { InvoiceStatus, Prisma } from "@prisma/client";
 import type { PrismaService } from "../prisma/prisma.service";
 import { InvoicesService } from "./invoices.service";
+import { InvoiceValidator } from "./domain/invoice-validator";
+import { InvoiceNumberGenerator } from "./domain/invoice-number-generator";
+import { InvoiceMemoryStore } from "./application/invoice-memory-store";
+import { InvoiceQueryService } from "./application/invoice-query.service";
+import { InvoiceCommandService } from "./application/invoice-command.service";
 
 type InvoiceListItem = Awaited<ReturnType<InvoicesService["findAll"]>>[number];
 type InvoiceClient = Awaited<ReturnType<InvoicesService["listClients"]>>[number];
@@ -10,7 +15,14 @@ type InvoiceClient = Awaited<ReturnType<InvoicesService["listClients"]>>[number]
 function createMemoryInvoicesService(): { service: InvoicesService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
-  const service = new InvoicesService({} as PrismaService);
+  
+  const prisma = {} as PrismaService;
+  const memoryStore = new InvoiceMemoryStore();
+  const validator = new InvoiceValidator();
+  const generator = new InvoiceNumberGenerator();
+  const queryService = new InvoiceQueryService(prisma, memoryStore);
+  const commandService = new InvoiceCommandService(prisma, memoryStore, queryService, validator, generator);
+  const service = new InvoicesService(queryService, commandService);
 
   return {
     service,
@@ -27,7 +39,13 @@ function createMemoryInvoicesService(): { service: InvoicesService; restore: () 
 function createPrismaInvoicesService(prismaMock: PrismaService): { service: InvoicesService; restore: () => void } {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "prisma";
-  const service = new InvoicesService(prismaMock);
+  
+  const memoryStore = new InvoiceMemoryStore();
+  const validator = new InvoiceValidator();
+  const generator = new InvoiceNumberGenerator();
+  const queryService = new InvoiceQueryService(prismaMock, memoryStore);
+  const commandService = new InvoiceCommandService(prismaMock, memoryStore, queryService, validator, generator);
+  const service = new InvoicesService(queryService, commandService);
 
   return {
     service,
@@ -1510,6 +1528,40 @@ async function testInvoiceNumberGeneration(): Promise<void> {
   }
 }
 
+async function testPaginationSupport() {
+  const { service, restore } = createMemoryInvoicesService();
+  try {
+    for (let i = 1; i <= 5; i++) {
+      await service.create({
+        clientName: `Client ${i}`,
+        issuedDate: "2026-07-05",
+        dueDate: "2026-07-12",
+        amount: 1000 * i,
+      });
+    }
+
+    const res1 = await service.findAllPaginated({ page: 1, limit: 2 });
+    expect(res1.data.length).toBe(2);
+    expect(res1.total).toBe(5);
+    expect(res1.page).toBe(1);
+    expect(res1.limit).toBe(2);
+    expect(res1.totalPages).toBe(3);
+
+    const res2 = await service.findAllPaginated({ page: 2, limit: 2 });
+    expect(res2.data.length).toBe(2);
+    expect(res2.total).toBe(5);
+    expect(res2.page).toBe(2);
+
+    const res3 = await service.findAllPaginated({ page: 3, limit: 2 });
+    expect(res3.data.length).toBe(1);
+    expect(res3.total).toBe(5);
+    expect(res3.page).toBe(3);
+  } finally {
+    restore();
+  }
+}
+
+
 describe("InvoicesService", () => {
   it("invoice list clients seeded labels", () => testListClientsReturnsSeededSortedLabels());
   it("invoice create existing client sequential numbering", () => testCreateUsesExistingClientAndGeneratesSequentialNumbers());
@@ -1534,4 +1586,5 @@ describe("InvoicesService", () => {
   it("payment history validation", () => testPaymentHistoryValidation());
   it("client sort order logic", () => testClientSortOrderLogic());
   it("invoice number generation", () => testInvoiceNumberGeneration());
+  it("invoice pagination support", () => testPaginationSupport());
 });

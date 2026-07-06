@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
 } from "@nestjs/common";
 import {
@@ -33,6 +34,7 @@ import {
   InvoiceListItemResponseDto,
 } from "./dto/invoice-response.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
+import { PaginationDto } from "./dto/pagination.dto";
 import { InvoicesService } from "./invoices.service";
 
 type ResponseLike = {
@@ -57,9 +59,15 @@ export class InvoicesController {
     type: InvoiceListItemResponseDto,
     isArray: true,
   })
-  findAll(@Res({ passthrough: true }) response: ResponseLike) {
+  findAll(
+    @Query() pagination: PaginationDto,
+    @Res({ passthrough: true }) response: ResponseLike
+  ) {
     response.setHeader("Cache-Control", "no-store, private");
-    return this.invoicesService.findAll();
+    if (pagination.page === undefined && pagination.limit === undefined) {
+      return this.invoicesService.findAll();
+    }
+    return this.invoicesService.findAllPaginated(pagination);
   }
 
   @Get("clients")
