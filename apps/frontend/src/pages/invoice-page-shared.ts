@@ -919,3 +919,48 @@ export function buildInvoicePayload({
     status: values.invoiceStatus,
   };
 }
+
+export function parseNumberInput(value: string): number {
+  const normalized = value.replace(/[^0-9.-]/g, "");
+  const val = Number.parseFloat(normalized);
+  return Number.isFinite(val) ? val : 0;
+}
+
+export function formatNumberInput(value: number): string {
+  return new Intl.NumberFormat("id-ID").format(value);
+}
+
+export function createEmptyDraftItems(): InvoiceDraftItem[] {
+  return [
+    {
+      id: "line-item-1",
+      description: "",
+      pax: 1,
+      currency: "IDR",
+      unitPrice: 0,
+    },
+  ];
+}
+
+export function mapBackendInvoiceItemsToDraftItems(items: ReadonlyArray<any> | undefined): InvoiceDraftItem[] {
+  if (!items || items.length === 0) {
+    return createEmptyDraftItems();
+  }
+
+  return items.map((item) => ({
+    id: item.id || `line-${Date.now()}-${Math.random()}`,
+    description: item.description,
+    pax: item.pax,
+    currency: item.currency,
+    unitPrice: item.unitPrice,
+  }));
+}
+
+export function createInitialInvoiceDraftItems(initialInvoice: InvoiceWorkspaceInitialData | null): InvoiceDraftItem[] {
+  if (!initialInvoice) {
+    return createEmptyDraftItems();
+  }
+
+  return mapBackendInvoiceItemsToDraftItems(initialInvoice.items);
+}
+

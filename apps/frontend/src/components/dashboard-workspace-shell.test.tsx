@@ -4,7 +4,6 @@ import { DashboardWorkspaceShell } from './dashboard-workspace-shell';
 import type { AuthSession } from '../shared/auth-session';
 import { useAppController } from '../hooks/use-app-controller';
 
-vi.mock('../hooks/use-app-controller');
 
 const mockController = {
   activeNav: 'overview' as const,
@@ -182,7 +181,7 @@ describe('DashboardWorkspaceShell', () => {
   it('should show sync feedback when present', () => {
     vi.mocked(useAppController).mockReturnValue({
       ...mockController,
-      syncFeedback: { id: '1', tone: 'success', message: 'Saved successfully' },
+      syncFeedback: { id: 1, tone: 'success', message: 'Saved successfully' },
     });
 
     render(<DashboardWorkspaceShell sessionUser={mockSessionUser} onLogout={mockOnLogout} />);
@@ -195,7 +194,7 @@ describe('DashboardWorkspaceShell', () => {
     const mockDismiss = vi.fn();
     vi.mocked(useAppController).mockReturnValue({
       ...mockController,
-      syncFeedback: { id: '1', tone: 'success', message: 'Saved successfully' },
+      syncFeedback: { id: 1, tone: 'success', message: 'Saved successfully' },
       dismissSyncFeedback: mockDismiss,
     });
 
@@ -218,7 +217,7 @@ describe('DashboardWorkspaceShell', () => {
 
       vi.mocked(useAppController).mockReturnValue({
         ...mockController,
-        syncFeedback: { id: '1', tone, message: `Test ${tone}` },
+        syncFeedback: { id: 1, tone, message: `Test ${tone}` },
       });
 
       render(<DashboardWorkspaceShell sessionUser={mockSessionUser} onLogout={mockOnLogout} />);

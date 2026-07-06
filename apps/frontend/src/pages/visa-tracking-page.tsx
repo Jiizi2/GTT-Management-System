@@ -1,182 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import * as Domain from "../shared/app-domain";
-import type {
-  AgreementApprovalStatus,
-  GroupData,
-  GroupRaudhahStatus,
-  VisaFilterId,
-  VisaTrackingRow,
-} from "../shared/app-domain";
+import type { AgreementApprovalStatus, GroupData, VisaTrackingRow, VisaFilterId } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
 import { PageHeroSection } from "../components/page-hero-section";
-import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { Button } from "../components/button";
-import { Badge } from "../components/badge";
+import { SereneSelect } from "../components/serene-select";
 import { useThemeMode } from "../theme/theme-provider";
-
-const {
-  buildVisaTrackingRowsFromGroups,
-  formatLocalIsoDate,
-  formatVisaShortDate,
-  getGroupAgreementHotelsByCity,
-  hasMissingHotelAllocation,
-  isVisaRowActionRequired,
-  resolveValidRaudhahAppointments,
-  resolveVisaAgreementDateRange,
-  resolveVisaAgreementNumber,
-  VISA_PAGE_SIZE,
-} = Domain;
-
-
-function resolveVisaTypeLabel(group: GroupData | undefined): "Visa+" | "Visa Only" {
-  return group?.visaSetup?.busStatus === "Visa+" ? "Visa+" : "Visa Only";
-}
-
-function formatSyarikahName(syarikah: string | undefined): string {
-  if (!syarikah) return "-";
-  const trimmed = syarikah.trim();
-  if (!trimmed) return "-";
-  // Ambil kata pertama jika lebih dari 1 kata
-  const words = trimmed.split(/\s+/);
-  return words[0] || "-";
-}
-
-function getAgreementApprovalClasses(status: "Approved" | "Waiting for Approval", isDarkMode: boolean): string {
-  if (status === "Approved") {
-    return isDarkMode
-      ? "border-primary/30 bg-primary/14 text-primary"
-      : "border-emerald-200 bg-emerald-100 text-emerald-800";
-  }
-
-  return isDarkMode
-    ? "border-secondary/35 bg-secondary/16 text-secondary"
-    : "border-amber-200 bg-amber-100 text-amber-800";
-}
-
-
-
-function toAgreementStatusSelectValue(status: AgreementApprovalStatus): "approved" | "waiting" {
-  return status === "Approved" ? "approved" : "waiting";
-}
-
-function fromAgreementStatusSelectValue(value: string): AgreementApprovalStatus {
-  return value === "approved" ? "Approved" : "Waiting for Approval";
-}
-
-type IssuedMonthOption = {
-  value: string;
-  label: string;
-};
-
-function resolveIssuedMonthKey(isoDate: string): string | null {
-  const normalizedIsoDate = isoDate.trim();
-  const matchedMonth = normalizedIsoDate.match(/^(\d{4})-(\d{2})-\d{2}$/);
-  if (!matchedMonth) {
-    return null;
-  }
-
-  return `${matchedMonth[1]}-${matchedMonth[2]}`;
-}
-
-function formatIssuedMonthLabel(monthKey: string): string {
-  const parsedDate = new Date(`${monthKey}-01T12:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return monthKey;
-  }
-
-  return parsedDate.toLocaleDateString("id-ID", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function resolveRaudhahEntries(
-  row: VisaTrackingRow,
-  group: GroupData | undefined,
-): Array<{ key: string; dateLabel: string; status: GroupRaudhahStatus }> {
-  const normalizedAppointments = resolveValidRaudhahAppointments(group);
-  if (normalizedAppointments.length === 0) {
-    return [
-      {
-        key: `${row.id}-raudhah-not-set`,
-        dateLabel: "Not set",
-        status: "Free",
-      },
-    ];
-  }
-
-  const configuredEntries: Array<{
-    key: string;
-    dateLabel: string;
-    status: GroupRaudhahStatus;
-    sortDate: string;
-  }> = [];
-  const seenEntryKeys = new Set<string>();
-
-  normalizedAppointments.forEach((appointment) => {
-    const dateIso = appointment.dateIso;
-    const dateLabel = appointment.status === "Free" ? "Not set" : formatVisaShortDate(dateIso);
-
-    const dedupeKey = `${dateLabel}-${appointment.status}`;
-    if (seenEntryKeys.has(dedupeKey)) {
-      return;
-    }
-    seenEntryKeys.add(dedupeKey);
-
-    configuredEntries.push({
-      key: appointment.id,
-      dateLabel,
-      status: appointment.status,
-      sortDate: appointment.status === "Free" ? "9999-12-31" : dateIso,
-    });
-  });
-
-  configuredEntries.sort((left, right) => left.sortDate.localeCompare(right.sortDate));
-
-  if (configuredEntries.length > 0) {
-    return configuredEntries.map(({ key, dateLabel, status }) => ({
-      key,
-      dateLabel,
-      status,
-    }));
-  }
-
-  return [
-    {
-      key: `${row.id}-raudhah-not-set`,
-      dateLabel: "Not set",
-      status: "Free",
-    },
-  ];
-}
-
-function resolveCityAgreementApprovalStatus(
-  row: VisaTrackingRow,
-  group: GroupData | undefined,
-  city: "makkah" | "madinah",
-): "Approved" | "Waiting for Approval" {
-  const cityAgreements = getGroupAgreementHotelsByCity(group, city);
-  if (cityAgreements.length > 0) {
-    const isAllApproved = cityAgreements.every((agreement) => agreement.status === "Approved");
-    return isAllApproved ? "Approved" : "Waiting for Approval";
-  }
-
-  const verifiedCount = city === "makkah" ? row.makkahVerified : row.madinahVerified;
-  return verifiedCount >= row.pax ? "Approved" : "Waiting for Approval";
-}
-
-
-type VisaRowGroup = {
-  mainRow: VisaTrackingRow;
-  followerRows: VisaTrackingRow[];
-};
-
-const desktopTableGridTemplate = "minmax(0, 0.9fr) minmax(0, 1.12fr) minmax(0, 0.64fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.72fr) minmax(0, 0.62fr) minmax(0, 0.8fr) minmax(0, 0.66fr)";
-
-function getVisaRowGroupKey(rowGroup: VisaRowGroup): string {
-  return rowGroup.mainRow.id || rowGroup.mainRow.groupCode;
-}
+import { useVisaTracking, desktopTableGridTemplate, getVisaRowGroupKey } from "./visa-tracking/hooks/use-visa-tracking";
+import { VisaTrackingStats } from "./visa-tracking/components/VisaTrackingStats";
+import { VisaTrackingRowGroup } from "./visa-tracking/components/VisaTrackingRowGroup";
 
 export function VisaTrackingScreen({
   groups,
@@ -189,612 +20,39 @@ export function VisaTrackingScreen({
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
-  const currentIssuedMonthKey = useMemo(() => formatLocalIsoDate(new Date()).slice(0, 7), []);
-  const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<VisaFilterId>("all");
-  const [issuedMonthFilter, setIssuedMonthFilter] = useState(() => currentIssuedMonthKey);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [expandedRowGroupKeys, setExpandedRowGroupKeys] = useState<Set<string>>(() => new Set());
 
-  const visaRows = useMemo(() => buildVisaTrackingRowsFromGroups(groups), [groups]);
-  const groupByCode = useMemo(() => new Map(groups.map((group) => [group.code, group] as const)), [groups]);
-  const durationByGroupCode = useMemo(
-    () => new Map(groups.map((group) => [group.code, group.durationDays] as const)),
-    [groups],
-  );
-  const normalizedQuery = query.trim().toLowerCase();
+  const state = useVisaTracking({ groups });
 
-  // Group all visa rows into row groups
-  const allGroupedRows = useMemo<VisaRowGroup[]>(() => {
-    const followersMap = new Map<string, VisaTrackingRow[]>();
-    const rowByGroupId = new Map<string, VisaTrackingRow>();
-    const rowByGroupCode = new Map<string, VisaTrackingRow>();
-
-    visaRows.forEach(row => {
-      const group = groupByCode.get(row.groupCode);
-      if (group) {
-        if (group.id) rowByGroupId.set(group.id, row);
-        rowByGroupCode.set(group.code, row);
-      }
-    });
-
-    const followerRowIds = new Set<string>();
-
-    visaRows.forEach(row => {
-      const group = groupByCode.get(row.groupCode);
-      if (group && group.parentGroupId) {
-        const parentRow = rowByGroupId.get(group.parentGroupId) || rowByGroupCode.get(group.parentGroupId);
-        if (parentRow) {
-          followerRowIds.add(row.id);
-          const parentKey = parentRow.id || parentRow.groupCode;
-          if (!followersMap.has(parentKey)) {
-            followersMap.set(parentKey, []);
-          }
-          followersMap.get(parentKey)!.push(row);
-        }
-      }
-    });
-
-    const result: VisaRowGroup[] = [];
-    visaRows.forEach(row => {
-      if (!followerRowIds.has(row.id)) {
-        const parentKey = row.id;
-        const followers = followersMap.get(parentKey) || [];
-        result.push({
-          mainRow: row,
-          followerRows: followers,
-        });
-      }
-    });
-
-    return result;
-  }, [visaRows, groupByCode]);
-
-  const doesRowMatchQuery = (row: VisaTrackingRow): boolean => {
-    if (!normalizedQuery) {
-      return true;
-    }
-
-    const group = groupByCode.get(row.groupCode);
-    const makkahAgreementNumber = resolveVisaAgreementNumber(row, group, "makkah");
-    const madinahAgreementNumber = resolveVisaAgreementNumber(row, group, "madinah");
-    const raudhahEntries = resolveRaudhahEntries(row, group)
-      .map((entry) => `${entry.dateLabel} ${entry.status}`)
-      .join(" ");
-
-    return [
-      row.groupCode,
-      row.groupName,
-      `${row.pax}`,
-      makkahAgreementNumber,
-      madinahAgreementNumber,
-      raudhahEntries,
-      row.visaStatus,
-      row.paymentStatus,
-    ].some((value) => value.toLowerCase().includes(normalizedQuery));
-  };
-
-  const doesRowMatchActiveFilter = (row: VisaTrackingRow): boolean => {
-    if (activeFilter === "all") {
-      return true;
-    }
-
-    if (activeFilter === "not-issued") {
-      return row.visaStatus !== "Issued";
-    }
-
-    if (activeFilter === "missing-hotel") {
-      return hasMissingHotelAllocation(row);
-    }
-
-    if (activeFilter === "visa-only") {
-      const group = groupByCode.get(row.groupCode);
-      return resolveVisaTypeLabel(group) === "Visa Only";
-    }
-
-    if (activeFilter === "visa-plus") {
-      const group = groupByCode.get(row.groupCode);
-      return resolveVisaTypeLabel(group) === "Visa+";
-    }
-
-    return row.paymentStatus !== "Paid";
-  };
-
-  const filteredGroupedRows = useMemo(() => {
-    return allGroupedRows
-      .filter(rowGroup => {
-        if (!normalizedQuery) return true;
-        return doesRowMatchQuery(rowGroup.mainRow) || rowGroup.followerRows.some(f => doesRowMatchQuery(f));
-      })
-      .filter(rowGroup => {
-        if (activeFilter === "all") return true;
-        return doesRowMatchActiveFilter(rowGroup.mainRow) || rowGroup.followerRows.some(f => doesRowMatchActiveFilter(f));
-      })
-      .filter(rowGroup => {
-        if (issuedMonthFilter === "all") return true;
-        const mainMonth = resolveIssuedMonthKey(rowGroup.mainRow.departureIso);
-        if (mainMonth === issuedMonthFilter) return true;
-        return rowGroup.followerRows.some(f => resolveIssuedMonthKey(f.departureIso) === issuedMonthFilter);
-      });
-  }, [allGroupedRows, normalizedQuery, activeFilter, issuedMonthFilter, groupByCode]);
-
-  const issuedMonthOptions = useMemo<IssuedMonthOption[]>(() => {
-    const monthCounter = new Map<string, number>();
-    monthCounter.set(currentIssuedMonthKey, 0);
-
-    visaRows.forEach((row) => {
-      const issuedMonthKey = resolveIssuedMonthKey(row.departureIso);
-      if (!issuedMonthKey) {
-        return;
-      }
-
-      monthCounter.set(issuedMonthKey, (monthCounter.get(issuedMonthKey) ?? 0) + 1);
-    });
-
-    return Array.from(monthCounter.entries())
-      .sort((left, right) => right[0].localeCompare(left[0]))
-      .map(([value]) => ({
-        value,
-        label: formatIssuedMonthLabel(value),
-      }));
-  }, [currentIssuedMonthKey, visaRows]);
-
-  const notIssuedCount = visaRows.filter((row) => row.visaStatus !== "Issued").length;
-  const missingHotelCount = visaRows.filter((row) => hasMissingHotelAllocation(row)).length;
-  const unpaidCount = visaRows.filter((row) => row.paymentStatus !== "Paid").length;
-  const visaOnlyCount = visaRows.filter((row) => {
-    const group = groupByCode.get(row.groupCode);
-    return resolveVisaTypeLabel(group) === "Visa Only";
-  }).length;
-  const visaPlusCount = visaRows.filter((row) => {
-    const group = groupByCode.get(row.groupCode);
-    return resolveVisaTypeLabel(group) === "Visa+";
-  }).length;
-  const issuedPaxCount = useMemo(() => {
-    return visaRows
-      .filter((row) => row.visaStatus === "Issued")
-      .reduce((sum, row) => sum + row.pax, 0);
-  }, [visaRows]);
-  const hasRowsForExport = filteredGroupedRows.length > 0;
-  const selectedIssuedMonthLabel =
-    issuedMonthFilter === "all"
-      ? "All Months"
-      : (issuedMonthOptions.find((option) => option.value === issuedMonthFilter)?.label ?? issuedMonthFilter);
-  const actionRequiredCount = visaRows.filter((row) => isVisaRowActionRequired(row)).length;
-
-  const totalPages = Math.max(1, Math.ceil(filteredGroupedRows.length / VISA_PAGE_SIZE));
-  const startIndex = (currentPage - 1) * VISA_PAGE_SIZE;
-  const paginatedRows = filteredGroupedRows.slice(startIndex, startIndex + VISA_PAGE_SIZE);
-  const rangeStart = filteredGroupedRows.length === 0 ? 0 : startIndex + 1;
-  const rangeEnd = filteredGroupedRows.length === 0 ? 0 : Math.min(filteredGroupedRows.length, startIndex + paginatedRows.length);
-  
-  const heroLabelClassName = isDarkMode
-    ? "text-xs font-semibold uppercase tracking-[0.2em] text-primary/85"
-    : "text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700";
-  const summaryIconClassName = isDarkMode
-    ? "material-symbols-outlined text-primary"
-    : "material-symbols-outlined text-emerald-700";
-  const actionRequiredSummaryCardClassName = isDarkMode
-    ? "serene-accent-card flex items-center gap-3 bg-primary p-4 text-on-primary"
-    : "serene-stat-card border-amber-200 bg-amber-50";
-  const actionRequiredIconClassName = isDarkMode
-    ? "material-symbols-outlined text-on-primary"
-    : "material-symbols-outlined text-amber-700";
-  const actionRequiredLabelClassName = isDarkMode
-    ? "text-xs font-bold uppercase tracking-[0.14em] text-on-primary/75"
-    : "text-xs font-semibold uppercase tracking-wide text-amber-700";
-  const actionRequiredValueClassName = isDarkMode
-    ? "text-xl font-extrabold text-on-primary"
-    : "text-xl font-bold text-amber-900";
-  const agreementDateTextClassName = isDarkMode ? "text-white" : "text-slate-500";
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query, activeFilter, issuedMonthFilter]);
-
-  useEffect(() => {
-    if (issuedMonthFilter === "all") {
-      return;
-    }
-
-    const isSelectedMonthAvailable = issuedMonthOptions.some((option) => option.value === issuedMonthFilter);
-    if (!isSelectedMonthAvailable) {
-      setIssuedMonthFilter(currentIssuedMonthKey);
-    }
-  }, [currentIssuedMonthKey, issuedMonthFilter, issuedMonthOptions]);
-
-  useEffect(() => {
-    setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
-  }, [totalPages]);
-
-  const handleExportPdf = () => {
-    const printableWindow = window.open("", "_blank", "width=1120,height=760");
-    if (!printableWindow) {
-      window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
-      return;
-    }
-
-    const exportedRows = filteredGroupedRows.flatMap(rg => [rg.mainRow, ...rg.followerRows]);
-
-    void import("./visa-tracking-export")
-      .then(({ exportVisaTrackingReportPdf }) => {
-        const exported = exportVisaTrackingReportPdf(
-          {
-            rows: exportedRows,
-            groups,
-            query,
-            activeFilter,
-            issuedMonthLabel: selectedIssuedMonthLabel,
-          },
-          {
-            printWindow: printableWindow,
-          },
-        );
-
-        if (!exported) {
-          if (!printableWindow.closed) {
-            printableWindow.close();
-          }
-          window.alert("Popup diblokir browser. Izinkan pop-up lalu coba Export PDF lagi.");
-        }
-      })
-      .catch(() => {
-        if (!printableWindow.closed) {
-          printableWindow.close();
-        }
-        window.alert("Gagal menyiapkan export PDF. Coba lagi.");
-      });
-  };
-
-  const toggleRowGroup = (rowGroupKey: string) => {
-    setExpandedRowGroupKeys((current) => {
-      const next = new Set(current);
-      if (next.has(rowGroupKey)) {
-        next.delete(rowGroupKey);
-      } else {
-        next.add(rowGroupKey);
-      }
-      return next;
-    });
-  };
-
-  const renderAgreementCell = (row: VisaTrackingRow, city: "makkah" | "madinah", view: "mobile" | "desktop" = "desktop") => {
-    const group = groupByCode.get(row.groupCode);
-    const agreements = getGroupAgreementHotelsByCity(group, city);
-    const hasAgreement = agreements.length > 0;
-    const agreementNumber = resolveVisaAgreementNumber(row, group, city);
-    const agreementStatus = resolveCityAgreementApprovalStatus(row, group, city);
-    const agreementDateRange = resolveVisaAgreementDateRange(
-      row,
-      durationByGroupCode.get(row.groupCode) ?? 8,
-      group,
-    );
-
-    const isMobile = view === "mobile";
-    const selectWidth = isMobile ? "w-[110px]" : "w-[96px]";
-    const selectTextSize = isMobile ? "text-[10px]" : "text-[11px]";
-    const agreementNumberTextSize = isMobile ? "text-xs" : "text-[13px]";
-    const badgeTextSize = isMobile ? "text-[10px]" : "text-[11px]";
-
-    return (
-      <div key={row.groupCode} className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <strong className={`break-all ${agreementNumberTextSize} font-semibold leading-tight text-slate-800`}>
-            {agreementNumber}
-          </strong>
-        </div>
-        <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
-          {hasAgreement
-            ? `${formatVisaShortDate(agreementDateRange.makkahStartIso || agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
-                agreementDateRange.makkahEndIso || agreementDateRange.madinahEndIso,
-              )}`
-            : "Stay dates pending"}
-        </small>
-        {hasAgreement ? (
-          <SereneSelect
-            value={toAgreementStatusSelectValue(agreementStatus)}
-            className={`serene-select-pill mt-1 ${selectWidth} ${selectTextSize} font-bold ${getAgreementApprovalClasses(
-              agreementStatus,
-              isDarkMode,
-            )}`}
-            onChange={(event) =>
-              onUpdateAgreementStatus(
-                row.groupCode,
-                city,
-                fromAgreementStatusSelectValue(event.target.value),
-              )
-            }
-            aria-label={`Update ${city} agreement status for ${row.groupCode}`}
-          >
-            <option value="approved">Approved</option>
-            <option value="waiting">Waiting</option>
-          </SereneSelect>
-        ) : (
-          <span className={`mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 ${badgeTextSize} font-bold leading-none text-on-tertiary-fixed-variant`}>
-            Not linked
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const renderMobileCardSingle = (
-    row: VisaTrackingRow,
-    options: {
-      hasFollowers?: boolean;
-      followerCount?: number;
-      isExpanded?: boolean;
-      onToggle?: () => void;
-    } = {},
-  ) => {
-    const group = groupByCode.get(row.groupCode);
-    const visaTypeLabel = resolveVisaTypeLabel(group);
-    const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
-
-
-
-    return (
-      <article
-        key={row.id}
-        className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-surface-container-lowest transition-all"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {hasFollowers ? (
-                <button
-                  type="button"
-                  className={`group inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1 text-left text-sm font-bold text-primary transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${isExpanded ? "border-primary/45 bg-primary/20 shadow-sm ring-1 ring-primary/15" : "border-primary/25 bg-primary/10 hover:border-primary/40 hover:bg-primary/15"}`}
-                  onClick={onToggle}
-                  aria-expanded={isExpanded}
-                  aria-controls={`visa-mobile-linked-${row.id}`}
-                  title={`${isExpanded ? "Hide" : "Show"} ${followerCount} child group${followerCount === 1 ? "" : "s"}`}
-                >
-                  <span className="min-w-0 break-words text-slate-900">{row.groupCode}</span>
-                </button>
-              ) : (
-                <p className="break-words text-sm font-semibold text-slate-900">
-                  {row.groupCode}
-                </p>
-              )}
-            </div>
-            <p className="mt-1 break-words text-sm font-medium leading-snug text-slate-700">{row.groupName}</p>
-          </div>
-
-          <div className="flex flex-col gap-1 items-end shrink-0">
-            <Badge status="neutral" className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]">
-              {row.pax} Pax
-            </Badge>
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-2">
-          <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-              Makkah Agreement
-            </p>
-            {renderAgreementCell(row, "makkah", "mobile")}
-          </div>
-
-          <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-              Madinah Agreement
-            </p>
-            {renderAgreementCell(row, "madinah", "mobile")}
-          </div>
-
-
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-surface-container-lowest p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <Badge
-                status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
-                className={`px-2.5 py-1 text-[11px] font-bold w-fit ${
-                  row.visaStatus !== "Issued" && row.visaStatus !== "Pending"
-                    ? "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
-                    : "border-transparent"
-                }`}
-              >
-                {row.visaStatus}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-surface-container-lowest p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <Badge
-                status="neutral"
-                className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-              >
-                {visaTypeLabel}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-surface-container-lowest p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Syarikah</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <Badge
-                status="neutral"
-                className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-                title={group?.visaSetup?.syarikah || "-"}
-              >
-                <span className="truncate max-w-[120px]">
-                  {formatSyarikahName(group?.visaSetup?.syarikah)}
-                </span>
-              </Badge>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-col gap-2">
-          <Button
-            className="w-full"
-            onClick={() => onOpenDetail(row)}
-          >
-            View Details
-          </Button>
-        </div>
-      </article>
-    );
-  };
-
-  const renderMobileCard = (rowGroup: VisaRowGroup) => {
-    const { mainRow, followerRows } = rowGroup;
-    const rowGroupKey = getVisaRowGroupKey(rowGroup);
-    const hasFollowers = followerRows.length > 0;
-    const isExpanded = expandedRowGroupKeys.has(rowGroupKey);
-    return (
-      <div key={mainRow.id} className="space-y-3">
-        {renderMobileCardSingle(mainRow, {
-          hasFollowers,
-          followerCount: followerRows.length,
-          isExpanded,
-          onToggle: hasFollowers ? () => toggleRowGroup(rowGroupKey) : undefined,
-        })}
-        {hasFollowers && isExpanded ? (
-          <div id={`visa-mobile-linked-${mainRow.id}`} className="space-y-3">
-            {followerRows.map((followerRow) => renderMobileCardSingle(followerRow))}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
-
-  const renderDesktopRowSingle = (
-    row: VisaTrackingRow,
-    options: {
-      hasFollowers?: boolean;
-      followerCount?: number;
-      isExpanded?: boolean;
-      onToggle?: () => void;
-    } = {},
-  ) => {
-    const group = groupByCode.get(row.groupCode);
-    const visaTypeLabel = resolveVisaTypeLabel(group);
-    const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
-    
-
-
-    return (
-      <article
-        key={row.id}
-        className="grid items-center gap-2.5 px-5 py-4 text-sm transition-colors hover:bg-surface-container-low/40"
-        style={{ gridTemplateColumns: desktopTableGridTemplate }}
-      >
-        <div className="flex min-w-0 items-center gap-1.5 py-1 font-semibold text-slate-800">
-          {hasFollowers ? (
-            <button
-              type="button"
-              className={`group inline-flex w-full min-w-0 flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1 text-left font-bold text-primary transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${isExpanded ? "border-primary/45 bg-primary/20 shadow-sm ring-1 ring-primary/15" : "border-primary/25 bg-primary/10 hover:border-primary/40 hover:bg-primary/15"}`}
-              onClick={onToggle}
-              aria-expanded={isExpanded}
-              aria-controls={`visa-desktop-linked-${row.id}`}
-              title={`${isExpanded ? "Hide" : "Show"} ${followerCount} child group${followerCount === 1 ? "" : "s"}`}
-            >
-              <span className="min-w-0 break-words text-slate-800">{row.groupCode}</span>
-            </button>
-          ) : (
-            <span className="min-w-0 break-words">{row.groupCode}</span>
-          )}
-        </div>
-
-        <div className="min-w-0 break-words py-1 font-medium leading-snug text-slate-700">
-          {row.groupName}
-        </div>
-
-        <div className="flex min-w-0 justify-self-center py-1">
-          <Badge status="neutral" className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]">
-            {row.pax} Pax
-          </Badge>
-        </div>
-
-        <div className="min-w-0 space-y-0.5 py-1">
-          {renderAgreementCell(row, "makkah", "desktop")}
-        </div>
-
-        <div className="min-w-0 space-y-0.5 py-1">
-          {renderAgreementCell(row, "madinah", "desktop")}
-        </div>
-
-
-
-        <div className="flex min-w-0 flex-col gap-1 justify-self-center py-1">
-          <Badge
-            status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
-            className={`px-3 py-1.5 text-xs font-bold w-fit ${
-              row.visaStatus !== "Issued" && row.visaStatus !== "Pending"
-                ? "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
-                : "border-transparent"
-            }`}
-          >
-            {row.visaStatus}
-          </Badge>
-        </div>
-
-        <div className="flex min-w-0 flex-col items-center justify-self-center py-1">
-          <Badge
-            status="neutral"
-            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-          >
-            {visaTypeLabel}
-          </Badge>
-        </div>
-
-        <div className="flex min-w-0 items-center justify-self-center py-1">
-          <Badge
-            status="neutral"
-            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-            title={group?.visaSetup?.syarikah || "-"}
-          >
-            <span className="truncate max-w-[120px]">
-              {formatSyarikahName(group?.visaSetup?.syarikah)}
-            </span>
-          </Badge>
-        </div>
-
-        <div className="flex min-w-0 justify-self-center py-1">
-          <Button
-            size="sm"
-            onClick={() => onOpenDetail(row)}
-            title="View Details"
-            aria-label={`View details for group ${row.groupCode}`}
-          >
-            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
-              search
-            </span>
-            <span>View</span>
-          </Button>
-        </div>
-      </article>
-    );
-  };
-
-  const renderDesktopRow = (rowGroup: VisaRowGroup) => {
-    const { mainRow, followerRows } = rowGroup;
-    const rowGroupKey = getVisaRowGroupKey(rowGroup);
-    const hasFollowers = followerRows.length > 0;
-    const isExpanded = expandedRowGroupKeys.has(rowGroupKey);
-    return (
-      <div key={mainRow.id} className="divide-y divide-slate-100/50">
-        {renderDesktopRowSingle(mainRow, {
-          hasFollowers,
-          followerCount: followerRows.length,
-          isExpanded,
-          onToggle: hasFollowers ? () => toggleRowGroup(rowGroupKey) : undefined,
-        })}
-        {hasFollowers && isExpanded ? (
-          <div id={`visa-desktop-linked-${mainRow.id}`} className="divide-y divide-slate-100/50">
-            {followerRows.map((followerRow) => renderDesktopRowSingle(followerRow))}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
+  const {
+    query,
+    setQuery,
+    activeFilter,
+    setActiveFilter,
+    issuedMonthFilter,
+    setIssuedMonthFilter,
+    currentPage,
+    setCurrentPage,
+    expandedRowGroupKeys,
+    visaRows,
+    groupByCode,
+    durationByGroupCode,
+    filteredGroupedRows,
+    issuedMonthOptions,
+    notIssuedCount,
+    missingHotelCount,
+    unpaidCount,
+    visaOnlyCount,
+    visaPlusCount,
+    issuedPaxCount,
+    hasRowsForExport,
+    actionRequiredCount,
+    totalPages,
+    paginatedRows,
+    rangeStart,
+    rangeEnd,
+    handleExportPdf,
+    toggleRowGroup,
+  } = state;
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
@@ -949,59 +207,13 @@ export function VisaTrackingScreen({
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Visa tracking summary">
-        <article className="serene-stat-card">
-          <span className={summaryIconClassName} aria-hidden="true">
-            group
-          </span>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <span className="sm:hidden">Groups</span>
-              <span className="hidden sm:inline">Total Groups</span>
-            </p>
-            <strong className="text-xl font-bold text-slate-900">{visaRows.length}</strong>
-          </div>
-        </article>
-
-        <article className="serene-stat-card">
-          <span className={summaryIconClassName} aria-hidden="true">
-            task_alt
-          </span>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <span className="sm:hidden">Issued</span>
-              <span className="hidden sm:inline">Visas Issued</span>
-            </p>
-            <strong className="text-xl font-bold text-slate-900">{issuedPaxCount}</strong>
-          </div>
-        </article>
-
-        <article className={actionRequiredSummaryCardClassName}>
-          <span className={actionRequiredIconClassName} aria-hidden="true">
-            warning
-          </span>
-          <div>
-            <p className={actionRequiredLabelClassName}>
-              <span className="sm:hidden">Need Action</span>
-              <span className="hidden sm:inline">Action Required</span>
-            </p>
-            <strong className={actionRequiredValueClassName}>{actionRequiredCount}</strong>
-          </div>
-        </article>
-
-        <article className="serene-stat-card">
-          <span className={summaryIconClassName} aria-hidden="true">
-            payments
-          </span>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <span className="sm:hidden">Payment</span>
-              <span className="hidden sm:inline">Payment Attention</span>
-            </p>
-            <strong className="text-xl font-bold text-slate-900">{unpaidCount}</strong>
-          </div>
-        </article>
-      </section>
+      <VisaTrackingStats
+        isDarkMode={isDarkMode}
+        actionRequiredCount={actionRequiredCount}
+        visaRowsCount={visaRows.length}
+        issuedPaxCount={issuedPaxCount}
+        unpaidCount={unpaidCount}
+      />
 
       {filteredGroupedRows.length === 0 ? (
         <article className="serene-empty-state">
@@ -1017,7 +229,23 @@ export function VisaTrackingScreen({
       ) : (
         <>
           <section className="space-y-3 md:hidden" aria-label="Visa tracking cards">
-            {paginatedRows.map((rowGroup) => renderMobileCard(rowGroup))}
+            {paginatedRows.map((rowGroup) => {
+              const rowGroupKey = getVisaRowGroupKey(rowGroup);
+              return (
+                <VisaTrackingRowGroup
+                  key={rowGroupKey}
+                  rowGroup={rowGroup}
+                  view="mobile"
+                  expanded={expandedRowGroupKeys.has(rowGroupKey)}
+                  isDarkMode={isDarkMode}
+                  groupByCode={groupByCode}
+                  durationByGroupCode={durationByGroupCode}
+                  onToggleExpand={toggleRowGroup}
+                  onOpenDetail={onOpenDetail}
+                  onUpdateAgreementStatus={onUpdateAgreementStatus}
+                />
+              );
+            })}
           </section>
 
           <section className="serene-table-shell hidden md:block" aria-label="Visa tracking table">
@@ -1039,13 +267,30 @@ export function VisaTrackingScreen({
                 </div>
 
                 <div className="divide-y divide-slate-100">
-                  {paginatedRows.map((rowGroup) => renderDesktopRow(rowGroup))}
+                  {paginatedRows.map((rowGroup) => {
+                    const rowGroupKey = getVisaRowGroupKey(rowGroup);
+                    return (
+                      <VisaTrackingRowGroup
+                        key={rowGroupKey}
+                        rowGroup={rowGroup}
+                        view="desktop"
+                        expanded={expandedRowGroupKeys.has(rowGroupKey)}
+                        isDarkMode={isDarkMode}
+                        groupByCode={groupByCode}
+                        durationByGroupCode={durationByGroupCode}
+                        onToggleExpand={toggleRowGroup}
+                        onOpenDetail={onOpenDetail}
+                        onUpdateAgreementStatus={onUpdateAgreementStatus}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </section>
         </>
       )}
+
 
       <PaginationControls
         currentPage={currentPage}

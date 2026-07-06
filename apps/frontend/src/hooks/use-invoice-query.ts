@@ -51,10 +51,12 @@ export function useInvoiceDashboardQuery() {
         fetchInvoicesFromBackend({ signal }),
       ]);
 
+      const rawRows = Array.isArray(rows) ? rows : rows.data;
+
       const data = {
         dataSource,
         clients: [...clients].sort((left, right) => left.sortOrder - right.sortOrder),
-        rows: sortInvoiceRows(rows),
+        rows: sortInvoiceRows(rawRows),
       };
 
       let reason = (window as any)._queryFetchReason;

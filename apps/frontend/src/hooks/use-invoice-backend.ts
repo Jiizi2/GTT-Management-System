@@ -326,32 +326,48 @@ export async function fetchInvoiceBackendDataSource({
 }
 
 export async function fetchInvoicesFromBackend({
+  page,
+  limit,
   signal,
 }: {
+  page?: number;
+  limit?: number;
   signal?: AbortSignal;
-} = {}): Promise<BackendInvoiceRow[]> {
+} = {}): Promise<BackendInvoiceRow[] | { data: BackendInvoiceRow[]; total: number; page: number; limit: number; totalPages: number }> {
   console.log(`[${new Date().toISOString()}] GET invoices request start`);
   const getStartTime = performance.now();
-  const { response, payload, responseText } = await fetchBackendParsed("/invoices", {
+
+  const queryParams = new URLSearchParams();
+  if (page !== undefined) queryParams.set("page", String(page));
+  if (limit !== undefined) queryParams.set("limit", String(limit));
+  const queryString = queryParams.toString();
+  const url = queryString ? `/invoices?${queryString}` : "/invoices";
+
+  const { response, payload, responseText } = await fetchBackendParsed(url, {
     method: "GET",
     signal,
     cache: "no-store",
   });
   const duration = Math.round(performance.now() - getStartTime);
-  const rowCount = Array.isArray(payload) ? payload.length : 0;
-  console.log(`[${new Date().toISOString()}] GET invoices response\nrows=${rowCount}\nduration=${duration}ms`);
-  const lastId = (window as any)._lastEditedInvoiceId;
-  if (lastId && Array.isArray(payload)) {
-    const matched = payload.find((r: any) => r.id === lastId);
-    if (matched) {
-      console.log(`[${new Date().toISOString()}] GET response payload for target invoice ${lastId}:\nstatus=${matched.status}\namount=${matched.amount}`);
-    } else {
-      console.log(`[${new Date().toISOString()}] GET response payload did NOT contain target invoice ${lastId}`);
-    }
-  }
 
   if (!response.ok) {
     throw new Error(formatBackendRequestError(response.status, payload, responseText, "Backend invoice fetch failed"));
+  }
+
+  if (page !== undefined || limit !== undefined) {
+    const paginated = payload as { data?: unknown; total?: unknown; page?: unknown; limit?: unknown; totalPages?: unknown };
+    const rows = Array.isArray(paginated.data)
+      ? paginated.data
+          .map((item) => mapBackendInvoice(item as BackendInvoiceRecord))
+          .filter((item): item is BackendInvoiceRow => item !== null)
+      : [];
+    return {
+      data: rows,
+      total: typeof paginated.total === "number" ? paginated.total : 0,
+      page: typeof paginated.page === "number" ? paginated.page : 1,
+      limit: typeof paginated.limit === "number" ? paginated.limit : 20,
+      totalPages: typeof paginated.totalPages === "number" ? paginated.totalPages : 1,
+    };
   }
 
   if (!Array.isArray(payload)) {
