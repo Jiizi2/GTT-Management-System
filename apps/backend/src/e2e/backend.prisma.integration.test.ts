@@ -77,7 +77,7 @@ async function startBackendServerWithPrisma(): Promise<StartedServer> {
 
   try {
     const { AppModule } = await import("../app.module.js");
-    app = await NestFactory.create(AppModule, { cors: true, logger: false });
+    app = await NestFactory.create(AppModule, { cors: true, logger: ['error', 'warn', 'log'] });
     app.setGlobalPrefix("api");
     app.useGlobalPipes(
       new ValidationPipe({
@@ -301,7 +301,6 @@ async function testPrismaIntegrationFlow(): Promise<void> {
     const createdClient = clients.find((item) => item.name === testClientName);
     assert.equal(Boolean(createdClient), true, "Expected created client in /api/invoices/clients.");
     assert.equal(typeof createdClient?.label, "string", "Created client should include formatted label.");
-
     const updateResponse = await requestJson(server.baseUrl, `/api/invoices/${createdInvoiceId}`, {
       method: "PATCH",
       headers: {
@@ -311,6 +310,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
         amount: 888000,
         downPaymentIdr: 120000,
         status: "PAID",
+        version: 0,
       }),
     });
     assert.equal(updateResponse.status, 200, `Update invoice failed: ${updateResponse.text}`);

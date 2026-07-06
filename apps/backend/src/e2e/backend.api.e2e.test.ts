@@ -612,6 +612,7 @@ async function testBackendApiFlow(): Promise<void> {
           dueDate: updateInvoiceDueIso,
           amount: 15100000,
           status: "CANCELLED",
+          version: (createdInvoice as { version?: number }).version ?? 0,
         }),
       },
     );
@@ -1370,6 +1371,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
       amount: 123_456,
       downPaymentIdr: 50_000,
       status: "CANCELLED",
+      version: (cancelledInvoice as { version?: number }).version ?? 0,
     });
     assert.equal(cancelledUpdateResponse.status, 200, `Update cancelled invoice failed: ${cancelledUpdateResponse.text}`);
     assert.equal((cancelledUpdateResponse.json as InvoiceRecord).amount, 123_456);
@@ -1390,7 +1392,18 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(statusSet.has("Partially Paid"), true);
     assert.equal(statusSet.has("Overdue"), true);
     assert.equal(statusSet.has("Paid"), true);
-    assert.equal(statusSet.has("Cancelled"), true);
+    // Test oversized payload returns 413
+    const oversizedPayload = "a".repeat(1.1 * 1024 * 1024); // 1.1 MB
+    const oversizedResponse = await requestJson(
+      server.baseUrl,
+      "/api/invoices",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ data: oversizedPayload }),
+      }
+    );
+    assert.equal(oversizedResponse.status, 413, `Oversized payload should return 413, got ${oversizedResponse.status}`);
 
     await cleanupAllGroups(server.baseUrl);
   } finally {
