@@ -11,13 +11,20 @@ To separate development-ready vs production-ready code:
 5. Promote to production by Pull Request from `develop` into `master` (or `main`).
 6. Merge only through Pull Request review.
 
-For now, verification is manual. Run the checks you need locally before opening or merging a Pull Request:
+### Verification & CI/CD Status
+GitHub Actions CI is currently removed from this repository. Therefore, validation must be executed manually before opening a Pull Request or performing a release merge.
 
-- `npm run qa`
-- `npm run qa:full`
-- `npm run verify`
-- `npm run test:integration`
-- `npm run test:e2e:frontend`
+Recommended verification checks to run locally:
+* **Fast path**: `npm run qa` (runs verification, type-checks, unit tests, and frontend smoke test + backend API test in memory mode)
+* **Full path**: `npm run qa:full` (runs fast path + database integrations + Playwright e2e tests)
+* **Granular commands** for checking specific layers:
+  * `npm run verify` (type-check, unit tests, and build)
+  * `npm run test:api` (API test in memory mode)
+  * `npm run test:integration` (integration tests with PostgreSQL)
+  * `npm run test:e2e:frontend` (Playwright e2e tests against dev builds)
+
+### GitHub Protection Settings
+Since status checks are not automatically run via CI, any required status checks in GitHub branch protection/rulesets should be disabled in the repository settings to allow manual validation without blocking merges.
 
 ## Local push guard
 

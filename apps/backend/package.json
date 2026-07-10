@@ -17,7 +17,7 @@
     "test:unit:coverage": "vitest run --config vitest.config.mts --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/unit/backend",
     "test:unit:coverage:check": "vitest run --config vitest.config.mts --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/unit/backend --coverage.thresholds.lines=60 --coverage.thresholds.functions=68 --coverage.thresholds.branches=62 --coverage.thresholds.statements=60",
     "test:integration": "npm run db:deploy && npm run build && node dist/e2e/backend.prisma.integration.test.js && node dist/e2e/backend.prisma.groups.integration.test.js",
-    "test:api": "npm run build && node dist/groups/tests/groups.service.test.js && node dist/groups/tests/groups.prisma-write-builders.test.js && node dist/runtime-config.test.js && node dist/e2e/backend.api.e2e.test.js",
+    "test:api": "npm run build && node dist/e2e/backend.api.e2e.test.js",
     "test": "npm run test:unit",
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:status": "prisma migrate status --schema prisma/schema.prisma",

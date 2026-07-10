@@ -347,13 +347,18 @@ GTT-Management-System/
 │   ├── deployment-vps-docker.md
 │   ├── docker-command-cheatsheet.md
 │   ├── qa.md
-│   └── release-flow.md
+│   ├── operations-runbook.md
+│   ├── roadmap/                     # Cetak biru & rencana pengembangan jangka panjang
+│   │   ├── evolusi-arsitektur-domain-group.md
+│   │   ├── evolusi-entitas-bisnis-agent.md
+│   │   └── evolusi-modul-finance.md
+│   └── archive/                     # Arsip rencana/audit historis yang sudah selesai
 │
 ├── docker-compose.yml               # Dev PostgreSQL lokal (port 6543)
 ├── docker-compose.prod.yml          # Stack production (web + backend + postgres)
 ├── package.json                     # Root workspace + script shortcut
 ├── tsconfig.base.json               # Shared TypeScript config
-└── CONTRIBUTING.md                  # Branch & PR flow
+└── CONTRIBUTING.md                  # Branch, PR & local QA flow
 ```
 
 ---
@@ -390,5 +395,11 @@ git config core.hooksPath .githooks
 | [Deploy VPS + Docker](docs/deployment-vps-docker.md) | Panduan deploy bertahap ke VPS |
 | [Docker Cheat Sheet](docs/docker-command-cheatsheet.md) | Command Docker yang sering dipakai |
 | [QA Workflow](docs/qa.md) | Jalur QA cepat dan penuh |
-| [Release Flow](docs/release-flow.md) | Branch strategy dan manual verification |
-| [Contributing](CONTRIBUTING.md) | Branch & PR flow, push guard |
+| [Invoice Runbook](docs/operations-runbook.md) | Runbook operasional & recovery modul Invoice |
+| [Contributing](CONTRIBUTING.md) | Branch, PR flow, dan instruksi manual QA |
+| **Roadmaps (Cetak Biru)** | |
+| [Evolusi Arsitektur Domain Group](docs/roadmap/evolusi-arsitektur-domain-group.md) | Rencana memecah Fat Aggregate `Group` |
+| [Evolusi Entitas Agent](docs/roadmap/evolusi-entitas-bisnis-agent.md) | Portal Agent & operasional B2B |
+| [Evolusi Modul Finance](docs/roadmap/evolusi-modul-finance.md) | Rencana modul keuangan terintegrasi |
+| **Arsip Historis** | |
+| [Folder Arsip](docs/archive/) | Kumpulan rencana refaktor lama dan laporan audit masa lalu |
