@@ -135,10 +135,18 @@ export class InvoicesController {
   }
 
   @Delete(":id")
-  @ApiMethodNotAllowedResponse({ type: ApiErrorResponseDto })
+  @Roles("super-admin", "admin")
+  @ApiOperation({
+    summary: "Hapus invoice",
+    description: "Menghapus invoice berdasarkan ID.",
+  })
+  @ApiParam({ name: "id", example: "clinvoiceid123" })
+  @ApiOkResponse({
+    description: "Invoice berhasil dihapus.",
+  })
+  @ApiNotFoundResponse({ type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   remove(@Param("id") id: string) {
-    throw new MethodNotAllowedException(
-      `Invoice '${id}' cannot be deleted. Set status to CANCELLED instead.`,
-    );
+    return this.invoicesService.delete(id);
   }
 }

@@ -46,6 +46,10 @@ export class InvoiceCommandService {
     return this.invoiceRepo.update(id, payload);
   }
 
+  async delete(id: string): Promise<void> {
+    return this.invoiceRepo.delete(id);
+  }
+
   async backfillLegacyItems(): Promise<{ count: number }> {
     return this.invoiceRepo.backfillLegacyItems();
   }

@@ -95,6 +95,14 @@ export class CreateInvoiceDto {
   notes?: string;
 
   @ApiPropertyOptional({
+    description: "Keterangan invoice.",
+    example: "Visa",
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
     description: "Nama Penerima invoice (PIC).",
     example: "PT Ghaniya Tour Travel",
   })

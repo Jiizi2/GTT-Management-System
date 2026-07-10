@@ -59,6 +59,10 @@ export class InvoicesService implements OnModuleInit {
     return this.commandService.update(id, payload);
   }
 
+  async delete(id: string): Promise<void> {
+    return this.commandService.delete(id);
+  }
+
   async backfillLegacyItems() {
     return this.commandService.backfillLegacyItems();
   }

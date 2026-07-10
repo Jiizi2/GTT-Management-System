@@ -206,6 +206,7 @@ model Invoice {
   downPaymentIdr Decimal       @default(0) @db.Decimal(12, 2)
   status         InvoiceStatus @default(PENDING)
   notes          String?
+  description    String?
   items          Json?
   recipientName  String?
   version        Int           @default(0)

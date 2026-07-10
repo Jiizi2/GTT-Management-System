@@ -83,6 +83,27 @@ export function InvoiceClientSelection({
           <FieldErrorMessage fieldId="invoice-client" message={selectedClientErrorMessage} />
         </label>
 
+        <label className="space-y-1">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
+            Keterangan
+          </span>
+          <input
+            id="invoice-description"
+            type="text"
+            className="h-10 w-full rounded-lg border-none bg-surface-container-low px-3 text-xs font-semibold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
+            list="invoice-description-suggestions"
+            placeholder="Visa, Hotel, Transport, Handling, Package, etc..."
+            {...register("description")}
+          />
+          <datalist id="invoice-description-suggestions">
+            <option value="Visa" />
+            <option value="Hotel" />
+            <option value="Transport" />
+            <option value="Handling" />
+            <option value="Package" />
+          </datalist>
+        </label>
+
         {isManualClientSelected ? (
           <label className="space-y-1">
             <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">

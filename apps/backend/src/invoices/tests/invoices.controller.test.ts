@@ -47,7 +47,7 @@ describe("InvoicesController", () => {
       listClients: vi.fn().mockResolvedValue([mockClientListItem]),
       create: vi.fn().mockResolvedValue(mockInvoiceListItem),
       update: vi.fn().mockResolvedValue(mockInvoiceListItem),
-      remove: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
       backfillLegacyItems: vi.fn().mockResolvedValue({
         processed: 10,
         success: 9,
@@ -129,11 +129,13 @@ describe("InvoicesController", () => {
     expect(result).toEqual(mockInvoiceListItem);
   });
 
-  it("should throw MethodNotAllowedException on remove", () => {
+  it("should delete invoice by id", async () => {
     const service = createMockService();
     const controller = new InvoicesController(service);
 
-    expect(() => controller.remove("inv-1")).toThrow(MethodNotAllowedException);
+    await controller.remove("inv-1");
+
+    expect(service.delete).toHaveBeenCalledWith("inv-1");
   });
 
   it("should trigger backfill for legacy items", async () => {

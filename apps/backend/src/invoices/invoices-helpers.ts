@@ -35,6 +35,7 @@ export type InvoiceListItem = {
   monthKey: string;
   recipientName?: string;
   notes?: string;
+  description?: string;
   items?: InvoiceLineItem[];
   version: number;
 };
@@ -76,6 +77,7 @@ export type MemoryInvoice = {
   downPaymentIdr: number;
   status: InvoiceStatus;
   notes?: string;
+  description?: string;
   recipientName?: string;
   items: MemoryInvoiceItem[];
   version: number;
@@ -265,10 +267,10 @@ export function isInvoiceLineItemCurrency(value: string): value is InvoiceLineIt
   return value === "IDR" || value === "USD" || value === "SAR";
 }
 
-export function extractExchangeRatesFromNotes(notes: string | undefined): { usdToIdr: number; sarToIdr: number } {
-  const rates = { usdToIdr: 0, sarToIdr: 0 };
+export function extractExchangeRatesFromNotes(notes: string | undefined): { usdToIdr: number | null; sarToIdr: number | null } {
+  const rates: { usdToIdr: number | null; sarToIdr: number | null } = { usdToIdr: null, sarToIdr: null };
   if (!notes) return rates;
-  const match = notes.match(/\[ExchangeRate:USD=(\d+),SAR=(\d+)\]/);
+  const match = notes.match(/\[ExchangeRate:USD=(\d+),SAR=(\d+)\]/) || notes.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/);
   if (match) {
     rates.usdToIdr = Number.parseInt(match[1], 10);
     rates.sarToIdr = Number.parseInt(match[2], 10);
@@ -278,8 +280,8 @@ export function extractExchangeRatesFromNotes(notes: string | undefined): { usdT
 
 export function normalizeInvoiceLineItem(
   value: unknown,
-  usdToIdr: number,
-  sarToIdr: number,
+  usdToIdr: number | null,
+  sarToIdr: number | null,
 ): InvoiceLineItem | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -296,9 +298,9 @@ export function normalizeInvoiceLineItem(
 
   // Authoritatively recalculate totalPriceIdr using extracted exchange rates
   let totalPriceIdr = totalPrice;
-  if (currency === "USD" && usdToIdr > 0) {
+  if (currency === "USD" && usdToIdr !== null) {
     totalPriceIdr = totalPrice * usdToIdr;
-  } else if (currency === "SAR" && sarToIdr > 0) {
+  } else if (currency === "SAR" && sarToIdr !== null) {
     totalPriceIdr = totalPrice * sarToIdr;
   } else if (currency !== "IDR") {
     totalPriceIdr = Math.max(0, Math.round(coerceNumber(item.totalPriceIdr, totalPrice)));
@@ -407,6 +409,7 @@ export const invoiceSummarySelect = {
   amount: true,
   status: true,
   notes: true,
+  description: true,
   items: true,
   recipientName: true,
   version: true,

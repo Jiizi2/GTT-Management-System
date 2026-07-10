@@ -151,6 +151,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       downPaymentIdr: normalizedDownPaymentIdr,
       status: effectiveStatus,
       notes: notes || undefined,
+      description: getTrimmedString(payload.description) || undefined,
       recipientName: getTrimmedString(payload.recipientName) || undefined,
       items: normalizedItems,
       version: 0,
@@ -236,6 +237,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       downPaymentIdr: normalizedDownPaymentIdr,
       status: effectiveStatus,
       notes: notes || undefined,
+      description: getTrimmedString(payload.description) || undefined,
       recipientName: getTrimmedString(payload.recipientName) || undefined,
       items: normalizedItems,
       version: currentInvoice.version + 1,
@@ -250,6 +252,14 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
 
   async backfillLegacyItems(): Promise<{ count: number }> {
     return { count: 0 };
+  }
+
+  async delete(id: string): Promise<void> {
+    const index = this.memoryStore.invoices.findIndex((inv) => inv.id === id);
+    if (index === -1) {
+      throw new NotFoundException(`Invoice '${id}' not found.`);
+    }
+    this.memoryStore.invoices.splice(index, 1);
   }
 
   async ensureInvoiceDownPaymentColumn(): Promise<boolean> {
@@ -358,6 +368,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       monthKey: resolveMonthKey(invoice.dueDateIso),
       recipientName: invoice.recipientName,
       notes: invoice.notes,
+      description: invoice.description,
       items: invoice.items?.length ? invoice.items : undefined,
       version: invoice.version,
     };

@@ -227,6 +227,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
               amount: roundedAmount,
               status: effectiveStatus,
               notes: notes || null,
+              description: getTrimmedString(payload.description) || null,
               recipientName: getTrimmedString(payload.recipientName) || null,
               items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
               itemsRel: {
@@ -237,7 +238,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
                     currency: item.currency,
                     unitPrice: item.unitPrice,
                     totalPrice: item.pax * item.unitPrice,
-                    totalPriceIdr: item.pax * item.unitPrice,
+                    totalPriceIdr: item.totalPriceIdr,
                   })),
                 },
               },
@@ -371,15 +372,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     let updated: unknown = null;
     try {
       updated = await this.prisma.$transaction(async (tx) => {
-        if (payload.items !== undefined) {
-          await tx.invoiceItem.deleteMany({
-            where: {
-              invoiceId: existing.id,
-            },
-          });
-        }
-
-        const dataClause: Prisma.InvoiceUncheckedUpdateInput = {
+        const scalarDataClause: Prisma.InvoiceUncheckedUpdateManyInput = {
           clientId: client.id,
           groupId: resolvedGroupId,
           issuedDate: createUtcDateFromIso(issuedDateIso),
@@ -387,25 +380,14 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
           amount: roundedAmount,
           status: effectiveStatus,
           notes: notes || null,
+          description: getTrimmedString(payload.description) || null,
           recipientName: getTrimmedString(payload.recipientName) || null,
           version: { increment: 1 },
           ...(canWriteInlineDownPayment ? { downPaymentIdr: nextDownPaymentIdr } : {}),
         };
 
         if (payload.items !== undefined) {
-          dataClause.items = normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull;
-          dataClause.itemsRel = {
-            createMany: {
-              data: normalizedItems.map((item) => ({
-                description: item.description,
-                pax: item.pax,
-                currency: item.currency,
-                unitPrice: item.unitPrice,
-                totalPrice: item.pax * item.unitPrice,
-                totalPriceIdr: item.pax * item.unitPrice,
-              })),
-            },
-          };
+          scalarDataClause.items = normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull;
         }
 
         const updateResult = await tx.invoice.updateMany({
@@ -413,7 +395,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
             id: existing.id,
             version: payload.version,
           },
-          data: dataClause,
+          data: scalarDataClause,
         });
 
         if (updateResult.count === 0) {
@@ -424,6 +406,34 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
               clientVersion: "unit-test",
             },
           );
+        }
+
+        if (payload.items !== undefined) {
+          await tx.invoiceItem.deleteMany({
+            where: {
+              invoiceId: existing.id,
+            },
+          });
+
+          await tx.invoice.update({
+            where: {
+              id: existing.id,
+            },
+            data: {
+              itemsRel: {
+                createMany: {
+                  data: normalizedItems.map((item) => ({
+                    description: item.description,
+                    pax: item.pax,
+                    currency: item.currency,
+                    unitPrice: item.unitPrice,
+                    totalPrice: item.pax * item.unitPrice,
+                    totalPriceIdr: item.totalPriceIdr,
+                  })),
+                },
+              },
+            },
+          });
         }
 
         const nextInvoice = await tx.invoice.findUnique({
@@ -514,6 +524,21 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
     Telemetry.end(executeTracker, { success: true, count });
     return { count };
+  }
+
+  async delete(id: string): Promise<void> {
+    const existing = await this.prisma.invoice.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Invoice '${id}' not found.`);
+    }
+
+    await this.prisma.invoice.delete({
+      where: { id },
+    });
   }
 
   async ensureInvoiceDownPaymentColumn(): Promise<boolean> {
@@ -645,6 +670,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       monthKey: resolveMonthKey(dueDateIso),
       recipientName: (invoice as any).recipientName ?? undefined,
       notes: invoice.notes ?? undefined,
+      description: (invoice as any).description ?? undefined,
       items: resolvedItems.length > 0 ? resolvedItems : undefined,
       version: invoice.version,
     };

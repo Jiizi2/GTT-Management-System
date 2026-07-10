@@ -36,6 +36,7 @@ export type InvoiceWorkspaceInitialData = {
   status: InvoiceStatus;
   recipientName?: string;
   notes?: string;
+  description?: string;
   items: InvoiceDraftItem[];
   version?: number;
 };
@@ -356,6 +357,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     status: row.status,
     recipientName: row.recipientName ?? "",
     notes: row.notes ?? "",
+    description: row.description ?? "",
     items,
     version: row.version,
   };
@@ -396,23 +398,16 @@ export function resolveExchangeRatesFromItems(
 
 export function resolveExchangeRatesFromRow(row: { notes?: string; items?: any[] }): { usdToIdr: number; sarToIdr: number } {
   const notesRaw = row.notes ?? "";
-  let usdToIdr = 0;
-  let sarToIdr = 0;
-
-  const ratesMatch = notesRaw.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/);
+  const ratesMatch = notesRaw.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/) || notesRaw.match(/\[ExchangeRate:USD=(\d+),SAR=(\d+)\]/);
   if (ratesMatch) {
-    usdToIdr = Number.parseInt(ratesMatch[1], 10);
-    sarToIdr = Number.parseInt(ratesMatch[2], 10);
+    return {
+      usdToIdr: Number.parseInt(ratesMatch[1], 10),
+      sarToIdr: Number.parseInt(ratesMatch[2], 10),
+    };
   }
 
-  if (usdToIdr <= 0 || sarToIdr <= 0) {
-    const items = row.items || [];
-    const itemRates = resolveExchangeRatesFromItems(items);
-    if (usdToIdr <= 0) usdToIdr = itemRates.usdToIdr;
-    if (sarToIdr <= 0) sarToIdr = itemRates.sarToIdr;
-  }
-
-  return { usdToIdr, sarToIdr };
+  const items = row.items || [];
+  return resolveExchangeRatesFromItems(items);
 }
 
 export function formatCurrencyLabel(value: number, currency: string): string {
@@ -913,6 +908,7 @@ export function buildInvoicePayload({
     amount: payloadAmountIdr,
     downPaymentIdr: totalPaidIdr,
     notes: payloadNotes,
+    description: values.description || "",
     recipientName: values.recipientName?.trim() ?? "",
     items: printableItems,
     version: values.version,
@@ -921,7 +917,9 @@ export function buildInvoicePayload({
 }
 
 export function parseNumberInput(value: string): number {
-  const normalized = value.replace(/[^0-9.-]/g, "");
+  let normalized = value.replace(/\./g, "");
+  normalized = normalized.replace(/,/g, ".");
+  normalized = normalized.replace(/[^0-9.-]/g, "");
   const val = Number.parseFloat(normalized);
   return Number.isFinite(val) ? val : 0;
 }

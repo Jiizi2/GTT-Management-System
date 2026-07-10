@@ -639,13 +639,8 @@ async function testBackendApiFlow(): Promise<void> {
     );
     assert.equal(
       deleteInvoiceResponse.status,
-      405,
-      `Delete invoice should be blocked: ${deleteInvoiceResponse.text}`,
-    );
-    assert.equal(
-      deleteInvoiceResponse.text.includes("CANCELLED"),
-      true,
-      `Delete invoice response should mention CANCELLED: ${deleteInvoiceResponse.text}`,
+      200,
+      `Delete invoice failed: ${deleteInvoiceResponse.text}`,
     );
 
     const listInvoicesResponse = await requestJson(server.baseUrl, "/api/invoices");
@@ -658,8 +653,8 @@ async function testBackendApiFlow(): Promise<void> {
     const invoices = listInvoicesResponse.json as Array<{ invoiceNumber?: string }>;
     assert.equal(
       invoices.some((invoice) => invoice.invoiceNumber === createdInvoice.invoiceNumber),
-      true,
-      "Created invoice should be returned in list endpoint.",
+      false,
+      "Created invoice should not be returned in list endpoint after deletion.",
     );
 
     const deleteResponse = await requestJson(server.baseUrl, `/api/groups/${groupCode}`, {
@@ -1377,21 +1372,30 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal((cancelledUpdateResponse.json as InvoiceRecord).amount, 123_456);
     assert.equal((cancelledUpdateResponse.json as InvoiceRecord).downPaymentIdr, 50_000);
 
-    const invoiceDeleteBlockedResponse = await requestJson(
+    const allInvoicesBefore = ensureArray<InvoiceRecord>(
+      (await requestJson(server.baseUrl, "/api/invoices")).json,
+      "Invoice list payload should be array.",
+    );
+    const statusSetBefore = new Set(allInvoicesBefore.map((invoice) => invoice.status));
+    assert.equal(statusSetBefore.has("Partially Paid"), true);
+    assert.equal(statusSetBefore.has("Overdue"), true);
+    assert.equal(statusSetBefore.has("Paid"), true);
+
+    const invoiceDeleteResponse = await requestJson(
       server.baseUrl,
       `/api/invoices/${pendingInvoice.id ?? ""}`,
       { method: "DELETE" },
     );
-    assert.equal(invoiceDeleteBlockedResponse.status, 405, "Delete invoice should be blocked.");
+    assert.equal(invoiceDeleteResponse.status, 200, "Delete invoice failed.");
 
-    const allInvoices = ensureArray<InvoiceRecord>(
+    const allInvoicesAfter = ensureArray<InvoiceRecord>(
       (await requestJson(server.baseUrl, "/api/invoices")).json,
       "Invoice list payload should be array.",
     );
-    const statusSet = new Set(allInvoices.map((invoice) => invoice.status));
-    assert.equal(statusSet.has("Partially Paid"), true);
-    assert.equal(statusSet.has("Overdue"), true);
-    assert.equal(statusSet.has("Paid"), true);
+    const statusSetAfter = new Set(allInvoicesAfter.map((invoice) => invoice.status));
+    assert.equal(statusSetAfter.has("Partially Paid"), false, "Partially Paid invoice should be deleted.");
+    assert.equal(statusSetAfter.has("Overdue"), true);
+    assert.equal(statusSetAfter.has("Paid"), true);
     // Test oversized payload returns 413
     const oversizedPayload = "a".repeat(1.1 * 1024 * 1024); // 1.1 MB
     const oversizedResponse = await requestJson(

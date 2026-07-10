@@ -10,6 +10,7 @@ export interface InvoiceRepository {
   create(payload: CreateInvoiceDto): Promise<InvoiceListItem>;
   update(id: string, payload: UpdateInvoiceDto): Promise<InvoiceListItem>;
   backfillLegacyItems(): Promise<{ count: number }>;
+  delete(id: string): Promise<void>;
   ensureInvoiceDownPaymentColumn(): Promise<boolean>;
   ensureInvoiceRecipientNameColumn(): Promise<boolean>;
 }

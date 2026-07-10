@@ -42,6 +42,7 @@ export const invoiceWorkspaceFormSchema = z
     manualClientName: z.string(),
     selectedGroupCode: z.string(),
     address: z.string().optional(),
+    description: z.string().optional(),
     recipientName: z.string().optional(),
     bankAccount: z.string(),
     notes: z.string(),
@@ -190,6 +191,7 @@ export function useInvoiceWorkspaceForm({
         : "",
       manualClientName: hasResolvedInitialManualClient ? resolvedInitialClientName : "",
       selectedGroupCode: resolvedInitialInvoice?.groupCode ?? "",
+      description: resolvedInitialInvoice?.description ?? "",
       address: (() => {
         if (!resolvedInitialInvoice) return "";
         const notesRaw = resolvedInitialInvoice.notes ?? "";

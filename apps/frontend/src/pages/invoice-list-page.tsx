@@ -5,7 +5,8 @@ import { PageHeroSection } from "../components/page-hero-section";
 import { PaginationControls } from "../components/pagination-controls";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { useInvoiceDashboardQuery } from "../hooks/use-invoice-query";
+import { InvoiceDeleteConfirmModal } from "../components/group-detail-modals/InvoiceDeleteConfirmModal";
+import { useInvoiceDashboardQuery, useDeleteInvoiceMutation } from "../hooks/use-invoice-query";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { useThemeMode } from "../theme/theme-provider";
 import { Button } from "../components/button";
@@ -85,7 +86,9 @@ export function InvoiceScreen({
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [draftSourceInvoice, setDraftSourceInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<InvoiceRow | null>(null);
   const invoiceDashboardQuery = useInvoiceDashboardQuery();
+  const deleteMutation = useDeleteInvoiceMutation();
   const issuingOfficeOptionsQuery = useMasterDataOptionsQuery({
     categoryKey: "invoice-issuing-office",
   });
@@ -257,6 +260,10 @@ export function InvoiceScreen({
     setWorkspaceMode("edit");
   };
 
+  const handleDeleteInvoice = (row: InvoiceRow) => {
+    setDeletingInvoice(row);
+  };
+
 
   useEffect(() => {
     if (!actionFeedback) {
@@ -367,6 +374,26 @@ export function InvoiceScreen({
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+      {deletingInvoice && (
+        <InvoiceDeleteConfirmModal
+          invoice={deletingInvoice}
+          onClose={() => setDeletingInvoice(null)}
+          onConfirm={() => {
+            const invoiceNumber = deletingInvoice.invoiceNumber;
+            const invoiceId = deletingInvoice.id;
+            setDeletingInvoice(null);
+            setActionFeedback(`Menghapus invoice ${invoiceNumber}...`);
+            deleteMutation.mutate(invoiceId, {
+              onSuccess: () => {
+                setActionFeedback(`Invoice ${invoiceNumber} berhasil dihapus.`);
+              },
+              onError: (err: any) => {
+                setActionFeedback(`Gagal menghapus invoice: ${err?.message || err}`);
+              },
+            });
+          }}
+        />
+      )}
       {visibleFeedback ? (
         <section
           className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-ambient"
@@ -606,9 +633,16 @@ export function InvoiceScreen({
                   >
                     {row.clientInitials}
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-on-surface">{row.clientName}</p>
-                    <p className="truncate text-xs text-on-surface-variant">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <p className="truncate text-sm font-semibold text-on-surface">{row.clientName}</p>
+                      {row.description && (
+                        <span className="shrink-0 inline-flex items-center rounded-md bg-surface-container-high px-1.5 py-0.5 text-[9px] font-semibold text-on-surface-variant/80">
+                          {row.description}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-on-surface-variant mt-0.5">
                       {row.groupCode ? `Group ${row.groupCode}` : "No group"}
                     </p>
                   </div>
@@ -675,6 +709,20 @@ export function InvoiceScreen({
                       edit
                     </span>
                   </button>
+
+                  {isInvoiceBackendAvailable && (
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
+                      aria-label={`Delete ${row.invoiceNumber}`}
+                      onClick={() => handleDeleteInvoice(row)}
+                      title="Delete"
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        delete
+                      </span>
+                    </button>
+                  )}
                 </div>
               </article>
             ))}
@@ -685,10 +733,11 @@ export function InvoiceScreen({
               <div className="min-w-full">
                 <div
                   className="grid gap-2 border-b border-slate-200 bg-surface-container-low px-5 py-3 text-xs font-semibold uppercase tracking-[0.11em] text-on-surface-variant/80"
-                  style={{ gridTemplateColumns: "1.2fr 1.05fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
+                  style={{ gridTemplateColumns: "1.2fr 1.05fr 1fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
                 >
                   <div>Invoice ID</div>
                   <div>Client Name</div>
+                  <div>Keterangan</div>
                   <div>Due Date</div>
                   <div>Amount</div>
                   <div>Status</div>
@@ -706,7 +755,7 @@ export function InvoiceScreen({
                             : "bg-emerald-50/70 hover:bg-emerald-50"
                           : "hover:bg-surface-container-low"
                       }`}
-                      style={{ gridTemplateColumns: "1.2fr 1.05fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
+                      style={{ gridTemplateColumns: "1.2fr 1.05fr 1fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
                     >
                       <div>
                         <button
@@ -729,6 +778,12 @@ export function InvoiceScreen({
                         <p className="truncate font-semibold text-on-surface">{row.clientName}</p>
                         <p className="truncate text-xs text-on-surface-variant">
                           {row.groupCode ? `Group ${row.groupCode}` : "No linked group"}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-on-surface" title={row.description}>
+                          {row.description || "-"}
                         </p>
                       </div>
 
@@ -788,6 +843,19 @@ export function InvoiceScreen({
                             edit
                           </span>
                         </button>
+                        {isInvoiceBackendAvailable && (
+                          <button
+                            type="button"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
+                            title="Delete"
+                            aria-label={`Delete ${row.invoiceNumber}`}
+                            onClick={() => handleDeleteInvoice(row)}
+                          >
+                            <span className="material-symbols-outlined text-base" aria-hidden="true">
+                              delete
+                            </span>
+                          </button>
+                        )}
                       </div>
                     </article>
                   ))}

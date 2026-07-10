@@ -39,6 +39,7 @@ export type BackendInvoiceRow = {
   monthKey: string;
   recipientName?: string;
   notes?: string;
+  description?: string;
   items?: BackendInvoiceItem[];
   version?: number;
 };
@@ -53,6 +54,7 @@ export type CreateBackendInvoicePayload = {
   downPaymentIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
+  description?: string;
   recipientName?: string;
   items?: BackendInvoiceItem[];
   version?: number;
@@ -68,6 +70,7 @@ export type UpdateBackendInvoicePayload = {
   downPaymentIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
+  description?: string;
   recipientName?: string;
   items?: BackendInvoiceItem[];
   version?: number;
@@ -99,6 +102,7 @@ type BackendInvoiceRecord = {
   monthKey?: unknown;
   recipientName?: unknown;
   notes?: unknown;
+  description?: unknown;
   items?: unknown;
   version?: unknown;
 };
@@ -271,6 +275,7 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
     monthKey: readString(record.monthKey, monthKeyFromDueDate),
     recipientName: readOptionalString(record.recipientName),
     notes: readOptionalString(record.notes),
+    description: readOptionalString(record.description),
     items: Array.isArray(record.items)
       ? (record.items
           .map((item) => mapBackendInvoiceItem(item as BackendInvoiceItemRecord))
@@ -407,6 +412,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
         payload.downPaymentIdr !== undefined ? Math.max(0, Math.round(payload.downPaymentIdr)) : undefined,
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
+      description: payload.description?.trim() || undefined,
       recipientName: payload.recipientName?.trim() || undefined,
       items: normalizeBackendInvoiceItems(payload.items),
     }),
@@ -463,6 +469,9 @@ export async function updateInvoiceInBackend(
   if (payload.notes !== undefined) {
     requestBody.notes = payload.notes.trim();
   }
+  if (payload.description !== undefined) {
+    requestBody.description = payload.description.trim();
+  }
   if (payload.recipientName !== undefined) {
     requestBody.recipientName = payload.recipientName.trim();
   }
@@ -498,4 +507,22 @@ export async function updateInvoiceInBackend(
   }
 
   return updated;
+}
+
+export async function deleteInvoiceInBackend(invoiceId: string): Promise<void> {
+  const normalizedInvoiceId = invoiceId.trim();
+  if (!normalizedInvoiceId) {
+    throw new Error("Backend invoice delete failed: missing invoice id.");
+  }
+
+  const { response, payload, responseText } = await fetchBackendParsed(`/invoices/${normalizedInvoiceId}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      formatBackendRequestError(response.status, payload, responseText, "Backend invoice delete failed"),
+    );
+  }
 }
