@@ -251,6 +251,13 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
   }
 
   private mapPrismaDraft(draft: PrismaHotelAgreementDraftRecord, remainingPax: number, assignedGroups: any[]) {
+    const isAssigned = assignedGroups.length > 0;
+    const assignmentStatus = isAssigned
+      ? remainingPax > 0
+        ? "Partially Assigned"
+        : "Assigned"
+      : "Unassigned";
+
     return {
       id: draft.id,
       city: draft.city,
@@ -264,6 +271,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       notes: draft.notes ?? undefined,
       remainingPax,
       assignedGroups,
+      assignmentStatus,
     };
   }
 
