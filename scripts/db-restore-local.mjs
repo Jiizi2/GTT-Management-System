@@ -57,12 +57,13 @@ try {
 console.log("Menghubungkan ke database lokal...");
 
 // 3. Execute restore using psql without shell to avoid Windows quote escaping issues
+// Note: databaseUrl (dbname parameter) must be the LAST argument passed to psql
 try {
   console.log("Membersihkan skema database lokal lama...");
   
   const dropCleanSql = "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;";
   
-  const dropResult = spawnSync("psql", [databaseUrl, "-c", dropCleanSql], { stdio: "inherit" });
+  const dropResult = spawnSync("psql", ["-c", dropCleanSql, databaseUrl], { stdio: "inherit" });
   if (dropResult.error) {
     throw dropResult.error;
   }
@@ -72,7 +73,7 @@ try {
   
   console.log("Memulai pemulihan data dari file backup...");
   
-  const restoreResult = spawnSync("psql", [databaseUrl, "-f", backupFilePath], { stdio: "inherit" });
+  const restoreResult = spawnSync("psql", ["-f", backupFilePath, databaseUrl], { stdio: "inherit" });
   if (restoreResult.error) {
     throw restoreResult.error;
   }
