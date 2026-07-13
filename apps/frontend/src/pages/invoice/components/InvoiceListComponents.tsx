@@ -345,9 +345,6 @@ export function InvoiceTable({
                   <p className="font-bold text-primary truncate leading-normal" title={row.invoiceNumber}>
                     {row.invoiceNumber}
                   </p>
-                  <p className="text-[10px] text-on-surface-variant leading-none mt-1">
-                    {row.id.slice(0, 8)}
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2.5 min-w-0">
