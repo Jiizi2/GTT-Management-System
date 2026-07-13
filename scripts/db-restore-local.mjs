@@ -35,9 +35,8 @@ if (!databaseUrlLine) {
   console.error("Error: DATABASE_URL tidak ditemukan di file apps/backend/.env");
   process.exit(1);
 }
-
 // Extract the connection URL and clean quotes
-let databaseUrl = databaseUrlLine.split("=")[1].trim();
+let databaseUrl = databaseUrlLine.substring(databaseUrlLine.indexOf("=") + 1).trim();
 if (databaseUrl.startsWith('"') && databaseUrl.endsWith('"')) {
   databaseUrl = databaseUrl.slice(1, -1);
 }
@@ -45,9 +44,6 @@ if (databaseUrl.startsWith("'") && databaseUrl.endsWith("'")) {
   databaseUrl = databaseUrl.slice(1, -1);
 }
 
-console.log("Menghubungkan ke database lokal...");
-
-// 3. Execute restore using psql
 try {
   // We use psql command directly with the connection URI
   // We use the --clean flag in pg_dump when generating, but since we want to overwrite,
