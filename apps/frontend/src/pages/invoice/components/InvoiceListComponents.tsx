@@ -369,7 +369,7 @@ export function InvoiceTable({
                   </div>
                 </div>
 
-                <div className="min-w-0 text-sm text-on-surface font-medium truncate" title={row.description || ""}>
+                <div className="min-w-0 text-sm text-on-surface font-medium whitespace-normal break-words" title={row.description || ""}>
                   {row.description || "-"}
                 </div>
 
