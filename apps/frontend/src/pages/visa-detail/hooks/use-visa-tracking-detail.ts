@@ -199,16 +199,8 @@ export function useVisaTrackingDetail({
       groupReturnDate: group?.returnDate,
       rowDepartureIso: row.departureIso,
       rowReturnIso: row.returnIso,
-      makkahStartIso: agreementDateRange.makkahStartIso,
-      makkahEndIso: agreementDateRange.makkahEndIso,
-      madinahStartIso: agreementDateRange.madinahStartIso,
-      madinahEndIso: agreementDateRange.madinahEndIso,
       totalPax,
       connectedAgreementKeys,
-      existingAgreements: [
-        ...makkahAgreements.map((a) => ({ ...a, city: "makkah" as const })),
-        ...madinahAgreements.map((a) => ({ ...a, city: "madinah" as const })),
-      ],
     });
   }, [
     agreementDraftsQuery.data,
@@ -217,13 +209,7 @@ export function useVisaTrackingDetail({
     group?.returnDate,
     row.departureIso,
     row.returnIso,
-    agreementDateRange.makkahStartIso,
-    agreementDateRange.makkahEndIso,
-    agreementDateRange.madinahStartIso,
-    agreementDateRange.madinahEndIso,
     totalPax,
-    makkahAgreements,
-    madinahAgreements,
   ]);
   
   const assignedDraftByAgreementId = useMemo(() => {

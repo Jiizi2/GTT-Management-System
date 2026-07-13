@@ -392,13 +392,8 @@ export function filterAgreementDrafts(
     groupReturnDate?: string;
     rowDepartureIso?: string;
     rowReturnIso?: string;
-    makkahStartIso?: string;
-    makkahEndIso?: string;
-    madinahStartIso?: string;
-    madinahEndIso?: string;
     totalPax: number;
     connectedAgreementKeys: Set<string>;
-    existingAgreements?: Array<{ stayStartIso: string; stayEndIso: string; city?: "makkah" | "madinah" }>;
   },
 ): { makkah: HotelAgreementDraft[]; madinah: HotelAgreementDraft[] } {
   const availableDrafts: Record<"makkah" | "madinah", HotelAgreementDraft[]> = {
@@ -408,57 +403,6 @@ export function filterAgreementDrafts(
 
   const groupArrival = (params.groupArrivalDate ?? "").trim() || (params.rowDepartureIso ?? "").trim();
   const groupReturn = (params.groupReturnDate ?? "").trim() || (params.rowReturnIso ?? "").trim();
-
-  const makkahStart = params.makkahStartIso || groupArrival;
-  const makkahEnd = params.makkahEndIso || groupReturn;
-  const madinahStart = params.madinahStartIso || groupArrival;
-  const madinahEnd = params.madinahEndIso || groupReturn;
-
-  const getStayNights = (startIso: string, endIso: string): string[] => {
-    const nights: string[] = [];
-    const startMs = Date.parse(startIso);
-    const endMs = Date.parse(endIso);
-    if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
-      return [];
-    }
-    const oneDayMs = 24 * 60 * 60 * 1000;
-    for (let currentMs = startMs; currentMs < endMs; currentMs += oneDayMs) {
-      nights.push(new Date(currentMs).toISOString().slice(0, 10));
-    }
-    return nights;
-  };
-
-  const makkahNights = isIsoDateValue(makkahStart) && isIsoDateValue(makkahEnd)
-    ? getStayNights(makkahStart, makkahEnd)
-    : [];
-
-  const madinahNights = isIsoDateValue(madinahStart) && isIsoDateValue(madinahEnd)
-    ? getStayNights(madinahStart, madinahEnd)
-    : [];
-
-  const coveredMakkahNights = new Set<string>();
-  const coveredMadinahNights = new Set<string>();
-
-  if (params.existingAgreements) {
-    for (const agreement of params.existingAgreements) {
-      const aggStart = (agreement.stayStartIso ?? "").trim();
-      const aggEnd = (agreement.stayEndIso ?? "").trim();
-      if (isIsoDateValue(aggStart) && isIsoDateValue(aggEnd)) {
-        const aggNights = getStayNights(aggStart, aggEnd);
-        for (const night of aggNights) {
-          if (agreement.city === "makkah") {
-            coveredMakkahNights.add(night);
-          } else if (agreement.city === "madinah") {
-            coveredMadinahNights.add(night);
-          } else {
-            // Fallback for backward compatibility
-            coveredMakkahNights.add(night);
-            coveredMadinahNights.add(night);
-          }
-        }
-      }
-    }
-  }
 
   for (const draft of drafts) {
     if (draft.assignmentStatus === "Assigned") {
@@ -470,70 +414,21 @@ export function filterAgreementDrafts(
       continue;
     }
 
-    const draftStart = (draft.stayStartIso ?? "").trim();
-    const draftEnd = (draft.stayEndIso ?? "").trim();
-
-    const cityStart = draft.city === "madinah" ? madinahStart : makkahStart;
-    const cityEnd = draft.city === "madinah" ? madinahEnd : makkahEnd;
-
-    // 1. Group Travel Period Filtering
-    if (isIsoDateValue(cityStart) && isIsoDateValue(cityEnd)) {
+    // 1. Group Travel Period Filtering (Option A: Fully Contained)
+    if (isIsoDateValue(groupArrival) && isIsoDateValue(groupReturn)) {
+      const draftStart = (draft.stayStartIso ?? "").trim();
+      const draftEnd = (draft.stayEndIso ?? "").trim();
       if (isIsoDateValue(draftStart) && isIsoDateValue(draftEnd)) {
-        const cityStartMs = Date.parse(cityStart);
-        const cityEndMs = Date.parse(cityEnd);
-        const draftStartMs = Date.parse(draftStart);
-        const draftEndMs = Date.parse(draftEnd);
-        const overlapsWithGroup = Math.max(cityStartMs, draftStartMs) < Math.min(cityEndMs, draftEndMs);
-        if (!overlapsWithGroup) {
+        if (draftStart < groupArrival || draftEnd > groupReturn) {
           continue;
         }
       }
     }
 
-    const cityNights = draft.city === "madinah" ? madinahNights : makkahNights;
-    const coveredNights = draft.city === "madinah" ? coveredMadinahNights : coveredMakkahNights;
-    const uncoveredNights = cityNights.length > 0
-      ? cityNights.filter((night) => !coveredNights.has(night))
-      : [];
-
-    let targetNights = uncoveredNights.length > 0 ? uncoveredNights : cityNights;
-    if (targetNights.length > 0 && isIsoDateValue(draftStart) && isIsoDateValue(draftEnd)) {
-      targetNights = targetNights.filter((night) => night >= draftStart && night < draftEnd);
-      if (targetNights.length === 0) {
-        continue;
-      }
-    }
-
     // 2. Pax Sufficiency Filtering
-    if (targetNights.length > 0) {
-      const assignedGroups = draft.assignedGroups ?? [];
-      let minRemaining = assignedGroups.length > 0
-        ? draft.pax
-        : (draft.remainingPax !== undefined ? draft.remainingPax : draft.pax);
-      for (const night of targetNights) {
-        const occupiedOnNight = assignedGroups
-          .filter((g: any) => {
-            const gStart = g.stayStart ?? g.stayStartIso;
-            const gEnd = g.stayEnd ?? g.stayEndIso;
-            if (gStart && gEnd) {
-              return night >= gStart && night < gEnd;
-            }
-            return true;
-          })
-          .reduce((sum: number, g: any) => sum + g.pax, 0);
-        const remainingOnNight = Math.max(0, draft.pax - occupiedOnNight);
-        if (remainingOnNight < minRemaining) {
-          minRemaining = remainingOnNight;
-        }
-      }
-      if (minRemaining <= 0) {
-        continue;
-      }
-    } else {
-      const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
-      if (availablePax <= 0) {
-        continue;
-      }
+    const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+    if (availablePax < params.totalPax) {
+      continue;
     }
 
     availableDrafts[draft.city].push(draft);
