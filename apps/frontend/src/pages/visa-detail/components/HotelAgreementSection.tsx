@@ -497,8 +497,8 @@ export function HotelAgreementSection() {
             city="makkah"
             drafts={availableAgreementDraftsByCity.makkah}
             group={group}
-            isLoading={agreementDraftsQueryLoading}
-            isError={agreementDraftsQueryError}
+            isLoading={agreementDraftsQueryLoading ?? false}
+            isError={agreementDraftsQueryError ?? false}
             assigningDraftId={assigningAgreementDraftId}
             onAssignDraft={(draft, selectedStart, selectedEnd) =>
               void assignAgreementDraft(draft, selectedStart, selectedEnd)
@@ -656,8 +656,8 @@ export function HotelAgreementSection() {
             city="madinah"
             drafts={availableAgreementDraftsByCity.madinah}
             group={group}
-            isLoading={agreementDraftsQueryLoading}
-            isError={agreementDraftsQueryError}
+            isLoading={agreementDraftsQueryLoading ?? false}
+            isError={agreementDraftsQueryError ?? false}
             assigningDraftId={assigningAgreementDraftId}
             onAssignDraft={(draft, selectedStart, selectedEnd) =>
               void assignAgreementDraft(draft, selectedStart, selectedEnd)
