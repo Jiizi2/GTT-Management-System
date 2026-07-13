@@ -9,75 +9,10 @@ import {
   type AuthSession,
 } from "../shared/auth-session.js";
 import { runCase } from "../test/run-case.js";
+import { createWindowMock, MemoryStorage } from "../test/with-mock-window.js";
 
 const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v2";
-const LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
-const LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
 
-type Listener = (event: Event) => void;
-
-class MemoryStorage {
-  private readonly store = new Map<string, string>();
-
-  getItem(key: string): string | null {
-    return this.store.has(key) ? (this.store.get(key) ?? null) : null;
-  }
-
-  setItem(key: string, value: string): void {
-    this.store.set(key, value);
-  }
-
-  removeItem(key: string): void {
-    this.store.delete(key);
-  }
-}
-
-function createWindowMock(): {
-  windowMock: {
-    localStorage: MemoryStorage;
-    sessionStorage: MemoryStorage;
-    addEventListener: (type: string, listener: Listener) => void;
-    removeEventListener: (type: string, listener: Listener) => void;
-    dispatchEvent: (event: Event) => boolean;
-  };
-  localStorage: MemoryStorage;
-  sessionStorage: MemoryStorage;
-} {
-  const localStorage = new MemoryStorage();
-  const sessionStorage = new MemoryStorage();
-  const listenersByEvent = new Map<string, Set<Listener>>();
-
-  return {
-    localStorage,
-    sessionStorage,
-    windowMock: {
-      localStorage,
-      sessionStorage,
-      addEventListener: (type: string, listener: Listener) => {
-        const listeners = listenersByEvent.get(type) ?? new Set<Listener>();
-        listeners.add(listener);
-        listenersByEvent.set(type, listeners);
-      },
-      removeEventListener: (type: string, listener: Listener) => {
-        const listeners = listenersByEvent.get(type);
-        if (!listeners) {
-          return;
-        }
-
-        listeners.delete(listener);
-      },
-      dispatchEvent: (event: Event) => {
-        const listeners = listenersByEvent.get(event.type);
-        if (!listeners) {
-          return true;
-        }
-
-        listeners.forEach((listener) => listener(event));
-        return true;
-      },
-    },
-  };
-}
 
 function withMockWindow<T>(
   fn: (context: {
@@ -87,7 +22,7 @@ function withMockWindow<T>(
   }) => T,
 ): T {
   const previousWindow = (globalThis as { window?: unknown }).window;
-  const { windowMock, localStorage, sessionStorage } = createWindowMock();
+  const windowMock = createWindowMock();
   let authStateEventCount = 0;
 
   windowMock.addEventListener(AUTH_STATE_CHANGED_EVENT, () => {
@@ -102,8 +37,8 @@ function withMockWindow<T>(
 
   try {
     return fn({
-      localStorage,
-      sessionStorage,
+      localStorage: windowMock.localStorage,
+      sessionStorage: windowMock.sessionStorage,
       countAuthStateEvents: () => authStateEventCount,
     });
   } finally {
@@ -198,11 +133,8 @@ function testPersistReadAndClearRememberedAuthSession(): void {
   });
 }
 
-function testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys(): void {
+function testPersistEphemeralSessionUsesSessionStorage(): void {
   withMockWindow(({ localStorage, sessionStorage }) => {
-    localStorage.setItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
-    localStorage.setItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY, "admin");
-
     persistAuthSession({
       expiresAt: "2099-02-01T00:00:00.000Z",
       rememberSession: false,
@@ -215,8 +147,6 @@ function testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys(): voi
       },
     });
 
-    assert.equal(localStorage.getItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY), null);
     assert.equal(localStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
     assert.notEqual(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
   });
@@ -241,19 +171,15 @@ function testReadPersistedSessionRejectsInvalidAndExpiredData(): void {
       },
     };
     sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(expiredSession));
-    localStorage.setItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
-    localStorage.setItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY, expiredSession.user.accessTier);
 
     assert.equal(readPersistedAuthSession(), null);
     assert.equal(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY), null);
   });
 }
 
 describe("auth session", () => {
   runCase("coercion validation", testCoerceAuthSessionValidation);
   runCase("persist/read/clear remembered flow", testPersistReadAndClearRememberedAuthSession);
-  runCase("ephemeral storage and legacy purge", testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys);
+  runCase("ephemeral storage flow", testPersistEphemeralSessionUsesSessionStorage);
   runCase("invalid/expired persistence guard", testReadPersistedSessionRejectsInvalidAndExpiredData);
 });

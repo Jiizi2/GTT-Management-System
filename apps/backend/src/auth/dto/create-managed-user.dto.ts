@@ -1,6 +1,7 @@
 import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import type { AuthManagedUserRole } from "../auth.types";
+import { IsStrongPassword } from "../is-strong-password";
 
 const MANAGED_USER_ROLE_VALUES: AuthManagedUserRole[] = [
   "super-admin",
@@ -41,12 +42,12 @@ export class CreateManagedUserDto {
   @ApiPropertyOptional({
     description: "Password awal opsional untuk langsung mengaktifkan akun.",
     example: "FinanceManager#2026",
-    minLength: 8,
+    minLength: 12,
     maxLength: 1024,
   })
   @IsOptional()
   @IsString()
-  @MinLength(8)
+  @IsStrongPassword()
   @MaxLength(1024)
   password?: string;
 }

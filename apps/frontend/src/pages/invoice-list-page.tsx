@@ -3,13 +3,18 @@ import * as Domain from "../shared/app-domain";
 import type { GroupData } from "../shared/app-domain";
 import { PageHeroSection } from "../components/page-hero-section";
 import { PaginationControls } from "../components/pagination-controls";
-import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { useInvoiceDashboardQuery } from "../hooks/use-invoice-query";
+import { InvoiceDeleteConfirmModal } from "../components/group-detail-modals/InvoiceDeleteConfirmModal";
+import { useInvoiceDashboardQuery, useDeleteInvoiceMutation } from "../hooks/use-invoice-query";
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { useThemeMode } from "../theme/theme-provider";
 import { Button } from "../components/button";
-import { Badge } from "../components/badge";
+import {
+  InvoiceSummaryBadges,
+  InvoiceListFilters,
+  InvoiceCardList,
+  InvoiceTable,
+} from "./invoice/components/InvoiceListComponents";
 import {
   createInvoiceWorkspaceInitialData,
   defaultBankDisbursementOptions,
@@ -34,7 +39,7 @@ import {
   type InvoiceClientOption,
   type InvoiceRow,
   type InvoiceWorkspaceInitialData,
-} from "./invoice-page-shared";
+} from "./invoice/helpers/invoice-page-shared";
 
 const LazyCreateInvoiceWorkspace = lazy(async () => ({
   default: (await import("./invoice-page")).CreateInvoiceWorkspace,
@@ -85,7 +90,9 @@ export function InvoiceScreen({
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [draftSourceInvoice, setDraftSourceInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<InvoiceRow | null>(null);
   const invoiceDashboardQuery = useInvoiceDashboardQuery();
+  const deleteMutation = useDeleteInvoiceMutation();
   const issuingOfficeOptionsQuery = useMasterDataOptionsQuery({
     categoryKey: "invoice-issuing-office",
   });
@@ -257,6 +264,10 @@ export function InvoiceScreen({
     setWorkspaceMode("edit");
   };
 
+  const handleDeleteInvoice = (row: InvoiceRow) => {
+    setDeletingInvoice(row);
+  };
+
 
   useEffect(() => {
     if (!actionFeedback) {
@@ -367,6 +378,26 @@ export function InvoiceScreen({
 
   return (
     <div className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+      {deletingInvoice && (
+        <InvoiceDeleteConfirmModal
+          invoice={deletingInvoice}
+          onClose={() => setDeletingInvoice(null)}
+          onConfirm={() => {
+            const invoiceNumber = deletingInvoice.invoiceNumber;
+            const invoiceId = deletingInvoice.id;
+            setDeletingInvoice(null);
+            setActionFeedback(`Menghapus invoice ${invoiceNumber}...`);
+            deleteMutation.mutate(invoiceId, {
+              onSuccess: () => {
+                setActionFeedback(`Invoice ${invoiceNumber} berhasil dihapus.`);
+              },
+              onError: (err: any) => {
+                setActionFeedback(`Gagal menghapus invoice: ${err?.message || err}`);
+              },
+            });
+          }}
+        />
+      )}
       {visibleFeedback ? (
         <section
           className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-ambient"
@@ -460,77 +491,23 @@ export function InvoiceScreen({
               </div>
             </label>
 
-            <label className="space-y-1">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-                Status
-              </span>
-              <SereneSelect
-                className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium text-on-surface-variant"
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled")
-                }
-              >
-                <option value="all">All Statuses</option>
-                <option value="paid">Paid</option>
-                <option value="partially-paid">Partially Paid</option>
-                <option value="pending">Pending</option>
-                <option value="overdue">Overdue</option>
-                <option value="cancelled">Cancelled</option>
-              </SereneSelect>
-            </label>
-
-            <label className="space-y-1">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-                Due Month
-              </span>
-              <SereneSelect
-                className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium text-on-surface-variant"
-                value={dueMonthFilter}
-                onChange={(event) => setDueMonthFilter(event.target.value)}
-              >
-                <option value="all">All Months</option>
-                {dueMonthOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </SereneSelect>
-            </label>
+            <InvoiceListFilters
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              dueMonthFilter={dueMonthFilter}
+              setDueMonthFilter={setDueMonthFilter}
+              dueMonthOptions={dueMonthOptions}
+            />
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className={paidSummaryBadgeClassName}>
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                task_alt
-              </span>
-              <span>Paid {paidCount}</span>
-            </span>
-            <span className={partiallyPaidSummaryBadgeClassName}>
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                payments
-              </span>
-              <span>Partially Paid {partiallyPaidCount}</span>
-            </span>
-            <span className={pendingSummaryBadgeClassName}>
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                hourglass_top
-              </span>
-              <span>Pending {pendingCount}</span>
-            </span>
-            <span className={overdueSummaryBadgeClassName}>
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                warning
-              </span>
-              <span>Overdue {overdueCount}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-slate-100 px-3 py-1 text-xs font-bold leading-none text-slate-700">
-              <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                block
-              </span>
-              <span>Cancelled {cancelledCount}</span>
-            </span>
-          </div>
+          <InvoiceSummaryBadges
+            paidCount={paidCount}
+            partiallyPaidCount={partiallyPaidCount}
+            pendingCount={pendingCount}
+            overdueCount={overdueCount}
+            cancelledCount={cancelledCount}
+            isDarkMode={isDarkMode}
+          />
         </article>
 
         <article className="serene-accent-card bg-primary text-on-primary">
@@ -570,231 +547,23 @@ export function InvoiceScreen({
         </article>
       ) : (
         <>
-          <section className="space-y-3 lg:hidden" aria-label="Invoice cards">
-            {paginatedRows.map((row) => (
-              <article
-                key={row.id}
-                className={`rounded-2xl border p-4 shadow-sm ${
-                  row.status === "Paid"
-                    ? isDarkMode
-                      ? "border-primary/45 bg-primary/10 shadow-ambient"
-                      : "border-emerald-300 bg-emerald-50/80 shadow-[0_16px_34px_rgba(5,150,105,0.14)]"
-                    : "border-slate-200 bg-surface-container-lowest"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
-                      Invoice ID
-                    </p>
-                    <p className="truncate text-sm font-bold text-primary">{row.invoiceNumber}</p>
-                  </div>
-                  <Badge
-                    status={row.status === "Paid" ? "success" : row.status === "Pending" ? "warning" : "error"}
-                    className="px-2.5 py-1 text-[11px] font-bold border-none"
-                  >
-                    {getInvoiceStatusDisplayLabel(row.status)}
-                  </Badge>
-                </div>
+          <InvoiceCardList
+            rows={paginatedRows}
+            isDarkMode={isDarkMode}
+            isInvoiceBackendAvailable={isInvoiceBackendAvailable}
+            onViewPdf={handleViewPdf}
+            onEditInvoice={handleOpenEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+          />
 
-                <div className="mt-3 flex items-center gap-2">
-                  <div
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${getAvatarToneByStatus(
-                      row.status,
-                      isDarkMode,
-                    )}`}
-                  >
-                    {row.clientInitials}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-on-surface">{row.clientName}</p>
-                    <p className="truncate text-xs text-on-surface-variant">
-                      {row.groupCode ? `Group ${row.groupCode}` : "No group"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-xl bg-surface-container-low px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">
-                      Due Date
-                    </p>
-                    <p className="mt-1 font-semibold text-on-surface">{formatDateLabel(row.dueDateIso)}</p>
-                  </div>
-                  <div className="rounded-xl bg-surface-container-low px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">
-                      Amount
-                    </p>
-                    {(() => {
-                      const displayTotals = resolveInvoiceDisplayTotals(row);
-                      return (
-                        <>
-                          <p className="mt-1 font-extrabold text-on-surface">
-                            {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
-                          </p>
-                          {displayTotals.downPayment > 0 && (
-                            <p className="text-[9px] text-on-surface-variant font-semibold mt-0.5">
-                              Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | Terbayar: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
-                    aria-label={`Open PDF for ${row.invoiceNumber}`}
-                    onClick={() => handleViewPdf(row)}
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      picture_as_pdf
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
-                      isInvoiceBackendAvailable
-                        ? "bg-surface-container-low"
-                        : "cursor-not-allowed bg-surface-container-high"
-                    }`}
-                    aria-label={`Edit ${row.invoiceNumber}`}
-                    onClick={() => handleOpenEditInvoice(row)}
-                    disabled={!isInvoiceBackendAvailable}
-                    title={
-                      isInvoiceBackendAvailable
-                        ? "Edit"
-                        : "Backend invoice/database belum terhubung, edit invoice dinonaktifkan."
-                    }
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      edit
-                    </span>
-                  </button>
-                </div>
-              </article>
-            ))}
-          </section>
-
-          <section className="serene-table-shell hidden lg:block" aria-label="Invoice list table">
-            <div className="overflow-x-auto">
-              <div className="min-w-full">
-                <div
-                  className="grid gap-2 border-b border-slate-200 bg-surface-container-low px-5 py-3 text-xs font-semibold uppercase tracking-[0.11em] text-on-surface-variant/80"
-                  style={{ gridTemplateColumns: "1.2fr 1.05fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
-                >
-                  <div>Invoice ID</div>
-                  <div>Client Name</div>
-                  <div>Due Date</div>
-                  <div>Amount</div>
-                  <div>Status</div>
-                  <div className="text-right">Actions</div>
-                </div>
-
-                <div className="divide-y divide-slate-100">
-                  {paginatedRows.map((row) => (
-                    <article
-                      key={row.id}
-                      className={`grid items-center gap-2 px-5 py-4 text-sm transition ${
-                        row.status === "Paid"
-                          ? isDarkMode
-                            ? "bg-primary/8 hover:bg-primary/12"
-                            : "bg-emerald-50/70 hover:bg-emerald-50"
-                          : "hover:bg-surface-container-low"
-                      }`}
-                      style={{ gridTemplateColumns: "1.2fr 1.05fr 0.7fr 0.85fr 0.65fr 0.85fr" }}
-                    >
-                      <div>
-                        <button
-                          type="button"
-                          className={`text-left font-display text-[0.95rem] font-bold text-primary transition ${
-                            row.groupCode ? "hover:underline" : "cursor-default"
-                          }`}
-                          onClick={() => {
-                            if (row.groupCode) {
-                              onOpenDetail(row.groupCode);
-                            }
-                          }}
-                          disabled={!row.groupCode}
-                        >
-                          {row.invoiceNumber}
-                        </button>
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-on-surface">{row.clientName}</p>
-                        <p className="truncate text-xs text-on-surface-variant">
-                          {row.groupCode ? `Group ${row.groupCode}` : "No linked group"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="font-medium text-on-surface">{formatDateLabel(row.dueDateIso)}</p>
-                      </div>
-
-                      <div>
-                        {(() => {
-                          const displayTotals = resolveInvoiceDisplayTotals(row);
-                          return (
-                            <>
-                              <p className="font-display text-[0.95rem] font-bold text-on-surface">{formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}</p>
-                              {displayTotals.downPayment > 0 && (
-                                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
-                                  Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | Terbayar: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
-                                </p>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-
-                      <div>
-                        <Badge
-                          status={row.status === "Paid" ? "success" : row.status === "Pending" ? "warning" : "error"}
-                          className="px-2.5 py-1 text-[11px] font-bold border-none"
-                        >
-                          {getInvoiceStatusDisplayLabel(row.status)}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-1">
-
-                        <button
-                          type="button"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
-                          title="View PDF"
-                          aria-label={`Open PDF for ${row.invoiceNumber}`}
-                          onClick={() => handleViewPdf(row)}
-                        >
-                          <span className="material-symbols-outlined text-base" aria-hidden="true">
-                            picture_as_pdf
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
-                            isInvoiceBackendAvailable ? "" : "cursor-not-allowed opacity-50"
-                          }`}
-                          title="Edit"
-                          aria-label={`Edit ${row.invoiceNumber}`}
-                          onClick={() => handleOpenEditInvoice(row)}
-                          disabled={!isInvoiceBackendAvailable}
-                        >
-                          <span className="material-symbols-outlined text-base" aria-hidden="true">
-                            edit
-                          </span>
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
+          <InvoiceTable
+            rows={paginatedRows}
+            isDarkMode={isDarkMode}
+            isInvoiceBackendAvailable={isInvoiceBackendAvailable}
+            onViewPdf={handleViewPdf}
+            onEditInvoice={handleOpenEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+          />
         </>
       )}
 

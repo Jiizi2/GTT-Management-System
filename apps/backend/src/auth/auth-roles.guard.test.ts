@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { AuthRolesGuard } from "./auth-roles.guard";
@@ -16,31 +17,28 @@ function createExecutionContext(authUser?: AuthTokenPayload) {
   };
 }
 
-async function main(): Promise<void> {
-  {
+describe("AuthRolesGuard", () => {
+  runCase("allows access when no roles are required", () => {
     const reflector = {
       getAllAndOverride: () => undefined,
     } as unknown as Reflector;
     const guard = new AuthRolesGuard(reflector);
 
-    assert.equal(guard.canActivate(createExecutionContext() as never), true);
-  }
+    expect(guard.canActivate(createExecutionContext() as never)).toBe(true);
+  });
 
-  {
+  runCase("rejects when session is not available", () => {
     const reflector = {
       getAllAndOverride: () => ["super-admin"],
     } as unknown as Reflector;
     const guard = new AuthRolesGuard(reflector);
 
-    assert.throws(
-      () => guard.canActivate(createExecutionContext() as never),
-      (error: unknown) =>
-        error instanceof UnauthorizedException &&
-        error.message.includes("Session is not available"),
+    expect(() => guard.canActivate(createExecutionContext() as never)).toThrow(
+      /Session is not available/i,
     );
-  }
+  });
 
-  {
+  runCase("rejects when user lacks required role", () => {
     const reflector = {
       getAllAndOverride: () => ["super-admin"],
     } as unknown as Reflector;
@@ -56,15 +54,12 @@ async function main(): Promise<void> {
       rememberSession: false,
     };
 
-    assert.throws(
-      () => guard.canActivate(createExecutionContext(adminUser) as never),
-      (error: unknown) =>
-        error instanceof ForbiddenException &&
-        error.message.includes("Super Admin access is required"),
+    expect(() => guard.canActivate(createExecutionContext(adminUser) as never)).toThrow(
+      /Super Admin access is required/i,
     );
-  }
+  });
 
-  {
+  runCase("allows access when user has required role", () => {
     const reflector = {
       getAllAndOverride: () => ["admin", "super-admin"],
     } as unknown as Reflector;
@@ -80,8 +75,6 @@ async function main(): Promise<void> {
       rememberSession: false,
     };
 
-    assert.equal(guard.canActivate(createExecutionContext(adminUser) as never), true);
-  }
-}
-
-void main();
+    expect(guard.canActivate(createExecutionContext(adminUser) as never)).toBe(true);
+  });
+});

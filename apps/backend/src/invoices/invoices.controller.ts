@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
 } from "@nestjs/common";
 import {
@@ -33,6 +34,7 @@ import {
   InvoiceListItemResponseDto,
 } from "./dto/invoice-response.dto";
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
+import { PaginationDto } from "./dto/pagination.dto";
 import { InvoicesService } from "./invoices.service";
 
 type ResponseLike = {
@@ -57,9 +59,15 @@ export class InvoicesController {
     type: InvoiceListItemResponseDto,
     isArray: true,
   })
-  findAll(@Res({ passthrough: true }) response: ResponseLike) {
+  findAll(
+    @Query() pagination: PaginationDto,
+    @Res({ passthrough: true }) response: ResponseLike
+  ) {
     response.setHeader("Cache-Control", "no-store, private");
-    return this.invoicesService.findAll();
+    if (pagination.page === undefined && pagination.limit === undefined) {
+      return this.invoicesService.findAll();
+    }
+    return this.invoicesService.findAllPaginated(pagination);
   }
 
   @Get("clients")
@@ -113,24 +121,19 @@ export class InvoicesController {
     return this.invoicesService.update(id, payload);
   }
 
-  @Post("backfill")
-  @Roles("super-admin")
-  @ApiOperation({
-    summary: "Backfill legacy items",
-    description: "Mengimpor item invoice dari data legacy JSON ke tabel relasional.",
-  })
-  @ApiOkResponse({
-    description: "Proses backfill selesai.",
-  })
-  backfill() {
-    return this.invoicesService.backfillLegacyItems();
-  }
-
   @Delete(":id")
-  @ApiMethodNotAllowedResponse({ type: ApiErrorResponseDto })
+  @Roles("super-admin", "admin")
+  @ApiOperation({
+    summary: "Hapus invoice",
+    description: "Menghapus invoice berdasarkan ID.",
+  })
+  @ApiParam({ name: "id", example: "clinvoiceid123" })
+  @ApiOkResponse({
+    description: "Invoice berhasil dihapus.",
+  })
+  @ApiNotFoundResponse({ type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   remove(@Param("id") id: string) {
-    throw new MethodNotAllowedException(
-      `Invoice '${id}' cannot be deleted. Set status to CANCELLED instead.`,
-    );
+    return this.invoicesService.delete(id);
   }
 }

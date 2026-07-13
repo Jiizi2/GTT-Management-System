@@ -70,6 +70,9 @@ export class InvoiceListItemResponseDto {
   @ApiPropertyOptional({ example: "Catatan tambahan invoice..." })
   notes?: string;
 
+  @ApiPropertyOptional({ example: "Visa" })
+  description?: string;
+
   @ApiPropertyOptional({
     description: "Daftar item invoice yang tersimpan.",
     type: [InvoiceLineItemDto],

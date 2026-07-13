@@ -6,8 +6,9 @@ import {
   resolveInvoiceDownPaymentIdr,
   resolveInvoiceOutstandingBalanceLabel,
   resolveBankAccountLabel,
-  defaultBankDisbursementOptions,
-} from "../pages/invoice-page-shared.js";
+  parseNumberInput,
+  resolveExchangeRatesFromRow,
+} from "../pages/invoice/helpers/invoice-page-shared.js";
 import { runCase } from "../test/run-case.js";
 
 describe("invoice-page-shared", () => {
@@ -113,5 +114,32 @@ describe("invoice-page-shared", () => {
 
     assert.equal(extractBankKey("Some user notes here\n[BankAccount:bca]"), "bca");
     assert.equal(extractBankKey("No bank account info here"), "bsi"); // fallback
+  });
+
+  runCase("parses Indonesian localized numbers in parseNumberInput", () => {
+    assert.equal(parseNumberInput("25000"), 25000);
+    assert.equal(parseNumberInput("25.000"), 25000);
+    assert.equal(parseNumberInput("40.000"), 40000);
+    assert.equal(parseNumberInput("2.500.000"), 2500000);
+    assert.equal(parseNumberInput("2.5"), 25);
+    assert.equal(parseNumberInput("2,5"), 2.5);
+    assert.equal(parseNumberInput("15.800,50"), 15800.5);
+  });
+
+  runCase("resolves exchange rates from notes and respects explicit 0 values and alternative formats", () => {
+    // 1. Tag [Rates:USD=X,SAR=Y]
+    const res1 = resolveExchangeRatesFromRow({ notes: "[Rates:USD=16000,SAR=4300]" });
+    assert.equal(res1.usdToIdr, 16000);
+    assert.equal(res1.sarToIdr, 4300);
+
+    // 2. Tag [ExchangeRate:USD=X,SAR=Y]
+    const res2 = resolveExchangeRatesFromRow({ notes: "[ExchangeRate:USD=15500,SAR=4100]" });
+    assert.equal(res2.usdToIdr, 15500);
+    assert.equal(res2.sarToIdr, 4100);
+
+    // 3. Explicit 0 values
+    const res3 = resolveExchangeRatesFromRow({ notes: "[Rates:USD=0,SAR=0]" });
+    assert.equal(res3.usdToIdr, 0);
+    assert.equal(res3.sarToIdr, 0);
   });
 });

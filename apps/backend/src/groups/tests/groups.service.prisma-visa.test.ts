@@ -1,8 +1,10 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../../test/run-case";
 import { NotFoundException } from "@nestjs/common";
 import { AgreementApprovalStatus, AgreementCity } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
+import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
 
 function createPrismaService(prismaMock: PrismaService): {
   service: GroupsService;
@@ -15,7 +17,7 @@ function createPrismaService(prismaMock: PrismaService): {
     create: async () => ({}),
     findMany: async () => [],
   };
-  const service = new GroupsService(prismaMock);
+  const service = new GroupsService(new PrismaGroupRepository(prismaMock));
 
   return {
     service,
@@ -27,11 +29,6 @@ function createPrismaService(prismaMock: PrismaService): {
       }
     },
   };
-}
-
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
 }
 
 function createGroupFindFirstMock() {
@@ -53,205 +50,74 @@ function createGroupFindFirstMock() {
   };
 }
 
-async function testPrismaAddVisaHotelAgreement(): Promise<void> {
-  let createdPayload: Record<string, unknown> | null = null;
-  const prismaMock = {
-    group: {
-      findFirst: createGroupFindFirstMock(),
-    },
-    visaSetup: {
-      upsert: async () => ({
-        id: "visa-1",
-        groupId: "grp-1",
-      }),
-    },
-    visaHotelAgreement: {
-      findMany: async () => [],
-      create: async (args: Record<string, unknown>) => {
-        createdPayload = args;
-        return { id: "hotel-1" };
+describe("GroupsServicePrismaVisa", () => {
+  runCase("groups prisma add visa hotel agreement", async () => {
+    let createdPayload: any = null;
+    const prismaMock = {
+      group: {
+        findFirst: createGroupFindFirstMock(),
       },
-    },
-  } as unknown as PrismaService;
-
-  const { service, restore } = createPrismaService(prismaMock);
-  try {
-    const result = (await service.addVisaHotelAgreement("GRP-PRISMA", {
-      city: AgreementCity.MAKKAH,
-      sourceDraftId: " draft-add-1 ",
-      hotelName: " Swissotel ",
-      agreementNumber: " AG-PR-1 ",
-      pax: 45,
-      stayStart: "2026-04-10",
-      stayEnd: "2026-04-12",
-    })) as { code?: string };
-
-    assert.equal(result.code, "GRP-PRISMA");
-    assert.ok(createdPayload);
-    const data = (
-      createdPayload as {
-        data: {
-          visaSetupId: string;
-          sourceDraftId: string | null;
-          city: AgreementCity;
-          hotelName: string;
-          agreementNumber: string;
-          pax: number;
-          status: AgreementApprovalStatus;
-          stayStart: Date;
-          stayEnd: Date;
-        };
-      }
-    ).data;
-
-    assert.equal(data.visaSetupId, "visa-1");
-    assert.equal(data.sourceDraftId, "draft-add-1");
-    assert.equal(data.city, AgreementCity.MAKKAH);
-    assert.equal(data.hotelName, "Swissotel");
-    assert.equal(data.agreementNumber, "AG-PR-1");
-    assert.equal(data.pax, 45);
-    assert.equal(data.status, AgreementApprovalStatus.WAITING);
-    assert.equal(data.stayStart.toISOString().slice(0, 10), "2026-04-10");
-    assert.equal(data.stayEnd.toISOString().slice(0, 10), "2026-04-12");
-  } finally {
-    restore();
-  }
-}
-
-async function testPrismaUpdateVisaHotelAgreement(): Promise<void> {
-  let updatedPayload: Record<string, unknown> | null = null;
-  const prismaMock = {
-    group: {
-      findFirst: createGroupFindFirstMock(),
-    },
-    visaHotelAgreement: {
-      findMany: async () => [
-        {
-          id: "mak-1",
-          city: AgreementCity.MAKKAH,
-          stayStart: new Date("2026-04-10T00:00:00.000Z"),
-          stayEnd: new Date("2026-04-12T00:00:00.000Z"),
-        },
-        {
-          id: "mad-1",
-          city: AgreementCity.MADINAH,
-          stayStart: new Date("2026-04-12T00:00:00.000Z"),
-          stayEnd: new Date("2026-04-15T00:00:00.000Z"),
-        },
-      ],
-      update: async (args: Record<string, unknown>) => {
-        updatedPayload = args;
-        return { id: "mad-1" };
-      },
-    },
-  } as unknown as PrismaService;
-
-  const { service, restore } = createPrismaService(prismaMock);
-  try {
-    const result = (await service.updateVisaHotelAgreement(
-      "GRP-PRISMA",
-      "mad-1",
-      {
-        city: AgreementCity.MADINAH,
-        sourceDraftId: " draft-update-1 ",
-        hotelName: " Pullman ",
-        agreementNumber: " AG-PR-2 ",
-        pax: 45,
-        status: AgreementApprovalStatus.APPROVED,
-        stayStart: "2026-04-12",
-        stayEnd: "2026-04-15",
-      },
-    )) as { code?: string };
-
-    assert.equal(result.code, "GRP-PRISMA");
-    assert.ok(updatedPayload);
-    const data = (
-      updatedPayload as {
-        data: {
-          city: AgreementCity;
-          sourceDraftId: string | null;
-          hotelName: string;
-          agreementNumber: string;
-          pax: number;
-          status: AgreementApprovalStatus;
-          stayStart: Date;
-          stayEnd: Date;
-        };
-      }
-    ).data;
-    assert.equal(data.city, AgreementCity.MADINAH);
-    assert.equal(data.sourceDraftId, "draft-update-1");
-    assert.equal(data.hotelName, "Pullman");
-    assert.equal(data.agreementNumber, "AG-PR-2");
-    assert.equal(data.status, AgreementApprovalStatus.APPROVED);
-
-    await assert.rejects(
-      () =>
-        service.updateVisaHotelAgreement("GRP-PRISMA", "missing-hotel", {
-          city: AgreementCity.MADINAH,
-          hotelName: "Pullman",
-          agreementNumber: "AG-X",
-          pax: 45,
-          stayStart: "2026-04-12",
-          stayEnd: "2026-04-15",
+      visaSetup: {
+        upsert: async () => ({
+          id: "visa-1",
+          groupId: "grp-1",
         }),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match(
-          (error as Error).message,
-          /Hotel agreement 'missing-hotel' not found/i,
-        );
-        return true;
-      },
-    );
-  } finally {
-    restore();
-  }
-}
-
-async function testPrismaRemoveVisaHotelAgreementGuards(): Promise<void> {
-  {
-    let deleteCalled = false;
-    const prismaMock = {
-      group: {
-        findFirst: createGroupFindFirstMock(),
       },
       visaHotelAgreement: {
-        findMany: async () => [
-          {
-            id: "mak-1",
-            city: AgreementCity.MAKKAH,
-            stayStart: new Date("2026-04-10T00:00:00.000Z"),
-            stayEnd: new Date("2026-04-12T00:00:00.000Z"),
-          },
-          {
-            id: "mad-1",
-            city: AgreementCity.MADINAH,
-            stayStart: new Date("2026-04-13T00:00:00.000Z"),
-            stayEnd: new Date("2026-04-15T00:00:00.000Z"),
-          },
-        ],
-        deleteMany: async () => {
-          deleteCalled = true;
-          return { count: 1 };
+        findMany: async () => [],
+        create: async (args: Record<string, unknown>) => {
+          createdPayload = args;
+          return { id: "hotel-1" };
         },
       },
     } as unknown as PrismaService;
 
     const { service, restore } = createPrismaService(prismaMock);
     try {
-      const result = (await service.removeVisaHotelAgreement(
-        "GRP-PRISMA",
-        "mak-1",
-      )) as { code?: string };
-      assert.equal(deleteCalled, true);
-      assert.equal(result.code, "GRP-PRISMA");
+      const result = (await service.addVisaHotelAgreement("GRP-PRISMA", {
+        city: AgreementCity.MAKKAH,
+        sourceDraftId: " draft-add-1 ",
+        hotelName: " Swissotel ",
+        agreementNumber: " AG-PR-1 ",
+        pax: 45,
+        stayStart: "2026-04-10",
+        stayEnd: "2026-04-12",
+      })) as { code?: string };
+
+      expect(result.code).toBe("GRP-PRISMA");
+      expect(createdPayload).toBeTruthy();
+      const data = (
+        createdPayload as {
+          data: {
+            visaSetupId: string;
+            sourceDraftId: string | null;
+            city: AgreementCity;
+            hotelName: string;
+            agreementNumber: string;
+            pax: number;
+            status: AgreementApprovalStatus;
+            stayStart: Date;
+            stayEnd: Date;
+          };
+        }
+      ).data;
+
+      expect(data.visaSetupId).toBe("visa-1");
+      expect(data.sourceDraftId).toBe("draft-add-1");
+      expect(data.city).toBe(AgreementCity.MAKKAH);
+      expect(data.hotelName).toBe("Swissotel");
+      expect(data.agreementNumber).toBe("AG-PR-1");
+      expect(data.pax).toBe(45);
+      expect(data.status).toBe(AgreementApprovalStatus.WAITING);
+      expect(data.stayStart.toISOString().slice(0, 10)).toBe("2026-04-10");
+      expect(data.stayEnd.toISOString().slice(0, 10)).toBe("2026-04-12");
     } finally {
       restore();
     }
-  }
+  });
 
-  {
+  runCase("groups prisma update visa hotel agreement", async () => {
+    let updatedPayload: any = null;
     const prismaMock = {
       group: {
         findFirst: createGroupFindFirstMock(),
@@ -267,90 +133,187 @@ async function testPrismaRemoveVisaHotelAgreementGuards(): Promise<void> {
           {
             id: "mad-1",
             city: AgreementCity.MADINAH,
-            stayStart: new Date("2026-04-13T00:00:00.000Z"),
+            stayStart: new Date("2026-04-12T00:00:00.000Z"),
             stayEnd: new Date("2026-04-15T00:00:00.000Z"),
           },
         ],
-        deleteMany: async () => ({ count: 0 }),
-      },
-    } as unknown as PrismaService;
-
-    const { service, restore } = createPrismaService(prismaMock);
-    try {
-      await assert.rejects(
-        () => service.removeVisaHotelAgreement("GRP-PRISMA", "mad-1"),
-        (error: unknown) => {
-          assert.equal(error instanceof NotFoundException, true);
-          assert.match(
-            (error as Error).message,
-            /Hotel agreement 'mad-1' not found/i,
-          );
-          return true;
-        },
-      );
-    } finally {
-      restore();
-    }
-  }
-
-  {
-    let deleteCalled = false;
-    const prismaMock = {
-      group: {
-        findFirst: createGroupFindFirstMock(),
-      },
-      visaHotelAgreement: {
-        findMany: async () => [
-          {
-            id: "mak-1",
-            city: AgreementCity.MAKKAH,
-            stayStart: new Date("2026-04-10T00:00:00.000Z"),
-            stayEnd: new Date("2026-04-12T00:00:00.000Z"),
-          },
-          {
-            id: "mad-1",
-            city: AgreementCity.MADINAH,
-            stayStart: new Date("2026-04-13T00:00:00.000Z"),
-            stayEnd: new Date("2026-04-15T00:00:00.000Z"),
-          },
-        ],
-        deleteMany: async () => {
-          deleteCalled = true;
-          return { count: 1 };
+        update: async (args: Record<string, unknown>) => {
+          updatedPayload = args;
+          return { id: "mad-1" };
         },
       },
     } as unknown as PrismaService;
 
     const { service, restore } = createPrismaService(prismaMock);
     try {
-      const result = (await service.removeVisaHotelAgreement(
+      const result = (await service.updateVisaHotelAgreement(
         "GRP-PRISMA",
         "mad-1",
+        {
+          city: AgreementCity.MADINAH,
+          sourceDraftId: " draft-update-1 ",
+          hotelName: " Pullman ",
+          agreementNumber: " AG-PR-2 ",
+          pax: 45,
+          status: AgreementApprovalStatus.APPROVED,
+          stayStart: "2026-04-12",
+          stayEnd: "2026-04-15",
+        },
       )) as { code?: string };
-      assert.equal(deleteCalled, true);
-      assert.equal(result.code, "GRP-PRISMA");
+
+      expect(result.code).toBe("GRP-PRISMA");
+      expect(updatedPayload).toBeTruthy();
+      const data = (
+        updatedPayload as {
+          data: {
+            city: AgreementCity;
+            sourceDraftId: string | null;
+            hotelName: string;
+            agreementNumber: string;
+            pax: number;
+            status: AgreementApprovalStatus;
+            stayStart: Date;
+            stayEnd: Date;
+          };
+        }
+      ).data;
+      expect(data.city).toBe(AgreementCity.MADINAH);
+      expect(data.sourceDraftId).toBe("draft-update-1");
+      expect(data.hotelName).toBe("Pullman");
+      expect(data.agreementNumber).toBe("AG-PR-2");
+      expect(data.status).toBe(AgreementApprovalStatus.APPROVED);
+
+      await expect(
+        () =>
+          service.updateVisaHotelAgreement("GRP-PRISMA", "missing-hotel", {
+            city: AgreementCity.MADINAH,
+            hotelName: "Pullman",
+            agreementNumber: "AG-X",
+            pax: 45,
+            stayStart: "2026-04-12",
+            stayEnd: "2026-04-15",
+          }),
+      ).rejects.toThrow(NotFoundException);
     } finally {
       restore();
     }
-  }
-}
+  });
 
-async function main(): Promise<void> {
-  await runCase(
-    "groups prisma add visa hotel agreement",
-    testPrismaAddVisaHotelAgreement,
-  );
-  await runCase(
-    "groups prisma update visa hotel agreement",
-    testPrismaUpdateVisaHotelAgreement,
-  );
-  await runCase(
-    "groups prisma remove visa hotel agreement guards",
-    testPrismaRemoveVisaHotelAgreementGuards,
-  );
-}
+  runCase("groups prisma remove visa hotel agreement guards", async () => {
+    {
+      let deleteCalled = false;
+      const prismaMock = {
+        group: {
+          findFirst: createGroupFindFirstMock(),
+        },
+        visaHotelAgreement: {
+          findMany: async () => [
+            {
+              id: "mak-1",
+              city: AgreementCity.MAKKAH,
+              stayStart: new Date("2026-04-10T00:00:00.000Z"),
+              stayEnd: new Date("2026-04-12T00:00:00.000Z"),
+            },
+            {
+              id: "mad-1",
+              city: AgreementCity.MADINAH,
+              stayStart: new Date("2026-04-13T00:00:00.000Z"),
+              stayEnd: new Date("2026-04-15T00:00:00.000Z"),
+            },
+          ],
+          deleteMany: async () => {
+            deleteCalled = true;
+            return { count: 1 };
+          },
+        },
+      } as unknown as PrismaService;
 
-void main().catch((error: unknown) => {
-  console.error("Groups prisma visa test failed:", error);
-  process.exitCode = 1;
+      const { service, restore } = createPrismaService(prismaMock);
+      try {
+        const result = (await service.removeVisaHotelAgreement(
+          "GRP-PRISMA",
+          "mak-1",
+        )) as { code?: string };
+        expect(deleteCalled).toBe(true);
+        expect(result.code).toBe("GRP-PRISMA");
+      } finally {
+        restore();
+      }
+    }
+
+    {
+      const prismaMock = {
+        group: {
+          findFirst: createGroupFindFirstMock(),
+        },
+        visaHotelAgreement: {
+          findMany: async () => [
+            {
+              id: "mak-1",
+              city: AgreementCity.MAKKAH,
+              stayStart: new Date("2026-04-10T00:00:00.000Z"),
+              stayEnd: new Date("2026-04-12T00:00:00.000Z"),
+            },
+            {
+              id: "mad-1",
+              city: AgreementCity.MADINAH,
+              stayStart: new Date("2026-04-13T00:00:00.000Z"),
+              stayEnd: new Date("2026-04-15T00:00:00.000Z"),
+            },
+          ],
+          deleteMany: async () => ({ count: 0 }),
+        },
+      } as unknown as PrismaService;
+
+      const { service, restore } = createPrismaService(prismaMock);
+      try {
+        await expect(
+          () => service.removeVisaHotelAgreement("GRP-PRISMA", "mad-1"),
+        ).rejects.toThrow(NotFoundException);
+      } finally {
+        restore();
+      }
+    }
+
+    {
+      let deleteCalled = false;
+      const prismaMock = {
+        group: {
+          findFirst: createGroupFindFirstMock(),
+        },
+        visaHotelAgreement: {
+          findMany: async () => [
+            {
+              id: "mak-1",
+              city: AgreementCity.MAKKAH,
+              stayStart: new Date("2026-04-10T00:00:00.000Z"),
+              stayEnd: new Date("2026-04-12T00:00:00.000Z"),
+            },
+            {
+              id: "mad-1",
+              city: AgreementCity.MADINAH,
+              stayStart: new Date("2026-04-13T00:00:00.000Z"),
+              stayEnd: new Date("2026-04-15T00:00:00.000Z"),
+            },
+          ],
+          deleteMany: async () => {
+            deleteCalled = true;
+            return { count: 1 };
+          },
+        },
+      } as unknown as PrismaService;
+
+      const { service, restore } = createPrismaService(prismaMock);
+      try {
+        const result = (await service.removeVisaHotelAgreement(
+          "GRP-PRISMA",
+          "mad-1",
+        )) as { code?: string };
+        expect(deleteCalled).toBe(true);
+        expect(result.code).toBe("GRP-PRISMA");
+      } finally {
+        restore();
+      }
+    }
+  });
 });

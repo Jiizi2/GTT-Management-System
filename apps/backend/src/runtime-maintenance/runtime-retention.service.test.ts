@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import type { ConfigService } from "@nestjs/config";
 import { RuntimeRetentionService } from "./runtime-retention.service";
 
@@ -10,8 +11,8 @@ function createConfigService(
   } as unknown as ConfigService;
 }
 
-async function main(): Promise<void> {
-  {
+describe("RuntimeRetentionService", () => {
+  runCase("skips cleanup in memory mode", async () => {
     let deleted = false;
     const prisma = {
       groupAuditLog: {
@@ -41,10 +42,10 @@ async function main(): Promise<void> {
     );
 
     await service.runCleanupNow();
-    assert.equal(deleted, false);
-  }
+    expect(deleted).toBe(false);
+  });
 
-  {
+  runCase("deletes expired records with correct retention windows", async () => {
     const calls: Array<{ model: string; args: unknown }> = [];
     const prisma = {
       groupAuditLog: {
@@ -85,8 +86,8 @@ async function main(): Promise<void> {
 
     await service.runCleanupNow();
 
-    assert.equal(calls.length, 3);
-    assert.deepEqual(calls, [
+    expect(calls.length).toBe(3);
+    expect(calls).toEqual([
       {
         model: "groupAuditLog",
         args: {
@@ -118,7 +119,5 @@ async function main(): Promise<void> {
         },
       },
     ]);
-  }
-}
-
-void main();
+  });
+});

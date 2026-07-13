@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createInvoiceInBackend,
+  deleteInvoiceInBackend,
   fetchInvoiceBackendDataSource,
   fetchInvoiceClientsFromBackend,
   fetchInvoicesFromBackend,
@@ -51,10 +52,12 @@ export function useInvoiceDashboardQuery() {
         fetchInvoicesFromBackend({ signal }),
       ]);
 
+      const rawRows = Array.isArray(rows) ? rows : rows.data;
+
       const data = {
         dataSource,
         clients: [...clients].sort((left, right) => left.sortOrder - right.sortOrder),
-        rows: sortInvoiceRows(rows),
+        rows: sortInvoiceRows(rawRows),
       };
 
       let reason = (window as any)._queryFetchReason;
@@ -184,6 +187,41 @@ export function useUpdateInvoiceMutation() {
     },
     onError: (err, variables, context) => {
       console.log(`[${new Date().toISOString()}] PATCH error:`, err);
+      if (context?.previous) {
+        queryClient.setQueryData(invoiceQueryKeys.dashboard, context.previous);
+      }
+      void queryClient.invalidateQueries({ queryKey: invoiceQueryKeys.dashboard });
+    },
+  });
+}
+
+export function useDeleteInvoiceMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (invoiceId: string) => {
+      return deleteInvoiceInBackend(invoiceId);
+    },
+    retry: false,
+    onMutate: async (invoiceId) => {
+      await queryClient.cancelQueries({ queryKey: invoiceQueryKeys.dashboard });
+      const previous = queryClient.getQueryData<InvoiceDashboardData>(invoiceQueryKeys.dashboard);
+      return { previous };
+    },
+    onSuccess: (_, invoiceId) => {
+      queryClient.setQueryData<InvoiceDashboardData | undefined>(invoiceQueryKeys.dashboard, (current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          rows: current.rows.filter((row) => row.id !== invoiceId),
+        };
+      });
+      (window as any)._queryFetchReason = "invalidateQueries";
+      void queryClient.invalidateQueries({ queryKey: invoiceQueryKeys.dashboard });
+    },
+    onError: (err, variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(invoiceQueryKeys.dashboard, context.previous);
       }

@@ -15,6 +15,7 @@ import { PrismaService } from "./prisma/prisma.service";
 import { RuntimeMaintenanceModule } from "./runtime-maintenance/runtime-maintenance.module";
 import { AppThrottlerGuard } from "./throttling/app-throttler.guard";
 import { AppThrottlerStorage } from "./throttling/app-throttler.storage";
+import { RepositoriesModule } from "./infrastructure/repositories/repositories.module";
 
 type HttpLogRequest = {
   id?: unknown;
@@ -224,6 +225,7 @@ function resolveHttpSuccessMessage(
     GroupsModule,
     InvoicesModule,
     MasterDataModule,
+    RepositoriesModule,
   ],
   providers: [
     {

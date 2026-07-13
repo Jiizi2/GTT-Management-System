@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": false
+  },
+  "include": ["src/e2e/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,40 +1,28 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { ListMasterDataOptionsDto } from "./dto/list-master-data-options.dto";
 
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
-}
+describe("ListMasterDataOptionsDto", () => {
+  runCase("accepts boolean-like query values", () => {
+    const dto = plainToInstance(ListMasterDataOptionsDto, {
+      categoryKey: "airline",
+      includeInactive: "true",
+    });
+    const errors = validateSync(dto);
 
-function testAcceptsBooleanLikeQueryValues(): void {
-  const dto = plainToInstance(ListMasterDataOptionsDto, {
-    categoryKey: "airline",
-    includeInactive: "true",
+    expect(errors.length).toBe(0);
+    expect(dto.includeInactive).toBe(true);
   });
-  const errors = validateSync(dto);
 
-  assert.equal(errors.length, 0);
-  assert.equal(dto.includeInactive, true);
-}
+  runCase("rejects invalid boolean-like query values", () => {
+    const dto = plainToInstance(ListMasterDataOptionsDto, {
+      categoryKey: "airline",
+      includeInactive: "abc",
+    });
+    const errors = validateSync(dto);
 
-function testRejectsInvalidBooleanLikeQueryValues(): void {
-  const dto = plainToInstance(ListMasterDataOptionsDto, {
-    categoryKey: "airline",
-    includeInactive: "abc",
+    expect(errors.some((error) => error.property === "includeInactive")).toBe(true);
   });
-  const errors = validateSync(dto);
-
-  assert.equal(errors.some((error) => error.property === "includeInactive"), true);
-}
-
-async function main(): Promise<void> {
-  await runCase("master data option query accepts boolean strings", testAcceptsBooleanLikeQueryValues);
-  await runCase("master data option query rejects invalid boolean strings", testRejectsInvalidBooleanLikeQueryValues);
-}
-
-void main().catch((error: unknown) => {
-  console.error("List master data options DTO test failed:", error);
-  process.exitCode = 1;
 });

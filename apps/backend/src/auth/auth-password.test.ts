@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import {
   createLegacyScryptPasswordHashForTest,
   hashAuthPassword,
@@ -7,48 +8,33 @@ import {
   verifyAuthPasswordAsync,
 } from "./auth-password";
 
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
-}
+describe("AuthPassword", () => {
+  runCase("hashes new passwords with bcrypt", () => {
+    const hash = hashAuthPassword("Password#2026");
 
-function testHashesNewPasswordsWithBcrypt(): void {
-  const hash = hashAuthPassword("Password#2026");
+    expect(hash).toMatch(/^\$2[aby]\$\d{2}\$/);
+    expect(verifyAuthPassword("Password#2026", hash)).toBe(true);
+    expect(verifyAuthPassword("WrongPassword#2026", hash)).toBe(false);
+  });
 
-  assert.match(hash, /^\$2[aby]\$\d{2}\$/);
-  assert.equal(verifyAuthPassword("Password#2026", hash), true);
-  assert.equal(verifyAuthPassword("WrongPassword#2026", hash), false);
-}
+  runCase("verifies legacy scrypt hashes", () => {
+    const legacyHash = createLegacyScryptPasswordHashForTest("Legacy#2026");
 
-function testVerifiesLegacyScryptHashes(): void {
-  const legacyHash = createLegacyScryptPasswordHashForTest("Legacy#2026");
+    expect(verifyAuthPassword("Legacy#2026", legacyHash)).toBe(true);
+    expect(verifyAuthPassword("WrongLegacy#2026", legacyHash)).toBe(false);
+  });
 
-  assert.equal(verifyAuthPassword("Legacy#2026", legacyHash), true);
-  assert.equal(verifyAuthPassword("WrongLegacy#2026", legacyHash), false);
-}
+  runCase("rejects malformed hashes", () => {
+    expect(verifyAuthPassword("Password#2026", "")).toBe(false);
+    expect(verifyAuthPassword("Password#2026", "not-a-real-hash")).toBe(false);
+    expect(verifyAuthPassword("", hashAuthPassword("Password#2026"))).toBe(false);
+  });
 
-function testRejectsMalformedHashes(): void {
-  assert.equal(verifyAuthPassword("Password#2026", ""), false);
-  assert.equal(verifyAuthPassword("Password#2026", "not-a-real-hash"), false);
-  assert.equal(verifyAuthPassword("", hashAuthPassword("Password#2026")), false);
-}
+  runCase("supports async bcrypt helpers", async () => {
+    const hash = await hashAuthPasswordAsync("AsyncPassword#2026");
 
-async function testAsyncBcryptHelpers(): Promise<void> {
-  const hash = await hashAuthPasswordAsync("AsyncPassword#2026");
-
-  assert.match(hash, /^\$2[aby]\$\d{2}\$/);
-  assert.equal(await verifyAuthPasswordAsync("AsyncPassword#2026", hash), true);
-  assert.equal(await verifyAuthPasswordAsync("WrongAsyncPassword#2026", hash), false);
-}
-
-async function main(): Promise<void> {
-  await runCase("auth password hashes new passwords with bcrypt", testHashesNewPasswordsWithBcrypt);
-  await runCase("auth password verifies legacy scrypt hashes", testVerifiesLegacyScryptHashes);
-  await runCase("auth password rejects malformed hashes", testRejectsMalformedHashes);
-  await runCase("auth password supports async bcrypt helpers", testAsyncBcryptHelpers);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Auth password test failed:", error);
-  process.exitCode = 1;
+    expect(hash).toMatch(/^\$2[aby]\$\d{2}\$/);
+    expect(await verifyAuthPasswordAsync("AsyncPassword#2026", hash)).toBe(true);
+    expect(await verifyAuthPasswordAsync("WrongAsyncPassword#2026", hash)).toBe(false);
+  });
 });

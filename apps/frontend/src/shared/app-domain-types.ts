@@ -254,7 +254,7 @@ export type ChecklistDriverAssignment = {
   drivers: ChecklistDriverProfile[];
 };
 
-export type VisaFilterId = "all" | "not-issued" | "missing-hotel" | "unpaid";
+export type VisaFilterId = "all" | "not-issued" | "missing-hotel" | "unpaid" | "visa-only" | "visa-plus";
 
 export type VisaStatus = "Issued" | "Draft" | "Pending";
 

@@ -65,21 +65,6 @@ function collectGroupAgreementHotels(group: GroupData): GroupAgreementHotel[] {
   return [...getGroupAgreementHotelsByCity(group, "makkah"), ...getGroupAgreementHotelsByCity(group, "madinah")];
 }
 
-function resolveAgreementDateBounds(group: GroupData): {
-  earliestAgreementIsoDate: string | null;
-  latestAgreementIsoDate: string | null;
-} {
-  const dates = collectGroupAgreementHotels(group)
-    .flatMap((hotel) => [hotel.stayStartIso, hotel.stayEndIso])
-    .map((value) => value.trim())
-    .filter(isIsoDateValue)
-    .sort();
-
-  return {
-    earliestAgreementIsoDate: dates[0] ?? null,
-    latestAgreementIsoDate: dates.at(-1) ?? null,
-  };
-}
 
 export function getStayPeriods(hotels: GroupAgreementHotel[]): Array<{ startIso: string; endIso: string }> {
   const parsed = hotels
@@ -211,7 +196,6 @@ export function resolveGroupCompleteness(
   const hasAnyAgreement = hasMakkahAgreement || hasMadinahAgreement;
   const hasItinerary = group.itinerary.length > 0;
   const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary, dependencies);
-  const { earliestAgreementIsoDate, latestAgreementIsoDate } = resolveAgreementDateBounds(group);
 
   if (!hasIdentity) {
     issues.push({

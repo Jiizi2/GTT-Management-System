@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import { BadRequestException } from "@nestjs/common";
 import { ApiExceptionFilter } from "./api-exception.filter";
 
@@ -29,10 +30,9 @@ function createHost(response: MockResponse, requestOverrides?: Record<string, un
   };
 }
 
-async function main(): Promise<void> {
-  const filter = new ApiExceptionFilter();
-
-  {
+describe("ApiExceptionFilter", () => {
+  runCase("handles bad request exception with categoryKey", () => {
+    const filter = new ApiExceptionFilter();
     const response: MockResponse = {};
     filter.catch(
       new BadRequestException({
@@ -44,8 +44,8 @@ async function main(): Promise<void> {
       createHost(response) as never,
     );
 
-    assert.equal(response.statusCode, 400);
-    assert.deepEqual(response.body, {
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toEqual({
       ok: false,
       statusCode: 400,
       error: "Bad Request",
@@ -55,15 +55,16 @@ async function main(): Promise<void> {
       requestId: "req-test-123",
       categoryKey: "group",
     });
-    assert.match(String((response.body as { timestamp: string }).timestamp), /^\d{4}-\d{2}-\d{2}T/);
-  }
+    expect(String((response.body as { timestamp: string }).timestamp)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
 
-  {
+  runCase("handles generic error as 500", () => {
+    const filter = new ApiExceptionFilter();
     const response: MockResponse = {};
     filter.catch(new Error("Boom"), createHost(response, { originalUrl: "/api/boom" }) as never);
 
-    assert.equal(response.statusCode, 500);
-    assert.deepEqual(response.body, {
+    expect(response.statusCode).toBe(500);
+    expect(response.body).toEqual({
       ok: false,
       statusCode: 500,
       error: "Internal Server Error",
@@ -72,8 +73,6 @@ async function main(): Promise<void> {
       timestamp: (response.body as { timestamp: string }).timestamp,
       requestId: "req-test-123",
     });
-    assert.match(String((response.body as { timestamp: string }).timestamp), /^\d{4}-\d{2}-\d{2}T/);
-  }
-}
-
-void main();
+    expect(String((response.body as { timestamp: string }).timestamp)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});

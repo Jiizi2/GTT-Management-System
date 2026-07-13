@@ -136,14 +136,72 @@ npm run dev:backend
 
 ### Testing
 
+Semua test menggunakan **Vitest** dengan auto-discovery. Tidak perlu rebuild TypeScript untuk menjalankan test.
+
 | Script | Keterangan |
 |---|---|
 | `npm run test` | Unit test semua workspace |
+| `npm run test:unit` | Unit test semua workspace (alias) |
 | `npm run test:smoke` | Smoke test frontend |
 | `npm run test:api` | Backend API e2e (mode memory) |
 | `npm run test:integration` | Integration test backend (butuh PostgreSQL) |
 | `npm run test:e2e:frontend` | Playwright e2e frontend + backend build |
 | `npm run test:unit:coverage` | Unit test dengan coverage report |
+| `npm run test:unit:coverage:check` | Unit test dengan coverage threshold enforcement |
+
+#### Coverage Thresholds
+
+- **Backend**: 60% lines, 68% functions, 62% branches
+- **Frontend**: 35% lines, 35% functions, 30% branches
+
+#### Test Structure
+
+**Backend** (`apps/backend/`):
+- Unit tests: `src/**/*.test.ts` (co-located dengan source)
+- Shared utilities: `src/test/` (runCase, withEnv, withDataSource, dll)
+- Integration tests: `src/e2e/*.test.ts` (exclude dari unit test)
+
+**Frontend** (`apps/frontend/`):
+- Unit tests: `src/unit/**/*.test.ts`
+- Smoke tests: `src/smoke/**/*.test.ts`
+- E2E tests: `e2e/**/*.spec.ts` (Playwright)
+- Shared utilities: `src/test/` (runCase, withMockFetch, withMockWindow, dll)
+
+#### Writing Tests
+
+```typescript
+// Backend example
+import { describe, expect } from 'vitest';
+import { runCase } from '../test/run-case';
+import { withEnv } from '../test/with-env';
+
+describe('MyService', () => {
+  runCase('should do something', async () => {
+    await withEnv({ DATA_SOURCE: 'memory' }, async () => {
+      const result = await myService.doSomething();
+      expect(result).toBe(expected);
+    });
+  });
+});
+
+// Frontend example
+import { describe, expect } from 'vitest';
+import { runCase } from '../test/run-case';
+import { withMockFetch } from '../test/with-mock-fetch';
+
+describe('useMyHook', () => {
+  runCase('should fetch data', async () => {
+    await withMockFetch(
+      async () => new Response(JSON.stringify({ data: 'test' })),
+      async (calls) => {
+        const result = await fetchData();
+        expect(result.data).toBe('test');
+        expect(calls.length).toBe(1);
+      }
+    );
+  });
+});
+```
 
 ### QA
 
@@ -289,13 +347,18 @@ GTT-Management-System/
 │   ├── deployment-vps-docker.md
 │   ├── docker-command-cheatsheet.md
 │   ├── qa.md
-│   └── release-flow.md
+│   ├── operations-runbook.md
+│   ├── roadmap/                     # Cetak biru & rencana pengembangan jangka panjang
+│   │   ├── evolusi-arsitektur-domain-group.md
+│   │   ├── evolusi-entitas-bisnis-agent.md
+│   │   └── evolusi-modul-finance.md
+│   └── archive/                     # Arsip rencana/audit historis yang sudah selesai
 │
 ├── docker-compose.yml               # Dev PostgreSQL lokal (port 6543)
 ├── docker-compose.prod.yml          # Stack production (web + backend + postgres)
 ├── package.json                     # Root workspace + script shortcut
 ├── tsconfig.base.json               # Shared TypeScript config
-└── CONTRIBUTING.md                  # Branch & PR flow
+└── CONTRIBUTING.md                  # Branch, PR & local QA flow
 ```
 
 ---
@@ -332,5 +395,11 @@ git config core.hooksPath .githooks
 | [Deploy VPS + Docker](docs/deployment-vps-docker.md) | Panduan deploy bertahap ke VPS |
 | [Docker Cheat Sheet](docs/docker-command-cheatsheet.md) | Command Docker yang sering dipakai |
 | [QA Workflow](docs/qa.md) | Jalur QA cepat dan penuh |
-| [Release Flow](docs/release-flow.md) | Branch strategy dan manual verification |
-| [Contributing](CONTRIBUTING.md) | Branch & PR flow, push guard |
+| [Invoice Runbook](docs/operations-runbook.md) | Runbook operasional & recovery modul Invoice |
+| [Contributing](CONTRIBUTING.md) | Branch, PR flow, dan instruksi manual QA |
+| **Roadmaps (Cetak Biru)** | |
+| [Evolusi Arsitektur Domain Group](docs/roadmap/evolusi-arsitektur-domain-group.md) | Rencana memecah Fat Aggregate `Group` |
+| [Evolusi Entitas Agent](docs/roadmap/evolusi-entitas-bisnis-agent.md) | Portal Agent & operasional B2B |
+| [Evolusi Modul Finance](docs/roadmap/evolusi-modul-finance.md) | Rencana modul keuangan terintegrasi |
+| **Arsip Historis** | |
+| [Folder Arsip](docs/archive/) | Kumpulan rencana refaktor lama dan laporan audit masa lalu |

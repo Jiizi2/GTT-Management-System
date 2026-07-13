@@ -3,6 +3,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import express from "express";
 import helmet from "helmet";
 import { Logger, PinoLogger } from "nestjs-pino";
 import { AUTH_COOKIE_NAME } from "./auth/auth-cookie";
@@ -90,6 +91,18 @@ async function bootstrap(): Promise<void> {
   });
 
   app.setGlobalPrefix("api");
+  app.use(
+    express.json({
+      limit: "1mb",
+      strict: true,
+    }),
+  );
+  app.use(
+    express.urlencoded({
+      extended: true,
+      limit: "1mb",
+    }),
+  );
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

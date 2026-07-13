@@ -163,6 +163,9 @@ model Group {
 
   @@index([createdAt])
   @@index([lifecycleStatus])
+  @@index([searchDocument, lifecycleStatus])
+  @@index([parentGroupId])
+  @@index([searchDocument(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model GroupAuditLog {
@@ -192,6 +195,7 @@ model InvoiceClient {
 
   @@index([sortOrder])
   @@index([name])
+  @@index([groupId])
 }
 
 model Invoice {
@@ -205,18 +209,20 @@ model Invoice {
   downPaymentIdr Decimal       @default(0) @db.Decimal(12, 2)
   status         InvoiceStatus @default(PENDING)
   notes          String?
-  items          Json?
+  description    String?
   recipientName  String?
   version        Int           @default(0)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   client         InvoiceClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
   group          Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  items          Json?
   itemsRel       InvoiceItem[]
 
   @@index([dueDate])
   @@index([clientId, dueDate])
   @@index([groupId])
+  @@index([status, dueDate(sort: Desc)])
 }
 
 model InvoiceItem {
@@ -232,7 +238,7 @@ model InvoiceItem {
   updatedAt      DateTime @updatedAt
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  @@index([invoiceId])
+  @@index([invoiceId, description])
 }
 
 model Musyrif {
@@ -270,7 +276,6 @@ model GroupTimelineItem {
   updatedAt    DateTime @updatedAt
   group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  @@index([groupId, sortOrder])
   @@unique([groupId, sortOrder])
 }
 
@@ -305,8 +310,8 @@ model ItineraryItem {
   group                 Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   checklistAssignments  ChecklistAssignment[]
 
-  @@index([groupId, sortOrder])
   @@unique([groupId, sortOrder])
+  @@index([isoDate])
 }
 
 model GroupNote {
@@ -409,6 +414,7 @@ model ChecklistAssignment {
   drivers            ChecklistDriver[]
 
   @@index([groupId, tripDate])
+  @@index([itineraryItemId])
 }
 
 model ChecklistDriver {
@@ -424,5 +430,4 @@ model ChecklistDriver {
   checklistAssignment   ChecklistAssignment  @relation(fields: [checklistAssignmentId], references: [id], onDelete: Cascade)
 
   @@unique([checklistAssignmentId, slotNumber])
-  @@index([checklistAssignmentId])
 }

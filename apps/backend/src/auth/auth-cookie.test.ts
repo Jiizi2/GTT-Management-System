@@ -1,4 +1,5 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "../test/run-case";
 import type { ConfigService } from "@nestjs/config";
 import {
   AUTH_COOKIE_NAME,
@@ -14,140 +15,109 @@ function createConfigServiceMock(values: Record<string, unknown>): ConfigService
   } as unknown as ConfigService;
 }
 
-async function runCase(name: string, fn: () => void): Promise<void> {
-  fn();
-  console.log(`PASS ${name}`);
-}
+describe("AuthCookie", () => {
+  runCase("serializes production cookie with secure domain and expiry", () => {
+    const runtimeConfig = resolveAuthCookieRuntimeConfig(
+      createConfigServiceMock({
+        NODE_ENV: "production",
+        AUTH_COOKIE_DOMAIN: ".example.com",
+      }),
+    );
 
-function testSerializesProductionCookieWithSecureDomainAndExpiry(): void {
-  const runtimeConfig = resolveAuthCookieRuntimeConfig(
-    createConfigServiceMock({
-      NODE_ENV: "production",
-      AUTH_COOKIE_DOMAIN: ".example.com",
-    }),
-  );
+    const serialized = serializeAuthCookie(
+      {
+        accessToken: "header.payload.signature",
+        rememberSession: true,
+        maxAgeSeconds: 120,
+      },
+      runtimeConfig,
+    );
 
-  const serialized = serializeAuthCookie(
-    {
-      accessToken: "header.payload.signature",
-      rememberSession: true,
-      maxAgeSeconds: 120,
-    },
-    runtimeConfig,
-  );
+    expect(serialized).toMatch(new RegExp(`^${AUTH_COOKIE_NAME}=header\\.payload\\.signature`));
+    expect(serialized).toMatch(/HttpOnly/);
+    expect(serialized).toMatch(/SameSite=Lax/);
+    expect(serialized).toMatch(/Priority=High/);
+    expect(serialized).toMatch(/Secure/);
+    expect(serialized).toMatch(/Domain=\.example\.com/);
+    expect(serialized).toMatch(/Max-Age=120/);
+    expect(serialized).toMatch(/Expires=/);
+  });
 
-  assert.match(serialized, new RegExp(`^${AUTH_COOKIE_NAME}=header\\.payload\\.signature`));
-  assert.match(serialized, /HttpOnly/);
-  assert.match(serialized, /SameSite=Lax/);
-  assert.match(serialized, /Priority=High/);
-  assert.match(serialized, /Secure/);
-  assert.match(serialized, /Domain=\.example\.com/);
-  assert.match(serialized, /Max-Age=120/);
-  assert.match(serialized, /Expires=/);
-}
+  runCase("serializes session cookie without domain or persistent expiry", () => {
+    const runtimeConfig = resolveAuthCookieRuntimeConfig(
+      createConfigServiceMock({
+        NODE_ENV: "development",
+      }),
+    );
 
-function testSerializesSessionCookieWithoutDomainOrPersistentExpiry(): void {
-  const runtimeConfig = resolveAuthCookieRuntimeConfig(
-    createConfigServiceMock({
-      NODE_ENV: "development",
-    }),
-  );
+    const serialized = serializeAuthCookie(
+      {
+        accessToken: "local-token",
+        rememberSession: false,
+        maxAgeSeconds: 600,
+      },
+      runtimeConfig,
+    );
 
-  const serialized = serializeAuthCookie(
-    {
-      accessToken: "local-token",
-      rememberSession: false,
-      maxAgeSeconds: 600,
-    },
-    runtimeConfig,
-  );
+    expect(serialized).not.toMatch(/Secure/);
+    expect(serialized).not.toMatch(/Domain=/);
+    expect(serialized).not.toMatch(/Max-Age=/);
+    expect(serialized).not.toMatch(/Expires=/);
+  });
 
-  assert.doesNotMatch(serialized, /Secure/);
-  assert.doesNotMatch(serialized, /Domain=/);
-  assert.doesNotMatch(serialized, /Max-Age=/);
-  assert.doesNotMatch(serialized, /Expires=/);
-}
+  runCase("allows disabling secure flag in production", () => {
+    const runtimeConfig = resolveAuthCookieRuntimeConfig(
+      createConfigServiceMock({
+        NODE_ENV: "production",
+        AUTH_COOKIE_SECURE: false,
+      }),
+    );
 
-function testAllowsDisablingSecureFlagInProduction(): void {
-  const runtimeConfig = resolveAuthCookieRuntimeConfig(
-    createConfigServiceMock({
-      NODE_ENV: "production",
-      AUTH_COOKIE_SECURE: false,
-    }),
-  );
+    const serialized = serializeAuthCookie(
+      {
+        accessToken: "prod-http-token",
+        rememberSession: false,
+        maxAgeSeconds: 600,
+      },
+      runtimeConfig,
+    );
 
-  const serialized = serializeAuthCookie(
-    {
-      accessToken: "prod-http-token",
-      rememberSession: false,
-      maxAgeSeconds: 600,
-    },
-    runtimeConfig,
-  );
+    expect(serialized).not.toMatch(/Secure/);
+  });
 
-  assert.doesNotMatch(serialized, /Secure/);
-}
+  runCase("serializes expired cookie with configured domain", () => {
+    const runtimeConfig = resolveAuthCookieRuntimeConfig(
+      createConfigServiceMock({
+        NODE_ENV: "production",
+        AUTH_COOKIE_DOMAIN: ".example.com",
+      }),
+    );
 
-function testSerializesExpiredCookieWithConfiguredDomain(): void {
-  const runtimeConfig = resolveAuthCookieRuntimeConfig(
-    createConfigServiceMock({
-      NODE_ENV: "production",
-      AUTH_COOKIE_DOMAIN: ".example.com",
-    }),
-  );
+    const serialized = serializeExpiredAuthCookie(runtimeConfig);
 
-  const serialized = serializeExpiredAuthCookie(runtimeConfig);
+    expect(serialized).toMatch(new RegExp(`^${AUTH_COOKIE_NAME}=`));
+    expect(serialized).toMatch(/Max-Age=0/);
+    expect(serialized).toMatch(/Expires=Thu, 01 Jan 1970 00:00:00 GMT/);
+    expect(serialized).toMatch(/Domain=\.example\.com/);
+    expect(serialized).toMatch(/Secure/);
+  });
 
-  assert.match(serialized, new RegExp(`^${AUTH_COOKIE_NAME}=`));
-  assert.match(serialized, /Max-Age=0/);
-  assert.match(serialized, /Expires=Thu, 01 Jan 1970 00:00:00 GMT/);
-  assert.match(serialized, /Domain=\.example\.com/);
-  assert.match(serialized, /Secure/);
-}
-
-function testRejectsInvalidCookieDomain(): void {
-  assert.throws(
-    () =>
+  runCase("rejects invalid cookie domain", () => {
+    expect(() =>
       resolveAuthCookieRuntimeConfig(
         createConfigServiceMock({
           NODE_ENV: "production",
           AUTH_COOKIE_DOMAIN: "https://example.com",
         }),
       ),
-    /Invalid AUTH_COOKIE_DOMAIN value/i,
-  );
-}
-
-function testExtractsCookieTokenFromHeader(): void {
-  const token = extractAuthCookieToken({
-    cookie: `other=value; ${AUTH_COOKIE_NAME}=encoded%20token; final=1`,
+    ).toThrow(/Invalid AUTH_COOKIE_DOMAIN value/i);
   });
 
-  assert.equal(token, "encoded token");
-}
+  runCase("extracts cookie token from header", () => {
+    const token = extractAuthCookieToken({
+      cookie: `other=value; ${AUTH_COOKIE_NAME}=encoded%20token; final=1`,
+    });
 
-async function main(): Promise<void> {
-  await runCase(
-    "auth cookie serializes production cookie with secure domain and expiry",
-    testSerializesProductionCookieWithSecureDomainAndExpiry,
-  );
-  await runCase(
-    "auth cookie serializes session cookie without domain or persistent expiry",
-    testSerializesSessionCookieWithoutDomainOrPersistentExpiry,
-  );
-  await runCase(
-    "auth cookie allows disabling secure flag in production",
-    testAllowsDisablingSecureFlagInProduction,
-  );
-  await runCase(
-    "auth cookie serializes expired cookie with configured domain",
-    testSerializesExpiredCookieWithConfiguredDomain,
-  );
-  await runCase("auth cookie rejects invalid cookie domain", testRejectsInvalidCookieDomain);
-  await runCase("auth cookie extracts cookie token from header", testExtractsCookieTokenFromHeader);
-}
-
-void main().catch((error: unknown) => {
-  console.error("Auth cookie test failed:", error);
-  process.exitCode = 1;
+    expect(token).toBe("encoded token");
+  });
 });

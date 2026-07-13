@@ -17,7 +17,9 @@ export function resolveConfiguredString(
   configService: ConfigService | undefined,
   key: string,
 ): string | undefined {
-  const configured = normalizeStringValue(configService?.get<unknown>(key));
+  const configured = (configService && typeof configService.get === "function")
+    ? normalizeStringValue(configService.get<unknown>(key))
+    : undefined;
   if (configured !== undefined) {
     return configured;
   }
@@ -30,7 +32,9 @@ export function resolveConfiguredNumber(
   key: string,
   fallbackValue: number,
 ): number {
-  const configured = configService?.get<unknown>(key);
+  const configured = (configService && typeof configService.get === "function")
+    ? configService.get<unknown>(key)
+    : undefined;
   if (typeof configured === "number" && Number.isFinite(configured)) {
     return configured;
   }
@@ -48,7 +52,9 @@ export function resolveConfiguredBoolean(
   configService: ConfigService | undefined,
   key: string,
 ): boolean | undefined {
-  const configured = configService?.get<unknown>(key);
+  const configured = (configService && typeof configService.get === "function")
+    ? configService.get<unknown>(key)
+    : undefined;
   if (typeof configured === "boolean") {
     return configured;
   }

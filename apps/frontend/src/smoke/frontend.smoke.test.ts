@@ -22,13 +22,13 @@ import {
   buildTimelineAndNextActivity,
   calculateItineraryDurationDays,
   resolveEffectiveGroupIdentityState,
-} from "../pages/add-group-workspace-helpers.js";
+} from "../pages/add-group-workspace/helpers/add-group-workspace-helpers.js";
 import {
   buildAgreementItineraryPrefill,
   buildNewGroupPayload,
   getAgreementSaveValidationError,
   validateConnectedAgreementDates,
-} from "../pages/new-group-screen-helpers.js";
+} from "../pages/new-group/helpers/new-group-screen-helpers.js";
 import { runCase } from "../test/run-case.js";
 
 function assertEqual<T>(actual: T, expected: T, message?: string): void {

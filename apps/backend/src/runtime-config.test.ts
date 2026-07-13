@@ -1,122 +1,93 @@
-import assert from "node:assert/strict";
+import { describe, expect } from "vitest";
+import { runCase } from "./test/run-case";
 import { resolveRuntimeConfig, resolveStartupErrorMessage } from "./runtime-config";
 
-async function runCase(name: string, fn: () => void | Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
+describe("RuntimeConfig", () => {
+  runCase("defaults", () => {
+    const config = resolveRuntimeConfig({
+      PORT: undefined,
+      DATA_SOURCE: undefined,
+      DATABASE_URL: undefined,
+      NODE_ENV: undefined,
+    });
 
-function testDefaultRuntimeConfig(): void {
-  const config = resolveRuntimeConfig({
-    PORT: undefined,
-    DATA_SOURCE: undefined,
-    DATABASE_URL: undefined,
-    NODE_ENV: undefined,
+    expect(config.port).toBe(3001);
+    expect(config.dataSource).toBe("memory");
   });
 
-  assert.equal(config.port, 3001);
-  assert.equal(config.dataSource, "memory");
-}
+  runCase("valid prisma", () => {
+    const config = resolveRuntimeConfig({
+      PORT: "3100",
+      DATA_SOURCE: "PRISMA",
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:6543/gtt_ops?schema=public",
+      NODE_ENV: "development",
+    });
 
-function testValidPrismaRuntimeConfig(): void {
-  const config = resolveRuntimeConfig({
-    PORT: "3100",
-    DATA_SOURCE: "PRISMA",
-    DATABASE_URL: "postgresql://postgres:postgres@localhost:6543/gtt_ops?schema=public",
-    NODE_ENV: "development",
+    expect(config.port).toBe(3100);
+    expect(config.dataSource).toBe("prisma");
   });
 
-  assert.equal(config.port, 3100);
-  assert.equal(config.dataSource, "prisma");
-}
-
-function testInvalidPortValidation(): void {
-  assert.throws(
-    () =>
+  runCase("invalid port", () => {
+    expect(() =>
       resolveRuntimeConfig({
         PORT: "abc",
         DATA_SOURCE: "memory",
         DATABASE_URL: undefined,
         NODE_ENV: undefined,
       }),
-    /Invalid PORT value/,
-  );
+    ).toThrow(/Invalid PORT value/);
 
-  assert.throws(
-    () =>
+    expect(() =>
       resolveRuntimeConfig({
         PORT: "0",
         DATA_SOURCE: "memory",
         DATABASE_URL: undefined,
         NODE_ENV: undefined,
       }),
-    /Invalid PORT value/,
-  );
-}
+    ).toThrow(/Invalid PORT value/);
+  });
 
-function testInvalidDataSourceValidation(): void {
-  assert.throws(
-    () =>
+  runCase("invalid datasource", () => {
+    expect(() =>
       resolveRuntimeConfig({
         PORT: "3001",
         DATA_SOURCE: "sqlite",
         DATABASE_URL: undefined,
         NODE_ENV: undefined,
       }),
-    /Invalid DATA_SOURCE value/,
-  );
-}
+    ).toThrow(/Invalid DATA_SOURCE value/);
+  });
 
-function testMissingDatabaseUrlForPrismaValidation(): void {
-  assert.throws(
-    () =>
+  runCase("missing prisma url", () => {
+    expect(() =>
       resolveRuntimeConfig({
         PORT: "3001",
         DATA_SOURCE: "prisma",
         DATABASE_URL: "   ",
         NODE_ENV: undefined,
       }),
-    /DATABASE_URL is required when DATA_SOURCE=prisma/,
-  );
-}
+    ).toThrow(/DATABASE_URL is required when DATA_SOURCE=prisma/);
+  });
 
-function testProductionRequiresPrismaDataSource(): void {
-  assert.throws(
-    () =>
+  runCase("production requires prisma", () => {
+    expect(() =>
       resolveRuntimeConfig({
         PORT: "3001",
         DATA_SOURCE: "memory",
         DATABASE_URL: "postgresql://postgres:postgres@localhost:6543/gtt_ops?schema=public",
         NODE_ENV: "production",
       }),
-    /DATA_SOURCE must be prisma in production/,
-  );
-}
+    ).toThrow(/DATA_SOURCE must be prisma in production/);
+  });
 
-function testResolveStartupErrorMessage(): void {
-  assert.equal(
-    resolveStartupErrorMessage(new Error("Runtime exploded")),
-    "Runtime exploded",
-  );
-  assert.equal(resolveStartupErrorMessage("  plain error  "), "plain error");
-  assert.equal(
-    resolveStartupErrorMessage({ message: "  object error message " }),
-    "object error message",
-  );
-  assert.equal(resolveStartupErrorMessage({ detail: "not-message" }), "Unknown startup error.");
-}
-
-async function main(): Promise<void> {
-  await runCase("runtime config defaults", testDefaultRuntimeConfig);
-  await runCase("runtime config valid prisma", testValidPrismaRuntimeConfig);
-  await runCase("runtime config invalid port", testInvalidPortValidation);
-  await runCase("runtime config invalid datasource", testInvalidDataSourceValidation);
-  await runCase("runtime config missing prisma url", testMissingDatabaseUrlForPrismaValidation);
-  await runCase("runtime config production requires prisma", testProductionRequiresPrismaDataSource);
-  await runCase("runtime config startup error message", testResolveStartupErrorMessage);
-}
-
-main().catch((error: unknown) => {
-  console.error("Runtime config test failed:", error);
-  throw error;
+  runCase("startup error message", () => {
+    expect(
+      resolveStartupErrorMessage(new Error("Runtime exploded")),
+    ).toBe("Runtime exploded");
+    expect(resolveStartupErrorMessage("  plain error  ")).toBe("plain error");
+    expect(
+      resolveStartupErrorMessage({ message: "  object error message " }),
+    ).toBe("object error message");
+    expect(resolveStartupErrorMessage({ detail: "not-message" })).toBe("Unknown startup error.");
+  });
 });

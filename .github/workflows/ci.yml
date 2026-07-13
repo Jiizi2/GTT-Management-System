@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run check
+
+      - name: Run backend unit tests
+        run: npm run test:unit --workspace backend
+        env:
+          DATA_SOURCE: memory
+          NODE_ENV: test
+
+      - name: Run frontend unit tests
+        run: npm run test:unit --workspace frontend
+
+      - name: Run frontend smoke tests
+        run: npm run test:smoke --workspace frontend
+
+      - name: Build backend
+        run: npm run build --workspace backend
+
+      - name: Build frontend
+        run: npm run build --workspace frontend
+
+      - name: Run E2E tests
+        run: npm run test:e2e:frontend
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run coverage
+        run: npm run test:unit:coverage
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/unit/backend
+            coverage/unit/frontend
+          retention-days: 30
+
+      - name: Check coverage thresholds
+        run: npm run test:unit:coverage:check

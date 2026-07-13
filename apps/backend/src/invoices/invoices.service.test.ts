@@ -1,16 +1,42 @@
-import assert from "node:assert/strict";
+import { Test } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import { PrismaInvoiceRepository } from "../infrastructure/repositories/prisma/prisma-invoice.repository";
+import { MemoryInvoiceRepository } from "../infrastructure/repositories/memory/memory-invoice.repository";
+import { describe, expect, it } from "vitest";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { InvoiceStatus, Prisma } from "@prisma/client";
 import type { PrismaService } from "../prisma/prisma.service";
 import { InvoicesService } from "./invoices.service";
+import { InvoiceValidator } from "./domain/invoice-validator";
+import { InvoiceNumberGenerator } from "./domain/invoice-number-generator";
+import { InvoiceMemoryStore } from "./application/invoice-memory-store";
+import { InvoiceQueryService } from "./application/invoice-query.service";
+import { InvoiceCommandService } from "./application/invoice-command.service";
 
 type InvoiceListItem = Awaited<ReturnType<InvoicesService["findAll"]>>[number];
 type InvoiceClient = Awaited<ReturnType<InvoicesService["listClients"]>>[number];
 
-function createMemoryInvoicesService(): { service: InvoicesService; restore: () => void } {
+async function createMemoryInvoicesService(): Promise<{ service: InvoicesService; restore: () => void }> {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
-  const service = new InvoicesService({} as PrismaService);
+  
+  const memoryStore = new InvoiceMemoryStore();
+  const repo = new MemoryInvoiceRepository(memoryStore);
+
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      InvoicesService,
+      InvoiceQueryService,
+      InvoiceCommandService,
+      ConfigService,
+      {
+        provide: "InvoiceRepository",
+        useValue: repo,
+      },
+    ],
+  }).compile();
+
+  const service = moduleRef.get(InvoicesService);
 
   return {
     service,
@@ -24,10 +50,26 @@ function createMemoryInvoicesService(): { service: InvoicesService; restore: () 
   };
 }
 
-function createPrismaInvoicesService(prismaMock: PrismaService): { service: InvoicesService; restore: () => void } {
+async function createPrismaInvoicesService(prismaMock: PrismaService): Promise<{ service: InvoicesService; restore: () => void }> {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "prisma";
-  const service = new InvoicesService(prismaMock);
+  
+  const repo = new PrismaInvoiceRepository(prismaMock);
+
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      InvoicesService,
+      InvoiceQueryService,
+      InvoiceCommandService,
+      ConfigService,
+      {
+        provide: "InvoiceRepository",
+        useValue: repo,
+      },
+    ],
+  }).compile();
+
+  const service = moduleRef.get(InvoicesService);
 
   return {
     service,
@@ -101,45 +143,40 @@ function withPrismaTransactionMocks<T extends Record<string, any>>(
   };
 }
 
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
-}
-
 function findClientByName(clients: InvoiceClient[], name: string): InvoiceClient {
   const matched = clients.find((entry) => entry.name === name);
-  assert.ok(matched, `Expected client '${name}' to exist.`);
+  if (!matched) {
+    throw new Error(`Expected client '${name}' to exist.`);
+  }
   return matched;
 }
 
 function assertInvoiceNumberPattern(invoiceNumber: string, year: string, serial: string): void {
-  assert.equal(invoiceNumber, `GTT/INV/${year}/${serial}`);
+  expect(invoiceNumber).toBe(`GTT/INV/${year}/${serial}`);
 }
 
 async function testListClientsReturnsSeededSortedLabels(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const clients = await service.listClients();
-    assert.equal(clients.length, 3);
-    assert.deepEqual(
+    expect(clients.length).toBe(3);
+    expect(
       clients.map((entry) => entry.name),
-      ["Yassir", "Haris", "JSA"],
-    );
-    assert.deepEqual(
+    ).toEqual(["Yassir", "Haris", "JSA"]);
+    expect(
       clients.map((entry) => entry.label),
-      ["01. Yassir", "02. Haris", "03. JSA"],
-    );
+    ).toEqual(["01. Yassir", "02. Haris", "03. JSA"]);
 
     const yassir = findClientByName(clients, "Yassir");
-    assert.equal(yassir.groupCode, "9017000001");
-    assert.equal(yassir.groupName, "Dummy Trip Lengkap");
+    expect(yassir.groupCode).toBe("9017000001");
+    expect(yassir.groupName).toBe("Dummy Trip Lengkap");
   } finally {
     restore();
   }
 }
 
 async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const clients = await service.listClients();
     const yassir = findClientByName(clients, "Yassir");
@@ -151,13 +188,13 @@ async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Prom
       amount: 1_500_000.4,
     });
     assertInvoiceNumberPattern(createdOne.invoiceNumber, "2099", "0001");
-    assert.equal(createdOne.clientName, "Yassir");
-    assert.equal(createdOne.clientInitials, "Y");
-    assert.equal(createdOne.status, "Pending");
-    assert.equal(createdOne.amount, 1_500_000);
-    assert.equal(createdOne.downPaymentIdr, 0);
-    assert.equal(createdOne.groupCode, "9017000001");
-    assert.equal(createdOne.monthKey, "2099-02");
+    expect(createdOne.clientName).toBe("Yassir");
+    expect(createdOne.clientInitials).toBe("Y");
+    expect(createdOne.status).toBe("Pending");
+    expect(createdOne.amount).toBe(1_500_000);
+    expect(createdOne.downPaymentIdr).toBe(0);
+    expect(createdOne.groupCode).toBe("9017000001");
+    expect(createdOne.monthKey).toBe("2099-02");
 
     const createdTwo = await service.create({
       clientId: yassir.id,
@@ -168,16 +205,16 @@ async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Prom
     assertInvoiceNumberPattern(createdTwo.invoiceNumber, "2099", "0002");
 
     const listed = await service.findAll();
-    assert.equal(listed.length, 2);
-    assert.equal(listed[0].invoiceNumber, "GTT/INV/2099/0002");
-    assert.equal(listed[1].invoiceNumber, "GTT/INV/2099/0001");
+    expect(listed.length).toBe(2);
+    expect(listed[0].invoiceNumber).toBe("GTT/INV/2099/0002");
+    expect(listed[1].invoiceNumber).toBe("GTT/INV/2099/0001");
   } finally {
     restore();
   }
 }
 
 async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const createdOverdue = await service.create({
       clientName: "Manual New Client",
@@ -185,9 +222,9 @@ async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<voi
       dueDate: "2000-01-01",
       amount: 123_450,
     });
-    assert.equal(createdOverdue.clientName, "Manual New Client");
-    assert.equal(createdOverdue.clientLabel, "04. Manual New Client");
-    assert.equal(createdOverdue.status, "Overdue");
+    expect(createdOverdue.clientName).toBe("Manual New Client");
+    expect(createdOverdue.clientLabel).toBe("04. Manual New Client");
+    expect(createdOverdue.status).toBe("Overdue");
 
     const createdCancelled = await service.create({
       clientName: "Another Manual Client",
@@ -196,21 +233,21 @@ async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<voi
       amount: 999_999,
       status: InvoiceStatus.CANCELLED,
     });
-    assert.equal(createdCancelled.clientLabel, "05. Another Manual Client");
-    assert.equal(createdCancelled.status, "Cancelled");
-    assert.equal(createdCancelled.amount, 999_999);
+    expect(createdCancelled.clientLabel).toBe("05. Another Manual Client");
+    expect(createdCancelled.status).toBe("Cancelled");
+    expect(createdCancelled.amount).toBe(999_999);
 
     const clients = await service.listClients();
-    assert.equal(clients.length, 5);
-    assert.equal(clients[3].name, "Manual New Client");
-    assert.equal(clients[4].name, "Another Manual Client");
+    expect(clients.length).toBe(5);
+    expect(clients[3].name).toBe("Manual New Client");
+    expect(clients[4].name).toBe("Another Manual Client");
   } finally {
     restore();
   }
 }
 
 async function testCreateReusesExistingClientCaseInsensitively(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const created = await service.create({
       clientName: "  yAsSiR  ",
@@ -219,18 +256,18 @@ async function testCreateReusesExistingClientCaseInsensitively(): Promise<void> 
       amount: 200_000,
     });
 
-    assert.equal(created.clientName, "Yassir");
-    assert.equal(created.clientLabel, "01. Yassir");
+    expect(created.clientName).toBe("Yassir");
+    expect(created.clientLabel).toBe("01. Yassir");
 
     const clients = await service.listClients();
-    assert.equal(clients.length, 3);
+    expect(clients.length).toBe(3);
   } finally {
     restore();
   }
 }
 
 async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const created = await service.create({
       clientName: "Item Persistence Client",
@@ -257,11 +294,11 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
         },
       ],
     });
-    assert.equal(created.items?.length, 2);
-    assert.equal(created.items?.[0].description, "Umrah Package");
-    assert.equal(created.items?.[1].currency, "IDR");
-    assert.equal(created.amount, 39_750_000);
-    assert.equal(created.downPaymentIdr, 300_000);
+    expect(created.items?.length).toBe(2);
+    expect(created.items?.[0].description).toBe("Umrah Package");
+    expect(created.items?.[1].currency).toBe("IDR");
+    expect(created.amount).toBe(39_750_000);
+    expect(created.downPaymentIdr).toBe(300_000);
 
     const updated = await service.update(created.id, {
       version: 0,
@@ -277,10 +314,10 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
         },
       ],
     });
-    assert.equal(updated.items?.length, 1);
-    assert.equal(updated.items?.[0].description, "Updated Package");
-    assert.equal(updated.amount, 18_000_000);
-    assert.equal(updated.downPaymentIdr, 120_000);
+    expect(updated.items?.length).toBe(1);
+    expect(updated.items?.[0].description).toBe("Updated Package");
+    expect(updated.amount).toBe(18_000_000);
+    expect(updated.downPaymentIdr).toBe(120_000);
 
     const manuallyAdjusted = await service.update(created.id, {
       version: 0,
@@ -288,73 +325,67 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
       downPaymentIdr: 120_000,
       status: InvoiceStatus.PAID,
     });
-    assert.equal(manuallyAdjusted.amount, 8_880_000);
-    assert.equal(manuallyAdjusted.downPaymentIdr, 120_000);
-    assert.equal(manuallyAdjusted.items?.length, 1);
+    expect(manuallyAdjusted.amount).toBe(8_880_000);
+    expect(manuallyAdjusted.downPaymentIdr).toBe(120_000);
+    expect(manuallyAdjusted.items?.length).toBe(1);
 
     const listed = await service.findAll();
-    assert.equal(listed[0].items?.length, 1);
-    assert.equal(listed[0].items?.[0].currency, "SAR");
-    assert.equal(listed[0].amount, 8_880_000);
-    assert.equal(listed[0].downPaymentIdr, 120_000);
+    expect(listed[0].items?.length).toBe(1);
+    expect(listed[0].items?.[0].currency).toBe("SAR");
+    expect(listed[0].amount).toBe(8_880_000);
+    expect(listed[0].downPaymentIdr).toBe(120_000);
   } finally {
     restore();
   }
 }
 
 async function testCreateValidationErrors(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
-    await assert.rejects(
-      () =>
-        service.create({
-          issuedDate: "2099-01-01",
-          dueDate: "2099-01-02",
-          amount: 1000,
-        } as any),
-      (error: unknown) => {
-        assert.equal(error instanceof BadRequestException, true);
-        assert.match((error as Error).message, /Either clientId or clientName is required/i);
-        return true;
-      },
-    );
+    try {
+      await service.create({
+        issuedDate: "2099-01-01",
+        dueDate: "2099-01-02",
+        amount: 1000,
+      } as any);
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toMatch(/Either clientId or clientName is required/i);
+    }
 
-    await assert.rejects(
-      () =>
-        service.create({
-          clientName: "Invalid Date Client",
-          issuedDate: "not-a-date",
-          dueDate: "2099-01-02",
-          amount: 1000,
-        }),
-      (error: unknown) => {
-        assert.equal(error instanceof BadRequestException, true);
-        assert.match((error as Error).message, /Invalid issuedDate value/i);
-        return true;
-      },
-    );
+    try {
+      await service.create({
+        clientName: "Invalid Date Client",
+        issuedDate: "not-a-date",
+        dueDate: "2099-01-02",
+        amount: 1000,
+      });
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toMatch(/Invalid issuedDate value/i);
+    }
 
-    await assert.rejects(
-      () =>
-        service.create({
-          clientId: "missing-client-id",
-          issuedDate: "2099-01-01",
-          dueDate: "2099-01-02",
-          amount: 1000,
-        }),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match((error as Error).message, /Invoice client 'missing-client-id' not found/i);
-        return true;
-      },
-    );
+    try {
+      await service.create({
+        clientId: "missing-client-id",
+        issuedDate: "2099-01-01",
+        dueDate: "2099-01-02",
+        amount: 1000,
+      });
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as Error).message).toMatch(/Invoice client 'missing-client-id' not found/i);
+    }
   } finally {
     restore();
   }
 }
 
 async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const created = await service.create({
       clientName: "Update Target Client",
@@ -371,9 +402,9 @@ async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void
       status: InvoiceStatus.CANCELLED,
       notes: "Cancelled by operator",
     });
-    assert.equal(cancelled.status, "Cancelled");
-    assert.equal(cancelled.amount, 2_500_000);
-    assert.equal(cancelled.groupCode, "GRP-001");
+    expect(cancelled.status).toBe("Cancelled");
+    expect(cancelled.amount).toBe(2_500_000);
+    expect(cancelled.groupCode).toBe("GRP-001");
 
     const switched = await service.update(created.id, {
       version: 1,
@@ -384,28 +415,27 @@ async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void
       amount: 2_500_000,
       notes: "Reopened",
     });
-    assert.equal(switched.clientName, "Switched Client");
-    assert.equal(switched.clientLabel, "05. Switched Client");
-    assert.equal(switched.status, "Pending");
-    assert.equal(switched.amount, 2_500_000);
-    assert.equal(switched.groupCode, undefined);
-    assert.equal(switched.groupName, undefined);
+    expect(switched.clientName).toBe("Switched Client");
+    expect(switched.clientLabel).toBe("05. Switched Client");
+    expect(switched.status).toBe("Pending");
+    expect(switched.amount).toBe(2_500_000);
+    expect(switched.groupCode).toBeUndefined();
+    expect(switched.groupName).toBeUndefined();
   } finally {
     restore();
   }
 }
 
 async function testUpdateValidationErrors(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
-    await assert.rejects(
-      () => service.update("missing-invoice-id", { version: 0, notes: "noop" }),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match((error as Error).message, /Invoice 'missing-invoice-id' not found/i);
-        return true;
-      },
-    );
+    try {
+      await service.update("missing-invoice-id", { version: 0, notes: "noop" });
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as Error).message).toMatch(/Invoice 'missing-invoice-id' not found/i);
+    }
 
     const created = await service.create({
       clientName: "Client To Update",
@@ -414,25 +444,23 @@ async function testUpdateValidationErrors(): Promise<void> {
       amount: 450_000,
     });
 
-    await assert.rejects(
-      () =>
-        service.update(created.id, {
-          version: 0,
-          clientId: "missing-client-id",
-        }),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match((error as Error).message, /Invoice client 'missing-client-id' not found/i);
-        return true;
-      },
-    );
+    try {
+      await service.update(created.id, {
+        version: 0,
+        clientId: "missing-client-id",
+      });
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as Error).message).toMatch(/Invoice client 'missing-client-id' not found/i);
+    }
   } finally {
     restore();
   }
 }
 
 async function testFindAllThrowsWhenInvoiceClientIsMissing(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const seededClients = await service.listClients();
     const yassir = findClientByName(seededClients, "Yassir");
@@ -452,14 +480,13 @@ async function testFindAllThrowsWhenInvoiceClientIsMissing(): Promise<void> {
       1,
     );
 
-    await assert.rejects(
-      () => service.findAll(),
-      (error: unknown) => {
-        assert.equal(error instanceof NotFoundException, true);
-        assert.match((error as Error).message, new RegExp(`Invoice client '${created.clientId}' not found`, "i"));
-        return true;
-      },
-    );
+    try {
+      await service.findAll();
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as Error).message).toMatch(new RegExp(`Invoice client '${created.clientId}' not found`, "i"));
+    }
   } finally {
     restore();
   }
@@ -506,7 +533,7 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           amount: 125_500,
           downPaymentIdr: 50_000,
           status: InvoiceStatus.PENDING,
-          items: [
+          itemsRel: [
             {
               description: "Alpha Package",
               pax: 2,
@@ -530,29 +557,29 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           dueDate: new Date("2099-01-11T00:00:00.000Z"),
           amount: 900_000,
           status: InvoiceStatus.CANCELLED,
-          items: [],
+          itemsRel: [],
         },
       ],
     },
   } as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const clients = await service.listClients();
-    assert.equal(clients.length, 2);
-    assert.equal(clients[0].label, "02. Beta Client");
-    assert.equal(clients[1].label, "01. Alpha Client");
-    assert.equal(clients[1].groupCode, "G-100");
+    expect(clients.length).toBe(2);
+    expect(clients[0].label).toBe("02. Beta Client");
+    expect(clients[1].label).toBe("01. Alpha Client");
+    expect(clients[1].groupCode).toBe("G-100");
 
     const invoices = await service.findAll();
-    assert.equal(invoices.length, 2);
-    assert.equal(invoices[0].status, "Partially Paid");
-    assert.equal(invoices[0].clientInitials, "AC");
-    assert.equal(invoices[0].items?.length, 1);
-    assert.equal(invoices[0].downPaymentIdr, 50_000);
-    assert.equal(invoices[1].status, "Cancelled");
-    assert.equal(invoices[1].amount, 900_000);
-    assert.equal(invoices[1].items, undefined);
+    expect(invoices.length).toBe(2);
+    expect(invoices[0].status).toBe("Partially Paid");
+    expect(invoices[0].clientInitials).toBe("AC");
+    expect(invoices[0].items?.length).toBe(1);
+    expect(invoices[0].downPaymentIdr).toBe(50_000);
+    expect(invoices[1].status).toBe("Cancelled");
+    expect(invoices[1].amount).toBe(900_000);
+    expect(invoices[1].items).toBeUndefined();
   } finally {
     restore();
   }
@@ -582,16 +609,15 @@ async function testPrismaListClientsAllowsDuplicateSortOrder(): Promise<void> {
     },
   } as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const clients = await service.listClients();
     const orderBy = (findManyArgs as Record<string, unknown> | null)?.orderBy;
-    assert.deepEqual(orderBy, [{ sortOrder: "asc" }, { createdAt: "asc" }]);
-    assert.equal(clients.length, 2);
-    assert.deepEqual(
+    expect(orderBy).toEqual([{ sortOrder: "asc" }, { createdAt: "asc" }]);
+    expect(clients.length).toBe(2);
+    expect(
       clients.map((client) => client.label),
-      ["04. Earlier Client", "04. Later Client"],
-    );
+    ).toEqual(["04. Earlier Client", "04. Later Client"]);
   } finally {
     restore();
   }
@@ -621,7 +647,7 @@ async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> 
           amount: 880_000,
           downPaymentIdr: 125_000,
           status: InvoiceStatus.PENDING,
-          items: [],
+          itemsRel: [],
         },
       ],
     },
@@ -635,16 +661,16 @@ async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> 
     },
   } as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     (service as unknown as { prismaInvoiceDownPaymentColumnState: boolean | null }).prismaInvoiceDownPaymentColumnState =
       true;
 
     const invoices = await service.findAll();
-    assert.equal(invoices.length, 1);
-    assert.equal(invoices[0].downPaymentIdr, 125_000);
-    assert.equal(rawReadCalls, 0);
-    assert.equal(rawWriteCalls, 0);
+    expect(invoices.length).toBe(1);
+    expect(invoices[0].downPaymentIdr).toBe(125_000);
+    expect(rawReadCalls).toBe(0);
+    expect(rawWriteCalls).toBe(0);
   } finally {
     restore();
   }
@@ -712,7 +738,7 @@ async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promi
     },
   }) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const created = await service.create({
       clientName: "Retry Client",
@@ -722,14 +748,13 @@ async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promi
       notes: "Create with retry",
     });
 
-    assert.equal(created.invoiceNumber, "GTT/INV/2099/0011");
-    assert.equal(created.clientName, "Retry Client");
-    assert.equal(created.status, "Pending");
-    assert.equal(createAttempt, 2);
-    assert.equal(
+    expect(created.invoiceNumber).toBe("GTT/INV/2099/0011");
+    expect(created.clientName).toBe("Retry Client");
+    expect(created.status).toBe("Pending");
+    expect(createAttempt).toBe(2);
+    expect(
       (createdPayloads[1].data as { invoiceNumber: string }).invoiceNumber,
-      "GTT/INV/2099/0011",
-    );
+    ).toBe("GTT/INV/2099/0011");
   } finally {
     restore();
   }
@@ -790,7 +815,7 @@ async function testPrismaCreateReusesClientFoundInsideLockedTransaction(): Promi
             notes: string | null;
           };
 
-          assert.equal(data.clientId, "cli-existing");
+          expect(data.clientId).toBe("cli-existing");
 
           return {
             id: "inv-locked-existing",
@@ -815,7 +840,7 @@ async function testPrismaCreateReusesClientFoundInsideLockedTransaction(): Promi
     },
   ) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const created = await service.create({
       clientName: "Locked Existing Client",
@@ -824,13 +849,13 @@ async function testPrismaCreateReusesClientFoundInsideLockedTransaction(): Promi
       amount: 450_000,
     });
 
-    assert.equal(created.clientName, "Locked Existing Client");
-    assert.equal(created.clientId, "cli-existing");
-    assert.equal(created.invoiceNumber, "GTT/INV/2099/0010");
-    assert.equal(clientLookupCount, 2);
-    assert.equal(aggregateCalls, 0);
-    assert.equal(clientCreateCalls, 0);
-    assert.equal(lockQueryCount, 2);
+    expect(created.clientName).toBe("Locked Existing Client");
+    expect(created.clientId).toBe("cli-existing");
+    expect(created.invoiceNumber).toBe("GTT/INV/2099/0010");
+    expect(clientLookupCount).toBe(2);
+    expect(aggregateCalls).toBe(0);
+    expect(clientCreateCalls).toBe(0);
+    expect(lockQueryCount).toBe(2);
   } finally {
     restore();
   }
@@ -888,7 +913,7 @@ async function testPrismaClientLookupIsCaseInsensitive(): Promise<void> {
     },
   }) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const created = await service.create({
       clientName: "  existing CLIENT ",
@@ -897,16 +922,13 @@ async function testPrismaClientLookupIsCaseInsensitive(): Promise<void> {
       amount: 510_000,
     });
 
-    assert.equal(created.clientId, "cli-existing");
-    assert.equal(clientLookupCount >= 1, true);
+    expect(created.clientId).toBe("cli-existing");
+    expect(clientLookupCount >= 1).toBeTruthy();
     const lookupWhere = lastClientLookupArgs as { where?: { name?: { equals?: string; mode?: string } } } | null;
-    assert.deepEqual(
-      lookupWhere?.where?.name,
-      {
-        equals: "existing CLIENT",
-        mode: "insensitive",
-      },
-    );
+    expect(lookupWhere?.where?.name).toEqual({
+      equals: "existing CLIENT",
+      mode: "insensitive",
+    });
   } finally {
     restore();
   }
@@ -926,7 +948,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
     invoice: {
       findFirst: async () => null,
       create: async () => {
-        throw new Error("should not be called when group is missing");
+        throw new Error("should not be called when group is left");
       },
     },
   } as unknown as PrismaService;
@@ -972,70 +994,64 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
   }) as unknown as PrismaService;
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockUnknownGroup);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockUnknownGroup);
     try {
-      await assert.rejects(
-        () =>
-          service.create({
-            clientId: "cli-1",
-            groupCode: "UNKNOWN",
-            issuedDate: "2099-01-01",
-            dueDate: "2099-01-10",
-            amount: 100_000,
-          }),
-        (error: unknown) => {
-          assert.equal(error instanceof NotFoundException, true);
-          assert.match((error as Error).message, /Group 'UNKNOWN' not found/i);
-          return true;
-        },
-      );
+      try {
+        await service.create({
+          clientId: "cli-1",
+          groupCode: "UNKNOWN",
+          issuedDate: "2099-01-01",
+          dueDate: "2099-01-10",
+          amount: 100_000,
+        });
+        throw new Error("Expected error was not thrown");
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(NotFoundException);
+        expect((error as Error).message).toMatch(/Group 'UNKNOWN' not found/i);
+      }
     } finally {
       restore();
     }
   }
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockPersistentP2002);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockPersistentP2002);
     try {
-      await assert.rejects(
-        () =>
-          service.create({
-            clientId: "cli-1",
-            groupCode: "GRP-1",
-            issuedDate: "2099-01-01",
-            dueDate: "2099-01-10",
-            amount: 100_000,
-          }),
-        (error: unknown) => {
-          assert.equal(error instanceof ConflictException, true);
-          assert.match((error as Error).message, /Failed to generate a unique invoice number/i);
-          return true;
-        },
-      );
+      try {
+        await service.create({
+          clientId: "cli-1",
+          groupCode: "GRP-1",
+          issuedDate: "2099-01-01",
+          dueDate: "2099-01-10",
+          amount: 100_000,
+        });
+        throw new Error("Expected error was not thrown");
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(ConflictException);
+        expect((error as Error).message).toMatch(/Failed to generate a unique invoice number/i);
+      }
     } finally {
       restore();
     }
   }
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockEnumMismatch);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockEnumMismatch);
     try {
-      await assert.rejects(
-        () =>
-          service.create({
-            clientId: "cli-1",
-            groupCode: "GRP-1",
-            issuedDate: "2099-01-01",
-            dueDate: "2099-01-10",
-            amount: 100_000,
-            status: InvoiceStatus.CANCELLED,
-          }),
-        (error: unknown) => {
-          assert.equal(error instanceof BadRequestException, true);
-          assert.match((error as Error).message, /CANCELLED belum tersedia di database/i);
-          return true;
-        },
-      );
+      try {
+        await service.create({
+          clientId: "cli-1",
+          groupCode: "GRP-1",
+          issuedDate: "2099-01-01",
+          dueDate: "2099-01-10",
+          amount: 100_000,
+          status: InvoiceStatus.CANCELLED,
+        });
+        throw new Error("Expected error was not thrown");
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as Error).message).toMatch(/CANCELLED belum tersedia di database/i);
+      }
     } finally {
       restore();
     }
@@ -1126,7 +1142,7 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
   }) as unknown as PrismaService;
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockSuccess);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockSuccess);
     try {
       const updated = await service.update("inv-100", {
         version: 0,
@@ -1137,39 +1153,35 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
         amount: 700_000,
       });
 
-      assert.equal(updated.clientName, "Brand New Client");
-      assert.equal(updated.clientLabel, "05. Brand New Client");
-      assert.equal(updated.groupCode, "G-NEW");
-      assert.equal(updated.status, "Pending");
-      assert.equal(
+      expect(updated.clientName).toBe("Brand New Client");
+      expect(updated.clientLabel).toBe("05. Brand New Client");
+      expect(updated.groupCode).toBe("G-NEW");
+      expect(updated.status).toBe("Pending");
+      expect(
         ((updateCalls[0].data as { clientId: string; groupId: string }).clientId),
-        "cli-new",
-      );
-      assert.equal(
+      ).toBe("cli-new");
+      expect(
         ((updateCalls[0].data as { clientId: string; groupId: string }).groupId),
-        "grp-new",
-      );
+      ).toBe("grp-new");
     } finally {
       restore();
     }
   }
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockError);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockError);
     try {
-      await assert.rejects(
-        () =>
-          service.update("inv-101", {
-            version: 0,
-            clientId: "cli-old",
-            groupCode: "GRP-EXISTING",
-          }),
-        (error: unknown) => {
-          assert.equal(error instanceof BadRequestException, true);
-          assert.match((error as Error).message, /Invalid invoice relation payload/i);
-          return true;
-        },
-      );
+      try {
+        await service.update("inv-101", {
+          version: 0,
+          clientId: "cli-old",
+          groupCode: "GRP-EXISTING",
+        });
+        throw new Error("Expected error was not thrown");
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as Error).message).toMatch(/Invalid invoice relation payload/i);
+      }
     } finally {
       restore();
     }
@@ -1202,50 +1214,401 @@ async function testPrismaUpdateVersionConcurrencyConflict(): Promise<void> {
     },
   }) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
-    await assert.rejects(
-      () =>
-        service.update("inv-conflict", {
-          version: 0,
-          amount: 500_000,
-        }),
-      (error: unknown) => {
-        assert.equal(error instanceof ConflictException, true);
-        assert.match((error as Error).message, /Invoice telah dimodifikasi oleh transaksi lain/i);
-        return true;
-      },
-    );
+    try {
+      await service.update("inv-conflict", {
+        version: 0,
+        amount: 500_000,
+      });
+      throw new Error("Expected error was not thrown");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as Error).message).toMatch(/Invoice telah dimodifikasi oleh transaksi lain/i);
+    }
   } finally {
     restore();
   }
 }
 
-async function main(): Promise<void> {
-  await runCase("invoice list clients seeded labels", testListClientsReturnsSeededSortedLabels);
-  await runCase("invoice create existing client sequential numbering", testCreateUsesExistingClientAndGeneratesSequentialNumbers);
-  await runCase("invoice create new clients and status rules", testCreateCanCreateNewClientAndResolvesStatusRules);
-  await runCase("invoice create reuses existing client case-insensitively", testCreateReusesExistingClientCaseInsensitively);
-  await runCase("invoice create and update persist items", testCreateAndUpdatePersistInvoiceItems);
-  await runCase("invoice create validation errors", testCreateValidationErrors);
-  await runCase("invoice update status client and group rules", testUpdateSupportsClientSwitchStatusAndGroupRules);
-  await runCase("invoice update validation errors", testUpdateValidationErrors);
-  await runCase("invoice findAll missing client guard", testFindAllThrowsWhenInvoiceClientIsMissing);
-  await runCase("invoice prisma list and findAll mapping", testPrismaListAndFindAllMapping);
-  await runCase("invoice prisma list clients allows duplicate sort order", testPrismaListClientsAllowsDuplicateSortOrder);
-  await runCase("invoice prisma findAll prefers inline down payment column", testPrismaFindAllPrefersInlineDownPaymentColumn);
-  await runCase("invoice prisma create retry and fallback serial", testPrismaCreateSupportsRetryAndFallbackSerialResolution);
-  await runCase(
-    "invoice prisma create reuses client found inside locked transaction",
-    testPrismaCreateReusesClientFoundInsideLockedTransaction,
-  );
-  await runCase("invoice prisma client lookup is case-insensitive", testPrismaClientLookupIsCaseInsensitive);
-  await runCase("invoice prisma create error mapping", testPrismaCreateErrorMappings);
-  await runCase("invoice prisma update success and error mapping", testPrismaUpdateSuccessAndErrorMappings);
-  await runCase("invoice prisma update version concurrency conflict", testPrismaUpdateVersionConcurrencyConflict);
+async function testFinancialCalculationsAndEdgeCases(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    // Test 1: Exchange rate calculations with USD
+    const usdInvoice = await service.create({
+      clientName: "USD Client",
+      issuedDate: "2099-05-01",
+      dueDate: "2099-05-15",
+      amount: 0,
+      notes: "[ExchangeRate:USD=15800,SAR=4200]",
+      items: [
+        {
+          description: "USD Package",
+          pax: 2,
+          currency: "USD",
+          unitPrice: 1000,
+          totalPrice: 2000,
+          totalPriceIdr: 31600000, // 2000 * 15800
+        },
+      ],
+    });
+    expect(usdInvoice.amount).toBe(31600000);
+    expect(usdInvoice.items?.[0].totalPriceIdr).toBe(31600000);
+
+    // Test 2: Exchange rate calculations with SAR
+    const sarInvoice = await service.create({
+      clientName: "SAR Client",
+      issuedDate: "2099-05-02",
+      dueDate: "2099-05-16",
+      amount: 0,
+      notes: "[ExchangeRate:USD=15800,SAR=4200]",
+      items: [
+        {
+          description: "SAR Package",
+          pax: 1,
+          currency: "SAR",
+          unitPrice: 5000,
+          totalPrice: 5000,
+          totalPriceIdr: 21000000, // 5000 * 4200
+        },
+      ],
+    });
+    expect(sarInvoice.amount).toBe(21000000);
+
+    // Test 3: Down payment normalization (cannot exceed amount)
+    const overpaymentInvoice = await service.create({
+      clientName: "Overpayment Client",
+      issuedDate: "2099-05-03",
+      dueDate: "2099-05-17",
+      amount: 1000000,
+      downPaymentIdr: 1500000, // Exceeds amount
+    });
+    expect(overpaymentInvoice.downPaymentIdr).toBe(1000000); // Normalized to amount
+    expect(overpaymentInvoice.status).toBe("Paid");
+
+    // Test 4: Partial payment status
+    const partialPaymentInvoice = await service.create({
+      clientName: "Partial Payment Client",
+      issuedDate: "2099-05-04",
+      dueDate: "2099-05-18",
+      amount: 1000000,
+      downPaymentIdr: 500000,
+    });
+    expect(partialPaymentInvoice.status).toBe("Partially Paid");
+    expect(partialPaymentInvoice.downPaymentIdr).toBe(500000);
+
+    // Test 5: Negative amount is normalized to 0 in memory mode
+    const negativeAmountInvoice = await service.create({
+      clientName: "Negative Amount Client",
+      issuedDate: "2099-05-05",
+      dueDate: "2099-05-19",
+      amount: -1000,
+    });
+    expect(negativeAmountInvoice.amount).toBe(0); // Normalized to 0
+
+    // Test 6: Negative down payment is normalized to 0 in memory mode
+    const negativeDPInvoice = await service.create({
+      clientName: "Negative DP Client",
+      issuedDate: "2099-05-06",
+      dueDate: "2099-05-20",
+      amount: 1000000,
+      downPaymentIdr: -500000,
+    });
+    expect(negativeDPInvoice.downPaymentIdr).toBe(0); // Normalized to 0
+
+    // Test 7: Invalid line item validation (memory mode is lenient, validation happens in Prisma mode)
+    // In memory mode, invalid items are filtered out, not rejected
+    const invalidItemInvoice = await service.create({
+      clientName: "Invalid Item Client",
+      issuedDate: "2099-05-07",
+      dueDate: "2099-05-21",
+      amount: 0,
+      items: [
+        {
+          description: "",
+          pax: 2,
+          currency: "USD",
+          unitPrice: 1000,
+          totalPrice: 2000,
+          totalPriceIdr: 31600000,
+        },
+      ],
+    });
+    // Empty description items are filtered out in memory mode
+    expect(invalidItemInvoice.items).toBeUndefined();
+
+    // Test 8: Invalid currency validation (cast to any to bypass TypeScript)
+    // In memory mode, invalid currency items are filtered out, not rejected
+    const invalidCurrencyInvoice = await service.create({
+      clientName: "Invalid Currency Client",
+      issuedDate: "2099-05-08",
+      dueDate: "2099-05-22",
+      amount: 0,
+      items: [
+        {
+          description: "Invalid Currency",
+          pax: 2,
+          currency: "EUR" as any,
+          unitPrice: 1000,
+          totalPrice: 2000,
+          totalPriceIdr: 17000000,
+        },
+      ],
+    });
+    // Invalid currency items are filtered out in memory mode
+    expect(invalidCurrencyInvoice.items).toBeUndefined();
+
+    // Test 9: Zero pax validation
+    // In memory mode, zero pax items are filtered out, not rejected
+    const zeroPaxInvoice = await service.create({
+      clientName: "Zero Pax Client",
+      issuedDate: "2099-05-09",
+      dueDate: "2099-05-23",
+      amount: 0,
+      items: [
+        {
+          description: "Zero Pax",
+          pax: 0,
+          currency: "USD",
+          unitPrice: 1000,
+          totalPrice: 0,
+          totalPriceIdr: 0,
+        },
+      ],
+    });
+    // Zero pax items are filtered out in memory mode
+    expect(zeroPaxInvoice.items).toBeUndefined();
+  } finally {
+    restore();
+  }
 }
 
-void main().catch((error: unknown) => {
-  console.error("Invoices service test failed:", error);
-  process.exitCode = 1;
+async function testOverdueStatusLogic(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    // Test 1: Invoice becomes overdue when past due date
+    const pastDueInvoice = await service.create({
+      clientName: "Past Due Client",
+      issuedDate: "2020-01-01",
+      dueDate: "2020-01-15",
+      amount: 1000000,
+    });
+    expect(pastDueInvoice.status).toBe("Overdue");
+
+    // Test 2: Invoice with NoDueDate flag doesn't become overdue
+    const noDueDateInvoice = await service.create({
+      clientName: "No Due Date Client",
+      issuedDate: "2020-01-01",
+      dueDate: "", // Empty due date
+      amount: 1000000,
+    });
+    expect(noDueDateInvoice.status).toBe("Pending");
+    expect(noDueDateInvoice.dueDateIso).toBe("");
+
+    // Test 3: Update invoice to add due date
+    const updatedWithDueDate = await service.update(noDueDateInvoice.id, {
+      version: 0,
+      dueDate: "2020-02-01",
+    });
+    expect(updatedWithDueDate.status).toBe("Overdue");
+    expect(updatedWithDueDate.dueDateIso).toBe("2020-02-01");
+
+    // Test 4: Partially paid invoice becomes overdue
+    const partialOverdueInvoice = await service.create({
+      clientName: "Partial Overdue Client",
+      issuedDate: "2020-02-01",
+      dueDate: "2020-02-15",
+      amount: 1000000,
+      downPaymentIdr: 500000,
+    });
+    expect(partialOverdueInvoice.status).toBe("Overdue");
+    expect(partialOverdueInvoice.downPaymentIdr).toBe(500000);
+  } finally {
+    restore();
+  }
+}
+
+async function testPaymentHistoryValidation(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    // Test 1: Valid payment history in notes (status determined by downPaymentIdr, not payment history)
+    const invoiceWithPayments = await service.create({
+      clientName: "Payment History Client",
+      issuedDate: "2099-06-01",
+      dueDate: "2099-06-15",
+      amount: 1000000,
+      downPaymentIdr: 500000, // This determines Partially Paid status
+      notes: `[Payments:${encodeURIComponent(JSON.stringify([
+        { amount: 300000, date: "2099-06-05" },
+        { amount: 200000, date: "2099-06-10" },
+      ]))}]`,
+    });
+    expect(invoiceWithPayments.status).toBe("Partially Paid");
+    expect(invoiceWithPayments.notes).toContain("[Payments:");
+
+    // Test 2: Invalid payment history JSON (memory mode is lenient)
+    // In memory mode, invalid JSON in notes is ignored, not rejected
+    const invalidJsonInvoice = await service.create({
+      clientName: "Invalid Payment JSON Client",
+      issuedDate: "2099-06-02",
+      dueDate: "2099-06-16",
+      amount: 1000000,
+      notes: "[Payments:invalid-json]",
+    });
+    // Invoice is created, notes are stored as-is
+    expect(invalidJsonInvoice.notes).toContain("[Payments:invalid-json]");
+
+    // Test 3: Negative payment amount (memory mode is lenient)
+    // In memory mode, negative payment amounts are ignored, not rejected
+    const negativePaymentInvoice = await service.create({
+      clientName: "Negative Payment Client",
+      issuedDate: "2099-06-03",
+      dueDate: "2099-06-17",
+      amount: 1000000,
+      notes: `[Payments:${encodeURIComponent(JSON.stringify([
+        { amount: -100000, date: "2099-06-05" },
+      ]))}]`,
+    });
+    // Invoice is created, notes are stored as-is
+    expect(negativePaymentInvoice.notes).toContain("[Payments:");
+  } finally {
+    restore();
+  }
+}
+
+async function testClientSortOrderLogic(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    // Test 1: New clients get next available sort order
+    const client1 = await service.create({
+      clientName: "Client A",
+      issuedDate: "2099-07-01",
+      dueDate: "2099-07-15",
+      amount: 1000000,
+    });
+    expect(client1.clientLabel).toBe("04. Client A");
+
+    const client2 = await service.create({
+      clientName: "Client B",
+      issuedDate: "2099-07-02",
+      dueDate: "2099-07-16",
+      amount: 1000000,
+    });
+    expect(client2.clientLabel).toBe("05. Client B");
+
+    // Test 2: Case-insensitive client matching
+    const client1Duplicate = await service.create({
+      clientName: "  client a  ",
+      issuedDate: "2099-07-03",
+      dueDate: "2099-07-17",
+      amount: 1000000,
+    });
+    expect(client1Duplicate.clientLabel).toBe("04. Client A"); // Reuses existing
+
+    // Test 3: Clients list is sorted by sortOrder
+    const clients = await service.listClients();
+    const sortOrders = clients.map((c) => c.sortOrder);
+    const sortedSortOrders = [...sortOrders].sort((a, b) => a - b);
+    expect(sortOrders).toEqual(sortedSortOrders);
+  } finally {
+    restore();
+  }
+}
+
+async function testInvoiceNumberGeneration(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    // Test 1: Sequential numbering within same year
+    const inv1 = await service.create({
+      clientName: "Numbering Client 1",
+      issuedDate: "2099-08-01",
+      dueDate: "2099-08-15",
+      amount: 1000000,
+    });
+    expect(inv1.invoiceNumber).toBe("GTT/INV/2099/0001");
+
+    const inv2 = await service.create({
+      clientName: "Numbering Client 2",
+      issuedDate: "2099-08-02",
+      dueDate: "2099-08-16",
+      amount: 1000000,
+    });
+    expect(inv2.invoiceNumber).toBe("GTT/INV/2099/0002");
+
+    // Test 2: Different year continues numbering (not reset)
+    const inv3 = await service.create({
+      clientName: "Numbering Client 3",
+      issuedDate: "2100-01-01",
+      dueDate: "2100-01-15",
+      amount: 1000000,
+    });
+    expect(inv3.invoiceNumber).toBe("GTT/INV/2100/0003"); // Continues from 0002
+
+    // Test 3: Month key extraction
+    expect(inv1.monthKey).toBe("2099-08");
+    expect(inv3.monthKey).toBe("2100-01");
+  } finally {
+    restore();
+  }
+}
+
+async function testPaginationSupport() {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    for (let i = 1; i <= 5; i++) {
+      await service.create({
+        clientName: `Client ${i}`,
+        issuedDate: "2026-07-05",
+        dueDate: "2026-07-12",
+        amount: 1000 * i,
+      });
+    }
+
+    const res1 = await service.findAllPaginated({ page: 1, limit: 2 });
+    expect(res1.data.length).toBe(2);
+    expect(res1.total).toBe(5);
+    expect(res1.page).toBe(1);
+    expect(res1.limit).toBe(2);
+    expect(res1.totalPages).toBe(3);
+
+    const res2 = await service.findAllPaginated({ page: 2, limit: 2 });
+    expect(res2.data.length).toBe(2);
+    expect(res2.total).toBe(5);
+    expect(res2.page).toBe(2);
+
+    const res3 = await service.findAllPaginated({ page: 3, limit: 2 });
+    expect(res3.data.length).toBe(1);
+    expect(res3.total).toBe(5);
+    expect(res3.page).toBe(3);
+  } finally {
+    restore();
+  }
+}
+
+
+describe("InvoicesService", () => {
+  it("invoice list clients seeded labels", async () => testListClientsReturnsSeededSortedLabels());
+  it("invoice create existing client sequential numbering", async () => testCreateUsesExistingClientAndGeneratesSequentialNumbers());
+  it("invoice create new clients and status rules", async () => testCreateCanCreateNewClientAndResolvesStatusRules());
+  it("invoice create reuses existing client case-insensitively", async () => testCreateReusesExistingClientCaseInsensitively());
+  it("invoice create and update persist items", async () => testCreateAndUpdatePersistInvoiceItems());
+  it("invoice create validation errors", async () => testCreateValidationErrors());
+  it("invoice update status client and group rules", async () => testUpdateSupportsClientSwitchStatusAndGroupRules());
+  it("invoice update validation errors", async () => testUpdateValidationErrors());
+  it("invoice findAll missing client guard", async () => testFindAllThrowsWhenInvoiceClientIsMissing());
+  it("invoice prisma list and findAll mapping", async () => testPrismaListAndFindAllMapping());
+  it("invoice prisma list clients allows duplicate sort order", async () => testPrismaListClientsAllowsDuplicateSortOrder());
+  it("invoice prisma findAll prefers inline down payment column", async () => testPrismaFindAllPrefersInlineDownPaymentColumn());
+  it("invoice prisma create retry and fallback serial", async () => testPrismaCreateSupportsRetryAndFallbackSerialResolution());
+  it("invoice prisma create reuses client found inside locked transaction", async () => testPrismaCreateReusesClientFoundInsideLockedTransaction());
+  it("invoice prisma client lookup is case-insensitive", async () => testPrismaClientLookupIsCaseInsensitive());
+  it("invoice prisma create error mapping", async () => testPrismaCreateErrorMappings());
+  it("invoice prisma update success and error mapping", async () => testPrismaUpdateSuccessAndErrorMappings());
+  it("invoice prisma update version concurrency conflict", async () => testPrismaUpdateVersionConcurrencyConflict());
+  it("financial calculations and edge cases", async () => testFinancialCalculationsAndEdgeCases());
+  it("overdue status logic", async () => testOverdueStatusLogic());
+  it("payment history validation", async () => testPaymentHistoryValidation());
+  it("client sort order logic", async () => testClientSortOrderLogic());
+  it("invoice number generation", async () => testInvoiceNumberGeneration());
+  it("invoice pagination support", async () => testPaginationSupport());
 });
