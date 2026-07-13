@@ -92,7 +92,6 @@ export type PrismaInvoiceSummaryRow = {
   amount: Prisma.Decimal | number;
   status: InvoiceStatus;
   notes: string | null;
-  items: unknown;
   recipientName: string | null;
   version: number;
   client: {
@@ -331,11 +330,6 @@ export function normalizeInvoiceLineItems(items: unknown, notes?: string): Invoi
     .filter((item): item is InvoiceLineItem => item !== null);
 }
 
-export function parseStoredInvoiceLineItems(items: unknown): InvoiceLineItem[] | undefined {
-  const normalizedItems = normalizeInvoiceLineItems(items);
-  return normalizedItems.length > 0 ? normalizedItems : undefined;
-}
-
 export function resolveInvoiceAmountFromItems(
   amount: number,
   items: ReadonlyArray<InvoiceLineItem> | undefined,
@@ -410,7 +404,6 @@ export const invoiceSummarySelect = {
   status: true,
   notes: true,
   description: true,
-  items: true,
   recipientName: true,
   version: true,
   client: {

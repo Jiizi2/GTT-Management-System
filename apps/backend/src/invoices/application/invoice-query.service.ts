@@ -16,51 +16,38 @@ export class InvoiceQueryService {
   constructor(
     @Inject("InvoiceRepository") private invoiceRepo: InvoiceRepository,
     private readonly configService?: ConfigService,
-  ) {
-    if (!this.invoiceRepo || typeof this.invoiceRepo.findAll !== "function") {
-      const dataSource = resolveConfiguredDataSource(this.configService);
-      const firstArg = this.invoiceRepo as any;
-      const resolvedPrisma = (firstArg && (firstArg.$transaction || firstArg.invoiceClient || firstArg.invoice)) ? firstArg : ({} as PrismaService);
-      const resolvedMemoryStore = this.configService instanceof InvoiceMemoryStore ? this.configService : new InvoiceMemoryStore();
-
-      if (dataSource === "prisma") {
-        this.invoiceRepo = new PrismaInvoiceRepository(resolvedPrisma);
-      } else {
-        this.invoiceRepo = new MemoryInvoiceRepository(resolvedMemoryStore);
-      }
-    }
-  }
+  ) {}
 
   get memoryStore(): InvoiceMemoryStore | undefined {
-    if (this.invoiceRepo && "memoryStore" in this.invoiceRepo) {
-      return (this.invoiceRepo as any).memoryStore;
+    if (this.invoiceRepo instanceof MemoryInvoiceRepository) {
+      return this.invoiceRepo.memoryStore;
     }
     return undefined;
   }
 
   get prismaInvoiceDownPaymentColumnState(): boolean | null {
-    if (this.invoiceRepo && "prismaInvoiceDownPaymentColumnState" in this.invoiceRepo) {
-      return (this.invoiceRepo as any).prismaInvoiceDownPaymentColumnState;
+    if (this.invoiceRepo instanceof PrismaInvoiceRepository) {
+      return this.invoiceRepo.prismaInvoiceDownPaymentColumnState;
     }
     return null;
   }
 
   set prismaInvoiceDownPaymentColumnState(value: boolean | null) {
-    if (this.invoiceRepo && "prismaInvoiceDownPaymentColumnState" in this.invoiceRepo) {
-      (this.invoiceRepo as any).prismaInvoiceDownPaymentColumnState = value;
+    if (this.invoiceRepo instanceof PrismaInvoiceRepository) {
+      this.invoiceRepo.prismaInvoiceDownPaymentColumnState = value;
     }
   }
 
   get prismaInvoiceRecipientNameColumnState(): boolean | null {
-    if (this.invoiceRepo && "prismaInvoiceRecipientNameColumnState" in this.invoiceRepo) {
-      return (this.invoiceRepo as any).prismaInvoiceRecipientNameColumnState;
+    if (this.invoiceRepo instanceof PrismaInvoiceRepository) {
+      return this.invoiceRepo.prismaInvoiceRecipientNameColumnState;
     }
     return null;
   }
 
   set prismaInvoiceRecipientNameColumnState(value: boolean | null) {
-    if (this.invoiceRepo && "prismaInvoiceRecipientNameColumnState" in this.invoiceRepo) {
-      (this.invoiceRepo as any).prismaInvoiceRecipientNameColumnState = value;
+    if (this.invoiceRepo instanceof PrismaInvoiceRepository) {
+      this.invoiceRepo.prismaInvoiceRecipientNameColumnState = value;
     }
   }
 

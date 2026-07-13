@@ -14,26 +14,11 @@ import { InvoiceMemoryStore } from "./invoice-memory-store";
 export class InvoiceCommandService {
   constructor(
     @Inject("InvoiceRepository") private invoiceRepo: InvoiceRepository,
-  ) {
-    if (!this.invoiceRepo || typeof this.invoiceRepo.create !== "function") {
-      const dataSource = process.env.DATA_SOURCE === "prisma" ? "prisma" : "memory";
-      const firstArg = this.invoiceRepo as any;
-      const resolvedPrisma = (firstArg && (firstArg.$transaction || firstArg.invoiceClient || firstArg.invoice)) ? firstArg : ({} as PrismaService);
-
-      const secondArg = arguments[1];
-      const resolvedMemoryStore = secondArg instanceof InvoiceMemoryStore ? secondArg : new InvoiceMemoryStore();
-
-      if (dataSource === "prisma") {
-        this.invoiceRepo = new PrismaInvoiceRepository(resolvedPrisma);
-      } else {
-        this.invoiceRepo = new MemoryInvoiceRepository(resolvedMemoryStore);
-      }
-    }
-  }
+  ) {}
 
   get memoryStore(): InvoiceMemoryStore | undefined {
-    if (this.invoiceRepo && "memoryStore" in this.invoiceRepo) {
-      return (this.invoiceRepo as any).memoryStore;
+    if (this.invoiceRepo instanceof MemoryInvoiceRepository) {
+      return this.invoiceRepo.memoryStore;
     }
     return undefined;
   }
@@ -48,9 +33,5 @@ export class InvoiceCommandService {
 
   async delete(id: string): Promise<void> {
     return this.invoiceRepo.delete(id);
-  }
-
-  async backfillLegacyItems(): Promise<{ count: number }> {
-    return this.invoiceRepo.backfillLegacyItems();
   }
 }

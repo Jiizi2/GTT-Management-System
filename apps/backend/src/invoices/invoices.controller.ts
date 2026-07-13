@@ -121,19 +121,6 @@ export class InvoicesController {
     return this.invoicesService.update(id, payload);
   }
 
-  @Post("backfill")
-  @Roles("super-admin")
-  @ApiOperation({
-    summary: "Backfill legacy items",
-    description: "Mengimpor item invoice dari data legacy JSON ke tabel relasional.",
-  })
-  @ApiOkResponse({
-    description: "Proses backfill selesai.",
-  })
-  backfill() {
-    return this.invoicesService.backfillLegacyItems();
-  }
-
   @Delete(":id")
   @Roles("super-admin", "admin")
   @ApiOperation({
