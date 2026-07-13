@@ -98,10 +98,7 @@ export function getVisaAgreementValidationError(visaSetup: GroupVisaSetup): stri
     }
   }
 
-  const totalHotels = visaSetup.makkahHotels.length + visaSetup.madinahHotels.length;
-  if (totalHotels > 0 && visaSetup.makkahHotels.length === 0) {
-    return "Agreement Makkah wajib diisi minimal 1 hotel.";
-  }
+
 
   const makkahContinuityError = getCityAgreementContinuityError("Makkah", visaSetup.makkahHotels);
   if (makkahContinuityError) {

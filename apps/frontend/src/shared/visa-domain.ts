@@ -167,24 +167,51 @@ export function resolveVisaAgreementDateRange(
     };
   }
 
-  const customMakkahStartIso =
-    [...makkahStartCandidates, ...madinahStartCandidates].sort()[0] ?? fallbackMakkahStartIso;
-  const customMakkahEndIso = [...makkahEndCandidates].sort().at(-1) ?? fallbackMakkahEndIso;
-  const customMadinahStartIso = [...madinahStartCandidates].sort()[0] ?? shiftIsoDate(customMakkahEndIso, 1);
-  const customMadinahEndIso = [...madinahEndCandidates, ...makkahEndCandidates].sort().at(-1) ?? fallbackMadinahEndIso;
+  const earliestMakkahStart = makkahStartCandidates.length > 0 ? [...makkahStartCandidates].sort()[0] : null;
+  const earliestMadinahStart = madinahStartCandidates.length > 0 ? [...madinahStartCandidates].sort()[0] : null;
 
-  const normalizedMakkahEndIso = customMakkahEndIso < customMakkahStartIso ? customMakkahStartIso : customMakkahEndIso;
-  const normalizedMadinahStartIso =
-    customMadinahStartIso < normalizedMakkahEndIso ? normalizedMakkahEndIso : customMadinahStartIso;
-  const normalizedMadinahEndIso =
-    customMadinahEndIso < normalizedMadinahStartIso ? normalizedMadinahStartIso : customMadinahEndIso;
+  const isMadinahFirst =
+    earliestMadinahStart !== null && (earliestMakkahStart === null || earliestMadinahStart < earliestMakkahStart);
 
-  return {
-    makkahStartIso: customMakkahStartIso,
-    makkahEndIso: normalizedMakkahEndIso,
-    madinahStartIso: normalizedMadinahStartIso,
-    madinahEndIso: normalizedMadinahEndIso,
-  };
+  if (isMadinahFirst) {
+    const customMadinahStartIso = earliestMadinahStart ?? fallbackMakkahStartIso;
+    const customMadinahEndIso = [...madinahEndCandidates].sort().at(-1) ?? fallbackMakkahEndIso;
+    const customMakkahStartIso = [...makkahStartCandidates].sort()[0] ?? shiftIsoDate(customMadinahEndIso, 1);
+    const customMakkahEndIso = [...makkahEndCandidates, ...madinahEndCandidates].sort().at(-1) ?? fallbackMadinahEndIso;
+
+    const normalizedMadinahEndIso =
+      customMadinahEndIso < customMadinahStartIso ? customMadinahStartIso : customMadinahEndIso;
+    const normalizedMakkahStartIso =
+      customMakkahStartIso < normalizedMadinahEndIso ? normalizedMadinahEndIso : customMakkahStartIso;
+    const normalizedMakkahEndIso =
+      customMakkahEndIso < normalizedMakkahStartIso ? normalizedMakkahStartIso : customMakkahEndIso;
+
+    return {
+      makkahStartIso: normalizedMakkahStartIso,
+      makkahEndIso: normalizedMakkahEndIso,
+      madinahStartIso: customMadinahStartIso,
+      madinahEndIso: normalizedMadinahEndIso,
+    };
+  } else {
+    const customMakkahStartIso =
+      [...makkahStartCandidates, ...madinahStartCandidates].sort()[0] ?? fallbackMakkahStartIso;
+    const customMakkahEndIso = [...makkahEndCandidates].sort().at(-1) ?? fallbackMakkahEndIso;
+    const customMadinahStartIso = [...madinahStartCandidates].sort()[0] ?? shiftIsoDate(customMakkahEndIso, 1);
+    const customMadinahEndIso = [...madinahEndCandidates, ...makkahEndCandidates].sort().at(-1) ?? fallbackMadinahEndIso;
+
+    const normalizedMakkahEndIso = customMakkahEndIso < customMakkahStartIso ? customMakkahStartIso : customMakkahEndIso;
+    const normalizedMadinahStartIso =
+      customMadinahStartIso < normalizedMakkahEndIso ? normalizedMakkahEndIso : customMadinahStartIso;
+    const normalizedMadinahEndIso =
+      customMadinahEndIso < normalizedMadinahStartIso ? normalizedMadinahStartIso : customMadinahEndIso;
+
+    return {
+      makkahStartIso: customMakkahStartIso,
+      makkahEndIso: normalizedMakkahEndIso,
+      madinahStartIso: normalizedMadinahStartIso,
+      madinahEndIso: normalizedMadinahEndIso,
+    };
+  }
 }
 
 export function resolveVisaProvider(packageName: string): string {

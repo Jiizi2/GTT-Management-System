@@ -41,7 +41,8 @@
     "db:deploy:backend": "npm run db:deploy --workspace backend",
     "db:migrate:backend": "npm run db:migrate --workspace backend",
     "db:seed:backend": "npm run db:seed --workspace backend",
-    "db:studio:backend": "npm run db:studio --workspace backend"
+    "db:studio:backend": "npm run db:studio --workspace backend",
+    "db:restore:local": "node scripts/db-restore-local.mjs"
   },
   "engines": {
     "node": ">=20"
