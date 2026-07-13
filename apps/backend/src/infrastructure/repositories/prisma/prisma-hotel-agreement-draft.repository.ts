@@ -231,17 +231,26 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     }
 
     const remainingPax = Math.max(0, draft.pax - maxOccupied);
-    const groupCodes = Array.from(
-      new Set(assignedAgreements.map((a) => a.visaSetup?.group?.code).filter(Boolean))
-    );
+    const groups = assignedAgreements
+      .map((a) => {
+        const code = a.visaSetup?.group?.code;
+        if (!code) return null;
+        return {
+          groupCode: code,
+          pax: a.pax,
+          stayStart: toIsoDateOnly(a.stayStart),
+          stayEnd: toIsoDateOnly(a.stayEnd),
+        };
+      })
+      .filter((g): g is { groupCode: string; pax: number; stayStart: string; stayEnd: string } => g !== null);
 
     return {
       remainingPax,
-      assignedGroups: groupCodes,
+      assignedGroups: groups,
     };
   }
 
-  private mapPrismaDraft(draft: PrismaHotelAgreementDraftRecord, remainingPax: number, assignedGroups: string[]) {
+  private mapPrismaDraft(draft: PrismaHotelAgreementDraftRecord, remainingPax: number, assignedGroups: any[]) {
     return {
       id: draft.id,
       city: draft.city,
@@ -284,7 +293,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         const matchNumber = draft.agreementNumber.toLowerCase().includes(normalizedQuery);
         const matchHotel = draft.hotelName.toLowerCase().includes(normalizedQuery);
         const matchAgent = draft.agentName?.toLowerCase().includes(normalizedQuery) ?? false;
-        const matchGroup = draft.assignedGroups.some((g) => g.toLowerCase().includes(normalizedQuery));
+        const matchGroup = draft.assignedGroups.some((g: any) => g.groupCode.toLowerCase().includes(normalizedQuery));
         return matchNumber || matchHotel || matchAgent || matchGroup;
       }
 
