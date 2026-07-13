@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 // 1. Get backup file from arguments
 const args = process.argv.slice(2);
@@ -35,6 +35,7 @@ if (!databaseUrlLine) {
   console.error("Error: DATABASE_URL tidak ditemukan di file apps/backend/.env");
   process.exit(1);
 }
+
 // Extract the connection URL and clean quotes
 let databaseUrl = databaseUrlLine.substring(databaseUrlLine.indexOf("=") + 1).trim();
 if (databaseUrl.startsWith('"') && databaseUrl.endsWith('"')) {
@@ -44,22 +45,40 @@ if (databaseUrl.startsWith("'") && databaseUrl.endsWith("'")) {
   databaseUrl = databaseUrl.slice(1, -1);
 }
 
+// Clean up Prisma-specific query params (like ?schema=public) that are invalid in standard psql
 try {
-  // We use psql command directly with the connection URI
-  // We use the --clean flag in pg_dump when generating, but since we want to overwrite,
-  // we can also drop schema public and recreate it for a clean slate
+  const parsedUrl = new URL(databaseUrl);
+  parsedUrl.searchParams.delete("schema");
+  databaseUrl = parsedUrl.toString();
+} catch (e) {
+  // If parsing fails, fall back to the original URL
+}
+
+console.log("Menghubungkan ke database lokal...");
+
+// 3. Execute restore using psql without shell to avoid Windows quote escaping issues
+try {
   console.log("Membersihkan skema database lokal lama...");
   
-  // Create a temporary file to drop and recreate public schema
   const dropCleanSql = "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;";
   
-  // Execute the drop schema command
-  execSync(`psql "${databaseUrl}" -c "${dropCleanSql}"`, { stdio: "inherit" });
+  const dropResult = spawnSync("psql", [databaseUrl, "-c", dropCleanSql], { stdio: "inherit" });
+  if (dropResult.error) {
+    throw dropResult.error;
+  }
+  if (dropResult.status !== 0) {
+    throw new Error(`psql drop schema command failed with exit code ${dropResult.status}`);
+  }
   
   console.log("Memulai pemulihan data dari file backup...");
   
-  // Execute the psql import command
-  execSync(`psql "${databaseUrl}" -f "${backupFilePath}"`, { stdio: "inherit" });
+  const restoreResult = spawnSync("psql", [databaseUrl, "-f", backupFilePath], { stdio: "inherit" });
+  if (restoreResult.error) {
+    throw restoreResult.error;
+  }
+  if (restoreResult.status !== 0) {
+    throw new Error(`psql restore command failed with exit code ${restoreResult.status}`);
+  }
   
   console.log("\n========================================================");
   console.log("🎉 BERHASIL: Database lokal telah diperbarui sesuai data backup!");
