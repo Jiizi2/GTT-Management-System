@@ -469,8 +469,9 @@ function testFilterAgreementDrafts(): void {
     connectedAgreementKeys: new Set(),
   });
 
-  assert.equal(result.makkah.length, 4);
+  assert.equal(result.makkah.length, 5);
   assert.equal(result.makkah.some(d => d.id === "d1"), true);
+  assert.equal(result.makkah.some(d => d.id === "d2"), true);
   assert.equal(result.makkah.some(d => d.id === "d3"), true);
   assert.equal(result.makkah.some(d => d.id === "d4"), true);
   assert.equal(result.makkah.some(d => d.id === "d6"), true);
