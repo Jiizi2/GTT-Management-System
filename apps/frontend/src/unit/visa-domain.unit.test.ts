@@ -477,6 +477,25 @@ function testFilterAgreementDrafts(): void {
 
   assert.equal(result.madinah.length, 1);
   assert.equal(result.madinah[0].id, "d5");
+
+  // Verify that having existing agreements in one city does NOT block available drafts in another city
+  const resultWithExisting = filterAgreementDrafts(drafts, {
+    groupArrivalDate: "2026-06-24",
+    groupReturnDate: "2026-07-02",
+    makkahStartIso: "2026-06-24",
+    makkahEndIso: "2026-06-29",
+    madinahStartIso: "2026-06-29",
+    madinahEndIso: "2026-07-02",
+    totalPax: 45,
+    connectedAgreementKeys: new Set(),
+    existingAgreements: [
+      { stayStartIso: "2026-06-29", stayEndIso: "2026-07-02", city: "madinah" }
+    ],
+  });
+
+  // Makkah drafts (d1: stay 2026-06-24 to 2026-07-02) should still be available in resultWithExisting
+  // since the existing agreement is only in Madinah and does not cover Makkah nights
+  assert.equal(resultWithExisting.makkah.some(d => d.id === "d1"), true);
 }
 
 function testGetInclusiveDays(): void {
