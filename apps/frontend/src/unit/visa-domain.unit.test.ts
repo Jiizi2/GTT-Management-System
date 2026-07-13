@@ -227,6 +227,37 @@ function testResolveVisaAgreementDateRangeFallbackAndCustomNormalization(): void
     madinahStartIso: "2026-04-20",
     madinahEndIso: "2026-04-20",
   });
+
+  const madinahFirstGroup = createGroupWithVisaHotels({
+    makkahHotels: [
+      createAgreementHotel({
+        id: "mak-custom-2",
+        stayStartIso: "2026-04-14",
+        stayEndIso: "2026-04-18",
+      }),
+    ],
+    madinahHotels: [
+      createAgreementHotel({
+        id: "mad-custom-2",
+        stayStartIso: "2026-04-10",
+        stayEndIso: "2026-04-14",
+      }),
+    ],
+  });
+  const madinahFirstRange = resolveVisaAgreementDateRange(
+    {
+      departureIso: "2026-04-10",
+      returnIso: "2026-04-18",
+    },
+    9,
+    madinahFirstGroup,
+  );
+  assert.deepEqual(madinahFirstRange, {
+    makkahStartIso: "2026-04-14",
+    makkahEndIso: "2026-04-18",
+    madinahStartIso: "2026-04-10",
+    madinahEndIso: "2026-04-14",
+  });
 }
 
 function testProviderAndActionRequirementHelpers(): void {

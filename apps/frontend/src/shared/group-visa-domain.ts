@@ -312,8 +312,12 @@ export function buildVisaTrackingRowsFromGroups(
       group.durationDays,
       group,
     );
-    const departureIso = customAgreementDateRange.makkahStartIso;
-    const returnIso = customAgreementDateRange.madinahEndIso;
+    const departureIso = customAgreementDateRange.makkahStartIso < customAgreementDateRange.madinahStartIso
+      ? customAgreementDateRange.makkahStartIso
+      : customAgreementDateRange.madinahStartIso;
+    const returnIso = customAgreementDateRange.makkahEndIso > customAgreementDateRange.madinahEndIso
+      ? customAgreementDateRange.makkahEndIso
+      : customAgreementDateRange.madinahEndIso;
 
     const visaStatus: VisaStatus = visaSetup?.visaStatus ?? "Draft";
     const paymentStatus: VisaPaymentStatus = visaSetup?.paymentStatus ?? "Unpaid";
