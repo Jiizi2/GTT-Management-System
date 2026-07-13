@@ -3,9 +3,6 @@ import type { SessionAccessTier } from "./app-domain.js";
 export const AUTH_STATE_CHANGED_EVENT = "gtt-auth-state-changed";
 
 const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v2";
-const LEGACY_AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v1";
-const LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
-const LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
 
 export type AuthSessionUser = {
   id: string;
@@ -119,22 +116,13 @@ function readRawPersistedSession(): string | null {
   const storage = getWindowStorage();
   return (
     readStorageValue(storage.session, AUTH_SESSION_STORAGE_KEY) ??
-    readStorageValue(storage.local, AUTH_SESSION_STORAGE_KEY) ??
-    readStorageValue(storage.local, LEGACY_AUTH_SESSION_STORAGE_KEY)
+    readStorageValue(storage.local, AUTH_SESSION_STORAGE_KEY)
   );
-}
-
-function purgeLegacyAuthStorage(): void {
-  const storage = getWindowStorage();
-  clearStorageValue(storage.local, LEGACY_AUTH_SESSION_STORAGE_KEY);
-  clearStorageValue(storage.local, LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY);
-  clearStorageValue(storage.local, LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY);
 }
 
 export function readPersistedAuthSession(): AuthSession | null {
   const raw = readRawPersistedSession();
   if (!raw) {
-    purgeLegacyAuthStorage();
     return null;
   }
 
@@ -169,7 +157,6 @@ export function persistAuthSession(session: AuthSession): void {
     throw new Error("Cannot persist invalid auth session.");
   }
 
-  purgeLegacyAuthStorage();
   clearStorageValue(window.localStorage, AUTH_SESSION_STORAGE_KEY);
   clearStorageValue(window.sessionStorage, AUTH_SESSION_STORAGE_KEY);
 
@@ -188,7 +175,6 @@ export function clearAuthSession(): void {
     return;
   }
 
-  purgeLegacyAuthStorage();
   try {
     window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
     window.sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY);

@@ -519,8 +519,6 @@ export function useNewGroupForm({
   };
 
   const selectClassName = "serene-select";
-  const toneDotClassName =
-    "pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full border";
   const getToneSelectClassName = (tone: InvoiceTone) => `${selectClassName} pl-10 ${getInvoiceToneClasses(tone)}`;
 
   const getAgreementStatusChipClassName = (status: AgreementApprovalStatus) =>

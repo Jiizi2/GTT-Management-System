@@ -1,7 +1,6 @@
 import { Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
-import type { GroupData } from "../../../shared/app-domain";
 
 const LazyDeleteGroupModal = lazy(async () => ({
   default: (await import("../../../components/group-detail-modals")).DeleteGroupModal,

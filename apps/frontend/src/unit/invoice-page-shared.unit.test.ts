@@ -6,7 +6,6 @@ import {
   resolveInvoiceDownPaymentIdr,
   resolveInvoiceOutstandingBalanceLabel,
   resolveBankAccountLabel,
-  defaultBankDisbursementOptions,
   parseNumberInput,
   resolveExchangeRatesFromRow,
 } from "../pages/invoice/helpers/invoice-page-shared.js";

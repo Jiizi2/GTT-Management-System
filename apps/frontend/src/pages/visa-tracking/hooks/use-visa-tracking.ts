@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Domain from "../../../shared/app-domain";
 import type {
   AgreementApprovalStatus,
@@ -16,7 +16,6 @@ const {
   hasMissingHotelAllocation,
   isVisaRowActionRequired,
   resolveValidRaudhahAppointments,
-  resolveVisaAgreementDateRange,
   resolveVisaAgreementNumber,
   VISA_PAGE_SIZE,
 } = Domain;
@@ -231,7 +230,7 @@ export function useVisaTracking({
     return result;
   }, [visaRows, groupByCode]);
 
-  const doesRowMatchQuery = (row: VisaTrackingRow): boolean => {
+  const doesRowMatchQuery = useCallback((row: VisaTrackingRow): boolean => {
     if (!normalizedQuery) {
       return true;
     }
@@ -253,9 +252,9 @@ export function useVisaTracking({
       row.visaStatus,
       row.paymentStatus,
     ].some((value) => value.toLowerCase().includes(normalizedQuery));
-  };
+  }, [normalizedQuery, groupByCode]);
 
-  const doesRowMatchActiveFilter = (row: VisaTrackingRow): boolean => {
+  const doesRowMatchActiveFilter = useCallback((row: VisaTrackingRow): boolean => {
     if (activeFilter === "all") {
       return true;
     }
@@ -279,7 +278,7 @@ export function useVisaTracking({
     }
 
     return row.paymentStatus !== "Paid";
-  };
+  }, [activeFilter, groupByCode]);
 
   const filteredGroupedRows = useMemo(() => {
     return allGroupedRows
@@ -297,7 +296,7 @@ export function useVisaTracking({
         if (mainMonth === issuedMonthFilter) return true;
         return rowGroup.followerRows.some(f => resolveIssuedMonthKey(f.departureIso) === issuedMonthFilter);
       });
-  }, [allGroupedRows, normalizedQuery, activeFilter, issuedMonthFilter, groupByCode]);
+  }, [allGroupedRows, normalizedQuery, activeFilter, issuedMonthFilter, doesRowMatchQuery, doesRowMatchActiveFilter]);
 
   const issuedMonthOptions = useMemo<IssuedMonthOption[]>(() => {
     const monthCounter = new Map<string, number>();

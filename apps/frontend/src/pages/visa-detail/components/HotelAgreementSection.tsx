@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
 import { DatePickerInput } from "../../../components/date-time-pickers";
 import type { GroupAgreementHotel, HotelAgreementDraft, GroupData } from "../../../shared/app-domain";
@@ -343,7 +342,6 @@ function AgreementInboxDraftAssignmentList({
 
 export function HotelAgreementSection() {
   const {
-    row,
     group,
     familyGroups,
     activeGroupCode,

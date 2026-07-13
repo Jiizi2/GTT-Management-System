@@ -10,12 +10,10 @@ export function RaudhahReminderScreen({
   groups,
   onOpenVisaDetail,
   onSetRaudhahTasrehPrinted,
-  onOpenDetail,
 }: {
   groups: GroupData[];
   onOpenVisaDetail: (row: VisaTrackingRow) => void;
   onSetRaudhahTasrehPrinted: (groupCode: string, appointmentId: string, tasrehPrinted: boolean) => void;
-  onOpenDetail?: (groupCode: string) => void;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
@@ -52,7 +50,6 @@ export function RaudhahReminderScreen({
     totalUpcoming,
     totalNotPrinted,
     handleCopyTemplate,
-    visaRows,
   } = state;
 
   const [pendingTasrehAction, setPendingTasrehAction] = useState<PendingTasrehAction | null>(null);

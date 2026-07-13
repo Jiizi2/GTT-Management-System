@@ -12,8 +12,7 @@ import { runCase } from "../test/run-case.js";
 import { createWindowMock, MemoryStorage } from "../test/with-mock-window.js";
 
 const AUTH_SESSION_STORAGE_KEY = "gtt-auth-session-v2";
-const LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY = "gtt-auth-access-token-v1";
-const LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY = "gtt-session-access-tier-v1";
+
 
 function withMockWindow<T>(
   fn: (context: {
@@ -134,11 +133,8 @@ function testPersistReadAndClearRememberedAuthSession(): void {
   });
 }
 
-function testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys(): void {
+function testPersistEphemeralSessionUsesSessionStorage(): void {
   withMockWindow(({ localStorage, sessionStorage }) => {
-    localStorage.setItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
-    localStorage.setItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY, "admin");
-
     persistAuthSession({
       expiresAt: "2099-02-01T00:00:00.000Z",
       rememberSession: false,
@@ -151,8 +147,6 @@ function testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys(): voi
       },
     });
 
-    assert.equal(localStorage.getItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY), null);
     assert.equal(localStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
     assert.notEqual(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
   });
@@ -177,19 +171,15 @@ function testReadPersistedSessionRejectsInvalidAndExpiredData(): void {
       },
     };
     sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(expiredSession));
-    localStorage.setItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
-    localStorage.setItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY, expiredSession.user.accessTier);
 
     assert.equal(readPersistedAuthSession(), null);
     assert.equal(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(LEGACY_AUTH_ACCESS_TOKEN_STORAGE_KEY), null);
-    assert.equal(localStorage.getItem(LEGACY_SESSION_ACCESS_TIER_STORAGE_KEY), null);
   });
 }
 
 describe("auth session", () => {
   runCase("coercion validation", testCoerceAuthSessionValidation);
   runCase("persist/read/clear remembered flow", testPersistReadAndClearRememberedAuthSession);
-  runCase("ephemeral storage and legacy purge", testPersistEphemeralSessionUsesSessionStorageAndPurgesLegacyKeys);
+  runCase("ephemeral storage flow", testPersistEphemeralSessionUsesSessionStorage);
   runCase("invalid/expired persistence guard", testReadPersistedSessionRejectsInvalidAndExpiredData);
 });

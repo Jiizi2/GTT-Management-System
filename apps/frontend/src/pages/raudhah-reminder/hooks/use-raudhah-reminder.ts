@@ -6,7 +6,6 @@ import type { GroupData, GroupRaudhahStatus } from "../../../shared/app-domain";
 const {
   buildVisaTrackingRowsFromGroups,
   formatLocalIsoDate,
-  formatVisaDateWithYear,
   isIsoDateValue,
   resolveValidRaudhahAppointments,
   shiftIsoDate,

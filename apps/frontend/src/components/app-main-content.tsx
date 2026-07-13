@@ -213,7 +213,6 @@ export function AppMainContent({ controller }: { controller: AppController }) {
             element={
               <LazyRaudhahReminderScreen
                 groups={controller.groupRecords}
-                onOpenDetail={controller.handleOpenDetail}
                 onOpenVisaDetail={controller.handleOpenVisaDetail}
                 onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
               />
