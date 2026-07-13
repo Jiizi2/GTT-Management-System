@@ -250,10 +250,6 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
     return this.mapMemoryInvoiceToListItem(updatedInvoice, client);
   }
 
-  async backfillLegacyItems(): Promise<{ count: number }> {
-    return { count: 0 };
-  }
-
   async delete(id: string): Promise<void> {
     const index = this.memoryStore.invoices.findIndex((inv) => inv.id === id);
     if (index === -1) {

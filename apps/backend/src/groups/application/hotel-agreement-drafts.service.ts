@@ -19,19 +19,7 @@ export class HotelAgreementDraftsService {
     private agreementDraftRepo: HotelAgreementDraftRepository,
     private readonly groupsService?: GroupsService,
     private readonly configService?: ConfigService,
-  ) {
-    if (!this.agreementDraftRepo || typeof this.agreementDraftRepo.findAll !== "function") {
-      const dataSource = resolveConfiguredDataSource(this.configService);
-      const resolvedPrisma = this.agreementDraftRepo as any;
-      const resolvedGroupsService = this.groupsService;
-
-      if (dataSource === "prisma") {
-        this.agreementDraftRepo = new PrismaHotelAgreementDraftRepository(resolvedPrisma, resolvedGroupsService!);
-      } else {
-        this.agreementDraftRepo = new MemoryHotelAgreementDraftRepository(resolvedGroupsService!);
-      }
-    }
-  }
+  ) {}
 
   get memoryDrafts() {
     if (this.agreementDraftRepo && "memoryDrafts" in this.agreementDraftRepo) {

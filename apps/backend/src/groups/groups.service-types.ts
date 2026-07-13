@@ -6,10 +6,10 @@ import {
 } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { CreateGroupDto } from "./dto/create-group.dto";
-import type {
+import {
   groupDetailSelection,
   groupSummarySelection,
-} from "./infrastructure/groups.prisma-include";
+} from "../infrastructure/repositories/prisma/helpers/prisma-group.helpers";
 
 export type MemoryItineraryItem = Omit<
   NonNullable<CreateGroupDto["itinerary"]>[number],

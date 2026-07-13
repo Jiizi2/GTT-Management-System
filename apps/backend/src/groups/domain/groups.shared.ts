@@ -95,3 +95,26 @@ export function toChecklistAssignmentSyncResult(
     })),
   };
 }
+
+export function extractGroupId(group: unknown): string | undefined {
+  if (typeof group !== "object" || group === null || !("id" in group)) {
+    return undefined;
+  }
+
+  const id = (group as { id?: unknown }).id;
+  return typeof id === "string" ? id.trim() || undefined : undefined;
+}
+
+export function extractGroupCode(group: unknown): string | undefined {
+  if (typeof group !== "object" || group === null) {
+    return undefined;
+  }
+
+  const code =
+    "code" in group
+      ? (group as { code?: unknown }).code
+      : "groupCode" in group
+        ? (group as { groupCode?: unknown }).groupCode
+        : undefined;
+  return typeof code === "string" ? code.trim().toUpperCase() : undefined;
+}

@@ -21,8 +21,6 @@ import {
   findAllFromMemory,
   paginateGroupItems,
   projectMemoryGroupRecord,
-} from "../../../groups/infrastructure/groups.listing";
-import {
   findOneFromMemory,
   createInMemory,
   replaceInMemory,
@@ -37,7 +35,7 @@ import {
   upsertPrimaryRaudhahAppointmentInMemory,
   confirmChecklistDriverInMemory,
   resetChecklistDriverInMemory,
-} from "../../../groups/infrastructure/groups.memory-store";
+} from "./helpers/memory-group.helpers";
 import { randomUUID } from "node:crypto";
 import { parseIsoDateOnly, validateTravelDateRangeOrThrow } from "../../../groups/domain/groups.shared";
 import { validateCreateOrReplaceHotelAgreementRules } from "../../../groups/domain/groups.hotel-validation";

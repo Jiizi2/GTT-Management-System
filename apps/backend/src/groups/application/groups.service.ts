@@ -15,7 +15,7 @@ import type { UpdateGroupDto } from "../dto/update-group.dto";
 import {
   extractGroupCode,
   extractGroupId,
-} from "../infrastructure/groups.audit";
+} from "../domain/groups.shared";
 import type {
   ChecklistAssignmentSyncResult,
   FindAllOptions,

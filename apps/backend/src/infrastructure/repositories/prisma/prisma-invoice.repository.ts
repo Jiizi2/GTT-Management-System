@@ -18,7 +18,6 @@ import {
   resolveEffectiveStatus,
   resolveDisplayedDownPaymentByAmount,
   resolveStoredInvoiceAmount,
-  parseStoredInvoiceLineItems,
   getTrimmedString,
   normalizeIsoDate,
   normalizeInvoiceLineItems,
@@ -42,9 +41,9 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   private readonly generator = new InvoiceNumberGenerator();
   private isProduction = process.env.NODE_ENV === "production";
 
-  private prismaInvoiceDownPaymentColumnState: boolean | null = null;
+  public prismaInvoiceDownPaymentColumnState: boolean | null = null;
   private prismaInvoiceDownPaymentColumnInitPromise: Promise<boolean> | null = null;
-  private prismaInvoiceRecipientNameColumnState: boolean | null = null;
+  public prismaInvoiceRecipientNameColumnState: boolean | null = null;
   private prismaInvoiceRecipientNameColumnInitPromise: Promise<boolean> | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -229,7 +228,6 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
               notes: notes || null,
               description: getTrimmedString(payload.description) || null,
               recipientName: getTrimmedString(payload.recipientName) || null,
-              items: normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull,
               itemsRel: {
                 createMany: {
                   data: normalizedItems.map((item) => ({
@@ -296,7 +294,6 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         amount: true,
         notes: true,
         status: true,
-        items: true,
         version: true,
         itemsRel: {
           select: {
@@ -386,9 +383,6 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
           ...(canWriteInlineDownPayment ? { downPaymentIdr: nextDownPaymentIdr } : {}),
         };
 
-        if (payload.items !== undefined) {
-          scalarDataClause.items = normalizedItems.length > 0 ? (normalizedItems as Prisma.InputJsonValue) : Prisma.JsonNull;
-        }
 
         const updateResult = await tx.invoice.updateMany({
           where: {
@@ -478,53 +472,6 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     return this.mapPrismaInvoiceToListItem(updated as PrismaInvoiceSummaryRowWithOptionalDownPayment, nextDownPaymentIdr);
   }
 
-  async backfillLegacyItems(): Promise<{ count: number }> {
-    const listTracker = Telemetry.start("invoice_backfill_list_ms");
-    const targetInvoices = await this.prisma.invoice.findMany({
-      where: {
-        items: {
-          not: Prisma.JsonNull,
-        },
-      },
-      select: {
-        id: true,
-        items: true,
-        itemsRel: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
-    Telemetry.end(listTracker, { count: targetInvoices.length });
-
-    const eligibleInvoices = targetInvoices.filter((inv) => inv.itemsRel.length === 0);
-    const executeTracker = Telemetry.start("invoice_backfill_execute_ms");
-    let count = 0;
-    
-    await this.prisma.$transaction(async (tx) => {
-      for (const inv of eligibleInvoices) {
-        const legacyItems = parseStoredInvoiceLineItems(inv.items) ?? [];
-        if (legacyItems.length > 0) {
-          await tx.invoiceItem.createMany({
-            data: legacyItems.map((item) => ({
-              invoiceId: inv.id,
-              description: item.description,
-              pax: item.pax,
-              currency: item.currency,
-              unitPrice: item.unitPrice,
-              totalPrice: item.pax * item.unitPrice,
-              totalPriceIdr: item.pax * item.unitPrice,
-            })),
-          });
-          count += 1;
-        }
-      }
-    });
-
-    Telemetry.end(executeTracker, { success: true, count });
-    return { count };
-  }
 
   async delete(id: string): Promise<void> {
     const existing = await this.prisma.invoice.findUnique({
@@ -605,7 +552,6 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     const dueDateIso = toIsoDateOnly(invoice.dueDate);
     const issuedDateIso = toIsoDateOnly(invoice.issuedDate);
     
-    const legacyItems = parseStoredInvoiceLineItems(invoice.items) ?? [];
     const relationalItems = (invoice as any).itemsRel?.map((item: any) => ({
       description: item.description,
       pax: item.pax,
@@ -615,32 +561,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       totalPriceIdr: Number(item.totalPriceIdr),
     })) ?? [];
 
-    if (!this.isProduction) {
-      let shadowMismatch = false;
-      if (legacyItems.length !== relationalItems.length) {
-        shadowMismatch = true;
-      } else {
-        for (let i = 0; i < legacyItems.length; i++) {
-          const legacy = legacyItems[i];
-          const relational = relationalItems[i];
-          if (
-            legacy.description !== relational.description ||
-            legacy.pax !== relational.pax ||
-            legacy.currency !== relational.currency ||
-            legacy.unitPrice !== relational.unitPrice
-          ) {
-            shadowMismatch = true;
-            break;
-          }
-        }
-      }
-
-      if (shadowMismatch) {
-        // Log shadow mismatch but do not disrupt runtime
-      }
-    }
-
-    const resolvedItems = relationalItems.length > 0 ? relationalItems : legacyItems;
+    const resolvedItems = relationalItems;
     const baseAmount = resolveStoredInvoiceAmount(Number(invoice.amount), resolvedItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
     const effectiveStatus = resolveEffectiveStatus(
@@ -769,13 +690,14 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
   private async createInvoiceClientWithPrisma(clientName: string): Promise<ResolvedPrismaInvoiceClient> {
     const createTracker = Telemetry.start("invoice_client_create_ms");
-    const lockTracker = Telemetry.start("invoice_lock_ms");
-    await this.acquirePrismaTransactionLock(this.prisma, "invoice_client_write", clientName);
-    Telemetry.end(lockTracker, { name: clientName });
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const created = await this.prisma.$transaction(async (tx) => {
+          const lockTracker = Telemetry.start("invoice_lock_ms");
+          await this.acquirePrismaTransactionLock(tx, "invoice_client_write", "global");
+          Telemetry.end(lockTracker, { name: clientName });
+
           const existing = await this.findPrismaInvoiceClientByName(clientName, tx);
           if (existing) {
             return existing;

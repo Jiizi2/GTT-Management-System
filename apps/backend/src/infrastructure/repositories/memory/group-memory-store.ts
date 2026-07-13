@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createDefaultMemoryGroups } from "../../../groups/infrastructure/groups.memory-store";
+import { createDefaultMemoryGroups } from "./helpers/memory-group.helpers";
 import type { MemoryGroupRecord, MemoryAuditLog } from "../../../groups/groups.service-types";
 
 @Injectable()

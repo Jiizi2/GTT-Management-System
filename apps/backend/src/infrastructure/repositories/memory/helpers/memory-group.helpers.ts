@@ -9,35 +9,286 @@ import {
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
-import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
-import type { CreateGroupDto } from "../dto/create-group.dto";
+import type { ConfirmChecklistDriverDto } from "../../../../groups/dto/confirm-checklist-driver.dto";
+import type { CreateGroupDto } from "../../../../groups/dto/create-group.dto";
 import type {
   UpsertGroupItineraryItemDto,
   UpsertGroupRaudhahDto,
   UpsertGroupVisaHotelDto,
-} from "../dto/group-operations.dto";
-import type { ResetChecklistDriverDto } from "../dto/reset-checklist-driver.dto";
-import type { UpdateGroupDto } from "../dto/update-group.dto";
-import { validateHotelAgreementRules } from "../domain/groups.hotel-validation";
-import {
-  buildMemoryItineraryItem,
-  buildMemoryRaudhahAppointment,
-  buildMemoryVisaHotelAgreement,
-  ensureMemoryVisaSetup,
-} from "./groups.memory-builders";
-import { buildMemoryGroupPayloadFields } from "./groups.memory-group-payload";
+} from "../../../../groups/dto/group-operations.dto";
+import type { ResetChecklistDriverDto } from "../../../../groups/dto/reset-checklist-driver.dto";
+import type { UpdateGroupDto } from "../../../../groups/dto/update-group.dto";
+import { validateHotelAgreementRules } from "../../../../groups/domain/groups.hotel-validation";
+import { resolveItineraryTitle } from "../../../../groups/domain/groups-itinerary-title";
 import {
   parseIsoDateOnly,
   toChecklistAssignmentSyncResult,
   toIsoDateOnly,
   toShortDateLabel,
   validateTravelDateRangeOrThrow,
-} from "../domain/groups.shared";
+} from "../../../../groups/domain/groups.shared";
 import type {
   ChecklistAssignmentSyncResult,
   MemoryChecklistAssignment,
   MemoryGroupRecord,
-} from "../groups.service-types";
+  MemoryItineraryItem,
+  MemoryRaudhahAppointment,
+  MemoryVisaHotelAgreement,
+  MemoryVisaSetup,
+  FindAllOptions,
+  GroupResponseProjection,
+  MemoryGroupSummaryRecord,
+  PaginatedGroupList,
+  GroupListFilter,
+} from "../../../../groups/groups.service-types";
+import { buildGroupSearchDocument, normalizeGroupSearchTokens } from "../../../../groups/domain/groups.search-document";
+
+// ==========================================
+// BUILDERS & PAYLOADS (from groups.memory-builders.ts / groups.memory-group-payload.ts)
+// ==========================================
+
+export function buildMemoryItineraryItem(
+  payload: UpsertGroupItineraryItemDto,
+  sortOrder: number,
+  id: string = randomUUID(),
+): MemoryItineraryItem {
+  return {
+    id,
+    sortOrder,
+    dateLabel: payload.dateLabel.trim(),
+    yearLabel: payload.yearLabel.trim(),
+    category: payload.category.trim(),
+    categoryKey: payload.categoryKey?.trim() || undefined,
+    title: resolveItineraryTitle({
+      title: payload.title,
+      category: payload.category,
+      categoryKey: payload.categoryKey,
+      fromLocation: payload.fromLocation,
+      toLocation: payload.toLocation,
+      cityTourCity: payload.cityTourCity,
+    }),
+    meta: payload.meta.trim(),
+    icon: payload.icon.trim(),
+    highlighted: payload.highlighted ?? false,
+    isoDate: payload.isoDate,
+    time: payload.time?.trim() || undefined,
+    flightNumber: payload.flightNumber?.trim() || undefined,
+    hotelName: payload.hotelName?.trim() || undefined,
+    fromHotelName: payload.fromHotelName?.trim() || undefined,
+    fromLocation: payload.fromLocation?.trim() || undefined,
+    toLocation: payload.toLocation?.trim() || undefined,
+    cityTourCity: payload.cityTourCity?.trim() || undefined,
+    requiresBus: payload.requiresBus ?? false,
+    notes: payload.notes?.trim() || undefined,
+    transferByTrain: payload.transferByTrain ?? false,
+    trainDepartureTime: payload.trainDepartureTime?.trim() || undefined,
+    destinationPickupTime: payload.destinationPickupTime?.trim() || undefined,
+    hotelPickupRequestTime: payload.hotelPickupRequestTime?.trim() || undefined,
+  };
+}
+
+export function buildMemoryVisaHotelAgreement(
+  payload: UpsertGroupVisaHotelDto,
+  id: string = randomUUID(),
+): MemoryVisaHotelAgreement {
+  return {
+    id,
+    city: payload.city,
+    sourceDraftId: payload.sourceDraftId?.trim() || undefined,
+    hotelName: payload.hotelName.trim(),
+    agreementNumber: payload.agreementNumber.trim(),
+    pax: payload.pax,
+    status: payload.status ?? AgreementApprovalStatus.WAITING,
+    stayStart: payload.stayStart,
+    stayEnd: payload.stayEnd,
+  };
+}
+
+export function buildMemoryRaudhahAppointment(
+  payload: UpsertGroupRaudhahDto,
+  id: string = randomUUID(),
+): MemoryRaudhahAppointment {
+  return {
+    id,
+    date: payload.date,
+    status: payload.status ?? GroupRaudhahStatus.FREE,
+    tasrehPrinted: payload.tasrehPrinted ?? false,
+  };
+}
+
+export function ensureMemoryVisaSetup(group: MemoryGroupRecord): MemoryVisaSetup {
+  if (!group.visaSetup) {
+    group.visaSetup = {
+      visaStatus: VisaStatus.DRAFT,
+      issuedDate: undefined,
+      syarikah: "Not assigned",
+      paymentStatus: VisaPaymentStatus.UNPAID,
+      hotelAgreements: [],
+      raudhahAppointments: [],
+    };
+  }
+
+  return group.visaSetup;
+}
+
+type MemoryGroupPayloadFields = Pick<
+  MemoryGroupRecord,
+  | "name"
+  | "status"
+  | "arrivalDate"
+  | "returnDate"
+  | "tone"
+  | "pax"
+  | "totalBuses"
+  | "packageName"
+  | "durationDays"
+  | "musyrif"
+  | "nextActivity"
+  | "timeline"
+  | "itinerary"
+  | "notes"
+  | "visaSetup"
+  | "checklistAssignments"
+  | "parentGroupId"
+>;
+
+function toIsoDateOnlyLocal(value: string): string {
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const parsedDate = new Date(trimmed);
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error(`Invalid ISO date value '${value}'.`);
+  }
+
+  return parsedDate.toISOString().slice(0, 10);
+}
+
+export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGroupPayloadFields {
+  return {
+    name: payload.name.trim(),
+    status: payload.status.trim(),
+    arrivalDate: toIsoDateOnlyLocal(payload.arrivalDate),
+    returnDate: toIsoDateOnlyLocal(payload.returnDate),
+    tone: payload.tone ?? GroupTone.ACTIVE,
+    pax: payload.pax,
+    totalBuses: payload.totalBuses ?? null,
+    packageName: payload.packageName.trim(),
+    durationDays: payload.durationDays,
+    parentGroupId: payload.parentGroupId?.trim() || null,
+    musyrif: payload.musyrif
+      ? {
+          name: payload.musyrif.name.trim(),
+          phone: payload.musyrif.phone.trim(),
+          avatar: payload.musyrif.avatar.trim(),
+        }
+      : undefined,
+    nextActivity: payload.nextActivity
+      ? {
+          title: payload.nextActivity.title.trim(),
+          dateLabel: payload.nextActivity.dateLabel.trim(),
+          timeLabel: payload.nextActivity.timeLabel.trim(),
+          icon: payload.nextActivity.icon.trim(),
+        }
+      : undefined,
+    timeline: (payload.timeline ?? []).map((item, index) => ({
+      sortOrder: item.sortOrder ?? index,
+      dateLabel: item.dateLabel.trim(),
+      title: item.title.trim(),
+      isCurrent: item.isCurrent ?? false,
+      nextActivity: item.nextActivity?.trim() || undefined,
+    })),
+    itinerary: (payload.itinerary ?? []).map((item, index) => ({
+      id: randomUUID(),
+      sortOrder: item.sortOrder ?? index,
+      dateLabel: item.dateLabel.trim(),
+      yearLabel: item.yearLabel.trim(),
+      category: item.category.trim(),
+      categoryKey: item.categoryKey?.trim() || undefined,
+      title: resolveItineraryTitle({
+        title: item.title,
+        category: item.category,
+        categoryKey: item.categoryKey,
+        fromLocation: item.fromLocation,
+        toLocation: item.toLocation,
+        cityTourCity: item.cityTourCity,
+      }),
+      meta: item.meta.trim(),
+      icon: item.icon.trim(),
+      highlighted: item.highlighted ?? false,
+      isoDate: item.isoDate,
+      time: item.time?.trim() || undefined,
+      flightNumber: item.flightNumber?.trim() || undefined,
+      hotelName: item.hotelName?.trim() || undefined,
+      fromHotelName: item.fromHotelName?.trim() || undefined,
+      fromLocation: item.fromLocation?.trim() || undefined,
+      toLocation: item.toLocation?.trim() || undefined,
+      cityTourCity: item.cityTourCity?.trim() || undefined,
+      requiresBus: item.requiresBus ?? false,
+      notes: item.notes?.trim() || undefined,
+      transferByTrain: item.transferByTrain ?? false,
+      trainDepartureTime: item.trainDepartureTime?.trim() || undefined,
+      destinationPickupTime: item.destinationPickupTime?.trim() || undefined,
+      hotelPickupRequestTime: item.hotelPickupRequestTime?.trim() || undefined,
+    })),
+    notes: (payload.notes ?? []).map((item, index) => ({
+      sortOrder: item.sortOrder ?? index,
+      text: item.text.trim(),
+      pinned: item.pinned ?? false,
+    })),
+    visaSetup: payload.visaSetup
+      ? {
+          visaStatus: payload.visaSetup.visaStatus ?? VisaStatus.DRAFT,
+          issuedDate: payload.visaSetup.issuedDate?.trim() || undefined,
+          syarikah: payload.visaSetup.syarikah.trim(),
+          paymentStatus: payload.visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
+          hotelAgreements: (payload.visaSetup.hotelAgreements ?? []).map((hotel) => ({
+            id: randomUUID(),
+            city: hotel.city ?? AgreementCity.MAKKAH,
+            hotelName: hotel.hotelName.trim(),
+            agreementNumber: hotel.agreementNumber.trim(),
+            pax: hotel.pax,
+            status: hotel.status ?? AgreementApprovalStatus.WAITING,
+            stayStart: hotel.stayStart,
+            stayEnd: hotel.stayEnd,
+          })),
+          raudhahAppointments: (payload.visaSetup.raudhahAppointments ?? []).map((appointment) => ({
+            id: randomUUID(),
+            idOrAppointment: randomUUID(),
+            date: appointment.date,
+            status: appointment.status ?? GroupRaudhahStatus.FREE,
+            tasrehPrinted: appointment.tasrehPrinted ?? false,
+          })),
+        }
+      : undefined,
+    checklistAssignments: (payload.checklistAssignments ?? []).map((assignment) => ({
+      id: randomUUID(),
+      itineraryItemId: assignment.itineraryItemId,
+      tripDate: assignment.tripDate,
+      activity: assignment.activity.trim(),
+      tripLabel: assignment.tripLabel.trim(),
+      requiredBusCount: assignment.requiredBusCount,
+      scheduledTime: assignment.scheduledTime.trim(),
+      transferByTrain: assignment.transferByTrain ?? false,
+      trainDepartureTime: assignment.trainDepartureTime?.trim() || undefined,
+      stationPickupTime: assignment.stationPickupTime?.trim() || undefined,
+      status: assignment.status ?? ChecklistAssignmentStatus.NOT_COMPLETE,
+      drivers: (assignment.drivers ?? []).map((driver, index) => ({
+        slotNumber: driver.slotNumber ?? index + 1,
+        name: driver.name.trim(),
+        phone: driver.phone.trim(),
+        plateNumber: driver.plateNumber.trim(),
+        isVerified: driver.isVerified ?? false,
+      })),
+    })),
+  };
+}
+
+// ==========================================
+// STORE CRUD & OPERATIONS (from groups.memory-store.ts)
+// ==========================================
 
 function addUtcDays(baseDate: Date, dayOffset: number): Date {
   const nextDate = new Date(baseDate);
@@ -855,3 +1106,133 @@ export function resetChecklistDriverInMemory(
 
   return toChecklistAssignmentSyncResult(group.code, assignment);
 }
+
+// ==========================================
+// LISTING & PAGINATION (from groups.listing.ts)
+// ==========================================
+
+export function projectMemoryGroupRecord(
+  group: MemoryGroupRecord,
+  projection: GroupResponseProjection,
+): MemoryGroupRecord | MemoryGroupSummaryRecord {
+  if (projection === "detail") {
+    return group;
+  }
+
+  return {
+    id: group.id,
+    code: group.code,
+    name: group.name,
+    status: group.status,
+    arrivalDate: group.arrivalDate,
+    returnDate: group.returnDate,
+    tone: group.tone,
+    pax: group.pax,
+    totalBuses: group.totalBuses,
+    packageName: group.packageName,
+    durationDays: group.durationDays,
+    nextActivity: group.nextActivity,
+    itinerary: group.itinerary,
+    notes: group.notes,
+    visaSetup: group.visaSetup,
+    parentGroupId: group.parentGroupId,
+    createdAt: group.createdAt,
+    updatedAt: group.updatedAt,
+  };
+}
+
+export function normalizeGroupListFilter(rawFilter?: string): GroupListFilter {
+  const normalized = rawFilter?.trim().toLowerCase();
+  if (normalized === "not-issued" || normalized === "missing-hotel" || normalized === "unpaid") {
+    return normalized;
+  }
+  return "all";
+}
+
+function matchesMemoryFilter(item: MemoryGroupRecord, filter: GroupListFilter, activeOnly: boolean): boolean {
+  if (activeOnly && item.tone !== GroupTone.ACTIVE) {
+    return false;
+  }
+
+  if (filter === "all") {
+    return true;
+  }
+
+  if (filter === "not-issued") {
+    return item.visaSetup?.visaStatus !== VisaStatus.ISSUED;
+  }
+
+  if (filter === "missing-hotel") {
+    if (!item.visaSetup) {
+      return true;
+    }
+    const makkahPax = item.visaSetup.hotelAgreements
+      .filter((h) => h.city === "MAKKAH")
+      .reduce((sum, h) => sum + h.pax, 0);
+    const madinahPax = item.visaSetup.hotelAgreements
+      .filter((h) => h.city === "MADINAH")
+      .reduce((sum, h) => sum + h.pax, 0);
+    return makkahPax < item.pax || madinahPax < item.pax;
+  }
+
+  return item.visaSetup?.paymentStatus !== VisaPaymentStatus.PAID;
+}
+
+export function findAllFromMemory(
+  memoryGroups: MemoryGroupRecord[],
+  query?: string,
+  rawFilter?: string,
+  activeOnly = false,
+): MemoryGroupRecord[] {
+  const searchTokens = normalizeGroupSearchTokens(query);
+  const filter = normalizeGroupListFilter(rawFilter);
+  const source =
+    searchTokens.length === 0
+      ? memoryGroups
+      : memoryGroups.filter((item) => {
+          const searchDocument = buildGroupSearchDocument({
+            code: item.code,
+            name: item.name,
+            status: item.status,
+            packageName: item.packageName,
+          });
+          return searchTokens.every((token) => searchDocument.includes(token));
+        });
+
+  const filtered = source.filter((item) => matchesMemoryFilter(item, filter, activeOnly));
+  return [...filtered].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function resolvePaginationState(options?: FindAllOptions): { page: number; pageSize: number } | null {
+  const hasPage = Number.isFinite(options?.page);
+  const hasPageSize = Number.isFinite(options?.pageSize);
+  if (!hasPage && !hasPageSize) {
+    return null;
+  }
+
+  const page = options?.page && options.page > 0 ? Math.floor(options.page) : 1;
+  const requestedSize = options?.pageSize && options.pageSize > 0 ? Math.floor(options.pageSize) : 20;
+  const pageSize = Math.max(1, Math.min(100, requestedSize));
+
+  return { page, pageSize };
+}
+
+export function paginateGroupItems<T>(
+  items: T[],
+  options?: FindAllOptions,
+): T[] | PaginatedGroupList<T> {
+  const pageState = resolvePaginationState(options);
+  if (!pageState) {
+    return items;
+  }
+
+  const start = (pageState.page - 1) * pageState.pageSize;
+  const pagedItems = items.slice(start, start + pageState.pageSize);
+  return {
+    items: pagedItems,
+    total: items.length,
+    page: pageState.page,
+    pageSize: pageState.pageSize,
+  };
+}
+

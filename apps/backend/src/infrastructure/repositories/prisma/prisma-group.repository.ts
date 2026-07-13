@@ -29,11 +29,9 @@ import {
 import {
   groupDetailSelection,
   groupSummarySelection,
-} from "../../../groups/infrastructure/groups.prisma-include";
-import {
   buildGroupWhere,
   resolvePaginationState,
-} from "../../../groups/infrastructure/groups.listing";
+} from "./helpers/prisma-group.helpers";
 import {
   validateCreateOrReplaceHotelAgreementRules,
   validateHotelAgreementRules,
@@ -53,11 +51,11 @@ import {
   toGroupStatusLabel,
 } from "../../../groups/domain/groups.lifecycle-status";
 import { randomUUID } from "node:crypto";
-import { sanitizeAuditPayloadValue } from "../../../groups/infrastructure/groups.audit";
 import {
+  sanitizeAuditPayloadValue,
   buildGroupCreateData,
   buildGroupReplaceData,
-} from "../../../groups/infrastructure/groups.prisma-write-builders";
+} from "./helpers/prisma-group.helpers";
 
 type PrismaParentLinkCurrentGroup = {
   id: string;
