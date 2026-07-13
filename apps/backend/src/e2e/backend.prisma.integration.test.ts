@@ -1,5 +1,6 @@
 import "dotenv/config";
 import "reflect-metadata";
+import { describe, it, afterAll } from "vitest";
 import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
@@ -17,12 +18,6 @@ const DEV_AUTH_ADMIN_PASSWORD =
   process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
-
-function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  return fn().then(() => {
-    console.log(`PASS ${name}`);
-  });
-}
 
 function restoreEnvVar(key: string, previousValue: string | undefined): void {
   if (previousValue === undefined) {
@@ -560,23 +555,20 @@ async function testPrismaManagedUserPasswordFlow(): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
-  await runCase("backend prisma integration flow", testPrismaIntegrationFlow);
-  await runCase(
-    "backend prisma concurrent invoice create flow",
-    testPrismaConcurrentInvoiceCreateFlow,
-  );
-  await runCase(
-    "backend prisma managed user password flow",
-    testPrismaManagedUserPasswordFlow,
-  );
-}
-
-void main()
-  .catch((error: unknown) => {
-    console.error("Backend Prisma integration test failed:", error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
+describe("backend prisma integration tests", () => {
+  afterAll(async () => {
     await prisma.$disconnect();
   });
+
+  it("should run backend prisma integration flow", async () => {
+    await testPrismaIntegrationFlow();
+  });
+
+  it("should run backend prisma concurrent invoice create flow", async () => {
+    await testPrismaConcurrentInvoiceCreateFlow();
+  });
+
+  it("should run backend prisma managed user password flow", async () => {
+    await testPrismaManagedUserPasswordFlow();
+  });
+});

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import "reflect-metadata";
+import { describe, it, afterAll } from "vitest";
 import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
@@ -42,12 +43,6 @@ const DEV_AUTH_ADMIN_PASSWORD =
   process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
-
-function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  return fn().then(() => {
-    console.log(`PASS ${name}`);
-  });
-}
 
 function toIsoDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -728,16 +723,16 @@ async function testPrismaGroupsErrorFlow(): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
-  await runCase("backend prisma groups main flow", testPrismaGroupsMainFlow);
-  await runCase("backend prisma groups error flow", testPrismaGroupsErrorFlow);
-}
-
-void main()
-  .catch((error: unknown) => {
-    console.error("Backend Prisma groups integration test failed:", error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
+describe("backend prisma groups integration tests", () => {
+  afterAll(async () => {
     await prisma.$disconnect();
   });
+
+  it("should run backend prisma groups main flow", async () => {
+    await testPrismaGroupsMainFlow();
+  });
+
+  it("should run backend prisma groups error flow", async () => {
+    await testPrismaGroupsErrorFlow();
+  });
+});

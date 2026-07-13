@@ -10,7 +10,7 @@ import {
   VisaStatus,
 } from "@prisma/client";
 import { resolveItineraryTitle, formatRouteSummary } from "../domain/groups-itinerary-title";
-import { buildMemoryGroupPayloadFields } from "../infrastructure/groups.memory-group-payload";
+import { buildMemoryGroupPayloadFields } from "../../infrastructure/repositories/memory/helpers/memory-group.helpers";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 
 function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto {

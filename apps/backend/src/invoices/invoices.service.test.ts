@@ -1,3 +1,7 @@
+import { Test } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import { PrismaInvoiceRepository } from "../infrastructure/repositories/prisma/prisma-invoice.repository";
+import { MemoryInvoiceRepository } from "../infrastructure/repositories/memory/memory-invoice.repository";
 import { describe, expect, it } from "vitest";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { InvoiceStatus, Prisma } from "@prisma/client";
@@ -12,17 +16,27 @@ import { InvoiceCommandService } from "./application/invoice-command.service";
 type InvoiceListItem = Awaited<ReturnType<InvoicesService["findAll"]>>[number];
 type InvoiceClient = Awaited<ReturnType<InvoicesService["listClients"]>>[number];
 
-function createMemoryInvoicesService(): { service: InvoicesService; restore: () => void } {
+async function createMemoryInvoicesService(): Promise<{ service: InvoicesService; restore: () => void }> {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
   
-  const prisma = {} as PrismaService;
   const memoryStore = new InvoiceMemoryStore();
-  const validator = new InvoiceValidator();
-  const generator = new InvoiceNumberGenerator();
-  const queryService = new InvoiceQueryService(prisma, memoryStore);
-  const commandService = new InvoiceCommandService(prisma, memoryStore, queryService, validator, generator);
-  const service = new InvoicesService(queryService, commandService);
+  const repo = new MemoryInvoiceRepository(memoryStore);
+
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      InvoicesService,
+      InvoiceQueryService,
+      InvoiceCommandService,
+      ConfigService,
+      {
+        provide: "InvoiceRepository",
+        useValue: repo,
+      },
+    ],
+  }).compile();
+
+  const service = moduleRef.get(InvoicesService);
 
   return {
     service,
@@ -36,16 +50,26 @@ function createMemoryInvoicesService(): { service: InvoicesService; restore: () 
   };
 }
 
-function createPrismaInvoicesService(prismaMock: PrismaService): { service: InvoicesService; restore: () => void } {
+async function createPrismaInvoicesService(prismaMock: PrismaService): Promise<{ service: InvoicesService; restore: () => void }> {
   const previousDataSource = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "prisma";
   
-  const memoryStore = new InvoiceMemoryStore();
-  const validator = new InvoiceValidator();
-  const generator = new InvoiceNumberGenerator();
-  const queryService = new InvoiceQueryService(prismaMock, memoryStore);
-  const commandService = new InvoiceCommandService(prismaMock, memoryStore, queryService, validator, generator);
-  const service = new InvoicesService(queryService, commandService);
+  const repo = new PrismaInvoiceRepository(prismaMock);
+
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      InvoicesService,
+      InvoiceQueryService,
+      InvoiceCommandService,
+      ConfigService,
+      {
+        provide: "InvoiceRepository",
+        useValue: repo,
+      },
+    ],
+  }).compile();
+
+  const service = moduleRef.get(InvoicesService);
 
   return {
     service,
@@ -132,7 +156,7 @@ function assertInvoiceNumberPattern(invoiceNumber: string, year: string, serial:
 }
 
 async function testListClientsReturnsSeededSortedLabels(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const clients = await service.listClients();
     expect(clients.length).toBe(3);
@@ -152,7 +176,7 @@ async function testListClientsReturnsSeededSortedLabels(): Promise<void> {
 }
 
 async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const clients = await service.listClients();
     const yassir = findClientByName(clients, "Yassir");
@@ -190,7 +214,7 @@ async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Prom
 }
 
 async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const createdOverdue = await service.create({
       clientName: "Manual New Client",
@@ -223,7 +247,7 @@ async function testCreateCanCreateNewClientAndResolvesStatusRules(): Promise<voi
 }
 
 async function testCreateReusesExistingClientCaseInsensitively(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const created = await service.create({
       clientName: "  yAsSiR  ",
@@ -243,7 +267,7 @@ async function testCreateReusesExistingClientCaseInsensitively(): Promise<void> 
 }
 
 async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const created = await service.create({
       clientName: "Item Persistence Client",
@@ -316,7 +340,7 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
 }
 
 async function testCreateValidationErrors(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     try {
       await service.create({
@@ -361,7 +385,7 @@ async function testCreateValidationErrors(): Promise<void> {
 }
 
 async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const created = await service.create({
       clientName: "Update Target Client",
@@ -403,7 +427,7 @@ async function testUpdateSupportsClientSwitchStatusAndGroupRules(): Promise<void
 }
 
 async function testUpdateValidationErrors(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     try {
       await service.update("missing-invoice-id", { version: 0, notes: "noop" });
@@ -436,7 +460,7 @@ async function testUpdateValidationErrors(): Promise<void> {
 }
 
 async function testFindAllThrowsWhenInvoiceClientIsMissing(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     const seededClients = await service.listClients();
     const yassir = findClientByName(seededClients, "Yassir");
@@ -509,7 +533,7 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           amount: 125_500,
           downPaymentIdr: 50_000,
           status: InvoiceStatus.PENDING,
-          items: [
+          itemsRel: [
             {
               description: "Alpha Package",
               pax: 2,
@@ -533,13 +557,13 @@ async function testPrismaListAndFindAllMapping(): Promise<void> {
           dueDate: new Date("2099-01-11T00:00:00.000Z"),
           amount: 900_000,
           status: InvoiceStatus.CANCELLED,
-          items: [],
+          itemsRel: [],
         },
       ],
     },
   } as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const clients = await service.listClients();
     expect(clients.length).toBe(2);
@@ -585,7 +609,7 @@ async function testPrismaListClientsAllowsDuplicateSortOrder(): Promise<void> {
     },
   } as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const clients = await service.listClients();
     const orderBy = (findManyArgs as Record<string, unknown> | null)?.orderBy;
@@ -623,7 +647,7 @@ async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> 
           amount: 880_000,
           downPaymentIdr: 125_000,
           status: InvoiceStatus.PENDING,
-          items: [],
+          itemsRel: [],
         },
       ],
     },
@@ -637,7 +661,7 @@ async function testPrismaFindAllPrefersInlineDownPaymentColumn(): Promise<void> 
     },
   } as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     (service as unknown as { prismaInvoiceDownPaymentColumnState: boolean | null }).prismaInvoiceDownPaymentColumnState =
       true;
@@ -714,7 +738,7 @@ async function testPrismaCreateSupportsRetryAndFallbackSerialResolution(): Promi
     },
   }) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const created = await service.create({
       clientName: "Retry Client",
@@ -816,7 +840,7 @@ async function testPrismaCreateReusesClientFoundInsideLockedTransaction(): Promi
     },
   ) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const created = await service.create({
       clientName: "Locked Existing Client",
@@ -889,7 +913,7 @@ async function testPrismaClientLookupIsCaseInsensitive(): Promise<void> {
     },
   }) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     const created = await service.create({
       clientName: "  existing CLIENT ",
@@ -970,7 +994,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
   }) as unknown as PrismaService;
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockUnknownGroup);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockUnknownGroup);
     try {
       try {
         await service.create({
@@ -991,7 +1015,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
   }
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockPersistentP2002);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockPersistentP2002);
     try {
       try {
         await service.create({
@@ -1012,7 +1036,7 @@ async function testPrismaCreateErrorMappings(): Promise<void> {
   }
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockEnumMismatch);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockEnumMismatch);
     try {
       try {
         await service.create({
@@ -1118,7 +1142,7 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
   }) as unknown as PrismaService;
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockSuccess);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockSuccess);
     try {
       const updated = await service.update("inv-100", {
         version: 0,
@@ -1145,7 +1169,7 @@ async function testPrismaUpdateSuccessAndErrorMappings(): Promise<void> {
   }
 
   {
-    const { service, restore } = createPrismaInvoicesService(prismaMockError);
+    const { service, restore } = await createPrismaInvoicesService(prismaMockError);
     try {
       try {
         await service.update("inv-101", {
@@ -1190,7 +1214,7 @@ async function testPrismaUpdateVersionConcurrencyConflict(): Promise<void> {
     },
   }) as unknown as PrismaService;
 
-  const { service, restore } = createPrismaInvoicesService(prismaMock);
+  const { service, restore } = await createPrismaInvoicesService(prismaMock);
   try {
     try {
       await service.update("inv-conflict", {
@@ -1208,7 +1232,7 @@ async function testPrismaUpdateVersionConcurrencyConflict(): Promise<void> {
 }
 
 async function testFinancialCalculationsAndEdgeCases(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     // Test 1: Exchange rate calculations with USD
     const usdInvoice = await service.create({
@@ -1360,7 +1384,7 @@ async function testFinancialCalculationsAndEdgeCases(): Promise<void> {
 }
 
 async function testOverdueStatusLogic(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     // Test 1: Invoice becomes overdue when past due date
     const pastDueInvoice = await service.create({
@@ -1405,7 +1429,7 @@ async function testOverdueStatusLogic(): Promise<void> {
 }
 
 async function testPaymentHistoryValidation(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     // Test 1: Valid payment history in notes (status determined by downPaymentIdr, not payment history)
     const invoiceWithPayments = await service.create({
@@ -1453,7 +1477,7 @@ async function testPaymentHistoryValidation(): Promise<void> {
 }
 
 async function testClientSortOrderLogic(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     // Test 1: New clients get next available sort order
     const client1 = await service.create({
@@ -1492,7 +1516,7 @@ async function testClientSortOrderLogic(): Promise<void> {
 }
 
 async function testInvoiceNumberGeneration(): Promise<void> {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     // Test 1: Sequential numbering within same year
     const inv1 = await service.create({
@@ -1529,7 +1553,7 @@ async function testInvoiceNumberGeneration(): Promise<void> {
 }
 
 async function testPaginationSupport() {
-  const { service, restore } = createMemoryInvoicesService();
+  const { service, restore } = await createMemoryInvoicesService();
   try {
     for (let i = 1; i <= 5; i++) {
       await service.create({
@@ -1563,28 +1587,28 @@ async function testPaginationSupport() {
 
 
 describe("InvoicesService", () => {
-  it("invoice list clients seeded labels", () => testListClientsReturnsSeededSortedLabels());
-  it("invoice create existing client sequential numbering", () => testCreateUsesExistingClientAndGeneratesSequentialNumbers());
-  it("invoice create new clients and status rules", () => testCreateCanCreateNewClientAndResolvesStatusRules());
-  it("invoice create reuses existing client case-insensitively", () => testCreateReusesExistingClientCaseInsensitively());
-  it("invoice create and update persist items", () => testCreateAndUpdatePersistInvoiceItems());
-  it("invoice create validation errors", () => testCreateValidationErrors());
-  it("invoice update status client and group rules", () => testUpdateSupportsClientSwitchStatusAndGroupRules());
-  it("invoice update validation errors", () => testUpdateValidationErrors());
-  it("invoice findAll missing client guard", () => testFindAllThrowsWhenInvoiceClientIsMissing());
-  it("invoice prisma list and findAll mapping", () => testPrismaListAndFindAllMapping());
-  it("invoice prisma list clients allows duplicate sort order", () => testPrismaListClientsAllowsDuplicateSortOrder());
-  it("invoice prisma findAll prefers inline down payment column", () => testPrismaFindAllPrefersInlineDownPaymentColumn());
-  it("invoice prisma create retry and fallback serial", () => testPrismaCreateSupportsRetryAndFallbackSerialResolution());
-  it("invoice prisma create reuses client found inside locked transaction", () => testPrismaCreateReusesClientFoundInsideLockedTransaction());
-  it("invoice prisma client lookup is case-insensitive", () => testPrismaClientLookupIsCaseInsensitive());
-  it("invoice prisma create error mapping", () => testPrismaCreateErrorMappings());
-  it("invoice prisma update success and error mapping", () => testPrismaUpdateSuccessAndErrorMappings());
-  it("invoice prisma update version concurrency conflict", () => testPrismaUpdateVersionConcurrencyConflict());
-  it("financial calculations and edge cases", () => testFinancialCalculationsAndEdgeCases());
-  it("overdue status logic", () => testOverdueStatusLogic());
-  it("payment history validation", () => testPaymentHistoryValidation());
-  it("client sort order logic", () => testClientSortOrderLogic());
-  it("invoice number generation", () => testInvoiceNumberGeneration());
-  it("invoice pagination support", () => testPaginationSupport());
+  it("invoice list clients seeded labels", async () => testListClientsReturnsSeededSortedLabels());
+  it("invoice create existing client sequential numbering", async () => testCreateUsesExistingClientAndGeneratesSequentialNumbers());
+  it("invoice create new clients and status rules", async () => testCreateCanCreateNewClientAndResolvesStatusRules());
+  it("invoice create reuses existing client case-insensitively", async () => testCreateReusesExistingClientCaseInsensitively());
+  it("invoice create and update persist items", async () => testCreateAndUpdatePersistInvoiceItems());
+  it("invoice create validation errors", async () => testCreateValidationErrors());
+  it("invoice update status client and group rules", async () => testUpdateSupportsClientSwitchStatusAndGroupRules());
+  it("invoice update validation errors", async () => testUpdateValidationErrors());
+  it("invoice findAll missing client guard", async () => testFindAllThrowsWhenInvoiceClientIsMissing());
+  it("invoice prisma list and findAll mapping", async () => testPrismaListAndFindAllMapping());
+  it("invoice prisma list clients allows duplicate sort order", async () => testPrismaListClientsAllowsDuplicateSortOrder());
+  it("invoice prisma findAll prefers inline down payment column", async () => testPrismaFindAllPrefersInlineDownPaymentColumn());
+  it("invoice prisma create retry and fallback serial", async () => testPrismaCreateSupportsRetryAndFallbackSerialResolution());
+  it("invoice prisma create reuses client found inside locked transaction", async () => testPrismaCreateReusesClientFoundInsideLockedTransaction());
+  it("invoice prisma client lookup is case-insensitive", async () => testPrismaClientLookupIsCaseInsensitive());
+  it("invoice prisma create error mapping", async () => testPrismaCreateErrorMappings());
+  it("invoice prisma update success and error mapping", async () => testPrismaUpdateSuccessAndErrorMappings());
+  it("invoice prisma update version concurrency conflict", async () => testPrismaUpdateVersionConcurrencyConflict());
+  it("financial calculations and edge cases", async () => testFinancialCalculationsAndEdgeCases());
+  it("overdue status logic", async () => testOverdueStatusLogic());
+  it("payment history validation", async () => testPaymentHistoryValidation());
+  it("client sort order logic", async () => testClientSortOrderLogic());
+  it("invoice number generation", async () => testInvoiceNumberGeneration());
+  it("invoice pagination support", async () => testPaginationSupport());
 });

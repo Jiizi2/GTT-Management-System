@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
@@ -20,11 +21,6 @@ function buildUniqueGroupCode(): string {
     .toString()
     .padStart(4, "0");
   return `E2E-${timeFragment}${randomFragment}`;
-}
-
-async function runCase(name: string, fn: () => Promise<void>): Promise<void> {
-  await fn();
-  console.log(`PASS ${name}`);
 }
 
 function restoreEnvVar(key: "PORT" | "DATA_SOURCE", previousValue: string | undefined): void {
@@ -1416,16 +1412,16 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
   }
 }
 
-async function main(): Promise<void> {
-  await runCase("backend api e2e flow", testBackendApiFlow);
-  await runCase("backend managed user password http flow", testManagedUserPasswordHttpFlow);
-  await runCase(
-    "backend comprehensive add-group overview invoice raudhah flow",
-    testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow,
-  );
-}
+describe("backend api e2e tests", () => {
+  it("should run backend api e2e flow", async () => {
+    await testBackendApiFlow();
+  });
 
-void main().catch((error: unknown) => {
-  console.error("Backend API e2e test failed:", error);
-  process.exitCode = 1;
+  it("should run backend managed user password http flow", async () => {
+    await testManagedUserPasswordHttpFlow();
+  });
+
+  it("should run backend comprehensive add-group overview invoice raudhah flow", async () => {
+    await testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow();
+  });
 });

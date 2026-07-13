@@ -15,7 +15,7 @@ import { CreateGroupDto } from "../dto/create-group.dto";
 import {
   buildGroupCreateData,
   buildGroupReplaceData,
-} from "../infrastructure/groups.prisma-write-builders";
+} from "../../infrastructure/repositories/prisma/helpers/prisma-group.helpers";
 
 function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto {
   return {

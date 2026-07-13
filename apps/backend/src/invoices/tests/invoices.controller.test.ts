@@ -48,12 +48,6 @@ describe("InvoicesController", () => {
       create: vi.fn().mockResolvedValue(mockInvoiceListItem),
       update: vi.fn().mockResolvedValue(mockInvoiceListItem),
       delete: vi.fn().mockResolvedValue(undefined),
-      backfillLegacyItems: vi.fn().mockResolvedValue({
-        processed: 10,
-        success: 9,
-        failed: 1,
-        anomalies: [],
-      }),
     } as unknown as InvoicesService;
   };
 
@@ -136,20 +130,5 @@ describe("InvoicesController", () => {
     await controller.remove("inv-1");
 
     expect(service.delete).toHaveBeenCalledWith("inv-1");
-  });
-
-  it("should trigger backfill for legacy items", async () => {
-    const service = createMockService();
-    const controller = new InvoicesController(service);
-
-    const result = await controller.backfill();
-
-    expect(service.backfillLegacyItems).toHaveBeenCalled();
-    expect(result).toEqual({
-      processed: 10,
-      success: 9,
-      failed: 1,
-      anomalies: [],
-    });
   });
 });
