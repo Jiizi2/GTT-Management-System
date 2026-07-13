@@ -526,12 +526,12 @@ export function filterAgreementDrafts(
           minRemaining = remainingOnNight;
         }
       }
-      if (minRemaining < params.totalPax) {
+      if (minRemaining <= 0) {
         continue;
       }
     } else {
       const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
-      if (availablePax < params.totalPax) {
+      if (availablePax <= 0) {
         continue;
       }
     }
