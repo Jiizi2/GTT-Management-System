@@ -64,6 +64,8 @@ export interface VisaDetailContextType {
   isClearRaudhahConfirmOpen: boolean;
   setIsClearRaudhahConfirmOpen: (open: boolean) => void;
   isWhatsappCopied: boolean;
+  agreementDraftsQueryLoading?: boolean;
+  agreementDraftsQueryError?: boolean;
   
   // Computed values
   totalPax: number;

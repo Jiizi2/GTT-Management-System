@@ -365,6 +365,8 @@ export function HotelAgreementSection() {
     setCoverageStartIso,
     setCoverageEndIso,
     cancelAddHotelInline,
+    agreementDraftsQueryLoading,
+    agreementDraftsQueryError,
   } = useVisaDetailContext();
 
   const makkahAgreementIdSet = useMemo(() => new Set(makkahAgreements.map((agreement) => agreement.id)), [makkahAgreements]);
@@ -495,8 +497,8 @@ export function HotelAgreementSection() {
             city="makkah"
             drafts={availableAgreementDraftsByCity.makkah}
             group={group}
-            isLoading={false}
-            isError={false}
+            isLoading={agreementDraftsQueryLoading}
+            isError={agreementDraftsQueryError}
             assigningDraftId={assigningAgreementDraftId}
             onAssignDraft={(draft, selectedStart, selectedEnd) =>
               void assignAgreementDraft(draft, selectedStart, selectedEnd)
@@ -654,8 +656,8 @@ export function HotelAgreementSection() {
             city="madinah"
             drafts={availableAgreementDraftsByCity.madinah}
             group={group}
-            isLoading={false}
-            isError={false}
+            isLoading={agreementDraftsQueryLoading}
+            isError={agreementDraftsQueryError}
             assigningDraftId={assigningAgreementDraftId}
             onAssignDraft={(draft, selectedStart, selectedEnd) =>
               void assignAgreementDraft(draft, selectedStart, selectedEnd)
