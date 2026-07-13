@@ -791,6 +791,8 @@ export function useVisaTrackingDetail({
     isClearRaudhahConfirmOpen,
     setIsClearRaudhahConfirmOpen,
     isWhatsappCopied,
+    agreementDraftsQueryLoading: agreementDraftsQuery.isLoading,
+    agreementDraftsQueryError: agreementDraftsQuery.isError,
     
     // Computed values
     totalPax,
