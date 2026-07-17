@@ -11,6 +11,7 @@ import { AppModule } from "./app.module";
 import { ApiExceptionFilter } from "./http/api-exception.filter";
 import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
 import { resolveStartupErrorMessage } from "./runtime-config";
+import { resolveExpressTrustProxy } from "./config/trust-proxy";
 
 type CorsOriginCallback = (error: Error | null, allow?: boolean) => void;
 type HeaderResponse = {
@@ -68,7 +69,7 @@ async function bootstrap(): Promise<void> {
   httpServer.disable?.("x-powered-by");
   httpServer.set?.(
     "trust proxy",
-    configService.get<string>("TRUST_PROXY")?.trim().toLowerCase() === "true" ? 1 : false,
+    resolveExpressTrustProxy(configService.get<unknown>("TRUST_PROXY")),
   );
 
   app.enableCors({
