@@ -23,12 +23,15 @@ services:
       DATA_SOURCE: prisma
       AUTH_BOOTSTRAP_DEFAULT_USERS: "false"
       TRUST_PROXY: "true"
+      INVOICE_DOCUMENT_ASSET_DIR: /run/secrets/invoice-document-assets
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gtt_ops}?schema=public
     depends_on:
       postgres:
         condition: service_healthy
     expose:
       - "3001"
+    volumes:
+      - ${INVOICE_DOCUMENT_ASSET_HOST_DIR:-./.private/invoice-document-assets}:/run/secrets/invoice-document-assets:ro
 
   postgres:
     image: postgres:16-alpine

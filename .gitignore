@@ -29,6 +29,15 @@ apps/*/.env
 apps/*/.env.*
 !apps/*/.env.example
 
+# Sensitive local database dumps
+.local-backups/
+*.dump
+*.backup
+production_backup*.sql
+
+# Private document assets (mounted read-only in production)
+.private/
+
 # Prisma local SQLite database
 apps/backend/prisma/dev.db
 apps/backend/prisma/dev.db-journal

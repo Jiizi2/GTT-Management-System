@@ -33,6 +33,7 @@ const ENVIRONMENT_SCHEMA = Joi.object({
   GROUP_AUDIT_LOG_RETENTION_DAYS: Joi.number().integer().min(1).default(180),
   AUTH_LOGIN_RATE_LIMIT_RETENTION_DAYS: Joi.number().integer().min(1).default(14),
   APP_THROTTLE_BUCKET_RETENTION_DAYS: Joi.number().integer().min(1).default(14),
+  INVOICE_DOCUMENT_ASSET_DIR: Joi.string().trim().allow("").optional(),
   DEV_AUTH_SUPERADMIN_PASSWORD: Joi.string().allow("").optional(),
   DEV_AUTH_ADMIN_PASSWORD: Joi.string().allow("").optional(),
 }).unknown(true);
@@ -61,6 +62,7 @@ type ValidatedEnvironment = {
   GROUP_AUDIT_LOG_RETENTION_DAYS: number;
   AUTH_LOGIN_RATE_LIMIT_RETENTION_DAYS: number;
   APP_THROTTLE_BUCKET_RETENTION_DAYS: number;
+  INVOICE_DOCUMENT_ASSET_DIR?: string;
   DEV_AUTH_SUPERADMIN_PASSWORD?: string;
   DEV_AUTH_ADMIN_PASSWORD?: string;
 };
