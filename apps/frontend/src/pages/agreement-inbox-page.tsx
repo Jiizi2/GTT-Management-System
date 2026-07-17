@@ -7,6 +7,7 @@ import { AgreementDraftFields } from "./agreement-inbox/components/AgreementDraf
 import { AgreementDraftCard } from "./agreement-inbox/components/AgreementDraftCard";
 import { AgreementDraftEditModal, DeleteAgreementDraftModal } from "./agreement-inbox/components/AgreementInboxModals";
 import type { AgreementDraftStatusFilter } from "../hooks/use-agreement-drafts-query";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 
 export function AgreementInboxScreen() {
   const state = useAgreementInbox();
@@ -16,6 +17,8 @@ export function AgreementInboxScreen() {
     query,
     setQuery,
     statusFilter,
+    agentFilter,
+    setAgentFilter,
     setStatusFilter,
     startDateFilter,
     setStartDateFilter,
@@ -63,7 +66,7 @@ export function AgreementInboxScreen() {
           <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Agreement Inbox</h1>
         </div>
 
-        <label
+        <div className="flex w-full gap-2 sm:max-w-sm"><label
           className="serene-page-search w-full cursor-text border border-transparent transition focus-within:border-brand-primary/25 focus-within:ring-2 focus-within:ring-brand-primary/15 sm:max-w-sm"
           aria-label="Search agreement drafts"
         >
@@ -77,7 +80,7 @@ export function AgreementInboxScreen() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search agreement..."
           />
-        </label>
+        </label></div>
       </header>
 
       {feedback ? (
@@ -162,7 +165,7 @@ export function AgreementInboxScreen() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="grid gap-4 md:grid-cols-[auto_minmax(11rem,0.7fr)_auto] md:items-end md:justify-between">
           {/* Status Segmented Control */}
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</span>
@@ -201,6 +204,8 @@ export function AgreementInboxScreen() {
               })}
             </div>
           </div>
+
+          <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" />
 
           {/* Stay Period Filter */}
           <div className="flex flex-col gap-1.5">

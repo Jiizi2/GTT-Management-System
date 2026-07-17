@@ -16,6 +16,7 @@ import { RuntimeMaintenanceModule } from "./runtime-maintenance/runtime-maintena
 import { AppThrottlerGuard } from "./throttling/app-throttler.guard";
 import { AppThrottlerStorage } from "./throttling/app-throttler.storage";
 import { RepositoriesModule } from "./infrastructure/repositories/repositories.module";
+import { AgentsModule } from "./agents/agents.module";
 
 type HttpLogRequest = {
   id?: unknown;
@@ -219,6 +220,7 @@ function resolveHttpSuccessMessage(
       },
     }),
     AuthModule,
+    AgentsModule,
     PrismaModule,
     RuntimeMaintenanceModule,
     HealthModule,

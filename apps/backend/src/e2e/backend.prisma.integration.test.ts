@@ -17,6 +17,7 @@ const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
 const DEV_AUTH_ADMIN_PASSWORD =
   process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026";
+const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
 
@@ -331,6 +332,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
+        agentId: GTT_DIRECT_AGENT_ID,
         clientName: testClientName,
         issuedDate: todayIso,
         dueDate: dueDateIso,
@@ -432,6 +434,7 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
             "content-type": "application/json",
           },
           body: JSON.stringify({
+            agentId: GTT_DIRECT_AGENT_ID,
             clientName: `${testClientPrefix}-${leftIndex + 1}`,
             issuedDate: "2026-01-15",
             dueDate: `${2030 + leftIndex}-01-15`,
@@ -444,6 +447,7 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
             "content-type": "application/json",
           },
           body: JSON.stringify({
+            agentId: GTT_DIRECT_AGENT_ID,
             clientName: `${testClientPrefix}-${rightIndex + 1}`,
             issuedDate: "2026-01-15",
             dueDate: `${2030 + rightIndex}-01-15`,

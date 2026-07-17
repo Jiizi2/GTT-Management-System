@@ -5,6 +5,7 @@ import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useRaudhahReminder, type PendingTasrehAction } from "./raudhah-reminder/hooks/use-raudhah-reminder";
 import { RaudhahReminderSection } from "./raudhah-reminder/components/RaudhahReminderSection";
 import { RaudhahReminderConfirmModal } from "./raudhah-reminder/components/RaudhahReminderConfirmModal";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 
 export function RaudhahReminderScreen({
   groups,
@@ -18,7 +19,9 @@ export function RaudhahReminderScreen({
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
 
-  const state = useRaudhahReminder({ groups });
+  const [agentFilter, setAgentFilter] = useState("all");
+  const scopedGroups = agentFilter === "all" ? groups : groups.filter((group) => group.agentId === agentFilter);
+  const state = useRaudhahReminder({ groups: scopedGroups });
 
   const {
     query,
@@ -98,7 +101,7 @@ export function RaudhahReminderScreen({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
           <label className="serene-page-search w-full cursor-text transition focus-within:border-primary/25 focus-within:ring-2 focus-within:ring-primary/15 sm:max-w-xs">
             <span className="material-symbols-outlined text-slate-400" aria-hidden="true">
               search
@@ -111,6 +114,8 @@ export function RaudhahReminderScreen({
               placeholder="Search group code, name, musyrif..."
             />
           </label>
+
+          <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} className="w-full sm:w-auto" />
 
           <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
         </div>

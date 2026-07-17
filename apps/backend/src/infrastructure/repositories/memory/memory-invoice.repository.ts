@@ -48,7 +48,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       }));
   }
 
-  async findAll(): Promise<InvoiceListItem[]> {
+  async findAll(agentId?: string): Promise<InvoiceListItem[]> {
     const todayIso = toIsoDateOnly(new Date());
     this.memoryStore.invoices.forEach((inv) => {
       const isNoDueDate = inv.notes?.includes("[NoDueDate:true]");
@@ -61,7 +61,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       }
     });
 
-    return [...this.memoryStore.invoices]
+    return [...this.memoryStore.invoices].filter((invoice) => !agentId || invoice.agentId === agentId)
       .sort((left, right) => {
         const dueDateDiff = right.dueDateIso.localeCompare(left.dueDateIso);
         if (dueDateDiff !== 0) {
@@ -78,10 +78,10 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       });
   }
 
-  async findAllPaginated(pagination: PaginationDto): Promise<PaginatedResponseDto<InvoiceListItem>> {
+  async findAllPaginated(pagination: PaginationDto, agentId?: string): Promise<PaginatedResponseDto<InvoiceListItem>> {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
-    const allMapped = await this.findAll();
+    const allMapped = await this.findAll(agentId);
     const sliced = allMapped.slice((page - 1) * limit, page * limit);
     return {
       data: sliced,
@@ -146,6 +146,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       id: randomUUID(),
       invoiceNumber,
       clientId: client.id,
+      agentId: payload.agentId?.trim() || "agent_gtt_direct",
       groupId: undefined,
       issuedDateIso,
       dueDateIso,
@@ -235,6 +236,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
     const updatedInvoice: MemoryInvoice = {
       ...currentInvoice,
       clientId: client.id,
+      agentId: payload.agentId?.trim() || currentInvoice.agentId || "agent_gtt_direct",
       issuedDateIso,
       dueDateIso,
       amount: roundedAmount,
@@ -359,6 +361,8 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       clientId: client.id,
+      agentId: invoice.agentId || "agent_gtt_direct",
+      agentName: "GTT Direct",
       clientName: client.name,
       clientLabel: formatClientLabel(client.sortOrder, client.name),
       clientInitials: getInitials(client.name),

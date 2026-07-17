@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { AgreementApprovalStatus, GroupData, VisaTrackingRow, VisaFilterId } from "../shared/app-domain";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 import { PaginationControls } from "../components/pagination-controls";
 import { PageHeroSection } from "../components/page-hero-section";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -21,7 +23,9 @@ export function VisaTrackingScreen({
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
 
-  const state = useVisaTracking({ groups });
+  const [agentFilter, setAgentFilter] = useState("all");
+  const scopedGroups = agentFilter === "all" ? groups : groups.filter((group) => group.agentId === agentFilter);
+  const state = useVisaTracking({ groups: scopedGroups });
 
   const {
     query,
@@ -181,8 +185,9 @@ export function VisaTrackingScreen({
           })}
         </div>
 
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <div className="relative min-w-[11rem]">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+          <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="pill" className="flex-1 sm:flex-none" />
+          <div className="relative min-w-[10.5rem] flex-1 sm:min-w-[11rem] sm:flex-none">
             <SereneSelect
               className="serene-select-pill h-9 w-full pr-9"
               value={issuedMonthFilter}

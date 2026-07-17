@@ -2,6 +2,7 @@ import { Controller, useFormContext } from "react-hook-form";
 import { DatePickerInput } from "../../../components/date-time-pickers";
 import { SereneSelect } from "../../../components/serene-select";
 import type { IdentityFormValues } from "../hooks/use-add-group-workspace-form";
+import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 
 interface GroupInformationFormProps {
   isScheduleOnlyMode: boolean;
@@ -22,6 +23,7 @@ export function GroupInformationForm({
   hasInvalidDateRange,
   isTotalBusBelowMinimum,
 }: GroupInformationFormProps) {
+  const agentsQuery = useAgentsQuery();
   const {
     register,
     control,
@@ -49,6 +51,24 @@ export function GroupInformationForm({
         </div>
 
         <div className={gridClassName}>
+          <label className={wideFieldClassName}>
+            <span>Agent</span>
+            <Controller
+              name="agentId"
+              control={control}
+              render={({ field }) => (
+                <SereneSelect className={selectClassName} value={field.value ?? ""} onChange={field.onChange}>
+                  <option value="" disabled>{agentsQuery.isLoading ? "Loading agents..." : "Select Agent"}</option>
+                  {(agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE").map((agent) => (
+                    <option key={agent.id} value={agent.id}>{agent.name} ({agent.code})</option>
+                  ))}
+                </SereneSelect>
+              )}
+            />
+            {identityErrors.agentId ? <p className="text-xs font-semibold text-error">{identityErrors.agentId.message}</p> : null}
+            {agentsQuery.isError ? <p className="text-xs font-semibold text-error">Agent list gagal dimuat.</p> : null}
+          </label>
+
           <label className={wideFieldClassName}>
             <span>Group Number</span>
             <input

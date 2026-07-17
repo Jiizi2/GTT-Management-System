@@ -19,6 +19,7 @@ type RequestResult = {
 
 const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.superadmin";
 const DEV_AUTH_PASSWORD = process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
+const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
 
@@ -205,6 +206,7 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
   it("should perform hotel agreement draft CRUD", async () => {
     const agreementNumber = `AGR-E2E-${Date.now()}`;
     const payload = {
+      agentId: GTT_DIRECT_AGENT_ID,
       city: "MAKKAH",
       hotelName: "Swissotel E2E",
       agreementNumber: agreementNumber,
@@ -263,6 +265,7 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
     // 1. Create a group
     const uniqueGroupCode = `GRP-DRAFT-${Date.now()}`;
     const groupPayload = {
+      agentId: GTT_DIRECT_AGENT_ID,
       code: uniqueGroupCode,
       name: "E2E Draft Group",
       status: "Active",
@@ -285,6 +288,7 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
     // 2. Create a draft agreement
     const agreementNumber = `AGR-ASSIGN-${Date.now()}`;
     const draftPayload = {
+      agentId: GTT_DIRECT_AGENT_ID,
       city: "MAKKAH",
       hotelName: "Swissotel Assign E2E",
       agreementNumber: agreementNumber,

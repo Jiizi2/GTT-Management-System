@@ -513,6 +513,13 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
 
   return {
     id: group.id,
+    agentId: readString(group.agentId, "agent_gtt_direct"),
+    agent: group.agent ? {
+      id: readString(group.agent.id), code: readString(group.agent.code), name: readString(group.agent.name),
+      type: group.agent.type === "PARTNER" ? "PARTNER" : "DIRECT",
+      status: group.agent.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      picName: group.agent.picName ?? null, phone: group.agent.phone ?? null, email: group.agent.email ?? null,
+    } : undefined,
     code,
     name,
     status: resolvedStatus,

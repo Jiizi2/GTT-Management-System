@@ -150,6 +150,7 @@ type MemoryGroupPayloadFields = Pick<
   | "visaSetup"
   | "checklistAssignments"
   | "parentGroupId"
+  | "agentId"
 >;
 
 function toIsoDateOnlyLocal(value: string): string {
@@ -177,6 +178,7 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
     totalBuses: payload.totalBuses ?? null,
     packageName: payload.packageName.trim(),
     durationDays: payload.durationDays,
+    agentId: payload.agentId?.trim() || "agent_gtt_direct",
     parentGroupId: payload.parentGroupId?.trim() || null,
     musyrif: payload.musyrif
       ? {
@@ -1235,4 +1237,3 @@ export function paginateGroupItems<T>(
     pageSize: pageState.pageSize,
   };
 }
-

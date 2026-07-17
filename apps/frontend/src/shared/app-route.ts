@@ -186,6 +186,10 @@ export function resolveDashboardRouteFromPathname(pathname: string): DashboardRo
     };
   }
 
+  if (normalizedLowerPathname === "/agents") {
+    return { activeNav: "master-data", selectedGroupCode: null, selectedVisaGroupCode: null, canonicalPath: "/master-data" };
+  }
+
   if (normalizedLowerPathname === "/manage-role" || normalizedLowerPathname === "/user-management") {
     return {
       activeNav: "user-management",

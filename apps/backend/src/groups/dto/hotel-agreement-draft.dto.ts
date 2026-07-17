@@ -12,14 +12,14 @@ import {
 } from "class-validator";
 
 export class UpsertHotelAgreementDraftDto {
+  @ApiProperty({ example: "agent_gtt_direct" })
+  @IsString()
+  @IsNotEmpty()
+  agentId?: string;
+
   @ApiProperty({ enum: AgreementCity, example: AgreementCity.MAKKAH })
   @IsEnum(AgreementCity)
   city!: AgreementCity;
-
-  @ApiPropertyOptional({ example: "PT Al Falah Agent" })
-  @IsOptional()
-  @IsString()
-  agentName?: string;
 
   @ApiProperty({ example: "Swissotel Al Maqam" })
   @IsString()

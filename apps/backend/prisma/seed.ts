@@ -35,6 +35,7 @@ async function resetData(): Promise<void> {
   await prisma.authUser.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.invoiceClient.deleteMany();
+  await prisma.hotelAgreementDraft.deleteMany();
   await prisma.checklistDriver.deleteMany();
   await prisma.checklistAssignment.deleteMany();
   await prisma.raudhahAppointment.deleteMany();
@@ -46,6 +47,17 @@ async function resetData(): Promise<void> {
   await prisma.nextActivity.deleteMany();
   await prisma.musyrif.deleteMany();
   await prisma.group.deleteMany();
+  await prisma.agent.deleteMany();
+}
+
+const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
+
+async function seedAgents(): Promise<void> {
+  await prisma.agent.upsert({
+    where: { code: "GTT-DIRECT" },
+    update: { name: "GTT Direct", type: "DIRECT", status: "ACTIVE" },
+    create: { id: GTT_DIRECT_AGENT_ID, code: "GTT-DIRECT", name: "GTT Direct", type: "DIRECT", status: "ACTIVE" },
+  });
 }
 
 async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): Promise<void> {
@@ -176,6 +188,7 @@ function withGroupSearchDocument<
     ...args,
     data: {
       ...args.data,
+      agentId: GTT_DIRECT_AGENT_ID,
       searchDocument: buildGroupSearchDocument(args.data),
     },
   };
@@ -1286,6 +1299,7 @@ async function seedInvoices({ resetDataFirst }: { resetDataFirst: boolean }): Pr
     await prisma.invoice.create({
       data: {
         invoiceNumber: seed.invoiceNumber,
+        agentId: GTT_DIRECT_AGENT_ID,
         clientId,
         groupId,
         issuedDate: toUtcMidnightDate(seed.issuedDateIso),
@@ -1316,6 +1330,7 @@ async function main(): Promise<void> {
 
   await seedAuthUsers();
   await seedMasterData({ resetDataFirst });
+  await seedAgents();
   await seedGroups({ resetDataFirst });
   await seedInvoiceClients({ resetDataFirst });
   await seedInvoices({ resetDataFirst });

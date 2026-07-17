@@ -7,6 +7,7 @@ import { Button } from "../components/button";
 import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 
 const { OVERVIEW_PAGE_SIZE } = Domain;
 
@@ -60,20 +61,22 @@ export function OverviewScreen({
 }) {
   const hasQuery = query.trim().length > 0;
   const [currentPage, setCurrentPage] = useState(1);
+  const [agentFilter, setAgentFilter] = useState("all");
+  const agentFilteredGroups = agentFilter === "all" ? filteredGroups : filteredGroups.filter((group) => group.agentId === agentFilter);
   const selectedOverviewMonthLabel =
     overviewMonthOptions.find((option) => option.value === overviewMonthFilter)?.label ??
     (overviewMonthFilter === "all" ? "All Months" : overviewMonthFilter);
-  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / OVERVIEW_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(agentFilteredGroups.length / OVERVIEW_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * OVERVIEW_PAGE_SIZE;
-  const paginatedGroups = filteredGroups.slice(pageStartIndex, pageStartIndex + OVERVIEW_PAGE_SIZE);
-  const visibleRangeStart = filteredGroups.length === 0 ? 0 : pageStartIndex + 1;
+  const paginatedGroups = agentFilteredGroups.slice(pageStartIndex, pageStartIndex + OVERVIEW_PAGE_SIZE);
+  const visibleRangeStart = agentFilteredGroups.length === 0 ? 0 : pageStartIndex + 1;
   const visibleRangeEnd =
-    filteredGroups.length === 0 ? 0 : Math.min(filteredGroups.length, pageStartIndex + paginatedGroups.length);
-  const hasGroupsForExport = filteredGroups.length > 0;
+    agentFilteredGroups.length === 0 ? 0 : Math.min(agentFilteredGroups.length, pageStartIndex + paginatedGroups.length);
+  const hasGroupsForExport = agentFilteredGroups.length > 0;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [overviewMonthFilter, query, isActiveOnly]);
+  }, [overviewMonthFilter, query, isActiveOnly, agentFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -90,7 +93,7 @@ export function OverviewScreen({
       .then(({ exportOverviewReportPdf }) => {
         const exported = exportOverviewReportPdf(
           {
-            groups: filteredGroups,
+            groups: agentFilteredGroups,
             query,
             isActiveOnly,
             monthLabel: selectedOverviewMonthLabel,
@@ -212,14 +215,15 @@ export function OverviewScreen({
 
       <section className="serene-summary-strip" aria-label="Search results summary">
         <div className="flex items-end gap-2 text-sm text-on-surface-variant">
-          <strong className="text-2xl font-bold leading-none text-on-surface">{filteredGroups.length}</strong>
-          <span className="sm:hidden">{filteredGroups.length === 1 ? "group" : "groups"}</span>
+          <strong className="text-2xl font-bold leading-none text-on-surface">{agentFilteredGroups.length}</strong>
+          <span className="sm:hidden">{agentFilteredGroups.length === 1 ? "group" : "groups"}</span>
           <span className="hidden sm:inline">
-            {filteredGroups.length === 1 ? "group displayed" : "groups displayed"}
+            {agentFilteredGroups.length === 1 ? "group displayed" : "groups displayed"}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="pill" />
           <div
             className="inline-flex min-h-9 max-w-full overflow-hidden rounded-xl border border-outline-variant/45 bg-surface-container-lowest shadow-sm"
             aria-label="Overview filters"
@@ -287,7 +291,7 @@ export function OverviewScreen({
         style={{ columnGap: "1.5rem", rowGap: "1.5rem" }}
         aria-label="Group itinerary cards"
       >
-        {filteredGroups.length > 0 ? (
+        {agentFilteredGroups.length > 0 ? (
           paginatedGroups.map((group) => <GroupCard key={group.code} group={group} groups={groups} onOpenDetail={onOpenDetail} />)
         ) : (
           <article className="serene-empty-state col-span-full">
@@ -305,7 +309,7 @@ export function OverviewScreen({
       <PaginationControls
         currentPage={currentPage}
         totalPages={totalPages}
-        totalItems={filteredGroups.length}
+        totalItems={agentFilteredGroups.length}
         rangeStart={visibleRangeStart}
         rangeEnd={visibleRangeEnd}
         itemLabel="groups"

@@ -13,6 +13,12 @@ const scriptPath = path.join(
 function runGuard(testDatabaseUrl) {
   const env = { ...process.env };
   delete env.TEST_DATABASE_URL;
+  // Keep guard scenarios deterministic even when a developer has configured
+  // TEST_DATABASE_URL in apps/backend/.env for the real integration suite.
+  env.DOTENV_CONFIG_PATH = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    ".env.integration-guard-empty",
+  );
   if (testDatabaseUrl !== undefined) env.TEST_DATABASE_URL = testDatabaseUrl;
   return spawnSync(process.execPath, [scriptPath], {
     encoding: "utf8",

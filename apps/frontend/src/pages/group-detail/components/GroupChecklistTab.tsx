@@ -140,6 +140,7 @@ export function GroupChecklistTab() {
             <span className={detailKickerClassName}>Group Name</span>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-xl font-semibold text-on-surface sm:text-2xl">{group.name}</h3>
+              <p className="mt-1 text-sm font-bold text-primary">Agent: {group.agent?.name ?? "GTT Direct"}</p>
             </div>
           </div>
         </div>

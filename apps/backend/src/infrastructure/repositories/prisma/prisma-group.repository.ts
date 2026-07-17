@@ -73,7 +73,7 @@ export class PrismaGroupRepository implements GroupRepository {
   }
 
   async findAll(query?: string, options?: FindAllOptions): Promise<GroupListResult> {
-    const where = buildGroupWhere(query, options?.filter, options?.activeOnly ?? false);
+    const where = buildGroupWhere(query, options?.filter, options?.activeOnly ?? false, options?.agentId);
     const pageState = resolvePaginationState(options);
     const select = options?.projection === "summary" ? groupSummarySelection : groupDetailSelection;
 
@@ -221,6 +221,7 @@ export class PrismaGroupRepository implements GroupRepository {
     const normalizedCode = payload.code.trim().toUpperCase();
     const parentGroupId = await this.validateParentGroupLinkWithPrisma({
       requestedParentGroupId: payload.parentGroupId,
+      agentId: payload.agentId,
     });
     const normalizedPayload: CreateGroupDto = {
       ...payload,
@@ -286,6 +287,7 @@ export class PrismaGroupRepository implements GroupRepository {
     );
     const parentGroupId = await this.validateParentGroupLinkWithPrisma({
       requestedParentGroupId: payload.parentGroupId,
+      agentId: payload.agentId,
       currentGroup: current,
     });
     const normalizedPayload: CreateGroupDto = {
@@ -515,6 +517,38 @@ export class PrismaGroupRepository implements GroupRepository {
         id: current.id,
       },
     });
+  }
+
+  async reassignAgent(idOrCode: string, agentId: string): Promise<GroupDetailRecord> {
+    const group = await this.prisma.group.findFirst({
+      where: { OR: [{ id: idOrCode }, { code: idOrCode.trim().toUpperCase() }] },
+      select: { id: true, code: true, parentGroupId: true, childGroups: { select: { id: true } } },
+    });
+    if (!group) throw new NotFoundException(`Group '${idOrCode}' not found.`);
+    if (group.parentGroupId) throw new BadRequestException("Reassign Agent harus dilakukan dari parent Group.");
+    const groupIds = [group.id, ...group.childGroups.map((child) => child.id)];
+    await this.prisma.$transaction(async (tx) => {
+      const linkedAgreements = await tx.visaHotelAgreement.findMany({
+        where: {
+          visaSetup: { groupId: { in: groupIds } },
+          sourceDraftId: { not: null },
+        },
+        select: { sourceDraftId: true },
+      });
+      const sourceDraftIds = linkedAgreements
+        .map((agreement) => agreement.sourceDraftId)
+        .filter((draftId): draftId is string => Boolean(draftId));
+
+      await tx.group.updateMany({ where: { id: { in: groupIds } }, data: { agentId } });
+      await tx.invoice.updateMany({ where: { groupId: { in: groupIds } }, data: { agentId } });
+      if (sourceDraftIds.length > 0) {
+        await tx.hotelAgreementDraft.updateMany({
+          where: { id: { in: sourceDraftIds } },
+          data: { agentId },
+        });
+      }
+    });
+    return this.findOneByIdOrCode(group.id);
   }
 
   async addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<GroupDetailRecord> {
@@ -1233,6 +1267,7 @@ export class PrismaGroupRepository implements GroupRepository {
   private async validateParentGroupLinkWithPrisma(input: {
     requestedParentGroupId?: string | null;
     currentGroup?: PrismaParentLinkCurrentGroup;
+    agentId?: string;
   }): Promise<string | null | undefined> {
     if (input.requestedParentGroupId === undefined) {
       return undefined;
@@ -1263,6 +1298,7 @@ export class PrismaGroupRepository implements GroupRepository {
         id: true,
         code: true,
         parentGroupId: true,
+        agentId: true,
       },
     });
 
@@ -1274,6 +1310,10 @@ export class PrismaGroupRepository implements GroupRepository {
       throw new ConflictException(
         `Group '${parentGroup.code}' is a child group and cannot be used as parent.`,
       );
+    }
+
+    if (input.agentId && parentGroup.agentId && parentGroup.agentId !== input.agentId) {
+      throw new ConflictException("Parent Group dan Child Group harus berasal dari Agent yang sama.");
     }
 
     if (currentGroup) {

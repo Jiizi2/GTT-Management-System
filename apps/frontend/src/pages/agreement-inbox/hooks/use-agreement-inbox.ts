@@ -23,7 +23,7 @@ import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-k
 export const draftSchema = z
   .object({
     city: z.enum(["makkah", "madinah"]),
-    agentName: z.string(),
+    agentId: z.string().trim().min(1, "Agent wajib dipilih."),
     hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
     agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
     pax: z
@@ -49,7 +49,7 @@ export const AGREEMENT_DRAFT_PAGE_SIZE = 8;
 export function createDefaultDraftForm(): HotelAgreementDraftFormState {
   return {
     city: "makkah",
-    agentName: "",
+    agentId: "",
     hotelName: "",
     agreementNumber: "",
     pax: "1",
@@ -70,6 +70,7 @@ export function useAgreementInbox() {
   const linkedGroupCode = searchParams.get("groupCode")?.trim().toUpperCase() ?? "";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
+  const [agentFilter, setAgentFilter] = useState("all");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,6 +94,7 @@ export function useAgreementInbox() {
 
   const filteredDrafts = useMemo(() => {
     let result = drafts;
+    if (agentFilter !== "all") result = result.filter((draft) => draft.agentId === agentFilter);
 
     if (hasDatesSelected && !isDateRangeInvalid) {
       result = result.filter((draft) => {
@@ -114,7 +116,7 @@ export function useAgreementInbox() {
     }
 
     return result;
-  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter]);
+  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter, agentFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDrafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
@@ -308,7 +310,7 @@ export function useAgreementInbox() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, startDateFilter, endDateFilter]);
+  }, [query, statusFilter, startDateFilter, endDateFilter, agentFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -319,6 +321,8 @@ export function useAgreementInbox() {
     query,
     setQuery,
     statusFilter,
+    agentFilter,
+    setAgentFilter,
     setStatusFilter,
     startDateFilter,
     setStartDateFilter,

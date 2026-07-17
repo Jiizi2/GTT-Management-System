@@ -10,13 +10,13 @@
 | ORM | Prisma |
 | Primary Key | CUID (collision-resistant unique ID) |
 | Schema | `apps/backend/prisma/schema.prisma` |
-| Migrations | `apps/backend/prisma/migrations/` (26 file) |
+| Migrations | `apps/backend/prisma/migrations/` (lihat direktori migration sebagai sumber terkini) |
 
 ---
 
 ## 🗂️ Daftar Tabel
 
-Total: **20 tabel**
+Total: **21 tabel**
 
 | No | Tabel | Fungsi |
 |----|-------|--------|
@@ -40,10 +40,26 @@ Total: **20 tabel**
 | 18 | `AppThrottleBucket` | Throttling API umum |
 | 19 | `GroupAuditLog` | Log audit perubahan grup |
 | 20 | `MasterDataOption` | Master data lookup |
+| 21 | `Agent` | Pemilik bisnis Group (GTT Direct atau agen mitra) |
 
 ---
 
 ## 📋 Detail Tabel
+
+### `Agent` — Pemilik Bisnis Operasional
+
+| Kolom | Tipe | Constraints | Keterangan |
+|-------|------|-------------|------------|
+| `id` | TEXT | PK, DEFAULT `cuid()` | Identitas stabil Agent |
+| `code` | TEXT | UNIQUE, NOT NULL | Kode bisnis Agent |
+| `name` | TEXT | NOT NULL | Nama Agent |
+| `type` | Enum | NOT NULL | `DIRECT` atau `PARTNER` |
+| `status` | Enum | NOT NULL | `ACTIVE` atau `INACTIVE` |
+| `picName`, `phone`, `email`, `address`, `notes` | TEXT | Nullable | Profil dan kontak internal |
+
+Agent yang sudah digunakan tidak dihapus. Statusnya diubah menjadi `INACTIVE` agar histori tetap utuh.
+
+---
 
 ### 1. `Group` — Entitas Inti
 
@@ -64,6 +80,7 @@ Tabel pusat yang menjadi referensi hampir semua tabel lain.
 | `totalBuses` | INTEGER | Nullable | Total bus yang dibutuhkan |
 | `packageName` | TEXT | NOT NULL | Nama paket perjalanan |
 | `durationDays` | INTEGER | NOT NULL | Durasi perjalanan (hari) |
+| `agentId` | TEXT | NOT NULL, FK → `Agent.id` (RESTRICT) | Pemilik bisnis Group |
 | `parentGroupId` | TEXT | Nullable, FK → `Group.id` (SET NULL) | Self-reference untuk parent group |
 | `createdAt` | TIMESTAMP | NOT NULL, DEFAULT `now()` | Waktu pembuatan |
 | `updatedAt` | TIMESTAMP | NOT NULL | Waktu update terakhir |
@@ -214,7 +231,7 @@ Tabel pusat yang menjadi referensi hampir semua tabel lain.
 |-------|------|-------------|------------|
 | `id` | TEXT | PK, DEFAULT `cuid()` | ID unik |
 | `city` | Enum | NOT NULL | `MAKKAH`, `MADINAH` |
-| `agentName` | TEXT | Nullable | Nama agen |
+| `agentId` | TEXT | NOT NULL, FK → `Agent.id` (RESTRICT) | Agent pemilik agreement |
 | `hotelName` | TEXT | NOT NULL | Nama hotel |
 | `agreementNumber` | TEXT | NOT NULL | Nomor kesepakatan |
 | `pax` | INTEGER | NOT NULL | Jumlah jamaah |
@@ -294,6 +311,7 @@ Tabel pusat yang menjadi referensi hampir semua tabel lain.
 | `name` | TEXT | NOT NULL | Nama klien |
 | `sortOrder` | INTEGER | NOT NULL | Urutan tampilan |
 | `groupId` | TEXT | Nullable, FK → `Group.id` (SET NULL) | Grup terkait |
+| `agentId` | TEXT | NOT NULL, FK → `Agent.id` (RESTRICT) | Agent pemilik invoice |
 | `createdAt` | TIMESTAMP | NOT NULL, DEFAULT `now()` | Waktu pembuatan |
 | `updatedAt` | TIMESTAMP | NOT NULL | Waktu update terakhir |
 

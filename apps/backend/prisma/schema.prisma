@@ -20,6 +20,16 @@ enum GroupLifecycleStatus {
   ARCHIVED
 }
 
+enum AgentType {
+  DIRECT
+  PARTNER
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum VisaStatus {
   DRAFT
   PENDING
@@ -132,6 +142,27 @@ model MasterDataOption {
   @@index([categoryKey, isActive])
 }
 
+model Agent {
+  id        String      @id @default(cuid())
+  code      String      @unique
+  name      String
+  type      AgentType   @default(PARTNER)
+  status    AgentStatus @default(ACTIVE)
+  picName   String?
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  groups    Group[]
+  hotelAgreementDrafts HotelAgreementDraft[]
+  invoices  Invoice[]
+
+  @@index([name])
+  @@index([status, type])
+}
+
 model Group {
   id                 String                @id @default(cuid())
   code               String                @unique
@@ -146,6 +177,7 @@ model Group {
   totalBuses         Int?
   packageName        String
   durationDays       Int
+  agentId            String
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   musyrif            Musyrif?
@@ -161,11 +193,13 @@ model Group {
   parentGroupId      String?
   parentGroup        Group?                @relation("GroupToGroup", fields: [parentGroupId], references: [id], onDelete: SetNull)
   childGroups        Group[]               @relation("GroupToGroup")
+  agent              Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
 
   @@index([createdAt])
   @@index([lifecycleStatus])
   @@index([searchDocument, lifecycleStatus])
   @@index([parentGroupId])
+  @@index([agentId, lifecycleStatus, arrivalDate])
   @@index([searchDocument(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
@@ -204,6 +238,7 @@ model Invoice {
   invoiceNumber  String        @unique
   clientId       String
   groupId        String?
+  agentId        String
   issuedDate     DateTime
   dueDate        DateTime
   amount         Decimal       @default(0) @db.Decimal(12, 2)
@@ -217,12 +252,14 @@ model Invoice {
   updatedAt      DateTime      @updatedAt
   client         InvoiceClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
   group          Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  agent          Agent         @relation(fields: [agentId], references: [id], onDelete: Restrict)
   items          Json?
   itemsRel       InvoiceItem[]
 
   @@index([dueDate])
   @@index([clientId, dueDate])
   @@index([groupId])
+  @@index([agentId, status, dueDate(sort: Desc)])
   @@index([status, dueDate(sort: Desc)])
 }
 
@@ -367,7 +404,7 @@ model VisaHotelAgreement {
 model HotelAgreementDraft {
   id              String                  @id @default(cuid())
   city            AgreementCity
-  agentName       String?
+  agentId         String
   hotelName       String
   agreementNumber String
   pax             Int
@@ -378,9 +415,11 @@ model HotelAgreementDraft {
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
   linkedHotelAgreements VisaHotelAgreement[]
+  agent           Agent                   @relation(fields: [agentId], references: [id], onDelete: Restrict)
 
   @@index([agreementNumber])
   @@index([city, stayStart])
+  @@index([agentId, city, stayStart])
 }
 
 model RaudhahAppointment {

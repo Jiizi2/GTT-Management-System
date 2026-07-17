@@ -165,6 +165,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
           <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
           <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
           <Route path="/agreement-inbox" element={<LazyAgreementInboxScreen />} />
+          <Route path="/agents" element={<Navigate to="/master-data" replace />} />
           <Route
             path="/visa"
             element={

@@ -36,6 +36,8 @@ type GroupPayload = {
   }>;
 };
 
+const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
+
 const DEV_AUTH_IDENTIFIER = process.env.DEV_AUTH_IDENTIFIER?.trim() || "dev.superadmin";
 const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
@@ -237,6 +239,7 @@ function createBaseGroupPayload(groupCode: string, groupName: string): Record<st
   const returnIso = addUtcDays(arrivalIso, 7);
 
   return {
+    agentId: GTT_DIRECT_AGENT_ID,
     code: groupCode,
     name: groupName,
     status: "Active",

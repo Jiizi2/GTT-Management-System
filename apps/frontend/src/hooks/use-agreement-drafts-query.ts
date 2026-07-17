@@ -66,8 +66,9 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
 
   return {
     id,
+    agentId: readString(record.agentId, "agent_gtt_direct"),
     city,
-    agentName: readString(record.agentName ?? "", ""),
+    agentName: readString(record.agent?.name ?? record.agentName ?? "", ""),
     hotelName: readString(record.hotelName),
     agreementNumber: readString(record.agreementNumber),
     pax: Math.max(1, readNumber(record.pax, 1)),
@@ -94,7 +95,7 @@ function buildDraftPayload(form: HotelAgreementDraftFormState) {
   const parsedPax = Number.parseInt(form.pax, 10);
   return {
     city: form.city === "madinah" ? "MADINAH" : "MAKKAH",
-    agentName: form.agentName.trim() || undefined,
+    agentId: form.agentId.trim(),
     hotelName: form.hotelName.trim(),
     agreementNumber: form.agreementNumber.trim(),
     pax: Number.isFinite(parsedPax) ? parsedPax : 1,

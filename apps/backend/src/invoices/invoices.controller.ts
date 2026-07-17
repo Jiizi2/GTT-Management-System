@@ -73,13 +73,16 @@ export class InvoicesController {
   })
   findAll(
     @Query() pagination: PaginationDto,
-    @Res({ passthrough: true }) response: ResponseLike
+    @Res({ passthrough: true }) response: ResponseLike,
+    @Query("agentId") agentId?: string,
   ) {
     response.setHeader("Cache-Control", "no-store, private");
     if (pagination.page === undefined && pagination.limit === undefined) {
-      return this.invoicesService.findAll();
+      return agentId ? this.invoicesService.findAll(agentId) : this.invoicesService.findAll();
     }
-    return this.invoicesService.findAllPaginated(pagination);
+    return agentId
+      ? this.invoicesService.findAllPaginated(pagination, agentId)
+      : this.invoicesService.findAllPaginated(pagination);
   }
 
   @Get("clients")

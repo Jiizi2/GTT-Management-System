@@ -34,6 +34,7 @@ export let globalIsDraftSubmit = false;
 
 export const invoiceWorkspaceFormSchema = z
   .object({
+    agentId: z.string().trim().min(1, "Select an Agent before saving invoice."),
     issueDateIso: z.string().trim().min(1, "Select issue date before saving invoice."),
     dueDateIso: z.string().optional(),
     invoiceStatus: z.string(),
@@ -171,6 +172,7 @@ export function useInvoiceWorkspaceForm({
     resolver: zodResolver(invoiceWorkspaceFormSchema),
     mode: "onChange",
     defaultValues: {
+      agentId: resolvedInitialInvoice?.agentId ?? "",
       issueDateIso: resolvedInitialInvoice?.issuedDateIso ?? "",
       dueDateIso: resolvedInitialInvoice?.dueDateIso ?? "",
       invoiceStatus: resolvedInitialInvoice?.status ?? "Pending",

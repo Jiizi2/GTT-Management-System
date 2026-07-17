@@ -26,6 +26,8 @@ export type BackendInvoiceRow = {
   id: string;
   invoiceNumber: string;
   clientId: string;
+  agentId: string;
+  agentName: string;
   clientName: string;
   clientLabel: string;
   clientInitials: string;
@@ -45,6 +47,7 @@ export type BackendInvoiceRow = {
 };
 
 export type CreateBackendInvoicePayload = {
+  agentId: string;
   clientId?: string;
   clientName?: string;
   groupCode?: string;
@@ -61,6 +64,7 @@ export type CreateBackendInvoicePayload = {
 };
 
 export type UpdateBackendInvoicePayload = {
+  agentId?: string;
   clientId?: string;
   clientName?: string;
   groupCode?: string;
@@ -89,6 +93,8 @@ type BackendInvoiceRecord = {
   id?: unknown;
   invoiceNumber?: unknown;
   clientId?: unknown;
+  agentId?: unknown;
+  agentName?: unknown;
   clientName?: unknown;
   clientLabel?: unknown;
   clientInitials?: unknown;
@@ -262,6 +268,8 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
     id,
     invoiceNumber,
     clientId,
+    agentId: readString(record.agentId, "agent_gtt_direct"),
+    agentName: readString(record.agentName, "GTT Direct"),
     clientName,
     clientLabel: readString(record.clientLabel, clientName),
     clientInitials: readString(record.clientInitials, defaultClientInitials || "NA"),
@@ -403,6 +411,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
     cache: "no-store",
     body: JSON.stringify({
       clientId: normalizedClientId || undefined,
+      agentId: payload.agentId.trim(),
       clientName: normalizedClientName || undefined,
       groupCode: payload.groupCode?.trim() || undefined,
       issuedDate: payload.issuedDateIso.trim(),
@@ -445,6 +454,7 @@ export async function updateInvoiceInBackend(
   if (payload.clientId !== undefined) {
     requestBody.clientId = payload.clientId.trim();
   }
+  if (payload.agentId !== undefined) requestBody.agentId = payload.agentId.trim();
   if (payload.clientName !== undefined) {
     requestBody.clientName = payload.clientName.trim();
   }

@@ -280,15 +280,17 @@ export function MasterDataOptionForm({
 // 2. MASTER DATA CATEGORY TABS
 // ==========================================
 
+export type MasterDataCategoryTabKey = MasterDataCategoryKey | "agents";
+
 export function MasterDataCategoryTabs({
   categories,
   activeCategoryKey,
   onSelectCategory,
   isLoading,
 }: {
-  categories: Array<{ key: MasterDataCategoryKey; label: string; description: string; activeOptions: number; totalOptions: number }>;
-  activeCategoryKey: MasterDataCategoryKey | null;
-  onSelectCategory: (categoryKey: MasterDataCategoryKey) => void;
+  categories: Array<{ key: MasterDataCategoryTabKey; label: string; description: string; activeOptions: number; totalOptions: number }>;
+  activeCategoryKey: MasterDataCategoryTabKey | null;
+  onSelectCategory: (categoryKey: MasterDataCategoryTabKey) => void;
   isLoading: boolean;
 }) {
   return (

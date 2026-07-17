@@ -85,6 +85,7 @@ export function InvoiceScreen({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled">("all");
   const [dueMonthFilter, setDueMonthFilter] = useState("all");
+  const [agentFilter, setAgentFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
@@ -191,6 +192,7 @@ export function InvoiceScreen({
   }, [invoiceRows]);
 
   const filteredRows = searchedRows
+    .filter((row) => agentFilter === "all" || row.agentId === agentFilter)
     .filter((row) => (statusFilter === "all" ? true : getStatusValue(row.status) === statusFilter))
     .filter((row) => (dueMonthFilter === "all" ? true : row.monthKey === dueMonthFilter));
 
@@ -285,7 +287,7 @@ export function InvoiceScreen({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, dueMonthFilter]);
+  }, [query, statusFilter, dueMonthFilter, agentFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -478,7 +480,7 @@ export function InvoiceScreen({
 
       <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
         <article className="serene-filter-panel">
-          <div className="grid gap-4 md:grid-cols-[1fr_0.9fr_auto] md:items-end">
+          <div className="grid gap-4 xl:grid-cols-[0.7fr_2.3fr] xl:items-end">
             <label className="space-y-1">
               <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
                 Date Range
@@ -492,6 +494,8 @@ export function InvoiceScreen({
             </label>
 
             <InvoiceListFilters
+              agentFilter={agentFilter}
+              setAgentFilter={setAgentFilter}
               statusFilter={statusFilter}
               setStatusFilter={setStatusFilter}
               dueMonthFilter={dueMonthFilter}

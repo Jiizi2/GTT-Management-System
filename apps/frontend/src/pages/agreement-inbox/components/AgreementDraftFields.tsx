@@ -3,6 +3,7 @@ import { DatePickerInput } from "../../../components/date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../../../components/form-accessibility";
 import { SereneSelect } from "../../../components/serene-select";
 import type { HotelAgreementDraftFormState } from "../../../shared/app-domain";
+import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 
 export function AgreementDraftFields({
   control,
@@ -15,12 +16,13 @@ export function AgreementDraftFields({
   errors: FieldErrors<HotelAgreementDraftFormState>;
   idPrefix: string;
 }) {
+  const agentsQuery = useAgentsQuery();
   const fieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-slate-700";
   const inputClassName = "serene-input serene-input-md";
   const textareaClassName = "serene-textarea min-h-24";
 
   const cityErrorMessage = errors.city?.message;
-  const agentNameErrorMessage = errors.agentName?.message;
+  const agentIdErrorMessage = errors.agentId?.message;
   const hotelNameErrorMessage = errors.hotelName?.message;
   const agreementNumberErrorMessage = errors.agreementNumber?.message;
   const paxErrorMessage = errors.pax?.message;
@@ -58,20 +60,15 @@ export function AgreementDraftFields({
 
       <div className="grid gap-1.5 lg:col-span-3">
         <label className={fieldClassName}>
-          <span>Agent Name</span>
-          <input
-            id={`${idPrefix}-agent`}
-            type="text"
-            className={inputClassName}
-            placeholder="Optional"
-            {...register("agentName")}
-            aria-invalid={getFieldAriaInvalid(agentNameErrorMessage)}
-            aria-describedby={getFieldDescribedBy(`${idPrefix}-agent`, {
-              errorMessage: agentNameErrorMessage,
-            })}
-          />
+          <span>Agent</span>
+          <Controller control={control} name="agentId" render={({ field }) => (
+            <SereneSelect id={`${idPrefix}-agent`} className="serene-select" value={field.value} onChange={(event) => field.onChange(event.target.value)}>
+              <option value="" disabled>Select Agent</option>
+              {(agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE").map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+            </SereneSelect>
+          )} />
         </label>
-        <FieldErrorMessage fieldId={`${idPrefix}-agent`} message={agentNameErrorMessage} />
+        <FieldErrorMessage fieldId={`${idPrefix}-agent`} message={agentIdErrorMessage} />
       </div>
 
       <div className="grid gap-1.5 lg:col-span-6">

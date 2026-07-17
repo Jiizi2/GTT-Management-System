@@ -8,7 +8,9 @@ import {
   useUpdateMasterDataOptionMutation,
 } from "../hooks/use-master-data-query";
 import type { MasterDataCategoryKey, MasterDataOption } from "../hooks/use-master-data-backend";
+import { useAgentsQuery } from "../hooks/use-agents-backend";
 import { useThemeMode } from "../theme/theme-provider";
+import { AgentsScreen } from "./agents-page";
 import {
   EMPTY_FORM,
   parseMetadataJson,
@@ -17,6 +19,7 @@ import {
   MasterDataOptionTable,
   type MasterDataOptionFormValues,
   type CategoryFormConfig,
+  type MasterDataCategoryTabKey,
 } from "./master-data/components/MasterDataComponents";
 
 type NoticeState = {
@@ -138,7 +141,8 @@ export function MasterDataScreen() {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
   const categoriesQuery = useMasterDataCategoriesQuery();
-  const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryKey | null>(null);
+  const agentsQuery = useAgentsQuery();
+  const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryTabKey | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -151,27 +155,41 @@ export function MasterDataScreen() {
     () => [...(categoriesQuery.data ?? [])].sort((left, right) => left.label.localeCompare(right.label)),
     [categoriesQuery.data],
   );
+  const categoryTabs = useMemo(() => {
+    const agents = agentsQuery.data ?? [];
+    return [
+      {
+        key: "agents" as const,
+        label: "Agents",
+        description: "Kelola Agent pemilik Group dan transaksi operasional.",
+        activeOptions: agents.filter((agent) => agent.status === "ACTIVE").length,
+        totalOptions: agents.length,
+      },
+      ...sortedCategories,
+    ];
+  }, [agentsQuery.data, sortedCategories]);
 
   useEffect(() => {
     setActiveCategoryKey((current) => {
-      if (current && sortedCategories.some((category) => category.key === current)) {
+      if (current && categoryTabs.some((category) => category.key === current)) {
         return current;
       }
 
-      return sortedCategories[0]?.key ?? null;
+      return categoryTabs[0]?.key ?? null;
     });
-  }, [sortedCategories]);
+  }, [categoryTabs]);
 
   const activeCategory =
-    activeCategoryKey !== null
+    activeCategoryKey !== null && activeCategoryKey !== "agents"
       ? (sortedCategories.find((category) => category.key === activeCategoryKey) ?? null)
       : null;
-  const activeCategoryFormConfig = activeCategoryKey !== null ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
+  const activeCategoryFormConfig =
+    activeCategoryKey !== null && activeCategoryKey !== "agents" ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
 
   const optionsQuery = useMasterDataOptionsQuery({
-    categoryKey: activeCategoryKey ?? "invoice-issuing-office",
+    categoryKey: activeCategoryKey && activeCategoryKey !== "agents" ? activeCategoryKey : "invoice-issuing-office",
     includeInactive,
-    enabled: activeCategoryKey !== null,
+    enabled: activeCategoryKey !== null && activeCategoryKey !== "agents",
   });
   const options = useMemo(() => optionsQuery.data ?? [], [optionsQuery.data]);
   const editingOption = useMemo(
@@ -229,7 +247,7 @@ export function MasterDataScreen() {
     });
   }, [optionsQuery.error]);
 
-  const handleSelectCategory = (categoryKey: MasterDataCategoryKey) => {
+  const handleSelectCategory = (categoryKey: MasterDataCategoryTabKey) => {
     setActiveCategoryKey(categoryKey);
     setIsCreateOpen(false);
     setEditingOptionId(null);
@@ -237,7 +255,7 @@ export function MasterDataScreen() {
   };
 
   const handleCreateSubmit = async (values: MasterDataOptionFormValues) => {
-    if (!activeCategoryKey) {
+    if (!activeCategoryKey || activeCategoryKey === "agents") {
       return;
     }
 
@@ -341,12 +359,15 @@ export function MasterDataScreen() {
 
       <section className="grid gap-4 lg:grid-cols-[0.92fr_2.08fr]">
         <MasterDataCategoryTabs
-          categories={sortedCategories}
+          categories={categoryTabs}
           activeCategoryKey={activeCategoryKey}
           onSelectCategory={handleSelectCategory}
           isLoading={categoriesQuery.isLoading}
         />
 
+        {activeCategoryKey === "agents" ? (
+          <AgentsScreen embedded />
+        ) : (
         <article className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 px-4 py-3 sm:px-5">
             <div>
@@ -438,6 +459,7 @@ export function MasterDataScreen() {
             </section>
           ) : null}
         </article>
+        )}
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 import { Badge } from "../../../components/badge";
 import { SereneSelect } from "../../../components/serene-select";
+import { AgentFilterSelect } from "../../../components/agent-filter-select";
 import {
   formatDateLabel,
   getAvatarToneByStatus,
@@ -90,12 +91,16 @@ export function InvoiceSummaryBadges({
 // ==========================================
 
 export function InvoiceListFilters({
+  agentFilter,
+  setAgentFilter,
   statusFilter,
   setStatusFilter,
   dueMonthFilter,
   setDueMonthFilter,
   dueMonthOptions,
 }: {
+  agentFilter: string;
+  setAgentFilter: (value: string) => void;
   statusFilter: "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled";
   setStatusFilter: (value: "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled") => void;
   dueMonthFilter: string;
@@ -103,7 +108,8 @@ export function InvoiceListFilters({
   dueMonthOptions: DueMonthOption[];
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-[1fr_0.9fr_auto] md:items-end">
+    <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
+      <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" />
       <label className="space-y-1">
         <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
           Status
@@ -211,7 +217,7 @@ export function InvoiceCardList({
                 )}
               </div>
               <p className="truncate text-xs text-on-surface-variant mt-0.5">
-                {row.groupCode ? `Group ${row.groupCode}` : "No group"}
+                {row.agentName} · {row.groupCode ? `Group ${row.groupCode}` : "No group"}
               </p>
             </div>
           </div>
@@ -361,7 +367,7 @@ export function InvoiceTable({
                       {row.clientName}
                     </p>
                     <p className="text-[10px] text-on-surface-variant truncate leading-none mt-0.5">
-                      {row.groupCode ? `Group ${row.groupCode}` : "No group"}
+                      {row.agentName} · {row.groupCode ? `Group ${row.groupCode}` : "No group"}
                     </p>
                   </div>
                 </div>

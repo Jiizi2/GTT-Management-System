@@ -458,6 +458,7 @@ function buildLocalIdentityGroup(identity: GroupIdentityDraftPayload): GroupData
   const pax = Math.max(1, identity.pax ?? 1);
 
   return {
+    agentId: identity.agentId?.trim() || "agent_gtt_direct",
     code: normalizedCode,
     name: identity.groupName?.trim() || `Group ${normalizedCode}`,
     status: "Entry Only",

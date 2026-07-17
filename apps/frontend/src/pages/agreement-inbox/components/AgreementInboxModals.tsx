@@ -12,7 +12,7 @@ import { AgreementDraftFields } from "./AgreementDraftFields";
 function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormState {
   return {
     city: draft.city,
-    agentName: draft.agentName,
+    agentId: draft.agentId,
     hotelName: draft.hotelName,
     agreementNumber: draft.agreementNumber,
     pax: draft.pax.toString(),

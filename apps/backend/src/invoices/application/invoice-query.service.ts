@@ -55,12 +55,12 @@ export class InvoiceQueryService {
     return this.invoiceRepo.listClients();
   }
 
-  async findAll(): Promise<InvoiceListItem[]> {
-    return this.invoiceRepo.findAll();
+  async findAll(agentId?: string): Promise<InvoiceListItem[]> {
+    return this.invoiceRepo.findAll(agentId);
   }
 
-  async findAllPaginated(pagination: PaginationDto): Promise<PaginatedResponseDto<InvoiceListItem>> {
-    return this.invoiceRepo.findAllPaginated(pagination);
+  async findAllPaginated(pagination: PaginationDto, agentId?: string): Promise<PaginatedResponseDto<InvoiceListItem>> {
+    return this.invoiceRepo.findAllPaginated(pagination, agentId);
   }
 
   async ensurePrismaInvoiceDownPaymentColumn(): Promise<boolean> {

@@ -13,6 +13,11 @@ import { Type } from "class-transformer";
 import { CreateMusyrifDto } from "./create-group.dto";
 
 export class CreateGroupIdentityDto {
+  @ApiProperty({ example: "agent_gtt_direct" })
+  @IsString()
+  @IsNotEmpty()
+  agentId?: string;
+
   @ApiProperty({ example: "9017001001" })
   @IsString()
   @IsNotEmpty()
