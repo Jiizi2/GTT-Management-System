@@ -207,9 +207,9 @@ describe('useMyHook', () => {
 
 | Script | Keterangan |
 |---|---|
-| `npm run qa` | QA cepat: verify + smoke + API e2e |
-| `npm run qa:full` | QA penuh: `qa` + integration + Playwright e2e |
-| `npm run verify` | check + test + build |
+| `npm run qa` | QA cepat: type-check, lint, unit, build, smoke, API e2e |
+| `npm run qa:full` | QA penuh: `qa` + component + integration database QA + Playwright |
+| `npm run verify` | check + lint + unit test + build |
 
 ### Database
 
@@ -398,6 +398,8 @@ git config core.hooksPath .githooks
 | [Invoice Runbook](docs/operations-runbook.md) | Runbook operasional & recovery modul Invoice |
 | [Contributing](CONTRIBUTING.md) | Branch, PR flow, dan instruksi manual QA |
 | **Roadmaps (Cetak Biru)** | |
+| [Rencana Remediasi Audit P0/P1](docs/roadmap/audit-remediation-p0-p1.md) | Rencana rinci stabilisasi internal dan kesiapan menuju akses publik |
+| [Backlog Temuan Menengah](docs/roadmap/audit-medium-findings-backlog.md) | Temuan audit menengah yang disimpan untuk triage |
 | [Evolusi Arsitektur Domain Group](docs/roadmap/evolusi-arsitektur-domain-group.md) | Rencana memecah Fat Aggregate `Group` |
 | [Evolusi Entitas Agent](docs/roadmap/evolusi-entitas-bisnis-agent.md) | Portal Agent & operasional B2B |
 | [Evolusi Modul Finance](docs/roadmap/evolusi-modul-finance.md) | Rencana modul keuangan terintegrasi |

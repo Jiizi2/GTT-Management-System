@@ -15,12 +15,12 @@ To separate development-ready vs production-ready code:
 GitHub Actions CI is currently removed from this repository. Therefore, validation must be executed manually before opening a Pull Request or performing a release merge.
 
 Recommended verification checks to run locally:
-* **Fast path**: `npm run qa` (runs verification, type-checks, unit tests, and frontend smoke test + backend API test in memory mode)
-* **Full path**: `npm run qa:full` (runs fast path + database integrations + Playwright e2e tests)
+* **Fast path**: `npm run qa` (type-check, lint, unit test, build, frontend smoke, dan backend API test mode memory)
+* **Full path**: `npm run qa:full` (fast path + component test + Prisma integration pada database QA khusus + Playwright release suite)
 * **Granular commands** for checking specific layers:
-  * `npm run verify` (type-check, unit tests, and build)
+  * `npm run verify` (type-check, lint, unit tests, and build)
   * `npm run test:api` (API test in memory mode)
-  * `npm run test:integration` (integration tests with PostgreSQL)
+  * `npm run test:integration` (integration tests with a guarded local PostgreSQL test database)
   * `npm run test:e2e:frontend` (Playwright e2e tests against dev builds)
 
 ### GitHub Protection Settings
@@ -69,12 +69,13 @@ npm run qa
 
 1. Unit tests: `src/unit/*.test.ts`
 2. Smoke tests: `src/smoke/*.test.ts` (integration-level)
-3. Import utilities dari `src/test/`:
+3. Component tests: `src/components/**/*.test.{ts,tsx}` (jsdom)
+4. Import utilities dari `src/test/`:
    - `runCase(name, fn)` - wrapper untuk `it()`
    - `withMockFetch(fn)` - mock global fetch
    - `withMockWindow(fn)` - mock window object
-4. Gunakan `describe()` untuk grouping, `expect()` untuk assertions
-5. Test pure functions dan business logic, bukan React components (untuk sekarang)
+5. Gunakan `describe()` untuk grouping, `expect()` untuk assertions
+6. Gunakan Testing Library untuk interaction dan accessibility contract komponen React
 
 ### Coverage Requirements
 
@@ -107,16 +108,23 @@ npm run test:unit:coverage
 
 ### Integration Tests
 
-Backend integration tests (`src/e2e/*.test.ts`) membutuhkan PostgreSQL:
+Backend integration tests (`src/e2e/*.test.ts`) membutuhkan database PostgreSQL lokal khusus QA. Runner menolak host remote dan nama database yang tidak memuat `test` atau `qa`.
 
 ```bash
-# Start PostgreSQL
+# Start PostgreSQL dan buat database khusus satu kali
 docker compose up -d postgres
+docker compose exec postgres createdb -U postgres gtt_ops_test
+```
 
-# Run migrations
-npm run db:deploy:backend
+Tambahkan ke `apps/backend/.env`:
 
-# Run integration tests
+```env
+TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:6543/gtt_ops_test?schema=public"
+```
+
+Runner menerapkan migration ke database tersebut sebelum menjalankan Vitest:
+
+```bash
 npm run test:integration
 ```
 
