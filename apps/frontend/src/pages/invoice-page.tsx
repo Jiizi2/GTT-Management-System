@@ -78,7 +78,6 @@ export function CreateInvoiceWorkspace({
     setKeepValasCurrency,
     saveFeedback,
     isSubmitting,
-    isSavingDraft,
     isCancelConfirmationOpen,
     setIsCancelConfirmationOpen,
     cancelConfirmationDialogRef,
@@ -88,7 +87,6 @@ export function CreateInvoiceWorkspace({
     selectedClient,
     selectedGroup,
     nextInvoiceNumberPreview,
-    handleSaveDraft,
     handleSubmitButtonClick,
     handleConfirmCancelledStatus,
   } = formState;
@@ -136,7 +134,7 @@ export function CreateInvoiceWorkspace({
               </span>
               <p className="text-xs font-semibold leading-relaxed">
                 Backend invoice/database belum terhubung.{" "}
-                {isEditMode ? "Save Changes" : "Save Draft dan Generate Invoice"} dinonaktifkan sampai koneksi backend
+                {isEditMode ? "Save Changes" : "Generate Invoice"} dinonaktifkan sampai koneksi backend
                 kembali normal.
               </p>
             </section>
@@ -163,10 +161,8 @@ export function CreateInvoiceWorkspace({
             isEditMode={isEditMode}
             isWorkspaceBusy={isWorkspaceBusy}
             isBackendAvailable={isBackendAvailable}
-            isSavingDraft={isSavingDraft}
             isSubmitting={isSubmitting}
             onBack={onBack}
-            onSaveDraft={handleSaveDraft}
             onSubmitButtonClick={handleSubmitButtonClick}
           />
         </section>

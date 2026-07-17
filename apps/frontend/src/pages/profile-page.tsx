@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod/v4";
 import type { NavId, SessionAccessTier } from "../shared/app-domain";
-import { clearAuthSession } from "../shared/auth-session";
+import { useLogoutMutation } from "../hooks/use-auth-session-query";
 
 const profilePermissionTags = ["MANAGE_USERS", "EDIT_ITINERARIES", "VIEW_ANALYTICS", "APPROVE_CHECKLISTS"] as const;
 
@@ -348,6 +348,7 @@ export function ProfileScreen({
   sessionAccessTier?: SessionAccessTier;
 }) {
   const canEditRoleTitle = sessionAccessTier === "super-admin";
+  const logoutMutation = useLogoutMutation();
   const roleBadgeLabel = resolveRoleBadgeLabel(sessionAccessTier);
 
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -454,8 +455,9 @@ export function ProfileScreen({
 
   const handleConfirmSignOut = () => {
     setIsSignOutModalOpen(false);
-    clearAuthSession();
-    onNavigate("overview");
+    logoutMutation.mutate(undefined, {
+      onSettled: () => onNavigate("overview"),
+    });
   };
 
   return (
@@ -538,6 +540,8 @@ export function ProfileScreen({
               type="button"
               className="serene-btn-primary w-full sm:w-auto lg:min-w-[13rem]"
               onClick={openEditProfileModal}
+              disabled
+              title="Edit profile belum tersedia karena endpoint backend belum diimplementasikan."
             >
               <span className="material-symbols-outlined text-base" aria-hidden="true">
                 edit
@@ -571,6 +575,8 @@ export function ProfileScreen({
                   type="button"
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-bold text-primary transition hover:bg-primary/10"
                   onClick={openChangePasswordModal}
+                  disabled
+                  title="Change password belum tersedia karena endpoint backend belum diimplementasikan."
                 >
                   Change
                 </button>
@@ -675,7 +681,7 @@ export function ProfileScreen({
                 <button type="button" className="serene-btn-secondary" onClick={closeSignOutModal}>
                   Cancel
                 </button>
-                <button type="button" className="serene-btn-danger" onClick={handleConfirmSignOut}>
+                <button type="button" className="serene-btn-danger" onClick={handleConfirmSignOut} disabled={logoutMutation.isPending}>
                   <span className="material-symbols-outlined text-base" aria-hidden="true">
                     logout
                   </span>

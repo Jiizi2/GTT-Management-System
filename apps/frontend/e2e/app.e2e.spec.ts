@@ -212,7 +212,7 @@ async function startFrontendStaticServer(): Promise<StartedFrontendServer> {
   };
 }
 
-function restoreEnvVar(key: "PORT" | "DATA_SOURCE" | "CORS_ORIGINS", previousValue: string | undefined): void {
+function restoreEnvVar(key: string, previousValue: string | undefined): void {
   if (previousValue === undefined) {
     delete process.env[key];
     return;
@@ -225,12 +225,18 @@ async function startBackendApiServer(frontendOrigin: string): Promise<StartedBac
   const previousPort = process.env.PORT;
   const previousDataSource = process.env.DATA_SOURCE;
   const previousCorsOrigins = process.env.CORS_ORIGINS;
+  const previousThrottleLimit = process.env.THROTTLE_DEFAULT_LIMIT;
+  const previousLoginRateLimit = process.env.AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS;
   const port = await allocatePort();
   const host = "127.0.0.1";
   const apiBaseUrl = `http://${host}:${port}/api`;
   process.env.PORT = String(port);
   process.env.DATA_SOURCE = "memory";
   process.env.CORS_ORIGINS = frontendOrigin;
+  // This suite exercises UI behavior, not throttling. A single loopback IP serves
+  // every test, so production limits would couple otherwise isolated cases.
+  process.env.THROTTLE_DEFAULT_LIMIT = "10000";
+  process.env.AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS = "1000";
 
   const require = createRequire(import.meta.url);
   Object.keys(require.cache).forEach((key) => {
@@ -273,6 +279,8 @@ async function startBackendApiServer(frontendOrigin: string): Promise<StartedBac
     restoreEnvVar("PORT", previousPort);
     restoreEnvVar("DATA_SOURCE", previousDataSource);
     restoreEnvVar("CORS_ORIGINS", previousCorsOrigins);
+    restoreEnvVar("THROTTLE_DEFAULT_LIMIT", previousThrottleLimit);
+    restoreEnvVar("AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS", previousLoginRateLimit);
     throw error;
   }
 
@@ -285,6 +293,8 @@ async function startBackendApiServer(frontendOrigin: string): Promise<StartedBac
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("DATA_SOURCE", previousDataSource);
       restoreEnvVar("CORS_ORIGINS", previousCorsOrigins);
+      restoreEnvVar("THROTTLE_DEFAULT_LIMIT", previousThrottleLimit);
+      restoreEnvVar("AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS", previousLoginRateLimit);
     },
   };
 }
@@ -610,7 +620,7 @@ test("edits group name from group detail modal", async ({ page }) => {
   await expect(updatedCard.getByText(updatedGroupName)).toBeVisible();
 });
 
-test("uses full-viewport modal overlays in group detail and profile", async ({ page }) => {
+test("uses full-viewport group modal overlays and honestly disables unavailable profile actions", async ({ page }) => {
   await openApp(page);
 
   const overviewCard = page.locator("article").filter({ hasText: "9017000001" }).first();
@@ -631,13 +641,10 @@ test("uses full-viewport modal overlays in group detail and profile", async ({ p
   await page.getByRole("button", { name: "Open Profile" }).click();
   await expect(page.getByRole("heading", { name: "Profile" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Edit Profile" }).click();
-  expectOverlayCoversViewport(await getVisibleModalOverlayRect(page));
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Edit profile" })).toBeHidden();
-
-  await page.getByRole("button", { name: "Change", exact: true }).click();
-  expectOverlayCoversViewport(await getVisibleModalOverlayRect(page));
+  await expect(page.getByRole("button", { name: "Edit Profile" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Change", exact: true })).toBeDisabled();
+  await expect(page.getByRole("dialog", { name: "Edit profile" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Change password" })).toHaveCount(0);
 });
 
 test("super-admin provisions managed user passwords and admin stays restricted from user management", async ({

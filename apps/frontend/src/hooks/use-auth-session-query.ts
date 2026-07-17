@@ -20,7 +20,7 @@ export function useAuthSessionQuery() {
     }
 
     const syncSessionFromStorage = () => {
-      queryClient.setQueryData<AuthSession | null>(authQueryKeys.session, readPersistedAuthSession());
+      void queryClient.invalidateQueries({ queryKey: authQueryKeys.session });
     };
 
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, syncSessionFromStorage);
@@ -35,10 +35,11 @@ export function useAuthSessionQuery() {
   const query = useQuery({
     queryKey: authQueryKeys.session,
     queryFn: fetchCurrentSessionFromBackend,
-    initialData: () => readPersistedAuthSession(),
+    placeholderData: () => readPersistedAuthSession(),
     retry: false,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {
@@ -61,6 +62,19 @@ export function useAuthSessionQuery() {
     clearAuthSession();
   }, [query.data]);
 
+  useEffect(() => {
+    if (!query.data?.expiresAt || typeof window === "undefined") return undefined;
+    const remainingMs = Date.parse(query.data.expiresAt) - Date.now();
+    if (remainingMs <= 0) {
+      void queryClient.invalidateQueries({ queryKey: authQueryKeys.session });
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: authQueryKeys.session });
+    }, Math.min(remainingMs + 250, 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [query.data?.expiresAt, queryClient]);
+
   return query;
 }
 
@@ -71,6 +85,10 @@ export function useLoginMutation() {
     mutationFn: (credentials: LoginCredentials) => loginWithBackend(credentials),
     retry: false,
     onSuccess: (session) => {
+      queryClient.getMutationCache().clear();
+      queryClient.removeQueries({
+        predicate: (candidate) => candidate.queryKey[0] !== "auth",
+      });
       persistAuthSession(session);
       queryClient.setQueryData(authQueryKeys.session, session);
     },
@@ -84,6 +102,11 @@ export function useLogoutMutation() {
     mutationFn: logoutFromBackend,
     retry: false,
     onSettled: () => {
+      void queryClient.cancelQueries();
+      queryClient.getMutationCache().clear();
+      queryClient.removeQueries({
+        predicate: (candidate) => candidate.queryKey[0] !== "auth",
+      });
       clearAuthSession();
       queryClient.setQueryData<AuthSession | null>(authQueryKeys.session, null);
     },

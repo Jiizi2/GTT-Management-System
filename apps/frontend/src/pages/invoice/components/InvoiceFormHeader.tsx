@@ -4,19 +4,15 @@ export function InvoiceFormHeader({
   isEditMode,
   isWorkspaceBusy,
   isBackendAvailable,
-  isSavingDraft,
   isSubmitting,
   onBack,
-  onSaveDraft,
   onSubmitButtonClick,
 }: {
   isEditMode: boolean;
   isWorkspaceBusy: boolean;
   isBackendAvailable: boolean;
-  isSavingDraft: boolean;
   isSubmitting: boolean;
   onBack: () => void;
-  onSaveDraft: () => void;
   onSubmitButtonClick: () => void;
 }) {
   return (
@@ -36,20 +32,6 @@ export function InvoiceFormHeader({
         </div>
 
         <div className="serene-form-actions rounded-xl bg-surface-container-low p-2">
-          {!isEditMode ? (
-            <Button
-              variant="secondary"
-              onClick={onSaveDraft}
-              disabled={isWorkspaceBusy || !isBackendAvailable}
-              title={
-                isBackendAvailable
-                  ? undefined
-                  : "Backend invoice/database belum terhubung, draft belum bisa disimpan."
-              }
-            >
-              {isSavingDraft ? "Saving Draft..." : "Save Draft"}
-            </Button>
-          ) : null}
           <Button
             variant="primary"
             onClick={onSubmitButtonClick}
