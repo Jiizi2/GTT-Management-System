@@ -63,8 +63,13 @@ async function bootstrap(): Promise<void> {
 
   const httpServer = app.getHttpAdapter().getInstance() as {
     disable?: (name: string) => void;
+    set?: (name: string, value: unknown) => void;
   };
   httpServer.disable?.("x-powered-by");
+  httpServer.set?.(
+    "trust proxy",
+    configService.get<string>("TRUST_PROXY")?.trim().toLowerCase() === "true" ? 1 : false,
+  );
 
   app.enableCors({
     origin: (origin: string | undefined, callback: CorsOriginCallback) => {

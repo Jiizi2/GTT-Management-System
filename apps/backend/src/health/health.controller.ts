@@ -7,6 +7,8 @@ import { Public } from "../auth/auth.public";
 import { ApiErrorResponseDto } from "../http/api-error-response.dto";
 import { PrismaService } from "../prisma/prisma.service";
 import { HealthResponseDto } from "./dto/health-response.dto";
+import fs from "node:fs";
+import path from "node:path";
 
 const HEALTH_CHECK_TIMEOUT_MS = 1_500;
 
@@ -58,6 +60,23 @@ export class HealthController {
     if (dataSource === "prisma") {
       try {
         await withTimeout(this.prisma.$queryRaw`SELECT 1`, HEALTH_CHECK_TIMEOUT_MS);
+        const migrationsDirectory = path.resolve(process.cwd(), "prisma", "migrations");
+        const latestMigration = fs.readdirSync(migrationsDirectory, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => entry.name)
+          .sort()
+          .at(-1);
+        if (!latestMigration) throw new Error("Repository migration metadata is missing.");
+        const applied = await withTimeout(
+          this.prisma.$queryRaw<Array<{ applied: boolean }>>`
+            SELECT EXISTS (
+              SELECT 1 FROM "_prisma_migrations"
+              WHERE migration_name = ${latestMigration} AND finished_at IS NOT NULL
+            ) AS applied
+          `,
+          HEALTH_CHECK_TIMEOUT_MS,
+        );
+        if (!applied[0]?.applied) throw new Error("Latest repository migration is not applied.");
       } catch {
         throw new ServiceUnavailableException({
           ok: false,
@@ -76,5 +95,23 @@ export class HealthController {
       database: dataSource === "prisma" ? "up" : "n/a",
       timestamp,
     };
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get("live")
+  liveness() {
+    return {
+      ok: true,
+      service: "backend",
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get("ready")
+  readiness() {
+    return this.check();
   }
 }
