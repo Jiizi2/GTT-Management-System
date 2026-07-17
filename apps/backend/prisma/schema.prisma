@@ -83,6 +83,7 @@ model AuthUser {
   role         AuthUserRole @default(ADMIN)
   passwordHash String?
   isActive     Boolean      @default(true)
+  tokenVersion Int          @default(0)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -360,6 +361,7 @@ model VisaHotelAgreement {
 
   @@index([visaSetupId, city, stayStart])
   @@index([sourceDraftId])
+  @@unique([sourceDraftId, visaSetupId])
 }
 
 model HotelAgreementDraft {

@@ -1,4 +1,5 @@
 import { escapeHtml } from "../shared/app-domain";
+import { fetchBackend } from "../shared/api-client";
 
 export type InvoiceExportCurrency = "IDR" | "USD" | "SAR";
 
@@ -17,6 +18,7 @@ export type InvoiceExportPaymentItem = {
 };
 
 export type InvoiceExportPayload = {
+  invoiceId?: string;
   invoiceNumber: string;
   issueDateIso: string;
   dueDateIso: string;
@@ -48,6 +50,46 @@ type InvoiceExportWindowOptions = {
 const PRINT_TRIGGER_DELAY_MS = 180;
 const PRINT_FALLBACK_TIMEOUT_MS = 4_500;
 const RESOURCE_WAIT_TIMEOUT_MS = 2_500;
+
+type ProtectedApprovalAssets = {
+  stampDataUrl?: string;
+  signatureDataUrl?: string;
+};
+
+async function responsePngToDataUrl(response: Response): Promise<string | undefined> {
+  if (!response.ok || response.headers.get("content-type")?.split(";", 1)[0] !== "image/png") {
+    return undefined;
+  }
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength === 0 || buffer.byteLength > 2 * 1024 * 1024) return undefined;
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return `data:image/png;base64,${btoa(binary)}`;
+}
+
+async function fetchProtectedApprovalAssets(invoiceId?: string): Promise<ProtectedApprovalAssets> {
+  const normalizedInvoiceId = invoiceId?.trim();
+  if (!normalizedInvoiceId) return {};
+  const encodedInvoiceId = encodeURIComponent(normalizedInvoiceId);
+  const read = async (kind: "stamp" | "signature") => {
+    try {
+      const response = await fetchBackend(`/invoices/${encodedInvoiceId}/document-assets/${kind}`, {
+        method: "GET",
+        headers: { Accept: "image/png" },
+        cache: "no-store",
+      });
+      return await responsePngToDataUrl(response);
+    } catch (error) {
+      console.warn(`Protected invoice ${kind} is unavailable.`, error);
+      return undefined;
+    }
+  };
+  const [stampDataUrl, signatureDataUrl] = await Promise.all([read("stamp"), read("signature")]);
+  return { stampDataUrl, signatureDataUrl };
+}
 
 const companyProfile = {
   brandName: "PT. Ghaniya Zilia Rahman",
@@ -361,6 +403,7 @@ export async function exportInvoicePdf(
   payload: InvoiceExportPayload,
   _options: InvoiceExportWindowOptions = {},
 ): Promise<boolean> {
+  const approvalAssets = await fetchProtectedApprovalAssets(payload.invoiceId);
   const iframe = window.document.createElement("iframe");
   iframe.name = `invoice_print_${Date.now()}`;
   iframe.style.position = "absolute";
@@ -376,8 +419,6 @@ export async function exportInvoicePdf(
   }
 
   const logoUrl = new URL("/logo-ghaniya-travel-polos.png", window.location.origin).toString();
-  const capUrl = new URL("/cap-ghaniya.png", window.location.origin).toString();
-  const signatureUrl = new URL("/ttd-husein.png", window.location.origin).toString();
   const appCssUrl = new URL("/index.css", window.location.origin).toString();
   const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const statusLabel = resolvePaymentStatusLabel(payload);
@@ -494,8 +535,8 @@ export async function exportInvoicePdf(
 <link as="style" href="${escapeHtml(fontsCssUrl)}" rel="preload"/>
 <link as="style" href="${escapeHtml(appCssUrl)}" rel="preload"/>
 <link as="image" href="${escapeHtml(logoUrl)}" rel="preload"/>
-<link as="image" href="${escapeHtml(capUrl)}" rel="preload"/>
-<link as="image" href="${escapeHtml(signatureUrl)}" rel="preload"/>
+${approvalAssets.stampDataUrl ? `<link as="image" href="${escapeHtml(approvalAssets.stampDataUrl)}" rel="preload"/>` : ""}
+${approvalAssets.signatureDataUrl ? `<link as="image" href="${escapeHtml(approvalAssets.signatureDataUrl)}" rel="preload"/>` : ""}
 <link href="${escapeHtml(fontsCssUrl)}" rel="stylesheet"/>
 <link href="${escapeHtml(appCssUrl)}" rel="stylesheet"/>
 <style>
@@ -1311,8 +1352,9 @@ ${hasUsdItems ? `
 </div>
 <div class="invoice-signature-block">
 <div class="signature-container">
-<img alt="Cap Ghaniya" class="stamp-img" decoding="sync" fetchpriority="high" src="${escapeHtml(capUrl)}"/>
-<img alt="Tanda Tangan Husein" class="signature-img" decoding="sync" fetchpriority="high" src="${escapeHtml(signatureUrl)}"/>
+${approvalAssets.signatureDataUrl ? `<img alt="Tanda tangan terotorisasi" class="signature-img" decoding="sync" src="${escapeHtml(approvalAssets.signatureDataUrl)}"/>` : ""}
+${approvalAssets.stampDataUrl ? `<img alt="Cap terotorisasi" class="stamp-img" decoding="sync" src="${escapeHtml(approvalAssets.stampDataUrl)}"/>` : ""}
+${!approvalAssets.signatureDataUrl && !approvalAssets.stampDataUrl ? `<span class="text-xs">Dokumen dibuat oleh sistem. Aset persetujuan belum tersedia.</span>` : ""}
 </div>
 <p class="signature-name">${escapeHtml(companyProfile.directorName)}</p>
 <p class="signature-title">${escapeHtml(companyProfile.directorTitle)}</p>

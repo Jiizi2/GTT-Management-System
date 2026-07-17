@@ -11,8 +11,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "./auth.service";
 
 const FIXED_NOW_EPOCH_MS = Date.parse("2026-04-09T08:00:00.000Z");
-const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
-const REMEMBERED_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 14;
+const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60;
+const REMEMBERED_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24;
 
 async function withFixedNow<T>(epochMs: number, fn: () => Promise<T>): Promise<T> {
   const originalNow = Date.now;

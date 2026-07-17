@@ -111,3 +111,18 @@ Once the dual-write database phase is fully deprecated and we enter contract cle
    ```sql
    ALTER TABLE "Invoice" DROP COLUMN "items";
    ```
+# Readiness, backup, dan rollback
+
+- Liveness: `GET /api/health/live` hanya membuktikan proses HTTP hidup.
+- Readiness: `GET /api/health/ready` memeriksa database dan memastikan migration terakhir di repo sudah selesai di `_prisma_migrations`.
+- Reverse proxy production harus menimpa `X-Forwarded-For` dengan alamat peer (`$remote_addr`). Backend production mempercayai tepat satu hop proxy (`TRUST_PROXY=true`); backend tidak boleh dipublikasikan langsung.
+- Release harus diberi tag yang mencatat commit SHA. Jalankan migration additive sebelum mengganti aplikasi, dan jangan menghapus field legacy dalam release backfill yang sama.
+
+Backup production wajib terjadwal, terenkripsi, memiliki salinan off-host, retention tertulis, serta alarm kegagalan. Catat RPO/RTO yang disetujui bisnis. Setiap kuartal, restore backup terbaru ke database disposable bernama `*_qa` atau `*_test` dengan `npm run db:restore:local`, jalankan readiness dan sampling data, lalu hapus dump sensitif. Backup tanpa restore drill tidak dianggap terverifikasi.
+
+Baseline jadwal, retention, monitoring, restore drill, ownership, dan prosedur insiden tersedia di `docs/operations/production-backup-restore-plan.md`.
+Otomasi dan langkah aktivasi host tersedia di `docs/operations/production-backup-implementation.md`; pre-deployment backup production memakai `gtt-backup-predeploy.service` dan deployment wajib berhenti bila backup gagal.
+
+Rollback aplikasi menggunakan image/tag release sebelumnya selama schema masih backward-compatible. Rollback data hanya boleh memakai run ID/backfill manifest yang spesifik; jangan menjalankan restore penuh atau menghapus migration tanpa maintenance window, backup baru, reviewer, dan query verifikasi.
+
+Cap dan tanda tangan invoice menggunakan secret mount privat, bukan frontend static assets. Prosedur instalasi dan rotasi ada di `docs/invoice-protected-approval-assets.md`.

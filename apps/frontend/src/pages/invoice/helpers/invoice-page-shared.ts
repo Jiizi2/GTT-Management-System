@@ -566,6 +566,7 @@ export async function viewInvoicePdfFromRow({
 
   return await exportInvoicePdf(
     {
+      invoiceId: row.id,
       invoiceNumber: row.invoiceNumber,
       issueDateIso: row.issuedDateIso,
       dueDateIso: row.dueDateIso,

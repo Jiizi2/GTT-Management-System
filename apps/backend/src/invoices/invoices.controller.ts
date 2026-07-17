@@ -3,13 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Inject,
   MethodNotAllowedException,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   Res,
+  StreamableFile,
 } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
@@ -36,6 +39,11 @@ import {
 import { UpdateInvoiceDto } from "./dto/update-invoice.dto";
 import { PaginationDto } from "./dto/pagination.dto";
 import { InvoicesService } from "./invoices.service";
+import {
+  InvoiceDocumentAssetsService,
+  type InvoiceDocumentAssetKind,
+} from "./invoice-document-assets.service";
+import type { AuthTokenPayload } from "../auth/auth.types";
 
 type ResponseLike = {
   setHeader: (name: string, value: string | readonly string[]) => void;
@@ -47,7 +55,11 @@ type ResponseLike = {
 @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
 @Controller("invoices")
 export class InvoicesController {
-  constructor(@Inject(InvoicesService) private readonly invoicesService: InvoicesService) {}
+  constructor(
+    @Inject(InvoicesService) private readonly invoicesService: InvoicesService,
+    @Inject(InvoiceDocumentAssetsService)
+    private readonly documentAssetsService: InvoiceDocumentAssetsService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -83,6 +95,41 @@ export class InvoicesController {
   listClients(@Res({ passthrough: true }) response: ResponseLike) {
     response.setHeader("Cache-Control", "no-store, private");
     return this.invoicesService.listClients();
+  }
+
+  @Get(":id/document-assets/:kind")
+  @Roles("super-admin", "admin")
+  @Header("Cache-Control", "no-store, private")
+  @Header("X-Content-Type-Options", "nosniff")
+  @ApiOperation({
+    summary: "Read protected invoice approval asset",
+    description: "Mengirim cap atau tanda tangan privat untuk invoice final dan mencatat aksesnya.",
+  })
+  @ApiParam({ name: "id", example: "clinvoiceid123" })
+  @ApiParam({ name: "kind", enum: ["stamp", "signature"] })
+  @ApiOkResponse({ description: "PNG privat berhasil dibaca." })
+  @ApiNotFoundResponse({ type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
+  async readDocumentAsset(
+    @Param("id") id: string,
+    @Param("kind") rawKind: string,
+    @Req() request: { authUser?: AuthTokenPayload },
+  ): Promise<StreamableFile> {
+    const kind = rawKind.trim().toLowerCase();
+    if (kind !== "stamp" && kind !== "signature") {
+      throw new MethodNotAllowedException("Asset kind must be 'stamp' or 'signature'.");
+    }
+    if (!request.authUser) throw new MethodNotAllowedException("Authenticated session is required.");
+    const content = await this.documentAssetsService.readForInvoice({
+      invoiceId: id,
+      kind: kind as InvoiceDocumentAssetKind,
+      actor: request.authUser,
+    });
+    return new StreamableFile(content, {
+      type: "image/png",
+      disposition: `inline; filename="invoice-${kind}.png"`,
+      length: content.length,
+    });
   }
 
   @Post()

@@ -288,11 +288,15 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       select: {
         id: true,
         clientId: true,
+        groupId: true,
         invoiceNumber: true,
         dueDate: true,
         issuedDate: true,
         amount: true,
+        downPaymentIdr: true,
         notes: true,
+        description: true,
+        recipientName: true,
         status: true,
         version: true,
         itemsRel: {
@@ -309,6 +313,14 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       throw new NotFoundException(`Invoice '${id}' not found.`);
     }
 
+    if (existing.version !== undefined && existing.version !== payload.version) {
+      Telemetry.end(queryTracker, { action: "update_version_conflict" });
+      Telemetry.end(submitTracker, { success: false });
+      throw new ConflictException(
+        "Invoice telah dimodifikasi oleh transaksi lain. Silakan muat ulang halaman dan coba lagi.",
+      );
+    }
+
     const client = await this.resolveClientForUpdateWithPrisma(payload, existing.clientId);
 
     const issuedDateIso = payload.issuedDate
@@ -323,10 +335,12 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
           ? issuedDateIso
           : normalizeIsoDate(payload.dueDate!, "dueDate"));
     const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
-    let resolvedGroupId: string | null = client.groupId ?? null;
-    const normalizedItems = normalizeInvoiceLineItems(payload.items, payload.notes);
+    let resolvedGroupId: string | null = existing.groupId;
+    const normalizedItems = payload.items === undefined
+      ? undefined
+      : normalizeInvoiceLineItems(payload.items, payload.notes ?? existing.notes ?? undefined);
 
-    if (requestedGroupCode) {
+    if (payload.groupCode !== undefined && requestedGroupCode) {
       const matchedGroup = await this.prisma.group.findUnique({
         where: {
           code: requestedGroupCode,
@@ -343,25 +357,33 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       }
 
       resolvedGroupId = matchedGroup.id;
+    } else if (payload.groupCode !== undefined) {
+      resolvedGroupId = null;
+    } else if ((payload.clientId !== undefined || payload.clientName !== undefined) && client.groupId) {
+      resolvedGroupId = client.groupId;
     }
     Telemetry.end(queryTracker, { action: "update_queries_success" });
 
-    const baseAmount = resolveInvoiceAmountFromItems(payload.amount ?? Number(existing.amount), normalizedItems);
+    const baseAmount = normalizedItems === undefined
+      ? (payload.amount ?? Number(existing.amount))
+      : resolveInvoiceAmountFromItems(payload.amount ?? Number(existing.amount), normalizedItems);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
-    let notes = getTrimmedString(payload.notes);
+    let notes = payload.notes === undefined ? (existing.notes ?? "") : getTrimmedString(payload.notes);
     if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
       notes = `${notes}\n[NoDueDate:true]`.trim();
+    } else if (payload.dueDate !== undefined && !isNoDueDate) {
+      notes = notes.replace("[NoDueDate:true]", "").trim();
     }
     const effectiveStatus = resolveEffectiveStatus(
-      payload.status ?? InvoiceStatus.PENDING,
+      payload.status ?? existing.status,
       dueDateIso,
       roundedAmount,
-      payload.downPaymentIdr ?? 0,
+      payload.downPaymentIdr ?? Number(existing.downPaymentIdr),
       notes,
     );
     const nextDownPaymentIdr = normalizeDownPaymentByAmount(
       roundedAmount,
-      payload.downPaymentIdr ?? 0,
+      payload.downPaymentIdr ?? Number(existing.downPaymentIdr),
     );
     const canWriteInlineDownPayment = await this.ensureInvoiceDownPaymentColumn();
 
@@ -377,8 +399,12 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
           amount: roundedAmount,
           status: effectiveStatus,
           notes: notes || null,
-          description: getTrimmedString(payload.description) || null,
-          recipientName: getTrimmedString(payload.recipientName) || null,
+          description: payload.description === undefined
+            ? existing.description
+            : (getTrimmedString(payload.description) || null),
+          recipientName: payload.recipientName === undefined
+            ? existing.recipientName
+            : (getTrimmedString(payload.recipientName) || null),
           version: { increment: 1 },
           ...(canWriteInlineDownPayment ? { downPaymentIdr: nextDownPaymentIdr } : {}),
         };
@@ -416,7 +442,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
             data: {
               itemsRel: {
                 createMany: {
-                  data: normalizedItems.map((item) => ({
+                    data: normalizedItems!.map((item) => ({
                     description: item.description,
                     pax: item.pax,
                     currency: item.currency,

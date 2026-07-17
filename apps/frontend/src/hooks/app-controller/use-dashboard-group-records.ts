@@ -536,7 +536,7 @@ export function useDashboardGroupRecords({
   // all overview rows, while Active only is applied as a local filter.
   const shouldUseRemoteOverviewActiveOnly = false;
   const shouldUseRemoteOverviewActiveOnlyRef = useRef(shouldUseRemoteOverviewActiveOnly);
-  const backendSyncRequestIdRef = useRef(0);
+  const backendSyncQueueRef = useRef<Promise<void>>(Promise.resolve());
   const currentDashboardDate = useCurrentDashboardDate();
   const currentOverviewMonthKey = useMemo(() => getCurrentMonthKey(currentDashboardDate), [currentDashboardDate]);
   const shouldFilterOverviewByMonth = activeNav === "overview" && overviewMonthFilter !== "all";
@@ -701,7 +701,7 @@ export function useDashboardGroupRecords({
   );
 
   const syncGroupsFromBackendOrRestore = useCallback(
-    async (requestId: number, rollbackSnapshot?: GroupRecordsSnapshot) => {
+    async (rollbackSnapshot?: GroupRecordsSnapshot) => {
       const projection = requestedProjectionRef.current;
       const activeOnly = shouldUseRemoteOverviewActiveOnlyRef.current;
 
@@ -710,16 +710,8 @@ export function useDashboardGroupRecords({
           projection,
           activeOnly,
         });
-        if (requestId !== backendSyncRequestIdRef.current) {
-          return;
-        }
-
         syncGroupRecords(backendGroups, projection, activeOnly);
       } catch (error: unknown) {
-        if (requestId !== backendSyncRequestIdRef.current) {
-          return;
-        }
-
         if (rollbackSnapshot) {
           syncGroupRecords(rollbackSnapshot.groupRecords, rollbackSnapshot.projection, rollbackSnapshot.activeOnly);
         }
@@ -738,35 +730,26 @@ export function useDashboardGroupRecords({
       rollbackSnapshot,
       showSuccess = true,
     }: {
-      task: Promise<void>;
+      task: () => Promise<void>;
       successMessage: string;
       failureMessage: SyncFailureMessage;
       rollbackSnapshot?: GroupRecordsSnapshot;
       showSuccess?: boolean;
     }) => {
-      const requestId = backendSyncRequestIdRef.current + 1;
-      backendSyncRequestIdRef.current = requestId;
+      const queuedTask = backendSyncQueueRef.current
+        .catch(() => undefined)
+        .then(task);
+      backendSyncQueueRef.current = queuedTask.then(() => undefined, () => undefined);
 
-      void task
+      void queuedTask
         .then(() => {
-          if (requestId !== backendSyncRequestIdRef.current) {
-            return;
-          }
-
-          void queryClient.invalidateQueries({ queryKey: groupQueryKeys.all });
-          void queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all });
           if (showSuccess) {
             showSyncFeedback("success", successMessage);
           }
         })
         .catch(async (error: unknown) => {
-          if (requestId !== backendSyncRequestIdRef.current) {
-            console.warn("Skipped stale backend sync failure.", error);
-            return;
-          }
-
           if (!allowLocalFallback) {
-            await syncGroupsFromBackendOrRestore(requestId, rollbackSnapshot);
+            await syncGroupsFromBackendOrRestore(rollbackSnapshot);
           }
 
           const resolvedFailureMessage = typeof failureMessage === "function" ? failureMessage(error) : failureMessage;
@@ -774,6 +757,10 @@ export function useDashboardGroupRecords({
           if (allowLocalFallback) {
             console.warn(resolvedFailureMessage, error);
           }
+        })
+        .finally(() => {
+          void queryClient.invalidateQueries({ queryKey: groupQueryKeys.all });
+          void queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all });
         });
     },
     [allowLocalFallback, queryClient, showSyncFeedback, syncGroupsFromBackendOrRestore],
@@ -1062,7 +1049,7 @@ export function useDashboardGroupRecords({
       commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
 
       runBackendSync({
-        task: replaceGroupMutation.mutateAsync({ groupCode, group: nextGroup }),
+        task: () => replaceGroupMutation.mutateAsync({ groupCode, group: nextGroup }),
         successMessage: syncMessages?.successMessage ?? "Perubahan visa berhasil disimpan.",
         failureMessage: syncMessages?.failureMessage ?? "Perubahan visa belum berhasil disimpan ke backend.",
         rollbackSnapshot,
@@ -1082,7 +1069,7 @@ export function useDashboardGroupRecords({
       navigateToOverview({ replace: true });
 
       runBackendSync({
-        task: deleteGroupMutation.mutateAsync(groupCode),
+        task: () => deleteGroupMutation.mutateAsync(groupCode),
         successMessage: "Group berhasil dihapus.",
         failureMessage: "Penghapusan group belum berhasil disimpan ke backend.",
         rollbackSnapshot,
@@ -1102,7 +1089,7 @@ export function useDashboardGroupRecords({
       navigateToVisaTracking({ replace: true });
 
       runBackendSync({
-        task: deleteGroupMutation.mutateAsync(groupCode),
+        task: () => deleteGroupMutation.mutateAsync(groupCode),
         successMessage: "Group berhasil dihapus.",
         failureMessage: "Penghapusan group belum berhasil disimpan ke backend.",
         rollbackSnapshot,
@@ -1270,7 +1257,7 @@ export function useDashboardGroupRecords({
       commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
 
       runBackendSync({
-        task: saveVisaHotelMutation
+        task: () => saveVisaHotelMutation
           .mutateAsync({
             groupCode,
             city,
@@ -1331,7 +1318,7 @@ export function useDashboardGroupRecords({
       commitGroupRecords((current) => current.map((group) => (group.code === groupCode ? nextGroup : group)));
 
       runBackendSync({
-        task: deleteVisaHotelMutation
+        task: () => deleteVisaHotelMutation
           .mutateAsync({
             groupCode,
             hotelId,
@@ -1434,7 +1421,7 @@ export function useDashboardGroupRecords({
       navigateToOverview({ replace: true });
 
       runBackendSync({
-        task: createGroupMutation.mutateAsync(normalizedGroup),
+        task: () => createGroupMutation.mutateAsync(normalizedGroup),
         successMessage: "Group baru berhasil disimpan.",
         failureMessage: (error: unknown) =>
           resolveDashboardSyncFailureMessage(error, "Group belum berhasil disimpan ke backend."),
@@ -1475,7 +1462,7 @@ export function useDashboardGroupRecords({
       navigateToGroupDetail(normalizedGroupCode, { replace: true });
 
       runBackendSync({
-        task: createGroupIdentityMutation.mutateAsync(identity).then((backendGroup) => {
+        task: () => createGroupIdentityMutation.mutateAsync(identity).then((backendGroup) => {
           const normalizedBackendGroup = normalizeGroupStatus(backendGroup);
           commitGroupRecords((current) =>
             current.map((group) =>
@@ -1573,7 +1560,7 @@ export function useDashboardGroupRecords({
       });
 
       runBackendSync({
-        task: replaceGroupMutation.mutateAsync({
+        task: () => replaceGroupMutation.mutateAsync({
           groupCode: backendTargetGroupCode,
           group: nextGroup,
         }),
@@ -1660,7 +1647,7 @@ export function useDashboardGroupRecords({
       });
 
       runBackendSync({
-        task: updateGroupMutation.mutateAsync({
+        task: () => updateGroupMutation.mutateAsync({
           groupCode: backendTargetGroupCode,
           group: nextGroup,
         }),
@@ -1747,7 +1734,7 @@ export function useDashboardGroupRecords({
       });
 
       runBackendSync({
-        task: replaceGroupMutation.mutateAsync({
+        task: () => replaceGroupMutation.mutateAsync({
           groupCode: backendTargetGroupCode,
           group: nextGroup,
         }),

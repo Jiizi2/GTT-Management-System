@@ -1,0 +1,19 @@
+[Unit]
+Description=GTT encrypted PostgreSQL production backup
+Requires=docker.service
+After=docker.service network-online.target
+OnFailure=gtt-backup-alert@%n
+
+[Service]
+Type=oneshot
+User=gtt-backup
+Group=gtt-backup
+WorkingDirectory=/opt/gtt
+EnvironmentFile=/etc/gtt/backup.env
+ExecStart=/usr/bin/flock --nonblock /var/lib/gtt-backup/backup.lock /usr/bin/node /opt/gtt/scripts/production-backup.mjs --kind scheduled
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gtt-backup
+UMask=0077

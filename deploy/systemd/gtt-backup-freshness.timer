@@ -1,0 +1,10 @@
+[Unit]
+Description=Check GTT production backup freshness hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=gtt-backup-freshness.service
+
+[Install]
+WantedBy=timers.target

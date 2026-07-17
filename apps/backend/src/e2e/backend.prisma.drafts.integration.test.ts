@@ -1,6 +1,6 @@
 import "dotenv/config";
 import "reflect-metadata";
-import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { PrismaClient, AgreementCity, AgreementApprovalStatus } from "@prisma/client";
@@ -162,12 +162,38 @@ async function authenticateDevSession(baseUrl: string): Promise<void> {
   activeAuthCookie = cookieHeader;
 }
 
+async function cleanupOwnedDraftFixtures(): Promise<void> {
+  await prisma.visaHotelAgreement.deleteMany({
+    where: {
+      visaSetup: {
+        group: { code: { startsWith: "GRP-DRAFT-" } },
+      },
+    },
+  });
+  await prisma.group.deleteMany({
+    where: { code: { startsWith: "GRP-DRAFT-" } },
+  });
+  await prisma.hotelAgreementDraft.deleteMany({
+    where: {
+      OR: [
+        { agreementNumber: { startsWith: "AGR-E2E-" } },
+        { agreementNumber: { startsWith: "AGR-ASSIGN-" } },
+      ],
+    },
+  });
+}
+
 describe("backend prisma hotel agreement drafts integration tests", () => {
   let server: StartedServer;
 
   beforeAll(async () => {
+    await cleanupOwnedDraftFixtures();
     server = await startBackendServerWithPrisma();
     await authenticateDevSession(server.baseUrl);
+  });
+
+  afterEach(async () => {
+    await cleanupOwnedDraftFixtures();
   });
 
   afterAll(async () => {
@@ -202,8 +228,9 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
     // Read (findAll)
     const listRes = await requestJson(server.baseUrl, `/api/visa/agreement-drafts?query=${agreementNumber}`);
     expect(listRes.status).toBe(200);
-    expect(listRes.json).toHaveLength(1);
-    expect(listRes.json[0].id).toBe(draftId);
+    expect(listRes.json).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: draftId, agreementNumber })]),
+    );
 
     // Update
     const patchRes = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${draftId}`, {
@@ -227,7 +254,9 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
 
     // Verify deletion
     const verifyRes = await requestJson(server.baseUrl, `/api/visa/agreement-drafts?query=${agreementNumber}`);
-    expect(verifyRes.json).toHaveLength(0);
+    expect(verifyRes.json).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: draftId })]),
+    );
   });
 
   it("should perform hotel agreement draft assignment and unassignment", async () => {
@@ -279,7 +308,9 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
     });
     expect(assignRes.status).toBe(201);
     expect(assignRes.json.remainingPax).toBe(10);
-    expect(assignRes.json.assignedGroups).toContain(uniqueGroupCode);
+    expect(assignRes.json.assignedGroups).toEqual(
+      expect.arrayContaining([expect.objectContaining({ groupCode: uniqueGroupCode, pax: 30 })]),
+    );
 
     // 4. Verify group got the visa hotel agreement assigned
     const groupRes = await requestJson(server.baseUrl, `/api/groups/${uniqueGroupCode}`);
@@ -324,7 +355,9 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
       body: JSON.stringify({ groupCode: secondGroupCode }),
     });
     expect(assignOldRes.status).toBe(400);
-    expect(assignOldRes.json.message).toContain("Rejected");
+    expect(assignOldRes.json.message).toMatch(/24 jam/u);
+    await expect(prisma.hotelAgreementDraft.findUnique({ where: { id: draftId } }))
+      .resolves.toMatchObject({ status: "REJECTED" });
 
     // 7. Unassign draft from the group
     const unassignRes = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${draftId}/unassign`, {
@@ -333,21 +366,9 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
       body: JSON.stringify({ groupCode: uniqueGroupCode }),
     });
     expect(unassignRes.status).toBe(201);
-    expect(unassignRes.json.assignedGroups).not.toContain(uniqueGroupCode);
+    expect(unassignRes.json.assignedGroups).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ groupCode: uniqueGroupCode })]),
+    );
 
-    // Clean up
-    await prisma.visaHotelAgreement.deleteMany({
-      where: {
-        visaSetup: {
-          group: { code: { in: [uniqueGroupCode, secondGroupCode] } }
-        }
-      }
-    });
-    await prisma.group.deleteMany({
-      where: { code: { in: [uniqueGroupCode, secondGroupCode] } }
-    });
-    await prisma.hotelAgreementDraft.delete({
-      where: { id: draftId }
-    });
   });
 });

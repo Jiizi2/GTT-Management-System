@@ -3,10 +3,6 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
-// Import from dist so Swagger/Nest decorator metadata matches the compiled backend runtime.
-// Vitest's TS transform is fine for test code, but compiled app metadata is more reliable here.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AppModule } = require("../dist/app.module.js") as { AppModule: unknown };
 
 async function withEnv<T>(
   overrides: Record<string, string | undefined>,
@@ -36,6 +32,9 @@ async function withEnv<T>(
 }
 
 async function createTestApp(): Promise<INestApplication> {
+  // Load after the test environment is installed; ConfigModule reads environment on import.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AppModule } = require("../dist/app.module.js") as { AppModule: unknown };
   const app = await NestFactory.create(AppModule, {
     logger: false,
   });

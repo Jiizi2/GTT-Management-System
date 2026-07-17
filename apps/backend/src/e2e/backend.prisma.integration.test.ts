@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { PrismaClient } from "@prisma/client";
+import { AuthService } from "../auth/auth.service";
 
 type StartedServer = {
   baseUrl: string;
@@ -223,6 +224,84 @@ async function cleanupManagedUsersByEmailPrefix(emailPrefix: string): Promise<vo
       },
     },
   });
+}
+
+async function testConcurrentSuperAdminInvariant(): Promise<void> {
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+  const usernamePrefix = `qa-super-invariant-${suffix}`;
+  const existingSuperAdmins = await prisma.authUser.findMany({
+    where: { role: "SUPER_ADMIN" },
+    select: { id: true, isActive: true },
+  });
+
+  const created = await prisma.$transaction(async (tx) => {
+    await tx.authUser.updateMany({
+      where: { role: "SUPER_ADMIN" },
+      data: { isActive: false },
+    });
+    return Promise.all([
+      tx.authUser.create({
+        data: {
+          name: "QA Concurrent Super A",
+          username: `${usernamePrefix}-a`,
+          email: `${usernamePrefix}-a@example.test`,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      }),
+      tx.authUser.create({
+        data: {
+          name: "QA Concurrent Super B",
+          username: `${usernamePrefix}-b`,
+          email: `${usernamePrefix}-b@example.test`,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      }),
+    ]);
+  });
+
+  const config = {
+    get: (key: string) => {
+      if (key === "DATA_SOURCE") return "prisma";
+      if (key === "AUTH_BOOTSTRAP_DEFAULT_USERS") return false;
+      if (key === "NODE_ENV") return "test";
+      if (key === "AUTH_SECRET") return "prisma-integration-auth-secret";
+      return undefined;
+    },
+  };
+  const service = new AuthService(prisma as never, config as never);
+
+  try {
+    const results = await Promise.allSettled(
+      created.map((user) =>
+        service.updateManagedUser(user.id, {
+          name: user.name,
+          email: user.email,
+          roleId: "admin",
+        }),
+      ),
+    );
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+    const rejection = results.find((result) => result.status === "rejected");
+    assert.match(String(rejection?.reason), /at least one super admin must remain/i);
+    assert.equal(
+      await prisma.authUser.count({ where: { role: "SUPER_ADMIN", isActive: true } }),
+      1,
+      "Concurrent demotions must preserve one active Super Admin.",
+    );
+  } finally {
+    await prisma.$transaction(async (tx) => {
+      await tx.authUser.deleteMany({ where: { username: { startsWith: usernamePrefix } } });
+      for (const user of existingSuperAdmins) {
+        await tx.authUser.update({
+          where: { id: user.id },
+          data: { isActive: user.isActive },
+        });
+      }
+    });
+  }
 }
 
 async function testPrismaIntegrationFlow(): Promise<void> {
@@ -570,5 +649,9 @@ describe("backend prisma integration tests", () => {
 
   it("should run backend prisma managed user password flow", async () => {
     await testPrismaManagedUserPasswordFlow();
+  });
+
+  it("should preserve one active Super Admin during concurrent demotions", async () => {
+    await testConcurrentSuperAdminInvariant();
   });
 });

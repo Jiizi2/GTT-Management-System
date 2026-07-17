@@ -38,21 +38,9 @@ type GroupHotelAgreementSnapshot = {
 };
 
 function buildPrismaDraftAgreementMatchers(
-  draft: Pick<PrismaHotelAgreementDraftRecord, "agreementNumber" | "city">
+  draft: Pick<PrismaHotelAgreementDraftRecord, "id">
 ) {
-  return [
-    {
-      sourceDraftId: (draft as any).id ?? "",
-    },
-    {
-      agreementNumber: draft.agreementNumber.trim(),
-      city: draft.city,
-    },
-    {
-      agreementNumber: draft.agreementNumber.trim().toUpperCase(),
-      city: draft.city,
-    },
-  ];
+  return [{ sourceDraftId: draft.id }];
 }
 
 function getStayNights(startIso: string, endIso: string): string[] {
@@ -356,8 +344,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
 
     await this.prisma.visaHotelAgreement.updateMany({
       where: {
-        agreementNumber: existing.agreementNumber,
-        city: existing.city,
+        sourceDraftId: existing.id,
       },
       data: {
         agreementNumber: normalizedPayload.agreementNumber,
@@ -392,31 +379,26 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       throw new BadRequestException("Group code is required.");
     }
 
-    const draft = await this.prisma.hotelAgreementDraft.findUnique({
-      where: { id: draftId },
-    });
-    if (!draft) {
-      throw new NotFoundException(`Hotel agreement draft '${draftId}' not found.`);
-    }
+    let assignmentResult;
+    try {
+      assignmentResult = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('hotel-draft-assignment'), hashtext(${draftId}))`;
+        const draft = await tx.hotelAgreementDraft.findUnique({ where: { id: draftId } });
+        if (!draft) throw new NotFoundException(`Hotel agreement draft '${draftId}' not found.`);
 
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    if (draft.status === AgreementApprovalStatus.WAITING && draft.updatedAt < cutoff) {
-      await this.prisma.hotelAgreementDraft.update({
-        where: { id: draft.id },
-        data: { status: AgreementApprovalStatus.REJECTED },
-      });
-      throw new BadRequestException(
-        "Hotel agreement ini berstatus ditolak (Rejected) karena telah melewati batas waktu 24 jam. Silakan edit nomor agreement untuk mengajukan kembali.",
-      );
-    }
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        if (draft.status === AgreementApprovalStatus.WAITING && draft.updatedAt < cutoff) {
+          await tx.hotelAgreementDraft.update({
+            where: { id: draft.id },
+            data: { status: AgreementApprovalStatus.REJECTED },
+          });
+          return { expired: true as const };
+        }
+        if (draft.status === AgreementApprovalStatus.REJECTED) {
+          throw new BadRequestException("Hotel agreement ini berstatus ditolak (Rejected). Edit draft untuk mengajukan kembali.");
+        }
 
-    if (draft.status === AgreementApprovalStatus.REJECTED) {
-      throw new BadRequestException(
-        "Hotel agreement ini berstatus ditolak (Rejected). Silakan edit nomor agreement untuk mengajukan kembali.",
-      );
-    }
-
-    const targetGroup = await this.prisma.group.findFirst({
+        const targetGroup = await tx.group.findFirst({
       where: {
         OR: [{ id: normalizedGroupCode }, { code: normalizedGroupCode }],
       },
@@ -439,10 +421,8 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
           },
         },
       },
-    });
-    if (!targetGroup) {
-      throw new NotFoundException(`Group '${normalizedGroupCode}' not found.`);
-    }
+        });
+        if (!targetGroup) throw new NotFoundException(`Group '${normalizedGroupCode}' not found.`);
 
     const customStart = payload.stayStart ? toIsoDateOnly(payload.stayStart) : undefined;
     const customEnd = payload.stayEnd ? toIsoDateOnly(payload.stayEnd) : undefined;
@@ -452,11 +432,9 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       ? { stayStart: customStart, stayEnd: customEnd }
       : calculateAllocatedStayDates(targetGroup, draft as any, existingAgreements);
 
-    const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
-      where: {
-        OR: buildPrismaDraftAgreementMatchers(draft),
-      },
-    });
+        const assignedAgreements = await tx.visaHotelAgreement.findMany({
+          where: { sourceDraftId: draft.id },
+        });
 
     const allocatedNights = getStayNights(allocatedStay.stayStart, allocatedStay.stayEnd);
     let minRemaining = draft.pax;
@@ -480,12 +458,12 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       );
     }
 
-    const targetGroupAgreement = await this.prisma.visaHotelAgreement.findFirst({
+        const targetGroupAgreement = await tx.visaHotelAgreement.findFirst({
       where: {
         visaSetup: {
           groupId: targetGroup.id,
         },
-        OR: buildPrismaDraftAgreementMatchers(draft),
+        sourceDraftId: draft.id,
       },
     });
     if (targetGroupAgreement) {
@@ -494,19 +472,44 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
 
     const paxToAssign = Math.min(targetGroup.pax, minRemaining);
 
-    const groupHotelPayload = {
-      ...this.toGroupHotelPayload(draft, draft.id),
-      pax: paxToAssign,
-      stayStart: allocatedStay.stayStart,
-      stayEnd: allocatedStay.stayEnd,
-    };
+        const visaSetup = await tx.visaSetup.upsert({
+          where: { groupId: targetGroup.id },
+          update: {},
+          create: {
+            groupId: targetGroup.id,
+            syarikah: "Not assigned",
+          },
+          select: { id: true },
+        });
+        await tx.visaHotelAgreement.create({
+          data: {
+            visaSetupId: visaSetup.id,
+            sourceDraftId: draft.id,
+            city: draft.city,
+            hotelName: draft.hotelName,
+            agreementNumber: draft.agreementNumber,
+            pax: paxToAssign,
+            status: draft.status,
+            stayStart: toUtcMidnightDate(allocatedStay.stayStart),
+            stayEnd: toUtcMidnightDate(allocatedStay.stayEnd),
+          },
+        });
+        return { expired: false as const, draft };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034")) {
+        throw new ConflictException("Assignment berubah secara bersamaan. Muat ulang dan coba lagi.");
+      }
+      throw error;
+    }
 
-    await this.groupsService.addVisaHotelAgreement(targetGroup.code, groupHotelPayload);
+    if (assignmentResult.expired) {
+      throw new BadRequestException(
+        "Hotel agreement ini telah melewati batas waktu 24 jam. Edit draft untuk mengajukan kembali.",
+      );
+    }
 
-    const assigned = await this.prisma.hotelAgreementDraft.findUnique({
-      where: { id: draft.id },
-    });
-
+    const assigned = assignmentResult.draft;
     if (!assigned) {
       throw new NotFoundException(`Draft not found after assignment.`);
     }
@@ -523,11 +526,9 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       throw new NotFoundException(`Hotel agreement draft '${draftId}' not found.`);
     }
 
-    const queryMatchers = buildPrismaDraftAgreementMatchers(draft);
-
     const assignments = await this.prisma.visaHotelAgreement.findMany({
       where: {
-        OR: queryMatchers,
+        sourceDraftId: draft.id,
         ...(groupCode
           ? {
               visaSetup: {
@@ -559,16 +560,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       const gCode = assoc.visaSetup?.group?.code;
       if (!gCode) continue;
 
-      const groupDetail = await this.groupsService.findOneByIdOrCode(gCode);
-      const matchedAgreement = (groupDetail.visaSetup?.hotelAgreements ?? []).find(
-        (a: any) =>
-          a.agreementNumber?.trim().toUpperCase() === draft.agreementNumber.trim().toUpperCase() &&
-          a.city?.trim().toLowerCase() === draft.city.trim().toLowerCase(),
-      );
-
-      if (matchedAgreement) {
-        await this.groupsService.removeVisaHotelAgreement(gCode, (matchedAgreement as any).id);
-      }
+      await this.prisma.visaHotelAgreement.delete({ where: { id: assoc.id } });
     }
 
     const updated = await this.prisma.hotelAgreementDraft.findUnique({

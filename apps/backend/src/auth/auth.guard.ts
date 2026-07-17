@@ -44,7 +44,7 @@ export class AuthGuard implements CanActivate {
     this.allowedOrigins = resolveCorsOrigins(resolveConfiguredString(this.configService, "CORS_ORIGINS"));
   }
 
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> {
     const isPublicRoute = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_ROUTE_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -71,6 +71,16 @@ export class AuthGuard implements CanActivate {
 
     if (resolvedAuthentication.transport === "cookie") {
       this.assertTrustedOriginForCookieAuth(request);
+    }
+
+    const authenticate = (this.authService as AuthService & {
+      authenticateAccessToken?: (token: string) => Promise<AuthTokenPayload>;
+    }).authenticateAccessToken;
+    if (typeof authenticate === "function") {
+      return authenticate.call(this.authService, resolvedAuthentication.token).then((authUser) => {
+        request.authUser = authUser;
+        return true;
+      });
     }
 
     request.authUser = this.authService.verifyAccessToken(resolvedAuthentication.token);

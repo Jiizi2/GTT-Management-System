@@ -5,6 +5,7 @@ import { InvoiceStatus } from "@prisma/client";
 import { CreateInvoiceDto } from "../dto/create-invoice.dto";
 import { UpdateInvoiceDto } from "../dto/update-invoice.dto";
 import { MethodNotAllowedException } from "@nestjs/common";
+import { InvoiceDocumentAssetsService } from "../invoice-document-assets.service";
 
 describe("InvoicesController", () => {
   const mockInvoiceListItem = {
@@ -51,9 +52,16 @@ describe("InvoicesController", () => {
     } as unknown as InvoicesService;
   };
 
+  const createMockDocumentAssetsService = () => ({
+    readForInvoice: vi.fn().mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47])),
+  }) as unknown as InvoiceDocumentAssetsService;
+
+  const createController = (service = createMockService(), assets = createMockDocumentAssetsService()) =>
+    new InvoicesController(service, assets);
+
   it("should fetch all invoices without pagination", async () => {
     const service = createMockService();
-    const controller = new InvoicesController(service);
+    const controller = createController(service);
 
     const result = await controller.findAll({}, mockResponse);
 
@@ -64,7 +72,7 @@ describe("InvoicesController", () => {
 
   it("should fetch all invoices with pagination", async () => {
     const service = createMockService();
-    const controller = new InvoicesController(service);
+    const controller = createController(service);
 
     const paginationDto = { page: 1, limit: 10 };
     const result = await controller.findAll(paginationDto, mockResponse);
@@ -82,7 +90,7 @@ describe("InvoicesController", () => {
 
   it("should list all invoice clients", async () => {
     const service = createMockService();
-    const controller = new InvoicesController(service);
+    const controller = createController(service);
 
     const result = await controller.listClients(mockResponse);
 
@@ -93,7 +101,7 @@ describe("InvoicesController", () => {
 
   it("should create an invoice", async () => {
     const service = createMockService();
-    const controller = new InvoicesController(service);
+    const controller = createController(service);
 
     const payload: CreateInvoiceDto = {
       clientName: "Client A",
@@ -110,7 +118,7 @@ describe("InvoicesController", () => {
 
   it("should update an invoice", async () => {
     const service = createMockService();
-    const controller = new InvoicesController(service);
+    const controller = createController(service);
 
     const payload: UpdateInvoiceDto = {
       amount: 200000,
@@ -125,10 +133,42 @@ describe("InvoicesController", () => {
 
   it("should delete invoice by id", async () => {
     const service = createMockService();
-    const controller = new InvoicesController(service);
+    const controller = createController(service);
 
     await controller.remove("inv-1");
 
     expect(service.delete).toHaveBeenCalledWith("inv-1");
+  });
+
+  it("should return a protected invoice asset for an authenticated operator", async () => {
+    const service = createMockService();
+    const assets = createMockDocumentAssetsService();
+    const controller = createController(service, assets);
+    const authUser = {
+      id: "usr-1",
+      name: "Admin",
+      username: "admin",
+      email: "admin@example.com",
+      accessTier: "admin" as const,
+      exp: 1_900_000_000,
+      rememberSession: false,
+      tokenVersion: 0,
+    };
+
+    const result = await controller.readDocumentAsset("inv-1", "stamp", { authUser });
+
+    expect(result).toBeInstanceOf(Object);
+    expect(assets.readForInvoice).toHaveBeenCalledWith({
+      invoiceId: "inv-1",
+      kind: "stamp",
+      actor: authUser,
+    });
+  });
+
+  it("should reject an unknown protected asset kind", async () => {
+    const controller = createController();
+    await expect(controller.readDocumentAsset("inv-1", "other", {})).rejects.toBeInstanceOf(
+      MethodNotAllowedException,
+    );
   });
 });

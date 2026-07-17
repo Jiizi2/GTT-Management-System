@@ -1,0 +1,12 @@
+[Unit]
+Description=Send an alert for failed GTT backup unit %i
+
+[Service]
+Type=oneshot
+User=gtt-backup
+Group=gtt-backup
+EnvironmentFile=/etc/gtt/backup.env
+ExecStart=/usr/bin/node /opt/gtt/scripts/backup-alert.mjs %i
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
