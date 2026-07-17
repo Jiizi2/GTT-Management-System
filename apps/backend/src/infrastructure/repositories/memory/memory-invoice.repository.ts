@@ -117,6 +117,8 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       if (!notes.includes("[NoDueDate:true]")) {
         notes = `${notes}\n[NoDueDate:true]`.trim();
       }
+    } else if (payload.dueDate !== undefined) {
+      notes = notes.replace("[NoDueDate:true]", "").trim();
     }
 
     const effectiveStatus = resolveEffectiveStatus(
@@ -195,11 +197,13 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       : baseAmount;
     const roundedAmount = Math.max(0, Math.round(resolvedAmount));
 
-    let notes = getTrimmedString(payload.notes);
+    let notes = payload.notes === undefined ? (currentInvoice.notes ?? "") : getTrimmedString(payload.notes);
     if (isNoDueDate) {
       if (!notes.includes("[NoDueDate:true]")) {
         notes = `${notes}\n[NoDueDate:true]`.trim();
       }
+    } else if (payload.dueDate !== undefined) {
+      notes = notes.replace("[NoDueDate:true]", "").trim();
     }
 
     const effectiveStatus = resolveEffectiveStatus(
@@ -237,8 +241,12 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       downPaymentIdr: normalizedDownPaymentIdr,
       status: effectiveStatus,
       notes: notes || undefined,
-      description: getTrimmedString(payload.description) || undefined,
-      recipientName: getTrimmedString(payload.recipientName) || undefined,
+      description: payload.description === undefined
+        ? currentInvoice.description
+        : (getTrimmedString(payload.description) || undefined),
+      recipientName: payload.recipientName === undefined
+        ? currentInvoice.recipientName
+        : (getTrimmedString(payload.recipientName) || undefined),
       items: normalizedItems,
       version: currentInvoice.version + 1,
     };
