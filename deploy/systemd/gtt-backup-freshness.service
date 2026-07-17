@@ -1,0 +1,13 @@
+[Unit]
+Description=Check GTT production backup freshness
+OnFailure=gtt-backup-alert@%n
+
+[Service]
+Type=oneshot
+User=gtt-backup
+Group=gtt-backup
+EnvironmentFile=/etc/gtt/backup.env
+ExecStart=/usr/bin/node /opt/gtt/scripts/backup-freshness.mjs
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
