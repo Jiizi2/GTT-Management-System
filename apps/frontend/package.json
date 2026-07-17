@@ -32,7 +32,8 @@
     "test:component:watch": "vitest --config vitest.component.config.mts src/components",
     "test:component:coverage": "vitest run --config vitest.component.config.mts src/components --coverage.enabled",
     "test": "npm run test:unit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test e2e/app.e2e.spec.ts",
+    "test:e2e:diagnostics": "playwright test e2e/diagnostics.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

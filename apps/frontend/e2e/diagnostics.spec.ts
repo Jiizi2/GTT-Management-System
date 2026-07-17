@@ -335,7 +335,7 @@ test.afterAll(async () => {
   }
 });
 
-test("Capture diagnostics logs during invoice edit/save", async ({ page }) => {
+test("Capture diagnostics logs during invoice edit/save", async ({ page }, testInfo) => {
   const logs: string[] = [];
   page.on("console", (msg) => {
     logs.push(msg.text());
@@ -404,8 +404,7 @@ test("Capture diagnostics logs during invoice edit/save", async ({ page }) => {
     const formattedLogs = logs.join("\n");
     console.log(formattedLogs);
 
-    // Write log to appDataDir/brain/currentConversationId/diagnostics_run.log
-    const logPath = "C:\\Users\\ghozi\\.gemini\\antigravity-ide\\brain\\6d450fa8-848a-457d-ad78-d25d909c0ba2\\diagnostics_run.log";
+    const logPath = testInfo.outputPath("diagnostics_run.log");
     await writeFile(logPath, formattedLogs, "utf-8");
     console.log(`Diagnostics log written to ${logPath}`);
   }
