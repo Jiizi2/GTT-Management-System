@@ -24,6 +24,7 @@ type PrismaAuthUserRecord = {
   role: AuthUserRole;
   passwordHash: string | null;
   isActive: boolean;
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -122,6 +123,7 @@ function createPrismaUser(overrides: Partial<PrismaAuthUserRecord>): PrismaAuthU
     passwordHash:
       overrides.passwordHash === undefined ? hashAuthPassword("Password#2026") : overrides.passwordHash,
     isActive: overrides.isActive ?? true,
+    tokenVersion: overrides.tokenVersion ?? 0,
     createdAt: overrides.createdAt ?? new Date("2026-04-09T08:00:00.000Z"),
     updatedAt: overrides.updatedAt ?? new Date("2026-04-09T08:00:00.000Z"),
   };
@@ -140,6 +142,8 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
 
   const mock = {
     __state: state,
+    $executeRaw: async () => 1,
+    $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback(mock),
     authUser: {
       findFirst: async (args: {
         where?: PrismaUserWhere;
@@ -201,6 +205,7 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
           role: AuthUserRole;
           passwordHash: string | null;
           isActive?: boolean;
+          tokenVersion?: number;
         };
         select?: Record<string, unknown>;
       }) => {
@@ -228,6 +233,7 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
           role: args.data.role,
           passwordHash: args.data.passwordHash,
           isActive: args.data.isActive ?? true,
+          tokenVersion: args.data.tokenVersion ?? 0,
           createdAt: now,
           updatedAt: now,
         };
@@ -241,6 +247,7 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
           email?: string;
           role?: AuthUserRole;
           passwordHash?: string | null;
+          tokenVersion?: number | { increment: number };
         };
         select?: Record<string, unknown>;
       }) => {
@@ -263,6 +270,9 @@ function createPrismaServiceMock(options: PrismaMockOptions = {}): PrismaMock {
           role: args.data.role ?? current.role,
           passwordHash:
             args.data.passwordHash === undefined ? current.passwordHash : args.data.passwordHash,
+          tokenVersion: typeof args.data.tokenVersion === "number"
+            ? args.data.tokenVersion
+            : current.tokenVersion + (args.data.tokenVersion?.increment ?? 0),
           updatedAt: new Date(),
         };
         state.users[targetIndex] = updated;

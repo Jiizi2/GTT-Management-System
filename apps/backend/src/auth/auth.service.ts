@@ -47,6 +47,7 @@ type AuthManagedUserRecord = {
   email: string;
   roleId: AuthManagedUserRole;
   passwordHash: string | null;
+  tokenVersion: number;
   updatedAtEpochMs: number;
 };
 
@@ -54,8 +55,8 @@ const TOKEN_TYPE = "Bearer" as const;
 const DEFAULT_AUTH_SECRET = "gtt-dev-auth-secret-please-change-in-production";
 const MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH = 32;
 
-const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
-const REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 14;
+const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60;
+const REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24;
 
 function decodeBase64UrlJson(value: string): unknown {
   const decoded = Buffer.from(value, "base64url").toString("utf8");
@@ -95,8 +96,11 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
       : null;
   const exp = toPositiveInteger(record.exp);
   const rememberSession = typeof record.rememberSession === "boolean" ? record.rememberSession : null;
+  const tokenVersion = typeof record.tokenVersion === "number" && Number.isInteger(record.tokenVersion)
+    ? record.tokenVersion
+    : null;
 
-  if (!id || !name || !username || !email || !accessTier || !exp || rememberSession === null) {
+  if (!id || !name || !username || !email || !accessTier || !exp || rememberSession === null || tokenVersion === null) {
     return null;
   }
 
@@ -108,6 +112,7 @@ function parseAuthTokenPayload(value: unknown): AuthTokenPayload | null {
     accessTier,
     exp,
     rememberSession,
+    tokenVersion,
   };
 }
 
@@ -174,6 +179,7 @@ function createDefaultManagedUsers(configService?: ConfigService): AuthManagedUs
       email: "superadmin.dev@ghaniya.local",
       roleId: "super-admin",
       passwordHash: hashAuthPassword(defaultSuperAdminPassword),
+      tokenVersion: 0,
       updatedAtEpochMs: now,
     },
     {
@@ -183,6 +189,7 @@ function createDefaultManagedUsers(configService?: ConfigService): AuthManagedUs
       email: "admin.dev@ghaniya.local",
       roleId: "admin",
       passwordHash: hashAuthPassword(defaultAdminPassword),
+      tokenVersion: 0,
       updatedAtEpochMs: now,
     },
   ];
@@ -274,6 +281,48 @@ export class AuthService {
     }
 
     return tokenPayload;
+  }
+
+  async authenticateAccessToken(token: string): Promise<AuthTokenPayload> {
+    const tokenPayload = this.verifyAccessToken(token);
+    if (this.dataSource === "prisma") {
+      const currentUser = await this.prisma.authUser.findUnique({
+        where: { id: tokenPayload.id },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          role: true,
+          isActive: true,
+          tokenVersion: true,
+        },
+      });
+      const accessTier = currentUser ? mapPrismaRoleToAccessTier(currentUser.role) : null;
+      if (!currentUser?.isActive || !accessTier || currentUser.tokenVersion !== tokenPayload.tokenVersion) {
+        throw new UnauthorizedException("Access token has been revoked.");
+      }
+      return {
+        ...tokenPayload,
+        name: currentUser.name,
+        username: currentUser.username,
+        email: currentUser.email,
+        accessTier,
+      };
+    }
+
+    const currentUser = this.managedUsers.find((entry) => entry.id === tokenPayload.id);
+    const accessTier = currentUser ? mapManagedRoleToAccessTier(currentUser.roleId) : null;
+    if (!currentUser || !accessTier || currentUser.tokenVersion !== tokenPayload.tokenVersion) {
+      throw new UnauthorizedException("Access token has been revoked.");
+    }
+    return {
+      ...tokenPayload,
+      name: currentUser.name,
+      username: currentUser.username,
+      email: currentUser.email,
+      accessTier,
+    };
   }
 
   async listManagedUsers(): Promise<AuthManagedUser[]> {
@@ -374,9 +423,11 @@ export class AuthService {
   private buildLoginResponse({
     account,
     rememberSession,
+    tokenVersion,
   }: {
     account: AuthSessionUser;
     rememberSession: boolean;
+    tokenVersion: number;
   }): AuthLoginResponse {
     const tokenLifetimeSeconds = rememberSession
       ? REMEMBERED_ACCESS_TOKEN_LIFETIME_SECONDS
@@ -386,6 +437,7 @@ export class AuthService {
       ...account,
       exp: expiresAtEpochSeconds,
       rememberSession,
+      tokenVersion,
     };
     const accessToken = this.signToken(tokenPayload);
 
@@ -428,6 +480,7 @@ export class AuthService {
         accessTier,
       },
       rememberSession,
+      tokenVersion: managedUser.tokenVersion,
     });
     this.logLoginSuccess(loginResponse.user, rememberSession);
     return loginResponse;
@@ -450,6 +503,7 @@ export class AuthService {
         email: true,
         role: true,
         passwordHash: true,
+        tokenVersion: true,
       },
     });
 
@@ -475,6 +529,7 @@ export class AuthService {
         accessTier,
       },
       rememberSession,
+      tokenVersion: account.tokenVersion,
     });
     this.logLoginSuccess(loginResponse.user, rememberSession);
     return loginResponse;
@@ -531,6 +586,7 @@ export class AuthService {
       passwordHash: payload.password?.trim()
         ? await hashAuthPasswordAsync(payload.password.trim())
         : null,
+      tokenVersion: 0,
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers.unshift(nextUser);
@@ -630,6 +686,7 @@ export class AuthService {
       name: normalizedName,
       email: normalizedEmail,
       roleId: payload.roleId,
+      tokenVersion: current.tokenVersion + (current.roleId === payload.roleId ? 0 : 1),
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers[targetIndex] = updated;
@@ -676,13 +733,15 @@ export class AuthService {
     }
 
     const nextRole = mapManagedRoleToPrismaRole(payload.roleId);
-    await this.assertSuperAdminWillRemain({
-      currentRole: currentUser.role,
-      nextRole,
-      deleting: false,
-    });
-
-    const updated = await this.prisma.authUser.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('auth-super-admin-invariant'))`;
+      if (currentUser.role === "SUPER_ADMIN" && nextRole !== "SUPER_ADMIN") {
+        const activeSuperAdmins = await tx.authUser.count({
+          where: { role: "SUPER_ADMIN", isActive: true },
+        });
+        if (activeSuperAdmins <= 1) throw new ConflictException("At least one Super Admin must remain.");
+      }
+      return tx.authUser.update({
       where: {
         id: normalizedUserId,
       },
@@ -690,6 +749,7 @@ export class AuthService {
         name: normalizedName,
         email: normalizedEmail,
         role: nextRole,
+        ...(currentUser.role === nextRole ? {} : { tokenVersion: { increment: 1 } }),
       },
       select: {
         id: true,
@@ -699,7 +759,8 @@ export class AuthService {
         passwordHash: true,
         updatedAt: true,
       },
-    });
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     this.logManagedUserMutation("auth.user.updated", this.toManagedUserFromPrisma(updated));
     return this.toManagedUserFromPrisma(updated);
@@ -724,6 +785,7 @@ export class AuthService {
     const updated: AuthManagedUserRecord = {
       ...current,
       passwordHash: await hashAuthPasswordAsync(normalizedPassword),
+      tokenVersion: current.tokenVersion + 1,
       updatedAtEpochMs: Date.now(),
     };
     this.managedUsers[targetIndex] = updated;
@@ -748,6 +810,7 @@ export class AuthService {
         },
         data: {
           passwordHash: await hashAuthPasswordAsync(normalizedPassword),
+          tokenVersion: { increment: 1 },
         },
         select: {
           id: true,
@@ -813,17 +876,16 @@ export class AuthService {
       throw new NotFoundException(`User '${userId}' not found.`);
     }
 
-    await this.assertSuperAdminWillRemain({
-      currentRole: currentUser.role,
-      nextRole: currentUser.role,
-      deleting: true,
-    });
-
-    await this.prisma.authUser.delete({
-      where: {
-        id: normalizedUserId,
-      },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('auth-super-admin-invariant'))`;
+      if (currentUser.role === "SUPER_ADMIN") {
+        const activeSuperAdmins = await tx.authUser.count({
+          where: { role: "SUPER_ADMIN", isActive: true },
+        });
+        if (activeSuperAdmins <= 1) throw new ConflictException("At least one Super Admin must remain.");
+      }
+      await tx.authUser.delete({ where: { id: normalizedUserId } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     this.logger.info(
       {

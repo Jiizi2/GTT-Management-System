@@ -17,6 +17,7 @@ export type AuthSessionUser = {
 export type AuthTokenPayload = AuthSessionUser & {
   exp: number;
   rememberSession: boolean;
+  tokenVersion: number;
 };
 
 export type AuthLoginResponse = {
