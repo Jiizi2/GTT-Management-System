@@ -24,6 +24,7 @@
     "test:unit:coverage": "npm run clean:test:coverage && npm run test:unit:coverage --workspace backend && npm run test:unit:coverage --workspace frontend",
     "test:unit:coverage:check": "npm run clean:test:coverage && npm run test:unit:coverage:check --workspace backend && npm run test:unit:coverage:check --workspace frontend",
     "test:smoke": "npm run test:smoke --workspace frontend",
+    "test:backup-safety": "node --test scripts/production-backup.test.mjs",
     "test:smoke:coverage:frontend": "npm run test:smoke:coverage --workspace frontend",
     "test:smoke:watch:frontend": "npm run test:smoke:watch --workspace frontend",
     "test:api": "npm run test:api --workspace backend",
@@ -42,7 +43,10 @@
     "db:migrate:backend": "npm run db:migrate --workspace backend",
     "db:seed:backend": "npm run db:seed --workspace backend",
     "db:studio:backend": "npm run db:studio --workspace backend",
-    "db:restore:local": "node scripts/db-restore-local.mjs"
+    "db:restore:local": "node scripts/db-restore-local.mjs",
+    "db:backup:production": "node scripts/production-backup.mjs --kind scheduled",
+    "db:backup:predeploy": "node scripts/production-backup.mjs --kind predeploy",
+    "db:backup:freshness": "node scripts/backup-freshness.mjs"
   },
   "engines": {
     "node": ">=20"
