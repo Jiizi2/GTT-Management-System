@@ -120,16 +120,16 @@ export function AgentShell({ session }: { session: AgentSession }) {
         className={`px-4 pb-28 transition-[margin] sm:px-6 xl:pb-8 ${collapsed ? "xl:ml-24" : "xl:ml-72"}`}
       >
         <Routes>
-          <Route path="/agent" element={<Navigate to="/agent/overview" replace />} />
-          <Route path="/agent/overview" element={<DashboardPage principalId={principalId} />} />
-          <Route path="/agent/groups" element={<GroupsPage principalId={principalId} />} />
-          <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId={principalId} />} />
-          <Route path="/agent/visa-process" element={<VisaApplicationsPage principalId={principalId} />} />
-          <Route path="/agent/agreements" element={<AgreementReadOnlyPage />} />
-          <Route path="/agent/invoices" element={<InvoicesPage principalId={principalId} />} />
-          <Route path="/agent/invoices/:id" element={<InvoiceDetailPage principalId={principalId} />} />
-          <Route path="/agent/checklist" element={<ChecklistPage principalId={principalId} />} />
-          <Route path="/agent/profile" element={<ProfilePage principalId={principalId} />} />
+          <Route index element={<Navigate to="/agent/overview" replace />} />
+          <Route path="overview" element={<DashboardPage principalId={principalId} />} />
+          <Route path="groups" element={<GroupsPage principalId={principalId} />} />
+          <Route path="groups/:identity" element={<GroupDetailPage principalId={principalId} />} />
+          <Route path="visa-process" element={<VisaApplicationsPage principalId={principalId} />} />
+          <Route path="agreements" element={<AgreementReadOnlyPage />} />
+          <Route path="invoices" element={<InvoicesPage principalId={principalId} />} />
+          <Route path="invoices/:id" element={<InvoiceDetailPage principalId={principalId} />} />
+          <Route path="checklist" element={<ChecklistPage principalId={principalId} />} />
+          <Route path="profile" element={<ProfilePage principalId={principalId} />} />
           <Route path="*" element={<Navigate to="/agent/overview" replace />} />
         </Routes>
       </main>

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AgentShell } from "../../agent/agent-shell";
 import type { AgentSession } from "../../agent/auth/agent-session";
@@ -29,7 +29,9 @@ describe("AgentShell routes", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/agent/agreements"]}>
-          <AgentShell session={session} />
+          <Routes>
+            <Route path="/agent/*" element={<AgentShell session={session} />} />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     );
