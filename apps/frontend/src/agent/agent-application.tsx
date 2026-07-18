@@ -23,9 +23,12 @@ export function AgentApplication() {
   }
   return (
     <Routes>
-      <Route path="/login" element={unauthorized ? <AgentLoginPage /> : <Navigate to="/agent/overview" replace />} />
       <Route
-        path="/*"
+        path="/agent/login"
+        element={unauthorized ? <AgentLoginPage /> : <Navigate to="/agent/overview" replace />}
+      />
+      <Route
+        path="/agent/*"
         element={unauthorized ? <Navigate to="/agent/login" replace /> : <AgentShell session={session.data!} />}
       />
     </Routes>
