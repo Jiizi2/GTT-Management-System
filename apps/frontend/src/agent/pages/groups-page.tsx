@@ -22,6 +22,7 @@ export function GroupsPage({
       groups={query.data}
       fixedAgentName={agentName}
       readOnly
+      showThemeToggle={false}
       onOpenDetail={(row) => navigate(`/agent/groups/${encodeURIComponent(row.groupCode)}`)}
       onUpdateAgreementStatus={() => undefined}
     />

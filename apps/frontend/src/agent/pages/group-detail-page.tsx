@@ -29,6 +29,7 @@ export function GroupDetailPage({
       group={group}
       groups={query.data}
       readOnly
+      showThemeToggle={false}
       onBack={() => navigate("/agent/groups")}
       onDeleteGroup={() => undefined}
       onSaveGroup={readOnlyResult}

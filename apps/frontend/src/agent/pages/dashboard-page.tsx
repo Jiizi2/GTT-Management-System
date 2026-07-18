@@ -249,6 +249,7 @@ export function DashboardPage({
       onOpenDetail={(groupCode) => navigate(`/agent/groups/${encodeURIComponent(groupCode)}`)}
       groups={groups}
       fixedAgentName={agentName}
+      showThemeToggle={false}
     />
   );
 }

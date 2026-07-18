@@ -115,8 +115,8 @@ export function AgreementDraftCard({
         <div className="border-b border-dashed border-black/45 bg-transparent p-5 lg:border-b-0 lg:border-r">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Agreement No</p>
-              <p className="mt-2 break-words text-2xl font-extrabold leading-none tracking-tight text-slate-900 sm:text-[2rem]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-on-surface">Agreement No</p>
+              <p className="mt-2 break-words text-2xl font-extrabold leading-none tracking-tight text-on-surface sm:text-[2rem]">
                 {draft.agreementNumber}
               </p>
             </div>
@@ -135,12 +135,12 @@ export function AgreementDraftCard({
           </div>
 
           <div className="mt-5 space-y-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Hotel</p>
-            <h3 className="break-words text-lg font-bold leading-snug text-slate-900">{draft.hotelName}</h3>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-on-surface">Hotel</p>
+            <h3 className="break-words text-lg font-bold leading-snug text-on-surface">{draft.hotelName}</h3>
             {draft.agentName ? (
               <p className="truncate text-sm font-semibold text-brand-primary">Agent: {draft.agentName}</p>
             ) : (
-              <p className="text-sm font-semibold text-slate-500">Agent belum diisi</p>
+              <p className="text-sm font-semibold text-on-surface-variant">Agent belum diisi</p>
             )}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="inline-flex rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-800">
@@ -156,14 +156,14 @@ export function AgreementDraftCard({
 
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Check In</p>
-              <strong className="mt-1 block text-sm font-extrabold text-slate-900 sm:text-base">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-on-surface">Check In</p>
+              <strong className="mt-1 block text-sm font-extrabold text-on-surface sm:text-base">
                 {formatVisaDateWithYear(draft.stayStartIso)}
               </strong>
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-900">Check Out</p>
-              <strong className="mt-1 block text-sm font-extrabold text-slate-900 sm:text-base">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-on-surface">Check Out</p>
+              <strong className="mt-1 block text-sm font-extrabold text-on-surface sm:text-base">
                 {formatVisaDateWithYear(draft.stayEndIso)}
               </strong>
             </div>
@@ -253,8 +253,8 @@ export function AgreementDraftCard({
                         className="flex items-center justify-between gap-3 bg-surface-container-high/60 rounded-xl px-3 py-1.5 border border-black/5"
                       >
                         <div className="min-w-0">
-                          <span className="font-extrabold text-slate-900 text-sm">{link.groupCode}</span>
-                          <span className="ml-2 text-xs font-semibold text-slate-500">({link.pax} Pax)</span>
+                          <span className="font-extrabold text-on-surface text-sm">{link.groupCode}</span>
+                          <span className="ml-2 text-xs font-semibold text-on-surface-variant">({link.pax} Pax)</span>
                         </div>
                         {!readOnly ? (
                           <button
@@ -273,9 +273,9 @@ export function AgreementDraftCard({
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-1 text-sm font-bold text-slate-900">Belum terhubung ke group</p>
+                  <p className="mt-1 text-sm font-bold text-on-surface">Belum terhubung ke group</p>
                 )}
-                <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
+                <p className="mt-2 text-xs font-semibold leading-relaxed text-on-surface-variant">
                   Created {formatDraftDateTime(draft.createdAtIso)}
                 </p>
               </div>
@@ -321,7 +321,7 @@ export function AgreementDraftCard({
           {draft.notes ? (
             <div className="border-t border-dashed border-black/20 pt-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Notes</p>
-              <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-600">{draft.notes}</p>
+              <p className="mt-1 text-sm font-semibold leading-relaxed text-on-surface-variant">{draft.notes}</p>
             </div>
           ) : null}
         </div>

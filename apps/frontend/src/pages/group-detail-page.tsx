@@ -63,6 +63,7 @@ export function GroupDetail({
   onSaveGroup,
   onPatchGroup,
   readOnly = false,
+  showThemeToggle = true,
 }: {
   group: GroupData;
   groups?: GroupData[];
@@ -71,6 +72,7 @@ export function GroupDetail({
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   onPatchGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   readOnly?: boolean;
+  showThemeToggle?: boolean;
 }) {
   const dashboard = useGroupDetailDashboard({
     group,
@@ -134,7 +136,7 @@ export function GroupDetail({
             <span className="hidden sm:inline">Back to Groups</span>
           </Button>
 
-          <ThemeToggleButton className="ml-auto sm:mr-5" />
+          {showThemeToggle ? <ThemeToggleButton className="ml-auto sm:mr-5" /> : null}
         </div>
 
         {group.parentGroupId && (
@@ -175,8 +177,10 @@ export function GroupDetail({
 
           <footer className="rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-3 text-center text-xs font-medium text-on-surface-variant/80">
             <p>
-              <span className="sm:hidden">GTT Operations Desk</span>
-              <span className="hidden sm:inline">Ghaniya Tour and Travel Management System | GTT Operations Desk</span>
+              <span className="sm:hidden">{readOnly ? "GTT Agent Portal" : "GTT Operations Desk"}</span>
+              <span className="hidden sm:inline">
+                Ghaniya Tour and Travel Management System | {readOnly ? "GTT Agent Portal" : "GTT Operations Desk"}
+              </span>
             </p>
           </footer>
         </div>

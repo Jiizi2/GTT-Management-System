@@ -17,12 +17,14 @@ export function VisaTrackingScreen({
   onUpdateAgreementStatus,
   readOnly = false,
   fixedAgentName,
+  showThemeToggle = true,
 }: {
   groups: GroupData[];
   onOpenDetail: (row: VisaTrackingRow) => void;
   onUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
   readOnly?: boolean;
   fixedAgentName?: string;
+  showThemeToggle?: boolean;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
@@ -80,7 +82,7 @@ export function VisaTrackingScreen({
           </label>
         </div>
 
-        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
+        {showThemeToggle ? <ThemeToggleButton className="sm:ml-auto sm:mr-5" /> : null}
       </header>
 
       <PageHeroSection

@@ -1,5 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { MetricCard } from "../../components/metric-card";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
+import { ReadOnlyIndicator } from "../../components/read-only-indicator";
 import { ErrorState, LoadingState } from "../components/data-state";
 import type { VisaApplication, VisaApplicationDocumentType } from "../data/contracts";
 import { formatDate, statusLabel } from "../data/format";
@@ -187,31 +191,35 @@ export function VisaApplicationsPage({ principalId }: { principalId: string }) {
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
 
   return (
-    <div className="mx-auto max-w-[96rem] space-y-5 px-4 pb-24 pt-4 sm:px-6 lg:px-8">
-      <header className="serene-page-toolbar pr-14">
-        <div className="min-w-0">
-          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Visa Operations</p>
-          <h1 className="mt-1 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">Visa Process Tracker</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Workflow, hambatan, PIC, dan kesiapan dokumen dalam satu workspace.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="serene-btn-secondary"
-          onClick={() => void query.refetch()}
-          disabled={query.isFetching}
-        >
-          <span className={`material-symbols-outlined text-lg ${query.isFetching ? "animate-spin" : ""}`}>refresh</span>
-          <span className="hidden sm:inline">{query.isFetching ? "Memperbarui..." : "Refresh"}</span>
-        </button>
-      </header>
+    <PageLayout width="workspace">
+      <PageHeader
+        variant="compact"
+        eyebrow="Visa Operations"
+        title="Visa Process Tracker"
+        description="Workflow, hambatan, PIC, dan kesiapan dokumen dalam satu workspace."
+        actions={
+          <>
+            <button
+              type="button"
+              className="serene-btn-secondary min-h-11"
+              onClick={() => void query.refetch()}
+              disabled={query.isFetching}
+            >
+              <span className={`material-symbols-outlined text-lg ${query.isFetching ? "animate-spin" : ""}`}>
+                refresh
+              </span>
+              <span>{query.isFetching ? "Memperbarui…" : "Segarkan"}</span>
+            </button>
+            <ReadOnlyIndicator />
+          </>
+        }
+      />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Visa process summary">
-        <SummaryCard icon="folder_open" label="Active Applications" value={applications.length} tone="primary" />
-        <SummaryCard icon="schedule" label="On Track" value={onTrackCount} tone="info" />
-        <SummaryCard icon="report" label="Need Attention" value={attentionCount} tone="warning" />
-        <SummaryCard icon="verified" label="Visa Issued" value={completedCount} tone="success" />
+        <MetricCard icon="folder_open" label="Active Applications" value={applications.length} tone="primary" />
+        <MetricCard icon="schedule" label="On Track" value={onTrackCount} tone="info" />
+        <MetricCard icon="report" label="Need Attention" value={attentionCount} tone="warning" />
+        <MetricCard icon="verified" label="Visa Issued" value={completedCount} tone="success" />
       </section>
 
       {applications.length === 0 ? (
@@ -283,39 +291,7 @@ export function VisaApplicationsPage({ principalId }: { principalId: string }) {
           {selected ? <VisaProcessWorkspace application={selected} /> : null}
         </div>
       )}
-    </div>
-  );
-}
-
-function SummaryCard({
-  icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: string;
-  label: string;
-  value: number;
-  tone: "primary" | "info" | "warning" | "success";
-}) {
-  const tones = {
-    primary: "bg-primary/10 text-primary",
-    info: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
-    warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-    success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  };
-  return (
-    <article className="serene-card flex items-center gap-3 rounded-2xl p-4 sm:p-5">
-      <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>
-        <span className="material-symbols-outlined text-xl">{icon}</span>
-      </span>
-      <div className="min-w-0">
-        <strong className="block text-2xl font-extrabold leading-none">{value}</strong>
-        <span className="mt-1 block text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-on-surface-variant sm:text-xs">
-          {label}
-        </span>
-      </div>
-    </article>
+    </PageLayout>
   );
 }
 
@@ -455,7 +431,7 @@ function VisaProcessWorkspace({ application }: { application: VisaApplication })
             </span>
           </div>
           <div className="mt-6 hidden overflow-x-auto pb-2 sm:block">
-            <ol className="grid grid-cols-8" style={{ minWidth: "704px" }}>
+            <ol className="grid grid-cols-8">
               {steps.map((step, index) => {
                 const state = stepState(step, currentLabels);
                 return <WorkflowNode key={step.label} step={step} state={state} last={index === steps.length - 1} />;

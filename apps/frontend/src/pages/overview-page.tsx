@@ -7,21 +7,10 @@ import { Button } from "../components/button";
 import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { MetricCard } from "../components/metric-card";
 import { AgentFilterSelect } from "../components/agent-filter-select";
 
 const { OVERVIEW_PAGE_SIZE } = Domain;
-
-function getStatToneClasses(tone: "primary" | "secondary" | "tertiary"): string {
-  if (tone === "primary") {
-    return "bg-primary text-on-primary shadow-ambient";
-  }
-
-  if (tone === "secondary") {
-    return "bg-secondary text-on-primary shadow-ambient";
-  }
-
-  return "bg-tertiary text-on-primary shadow-ambient";
-}
 
 export function OverviewScreen({
   query,
@@ -37,6 +26,7 @@ export function OverviewScreen({
   onOpenDetail,
   groups = [],
   fixedAgentName,
+  showThemeToggle = true,
 }: {
   query: string;
   filteredGroups: GroupData[];
@@ -60,6 +50,7 @@ export function OverviewScreen({
   onOpenDetail: (groupCode: string) => void;
   groups?: GroupData[];
   fixedAgentName?: string;
+  showThemeToggle?: boolean;
 }) {
   const hasQuery = query.trim().length > 0;
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,7 +131,7 @@ export function OverviewScreen({
           />
         </label>
 
-        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
+        {showThemeToggle ? <ThemeToggleButton className="sm:ml-auto sm:mr-5" /> : null}
       </header>
 
       <PageHeroSection
@@ -156,8 +147,8 @@ export function OverviewScreen({
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.95fr_1fr_1fr_1fr]" aria-label="Weekly summary">
-        <article className="serene-card flex min-h-[11rem] flex-col p-4 sm:min-h-[12.25rem] sm:p-6">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_1fr_1fr]" aria-label="Weekly summary">
+        <article className="serene-card flex min-h-[7rem] flex-col justify-between p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
               <span className="material-symbols-outlined text-xl" aria-hidden="true">
@@ -165,14 +156,12 @@ export function OverviewScreen({
               </span>
             </div>
 
-            <h2 className="font-display text-2xl font-extrabold leading-[1.05] tracking-tight text-primary sm:text-4xl">
-              Weekly
-              <br />
-              Summary
+            <h2 className="font-display text-xl font-extrabold leading-tight tracking-tight text-primary sm:text-2xl">
+              Weekly Summary
             </h2>
           </div>
 
-          <p className="mt-2 text-xs font-medium text-on-surface-variant sm:text-sm">
+          <p className="mt-2 text-xs font-medium text-on-surface-variant">
             Generate and download weekly itinerary report.
           </p>
 
@@ -188,29 +177,14 @@ export function OverviewScreen({
         </article>
 
         {statCards.map((card) => (
-          <article
+          <MetricCard
             key={card.label}
-            className={`relative min-h-[11rem] overflow-hidden rounded-2xl p-4 sm:min-h-[12.25rem] sm:p-6 ${getStatToneClasses(
-              card.tone,
-            )}`}
-          >
-            <span className="block text-xs font-bold uppercase tracking-[0.14em] opacity-80">{card.label}</span>
-            <strong className="mt-4 block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
-              {card.value}
-            </strong>
-            {card.subtitle ? (
-              <span className="mt-3 hidden text-xs font-semibold tracking-wide opacity-80 sm:block sm:text-sm">
-                {card.subtitle}
-              </span>
-            ) : null}
-
-            <span
-              className="material-symbols-outlined absolute -bottom-1 right-2 text-6xl opacity-20 sm:text-7xl"
-              aria-hidden="true"
-            >
-              {card.icon}
-            </span>
-          </article>
+            icon={card.icon}
+            label={card.label}
+            value={card.value}
+            supportingText={card.subtitle}
+            tone={card.tone === "primary" ? "primary" : card.tone === "tertiary" ? "danger" : "neutral"}
+          />
         ))}
       </section>
 
