@@ -11,6 +11,9 @@ const LazyDashboardWorkspaceShell = lazy(async () => ({
 const LazyLoginScreen = lazy(async () => ({
   default: (await import("./pages/login-page")).LoginScreen,
 }));
+const LazyAgentApplication = lazy(async () => ({
+  default: (await import("./agent/agent-application")).AgentApplication,
+}));
 
 const DEVELOPMENT_LOGIN_ACCOUNTS: DevelopmentLoginAccountHint[] = [
   {
@@ -50,7 +53,7 @@ function RestoringSessionScreen() {
   );
 }
 
-export function App() {
+function InternalApplication() {
   const location = useLocation();
   const authSessionQuery = useAuthSessionQuery();
   const loginMutation = useLoginMutation();
@@ -127,4 +130,16 @@ export function App() {
       />
     </Routes>
   );
+}
+
+export function App() {
+  const location = useLocation();
+  if (location.pathname === "/agent" || location.pathname.startsWith("/agent/")) {
+    return (
+      <Suspense fallback={<RestoringSessionScreen />}>
+        <LazyAgentApplication />
+      </Suspense>
+    );
+  }
+  return <InternalApplication />;
 }
