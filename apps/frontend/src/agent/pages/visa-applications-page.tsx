@@ -13,7 +13,7 @@ function hasStatus(value: string, accepted: readonly string[]): boolean {
   return accepted.includes(value);
 }
 
-function buildWorkflow(application: VisaApplication): WorkflowStep[] {
+export function buildWorkflow(application: VisaApplication): WorkflowStep[] {
   const documentReceived = application.documentStatus !== "WAITING_DOCUMENT";
   const documentVerified = application.documentStatus === "VERIFIED";
   const nusukEntered = hasStatus(application.nusukStatus, ["PASSENGER_ENTERED", "GROUP_CREATED"]);
@@ -44,7 +44,7 @@ function buildWorkflow(application: VisaApplication): WorkflowStep[] {
   ];
 }
 
-function getBlockingIssue(application: VisaApplication): BlockingIssue | null {
+export function getBlockingIssue(application: VisaApplication): BlockingIssue | null {
   if (application.documentStatus === "WAITING_DOCUMENT") {
     return {
       reason: "Dokumen atau passport belum lengkap diterima.",
@@ -86,9 +86,21 @@ function getBlockingIssue(application: VisaApplication): BlockingIssue | null {
   return null;
 }
 
-function stepState(steps: WorkflowStep[], index: number): StepState {
-  if (steps[index].completed) return "completed";
-  return steps.findIndex((step) => !step.completed) === index ? "current" : "pending";
+export function getCurrentStepLabels(steps: WorkflowStep[]): string[] {
+  if (!steps[0].completed) return [steps[0].label];
+  if (!steps[1].completed) return [steps[1].label];
+  const parallel = steps
+    .slice(2, 4)
+    .filter((step) => !step.completed)
+    .map((step) => step.label);
+  if (parallel.length > 0) return parallel;
+  const next = steps.slice(4).find((step) => !step.completed);
+  return next ? [next.label] : [];
+}
+
+function stepState(step: WorkflowStep, currentLabels: readonly string[]): StepState {
+  if (step.completed) return "completed";
+  return currentLabels.includes(step.label) ? "current" : "pending";
 }
 
 export function VisaApplicationsPage({ principalId }: { principalId: string }) {
@@ -147,8 +159,8 @@ function VisaProcessCard({ application }: { application: VisaApplication }) {
   const steps = buildWorkflow(application);
   const completed = steps.filter((step) => step.completed).length;
   const progress = Math.round((completed / steps.length) * 100);
-  const currentIndex = steps.findIndex((step) => !step.completed);
-  const currentStep = currentIndex >= 0 ? steps[currentIndex].label : "Completed";
+  const currentLabels = getCurrentStepLabels(steps);
+  const currentStep = currentLabels.length > 0 ? currentLabels.join(" & ") : "Completed";
   const blocker = getBlockingIssue(application);
 
   return (
@@ -231,8 +243,8 @@ function VisaProcessCard({ application }: { application: VisaApplication }) {
       <section className="p-5 pt-0 lg:p-7 lg:pt-0">
         <h3 className="text-lg font-bold">Timeline</h3>
         <ol className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {steps.map((step, index) => {
-            const state = stepState(steps, index);
+          {steps.map((step) => {
+            const state = stepState(step, currentLabels);
             return (
               <li
                 key={step.label}
