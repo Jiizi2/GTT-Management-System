@@ -4,6 +4,7 @@ import { resolveRuntimeConfig } from "../runtime-config";
 
 const COOKIE_DOMAIN_PATTERN = /^\.?[a-z0-9-]+(\.[a-z0-9-]+)*$/i;
 const DEFAULT_AUTH_SECRET = "gtt-dev-auth-secret-please-change-in-production";
+const DEFAULT_AGENT_AUTH_SECRET = "gtt-dev-agent-auth-secret-change-before-production";
 const MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH = 32;
 
 const ENVIRONMENT_SCHEMA = Joi.object({
@@ -12,6 +13,7 @@ const ENVIRONMENT_SCHEMA = Joi.object({
   DATA_SOURCE: Joi.string().trim().valid("memory", "prisma").default("memory"),
   DATABASE_URL: Joi.string().trim().allow("").optional(),
   AUTH_SECRET: Joi.string().allow("").optional(),
+  AGENT_AUTH_SECRET: Joi.string().allow("").optional(),
   AUTH_BOOTSTRAP_DEFAULT_USERS: Joi.boolean().truthy("true").falsy("false").optional(),
   CORS_ORIGINS: Joi.string().trim().allow("").optional(),
   TRUST_PROXY: Joi.boolean().truthy("true").falsy("false").optional(),
@@ -22,6 +24,8 @@ const ENVIRONMENT_SCHEMA = Joi.object({
   HTTP_LOG_SUCCESS: Joi.boolean().truthy("true").falsy("false").optional(),
   AUTH_COOKIE_DOMAIN: Joi.string().trim().pattern(COOKIE_DOMAIN_PATTERN).allow("").optional(),
   AUTH_COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").optional(),
+  AGENT_AUTH_COOKIE_DOMAIN: Joi.string().trim().pattern(COOKIE_DOMAIN_PATTERN).allow("").optional(),
+  AGENT_AUTH_COOKIE_SECURE: Joi.boolean().truthy("true").falsy("false").optional(),
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1_000).default(60_000),
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
   AUTH_LOGIN_RATE_LIMIT_LOCK_MS: Joi.number().integer().min(1_000).default(300_000),
@@ -44,6 +48,7 @@ type ValidatedEnvironment = {
   DATA_SOURCE: "memory" | "prisma";
   DATABASE_URL?: string;
   AUTH_SECRET?: string;
+  AGENT_AUTH_SECRET?: string;
   AUTH_BOOTSTRAP_DEFAULT_USERS?: boolean;
   CORS_ORIGINS?: string;
   TRUST_PROXY?: boolean;
@@ -51,6 +56,8 @@ type ValidatedEnvironment = {
   HTTP_LOG_SUCCESS?: boolean;
   AUTH_COOKIE_DOMAIN?: string;
   AUTH_COOKIE_SECURE?: boolean;
+  AGENT_AUTH_COOKIE_DOMAIN?: string;
+  AGENT_AUTH_COOKIE_SECURE?: boolean;
   AUTH_LOGIN_RATE_LIMIT_WINDOW_MS: number;
   AUTH_LOGIN_RATE_LIMIT_MAX_ATTEMPTS: number;
   AUTH_LOGIN_RATE_LIMIT_LOCK_MS: number;
@@ -107,6 +114,19 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
 
     if (authSecret === DEFAULT_AUTH_SECRET) {
       throw new Error("AUTH_SECRET must not use the development default value in production.");
+    }
+
+    const agentAuthSecret = validated.AGENT_AUTH_SECRET?.trim() ?? "";
+    if (!agentAuthSecret) {
+      throw new Error("AGENT_AUTH_SECRET is required in production.");
+    }
+    if (agentAuthSecret.length < MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH) {
+      throw new Error(
+        `AGENT_AUTH_SECRET must be at least ${MINIMUM_PRODUCTION_AUTH_SECRET_LENGTH} characters in production.`,
+      );
+    }
+    if (agentAuthSecret === DEFAULT_AGENT_AUTH_SECRET || agentAuthSecret === authSecret) {
+      throw new Error("AGENT_AUTH_SECRET must be distinct from AUTH_SECRET in production.");
     }
 
     if (validated.AUTH_BOOTSTRAP_DEFAULT_USERS === true) {

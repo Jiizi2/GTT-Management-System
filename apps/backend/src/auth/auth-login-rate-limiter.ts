@@ -144,15 +144,21 @@ export class AuthLoginRateLimiter {
     this.dataSource = resolveConfiguredDataSource(this.configService);
   }
 
-  resolveKeys(identifier: string, request: LoginRequestLike): LoginRateLimiterKeySet {
+  resolveKeys(
+    identifier: string,
+    request: LoginRequestLike,
+    namespace = "",
+  ): LoginRateLimiterKeySet {
     const clientIp = resolveClientIp(request, {
       trustProxyHeaders: this.trustProxyHeaders,
     });
     const normalizedIdentifier = normalizeIdentifier(identifier);
 
+    const prefix = namespace.trim().toLowerCase();
+    const keyPrefix = prefix ? `${prefix}:` : "";
     return {
-      ipKey: `ip:${clientIp}`,
-      principalKey: `principal:${clientIp}|${normalizedIdentifier}`,
+      ipKey: `${keyPrefix}ip:${clientIp}`,
+      principalKey: `${keyPrefix}principal:${clientIp}|${normalizedIdentifier}`,
     };
   }
 

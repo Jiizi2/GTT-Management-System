@@ -30,6 +30,75 @@ enum AgentStatus {
   INACTIVE
 }
 
+enum AgentPortalUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AgentPortalAccountAuditAction {
+  CREATED
+  ACTIVATED
+  DISABLED
+  PASSWORD_RESET
+  REVOKED
+}
+
+enum VisaApplicationStatus {
+  WAITING_DOCUMENT
+  NEED_REVISION
+  DOCUMENT_VERIFIED
+  WAITING_HOTEL_AGREEMENT
+  PASSENGER_ENTERED
+  GROUP_CREATED
+  READY_TO_SEND
+  VISA_SUBMITTED
+  PAYMENT_COMPLETED
+  VISA_PROCESSING
+  VISA_ISSUED
+  COMPLETED
+}
+
+enum VisaApplicationDocumentStatus {
+  WAITING_DOCUMENT
+  NEED_REVISION
+  VERIFIED
+}
+
+enum VisaApplicationAgreementStatus {
+  NOT_STARTED
+  WAITING_APPROVAL
+  APPROVED
+}
+
+enum VisaApplicationNusukStatus {
+  NOT_STARTED
+  PASSENGER_ENTRY
+  PASSENGER_ENTERED
+  GROUP_CREATED
+}
+
+enum VisaApplicationPaymentStatus {
+  NOT_STARTED
+  WAITING_PAYMENT
+  COMPLETED
+}
+
+enum VisaApplicationVisaStatus {
+  NOT_STARTED
+  READY_TO_SEND
+  SUBMITTED
+  PROCESSING
+  ISSUED
+  COMPLETED
+}
+
+enum VisaApplicationDocumentType {
+  PASSPORT
+  VACCINE_CERTIFICATE
+  MANIFEST
+  PACKAGE_INFORMATION
+}
+
 enum VisaStatus {
   DRAFT
   PENDING
@@ -96,6 +165,7 @@ model AuthUser {
   tokenVersion Int          @default(0)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  agentPortalAccountAuditLogs AgentPortalAccountAuditLog[]
 
   @@index([role])
   @@index([isActive])
@@ -158,9 +228,97 @@ model Agent {
   groups    Group[]
   hotelAgreementDrafts HotelAgreementDraft[]
   invoices  Invoice[]
+  portalUsers AgentPortalUser[]
+  portalAccountAuditLogs AgentPortalAccountAuditLog[]
+  visaApplications VisaApplication[]
 
   @@index([name])
   @@index([status, type])
+}
+
+model AgentPortalUser {
+  id                   String                @id @default(cuid())
+  agentId              String
+  displayName          String
+  email                String
+  normalizedIdentifier String                @unique
+  passwordHash         String
+  status               AgentPortalUserStatus @default(ACTIVE)
+  mustChangePassword   Boolean               @default(true)
+  tokenVersion         Int                   @default(0)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  agent                Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  auditLogs            AgentPortalAccountAuditLog[]
+  visaApplications     VisaApplication[]
+
+  @@index([agentId, status])
+}
+
+model VisaApplication {
+  id                   String                          @id @default(cuid())
+  applicationNumber    String                          @unique
+  agentId              String
+  createdByPortalUserId String
+  departureDate        DateTime
+  returnDate           DateTime
+  departureCity        String
+  providerName         String?
+  packageName          String
+  passengerCount       Int
+  status               VisaApplicationStatus           @default(WAITING_DOCUMENT)
+  documentStatus       VisaApplicationDocumentStatus   @default(WAITING_DOCUMENT)
+  agreementStatus      VisaApplicationAgreementStatus  @default(NOT_STARTED)
+  nusukStatus          VisaApplicationNusukStatus      @default(NOT_STARTED)
+  paymentStatus        VisaApplicationPaymentStatus    @default(NOT_STARTED)
+  visaStatus           VisaApplicationVisaStatus       @default(NOT_STARTED)
+  nusukGroupNumber     String?
+  nusukReferenceNumber String?
+  adminNote            String?
+  submittedAt          DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime                        @default(now())
+  updatedAt            DateTime                        @updatedAt
+  agent                Agent                           @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  createdByPortalUser  AgentPortalUser                 @relation(fields: [createdByPortalUserId], references: [id], onDelete: Restrict)
+  documents            VisaApplicationDocument[]
+
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model VisaApplicationDocument {
+  id                String                        @id @default(cuid())
+  visaApplicationId String
+  type              VisaApplicationDocumentType
+  originalName      String
+  mimeType          String
+  sizeBytes         Int
+  storageKey        String
+  status            VisaApplicationDocumentStatus @default(WAITING_DOCUMENT)
+  reviewNote        String?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+  visaApplication   VisaApplication               @relation(fields: [visaApplicationId], references: [id], onDelete: Cascade)
+
+  @@unique([visaApplicationId, type])
+  @@index([visaApplicationId, status])
+}
+
+model AgentPortalAccountAuditLog {
+  id              String                        @id @default(cuid())
+  portalUserId    String?
+  agentId         String
+  actorAuthUserId String?
+  action          AgentPortalAccountAuditAction
+  createdAt       DateTime                      @default(now())
+  portalUser      AgentPortalUser?              @relation(fields: [portalUserId], references: [id], onDelete: SetNull)
+  agent           Agent                         @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  actorAuthUser   AuthUser?                      @relation(fields: [actorAuthUserId], references: [id], onDelete: SetNull)
+
+  @@index([portalUserId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([actorAuthUserId, createdAt])
 }
 
 model Group {
