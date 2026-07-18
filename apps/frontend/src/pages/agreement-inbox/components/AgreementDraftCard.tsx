@@ -72,6 +72,7 @@ export function AgreementDraftCard({
   onAssignmentGroupCodeChange,
   onAssignToGroup,
   onUnassignFromGroup,
+  readOnly = false,
 }: {
   draft: HotelAgreementDraft;
   linkedGroupCode: string;
@@ -88,6 +89,7 @@ export function AgreementDraftCard({
   onAssignmentGroupCodeChange: (draftId: string, value: string) => void;
   onAssignToGroup: (draft: HotelAgreementDraft) => void;
   onUnassignFromGroup: (draft: HotelAgreementDraft, code?: string) => void;
+  readOnly?: boolean;
 }) {
   const isAssigned = draft.assignmentStatus === "Assigned" || draft.assignmentStatus === "Partially Assigned";
   const isRejected = draft.status === "Rejected";
@@ -118,16 +120,18 @@ export function AgreementDraftCard({
                 {draft.agreementNumber}
               </p>
             </div>
-            <button
-              type="button"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest/90 text-slate-900 transition hover:bg-surface-container-high"
-              aria-label={`Edit agreement draft ${draft.agreementNumber}`}
-              onClick={() => onStartEdit(draft)}
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                edit
-              </span>
-            </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest/90 text-slate-900 transition hover:bg-surface-container-high"
+                aria-label={`Edit agreement draft ${draft.agreementNumber}`}
+                onClick={() => onStartEdit(draft)}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  edit
+                </span>
+              </button>
+            ) : null}
           </div>
 
           <div className="mt-5 space-y-1.5">
@@ -190,43 +194,49 @@ export function AgreementDraftCard({
                 >
                   {draft.assignmentStatus}
                 </span>
-                {hasDatesSelected && !isDateRangeInvalid && (() => {
-                  const isFullCoverage = draft.stayStartIso <= startDateFilter && draft.stayEndIso >= endDateFilter;
-                  const coverageType = isFullCoverage ? "Full Coverage" : "Partial Coverage";
-                  const filterDays = getInclusiveDays(startDateFilter, endDateFilter);
-                  const overlapStart = draft.stayStartIso > startDateFilter ? draft.stayStartIso : startDateFilter;
-                  const overlapEnd = draft.stayEndIso < endDateFilter ? draft.stayEndIso : endDateFilter;
-                  const matchDays = getInclusiveDays(overlapStart, overlapEnd);
-                  return (
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold uppercase leading-none tracking-[0.08em] ${
-                        isFullCoverage
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                          : "border-amber-400 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
-                        {isFullCoverage ? "assignment_turned_in" : "assignment_late"}
+                {hasDatesSelected &&
+                  !isDateRangeInvalid &&
+                  (() => {
+                    const isFullCoverage = draft.stayStartIso <= startDateFilter && draft.stayEndIso >= endDateFilter;
+                    const coverageType = isFullCoverage ? "Full Coverage" : "Partial Coverage";
+                    const filterDays = getInclusiveDays(startDateFilter, endDateFilter);
+                    const overlapStart = draft.stayStartIso > startDateFilter ? draft.stayStartIso : startDateFilter;
+                    const overlapEnd = draft.stayEndIso < endDateFilter ? draft.stayEndIso : endDateFilter;
+                    const matchDays = getInclusiveDays(overlapStart, overlapEnd);
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-extrabold uppercase leading-none tracking-[0.08em] ${
+                          isFullCoverage
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                            : "border-amber-400 bg-amber-50 text-amber-800"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
+                          {isFullCoverage ? "assignment_turned_in" : "assignment_late"}
+                        </span>
+                        <span>
+                          {coverageType} ({matchDays}/{filterDays} hari)
+                        </span>
                       </span>
-                      <span>{coverageType} ({matchDays}/{filterDays} hari)</span>
-                    </span>
-                  );
-                })()}
+                    );
+                  })()}
               </div>
             </div>
-            <Button
-              variant="danger"
-              size="sm"
-              className="h-9 w-9 p-0 rounded-full inline-flex items-center justify-center shrink-0"
-              aria-label={`Delete agreement draft ${draft.agreementNumber}`}
-              title={isAssigned ? "Unassign agreement before deleting it." : undefined}
-              onClick={() => onDeleteRequest(draft)}
-              disabled={deleteDraftMutationPending || isAssigned}
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                delete
-              </span>
-            </Button>
+            {!readOnly ? (
+              <Button
+                variant="danger"
+                size="sm"
+                className="h-9 w-9 p-0 rounded-full inline-flex items-center justify-center shrink-0"
+                aria-label={`Delete agreement draft ${draft.agreementNumber}`}
+                title={isAssigned ? "Unassign agreement before deleting it." : undefined}
+                onClick={() => onDeleteRequest(draft)}
+                disabled={deleteDraftMutationPending || isAssigned}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  delete
+                </span>
+              </Button>
+            ) : null}
           </div>
 
           <div className="border-t border-dashed border-black/20 pt-4">
@@ -238,22 +248,27 @@ export function AgreementDraftCard({
                 {draft.assignedGroups && draft.assignedGroups.length > 0 ? (
                   <div className="mt-2 space-y-1.5 max-w-md">
                     {draft.assignedGroups.map((link) => (
-                      <div key={link.groupCode} className="flex items-center justify-between gap-3 bg-surface-container-high/60 rounded-xl px-3 py-1.5 border border-black/5">
+                      <div
+                        key={link.groupCode}
+                        className="flex items-center justify-between gap-3 bg-surface-container-high/60 rounded-xl px-3 py-1.5 border border-black/5"
+                      >
                         <div className="min-w-0">
                           <span className="font-extrabold text-slate-900 text-sm">{link.groupCode}</span>
                           <span className="ml-2 text-xs font-semibold text-slate-500">({link.pax} Pax)</span>
                         </div>
-                        <button
-                          type="button"
-                          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
-                          onClick={() => onUnassignFromGroup(draft, link.groupCode)}
-                          disabled={unassignDraftMutationPending}
-                        >
-                          <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                            link_off
-                          </span>
-                          <span>Lepas</span>
-                        </button>
+                        {!readOnly ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                            onClick={() => onUnassignFromGroup(draft, link.groupCode)}
+                            disabled={unassignDraftMutationPending}
+                          >
+                            <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                              link_off
+                            </span>
+                            <span>Lepas</span>
+                          </button>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -265,7 +280,7 @@ export function AgreementDraftCard({
                 </p>
               </div>
 
-              {isRejected ? (
+              {readOnly ? null : isRejected ? (
                 <div className="flex min-w-0 flex-col gap-1 sm:w-64">
                   <p className="text-xs font-semibold text-rose-600 flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -274,7 +289,7 @@ export function AgreementDraftCard({
                     <span>Draft ditolak. Harap edit nomor agreement dengan nomor baru untuk menghubungkan.</span>
                   </p>
                 </div>
-              ) : (draft.remainingPax === undefined || draft.remainingPax > 0) ? (
+              ) : draft.remainingPax === undefined || draft.remainingPax > 0 ? (
                 <div className="flex min-w-0 flex-col gap-2 sm:w-64">
                   <label className="sr-only" htmlFor={`assign-${draft.id}`}>
                     Group number
@@ -305,9 +320,7 @@ export function AgreementDraftCard({
 
           {draft.notes ? (
             <div className="border-t border-dashed border-black/20 pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
-                Notes
-              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">Notes</p>
               <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-600">{draft.notes}</p>
             </div>
           ) : null}

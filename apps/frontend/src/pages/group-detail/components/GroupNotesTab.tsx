@@ -2,7 +2,7 @@ import { Badge } from "../../../components/badge";
 import { useGroupDetailContext } from "../context/GroupDetailContext";
 
 export function GroupNotesTab() {
-  const { group, noteItems, handleOpenNoteModal } = useGroupDetailContext();
+  const { group, noteItems, handleOpenNoteModal, readOnly } = useGroupDetailContext();
 
   return (
     <section className="rounded-3xl border border-brand-tertiary/25 bg-brand-tertiary/[0.08] p-5 shadow-ambient">
@@ -37,7 +37,7 @@ export function GroupNotesTab() {
         ))}
       </ul>
 
-      {!group.parentGroupId && (
+      {!readOnly && !group.parentGroupId && (
         <button
           type="button"
           className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-dashed border-brand-tertiary/55 bg-brand-neutral px-4 py-2.5 text-xs font-extrabold uppercase tracking-[0.08em] text-brand-tertiary transition hover:bg-brand-tertiary/12"

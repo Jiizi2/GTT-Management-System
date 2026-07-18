@@ -30,6 +30,7 @@ export function VisaTrackingRowGroup({
   onToggleExpand,
   onOpenDetail,
   onUpdateAgreementStatus,
+  readOnly = false,
 }: {
   rowGroup: VisaRowGroup;
   view?: "mobile" | "desktop";
@@ -40,22 +41,23 @@ export function VisaTrackingRowGroup({
   onToggleExpand: (key: string) => void;
   onOpenDetail: (row: VisaTrackingRow) => void;
   onUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
+  readOnly?: boolean;
 }) {
   const rowGroupKey = getVisaRowGroupKey(rowGroup);
   const hasFollowers = rowGroup.followerRows.length > 0;
   const agreementDateTextClassName = isDarkMode ? "text-white" : "text-slate-500";
 
-  const renderAgreementCell = (row: VisaTrackingRow, city: "makkah" | "madinah", cellView: "mobile" | "desktop" = "desktop") => {
+  const renderAgreementCell = (
+    row: VisaTrackingRow,
+    city: "makkah" | "madinah",
+    cellView: "mobile" | "desktop" = "desktop",
+  ) => {
     const group = groupByCode.get(row.groupCode);
     const agreements = getGroupAgreementHotelsByCity(group, city);
     const hasAgreement = agreements.length > 0;
     const agreementNumber = resolveVisaAgreementNumber(row, group, city);
     const agreementStatus = resolveCityAgreementApprovalStatus(row, group, city);
-    const agreementDateRange = resolveVisaAgreementDateRange(
-      row,
-      durationByGroupCode.get(row.groupCode) ?? 8,
-      group,
-    );
+    const agreementDateRange = resolveVisaAgreementDateRange(row, durationByGroupCode.get(row.groupCode) ?? 8, group);
 
     const isMobile = cellView === "mobile";
     const selectWidth = isMobile ? "w-[110px]" : "w-[96px]";
@@ -77,7 +79,7 @@ export function VisaTrackingRowGroup({
               )}`
             : "Stay dates pending"}
         </small>
-        {hasAgreement ? (
+        {hasAgreement && !readOnly ? (
           <SereneSelect
             value={toAgreementStatusSelectValue(agreementStatus)}
             className={`serene-select-pill mt-1 ${selectWidth} ${selectTextSize} font-bold ${getAgreementApprovalClasses(
@@ -85,19 +87,26 @@ export function VisaTrackingRowGroup({
               isDarkMode,
             )}`}
             onChange={(event) =>
-              onUpdateAgreementStatus(
-                row.groupCode,
-                city,
-                fromAgreementStatusSelectValue(event.target.value),
-              )
+              onUpdateAgreementStatus(row.groupCode, city, fromAgreementStatusSelectValue(event.target.value))
             }
             aria-label={`Update ${city} agreement status for ${row.groupCode}`}
           >
             <option value="approved">Approved</option>
             <option value="waiting">Waiting</option>
           </SereneSelect>
+        ) : hasAgreement ? (
+          <span
+            className={`mt-1 inline-flex rounded-md border px-2.5 py-1 ${badgeTextSize} font-bold leading-none ${getAgreementApprovalClasses(
+              agreementStatus,
+              isDarkMode,
+            )}`}
+          >
+            {agreementStatus}
+          </span>
         ) : (
-          <span className={`mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 ${badgeTextSize} font-bold leading-none text-on-tertiary-fixed-variant`}>
+          <span
+            className={`mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 ${badgeTextSize} font-bold leading-none text-on-tertiary-fixed-variant`}
+          >
             Not linked
           </span>
         )}
@@ -138,16 +147,17 @@ export function VisaTrackingRowGroup({
                   <span className="min-w-0 break-words text-slate-900">{row.groupCode}</span>
                 </button>
               ) : (
-                <p className="break-words text-sm font-semibold text-slate-900">
-                  {row.groupCode}
-                </p>
+                <p className="break-words text-sm font-semibold text-slate-900">{row.groupCode}</p>
               )}
             </div>
             <p className="mt-1 break-words text-sm font-medium leading-snug text-slate-700">{row.groupName}</p>
           </div>
 
           <div className="flex flex-col gap-1 items-end shrink-0">
-            <Badge status="neutral" className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]">
+            <Badge
+              status="neutral"
+              className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
+            >
               {row.pax} Pax
             </Badge>
           </div>
@@ -155,16 +165,12 @@ export function VisaTrackingRowGroup({
 
         <div className="mt-3 space-y-2">
           <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-              Makkah Agreement
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Makkah Agreement</p>
             {renderAgreementCell(row, "makkah", "mobile")}
           </div>
 
           <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-              Madinah Agreement
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Madinah Agreement</p>
             {renderAgreementCell(row, "madinah", "mobile")}
           </div>
         </div>
@@ -206,19 +212,14 @@ export function VisaTrackingRowGroup({
                 className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
                 title={group?.visaSetup?.syarikah || "-"}
               >
-                <span className="truncate max-w-[120px]">
-                  {formatSyarikahName(group?.visaSetup?.syarikah)}
-                </span>
+                <span className="truncate max-w-[120px]">{formatSyarikahName(group?.visaSetup?.syarikah)}</span>
               </Badge>
             </div>
           </div>
         </div>
 
         <div className="mt-3 flex flex-col gap-2">
-          <Button
-            className="w-full"
-            onClick={() => onOpenDetail(row)}
-          >
+          <Button className="w-full" onClick={() => onOpenDetail(row)}>
             View Details
           </Button>
         </div>
@@ -265,23 +266,20 @@ export function VisaTrackingRowGroup({
           )}
         </div>
 
-        <div className="min-w-0 break-words py-1 font-medium leading-snug text-slate-700">
-          {row.groupName}
-        </div>
+        <div className="min-w-0 break-words py-1 font-medium leading-snug text-slate-700">{row.groupName}</div>
 
         <div className="flex min-w-0 justify-self-center py-1">
-          <Badge status="neutral" className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]">
+          <Badge
+            status="neutral"
+            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
+          >
             {row.pax} Pax
           </Badge>
         </div>
 
-        <div className="min-w-0 space-y-0.5 py-1">
-          {renderAgreementCell(row, "makkah", "desktop")}
-        </div>
+        <div className="min-w-0 space-y-0.5 py-1">{renderAgreementCell(row, "makkah", "desktop")}</div>
 
-        <div className="min-w-0 space-y-0.5 py-1">
-          {renderAgreementCell(row, "madinah", "desktop")}
-        </div>
+        <div className="min-w-0 space-y-0.5 py-1">{renderAgreementCell(row, "madinah", "desktop")}</div>
 
         <div className="flex min-w-0 flex-col gap-1 justify-self-center py-1">
           <Badge
@@ -311,9 +309,7 @@ export function VisaTrackingRowGroup({
             className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
             title={group?.visaSetup?.syarikah || "-"}
           >
-            <span className="truncate max-w-[120px]">
-              {formatSyarikahName(group?.visaSetup?.syarikah)}
-            </span>
+            <span className="truncate max-w-[120px]">{formatSyarikahName(group?.visaSetup?.syarikah)}</span>
           </Badge>
         </div>
 

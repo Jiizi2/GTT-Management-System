@@ -35,7 +35,7 @@ describe("AgentShell routes", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("heading", { name: "Agreement" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agreement Inbox" })).toBeInTheDocument();
     const trackerLinks = screen.getAllByRole("link", { name: /Visa Process Tracker/i });
     expect(trackerLinks).toHaveLength(2);
     for (const link of trackerLinks) {

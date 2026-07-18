@@ -15,10 +15,14 @@ export function VisaTrackingScreen({
   groups,
   onOpenDetail,
   onUpdateAgreementStatus,
+  readOnly = false,
+  fixedAgentName,
 }: {
   groups: GroupData[];
   onOpenDetail: (row: VisaTrackingRow) => void;
   onUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
+  readOnly?: boolean;
+  fixedAgentName?: string;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
@@ -119,74 +123,88 @@ export function VisaTrackingScreen({
                 activeFilter === "all"
                   ? "3px"
                   : activeFilter === "not-issued"
-                  ? "calc(16.666% + 2px)"
-                  : activeFilter === "missing-hotel"
-                  ? "calc(33.333% + 2px)"
-                  : activeFilter === "visa-only"
-                  ? "calc(50% + 2px)"
-                  : activeFilter === "visa-plus"
-                  ? "calc(66.666% + 2px)"
-                  : "calc(83.333% + 2px)",
+                    ? "calc(16.666% + 2px)"
+                    : activeFilter === "missing-hotel"
+                      ? "calc(33.333% + 2px)"
+                      : activeFilter === "visa-only"
+                        ? "calc(50% + 2px)"
+                        : activeFilter === "visa-plus"
+                          ? "calc(66.666% + 2px)"
+                          : "calc(83.333% + 2px)",
             }}
           />
-          {(["all", "not-issued", "missing-hotel", "visa-only", "visa-plus", "unpaid"] as VisaFilterId[]).map((filter) => {
-            const isActive = activeFilter === filter;
-            let label = "";
-            let count = 0;
-            if (filter === "all") {
-              label = "All Groups";
-              count = visaRows.length;
-            } else if (filter === "not-issued") {
-              label = "Not Issued";
-              count = notIssuedCount;
-            } else if (filter === "missing-hotel") {
-              label = "Missing Hotel";
-              count = missingHotelCount;
-            } else if (filter === "visa-only") {
-              label = "Visa Only";
-              count = visaOnlyCount;
-            } else if (filter === "visa-plus") {
-              label = "Visa+";
-              count = visaPlusCount;
-            } else {
-              label = "Unpaid";
-              count = unpaidCount;
-            }
-            return (
-              <button
-                key={filter}
-                type="button"
-                className={`relative z-10 flex-1 h-full rounded-lg text-xs font-extrabold transition-colors duration-200 leading-none text-center ${
-                  isActive
-                    ? "text-brand-primary dark:text-primary"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-                onClick={() => setActiveFilter(filter)}
-              >
-                <span className="sm:hidden">
-                  {filter === "all"
-                    ? "All"
-                    : filter === "not-issued"
-                    ? "Pending"
-                    : filter === "missing-hotel"
-                    ? "No Hotel"
-                    : filter === "visa-only"
-                    ? "Visa Only"
-                    : filter === "visa-plus"
-                    ? "Visa+"
-                    : "Unpaid"}{" "}
-                  ({count})
-                </span>
-                <span className="hidden sm:inline">
-                  {label} ({count})
-                </span>
-              </button>
-            );
-          })}
+          {(["all", "not-issued", "missing-hotel", "visa-only", "visa-plus", "unpaid"] as VisaFilterId[]).map(
+            (filter) => {
+              const isActive = activeFilter === filter;
+              let label = "";
+              let count = 0;
+              if (filter === "all") {
+                label = "All Groups";
+                count = visaRows.length;
+              } else if (filter === "not-issued") {
+                label = "Not Issued";
+                count = notIssuedCount;
+              } else if (filter === "missing-hotel") {
+                label = "Missing Hotel";
+                count = missingHotelCount;
+              } else if (filter === "visa-only") {
+                label = "Visa Only";
+                count = visaOnlyCount;
+              } else if (filter === "visa-plus") {
+                label = "Visa+";
+                count = visaPlusCount;
+              } else {
+                label = "Unpaid";
+                count = unpaidCount;
+              }
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  className={`relative z-10 flex-1 h-full rounded-lg text-xs font-extrabold transition-colors duration-200 leading-none text-center ${
+                    isActive
+                      ? "text-brand-primary dark:text-primary"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                  onClick={() => setActiveFilter(filter)}
+                >
+                  <span className="sm:hidden">
+                    {filter === "all"
+                      ? "All"
+                      : filter === "not-issued"
+                        ? "Pending"
+                        : filter === "missing-hotel"
+                          ? "No Hotel"
+                          : filter === "visa-only"
+                            ? "Visa Only"
+                            : filter === "visa-plus"
+                              ? "Visa+"
+                              : "Unpaid"}{" "}
+                    ({count})
+                  </span>
+                  <span className="hidden sm:inline">
+                    {label} ({count})
+                  </span>
+                </button>
+              );
+            },
+          )}
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-          <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="pill" className="flex-1 sm:flex-none" />
+          {fixedAgentName ? (
+            <div className="relative flex h-9 min-w-[10.5rem] flex-1 items-center rounded-xl border border-outline-variant/45 bg-surface-container-lowest px-3 pr-9 text-sm font-bold text-on-surface-variant shadow-sm sm:flex-none">
+              <span className="truncate">{fixedAgentName}</span>
+              <span className="pointer-events-none absolute right-3 material-symbols-outlined text-base">business</span>
+            </div>
+          ) : (
+            <AgentFilterSelect
+              value={agentFilter}
+              onChange={setAgentFilter}
+              variant="pill"
+              className="flex-1 sm:flex-none"
+            />
+          )}
           <div className="relative min-w-[10.5rem] flex-1 sm:min-w-[11rem] sm:flex-none">
             <SereneSelect
               className="serene-select-pill h-9 w-full pr-9"
@@ -248,6 +266,7 @@ export function VisaTrackingScreen({
                   onToggleExpand={toggleRowGroup}
                   onOpenDetail={onOpenDetail}
                   onUpdateAgreementStatus={onUpdateAgreementStatus}
+                  readOnly={readOnly}
                 />
               );
             })}
@@ -286,6 +305,7 @@ export function VisaTrackingScreen({
                         onToggleExpand={toggleRowGroup}
                         onOpenDetail={onOpenDetail}
                         onUpdateAgreementStatus={onUpdateAgreementStatus}
+                        readOnly={readOnly}
                       />
                     );
                   })}
@@ -295,7 +315,6 @@ export function VisaTrackingScreen({
           </section>
         </>
       )}
-
 
       <PaginationControls
         currentPage={currentPage}

@@ -1,9 +1,6 @@
 import { Link } from "react-router-dom";
 import { useGroupDetailContext } from "../context/GroupDetailContext";
-import {
-  inferCategoryKey,
-  getScheduleTypeOption,
-} from "../../../shared/app-domain";
+import { inferCategoryKey, getScheduleTypeOption } from "../../../shared/app-domain";
 
 // Replicate the formatting helpers from original file if they are local helpers
 function formatItineraryMetaForDisplay(meta: string): string {
@@ -21,7 +18,11 @@ function formatItineraryMetaForDisplay(meta: string): string {
   const formatScheduleTimeLocal = (val: string) => {
     const trimmed = val.trim();
     if (!trimmed) return "";
-    if (trimmed.toLowerCase().includes("wib") || trimmed.toLowerCase().includes("wita") || trimmed.toLowerCase().includes("wit")) {
+    if (
+      trimmed.toLowerCase().includes("wib") ||
+      trimmed.toLowerCase().includes("wita") ||
+      trimmed.toLowerCase().includes("wit")
+    ) {
       return trimmed;
     }
     const cleanTime = trimmed.replace(/[^0-9:]/g, "");
@@ -114,6 +115,7 @@ export function GroupItineraryTab() {
     handleOpenEditModal,
     handleOpenDeleteModal,
     handleOpenScheduleModal,
+    readOnly,
   } = useGroupDetailContext();
 
   return (
@@ -141,11 +143,15 @@ export function GroupItineraryTab() {
 
       {group.parentGroupId && (
         <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-xs">
-          <span className="material-symbols-outlined text-base text-sky-700" aria-hidden="true">info</span>
+          <span className="material-symbols-outlined text-base text-sky-700" aria-hidden="true">
+            info
+          </span>
           <div>
             <strong>Data Itinerary Terhubung</strong>
             <p className="mt-0.5 text-[11px] text-sky-600 font-medium">
-              Grup ini mewarisi itinerary bersama dari Group Utama ({groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}). Edit itinerary di halaman Group Utama tersebut.
+              Grup ini mewarisi itinerary bersama dari Group Utama (
+              {groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}). Edit
+              itinerary di halaman Group Utama tersebut.
             </p>
           </div>
         </div>
@@ -170,9 +176,7 @@ export function GroupItineraryTab() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="flex min-w-[74px] flex-col rounded-xl bg-surface-container-high/60 px-2.5 py-2 text-center">
-                      <strong className="text-base font-bold leading-tight text-brand-primary">
-                        {item.date}
-                      </strong>
+                      <strong className="text-base font-bold leading-tight text-brand-primary">{item.date}</strong>
                       <span className="text-[11px] font-medium text-on-surface-variant/80">{item.year}</span>
                     </div>
 
@@ -183,7 +187,7 @@ export function GroupItineraryTab() {
                     </div>
                   </div>
 
-                  {!group.parentGroupId && (
+                  {!readOnly && !group.parentGroupId && (
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
@@ -210,14 +214,10 @@ export function GroupItineraryTab() {
                 </div>
 
                 <div className="mt-3 min-w-0">
-                  <h4 className="text-[1.2rem] font-semibold leading-tight text-on-surface">
-                    {activityHeading}
-                  </h4>
+                  <h4 className="text-[1.2rem] font-semibold leading-tight text-on-surface">{activityHeading}</h4>
                   <p className="mt-1 text-sm text-on-surface-variant">{compactSummary}</p>
                   {supportMeta ? (
-                    <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
-                      {supportMeta}
-                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{supportMeta}</span>
                   ) : null}
                 </div>
               </div>
@@ -235,18 +235,14 @@ export function GroupItineraryTab() {
                 </div>
 
                 <div className="min-w-0">
-                  <h4 className="text-[1.18rem] font-semibold leading-tight text-on-surface">
-                    {activityHeading}
-                  </h4>
+                  <h4 className="text-[1.18rem] font-semibold leading-tight text-on-surface">{activityHeading}</h4>
                   <p className="mt-1 text-sm text-on-surface-variant">{compactSummary}</p>
                   {supportMeta ? (
-                    <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
-                      {supportMeta}
-                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">{supportMeta}</span>
                   ) : null}
                 </div>
 
-                {!group.parentGroupId && (
+                {!readOnly && !group.parentGroupId && (
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -275,7 +271,7 @@ export function GroupItineraryTab() {
           );
         })}
 
-        {!group.parentGroupId && (
+        {!readOnly && !group.parentGroupId && (
           <button
             type="button"
             className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-primary/35 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/10 md:text-base"

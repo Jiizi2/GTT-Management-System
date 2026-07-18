@@ -4,13 +4,8 @@ import { buildVisaDetailPath } from "../../../shared/app-route";
 import { useGroupDetailContext } from "../context/GroupDetailContext";
 
 export function GroupDetailHeader() {
-  const {
-    group,
-    isWhatsappCopied,
-    handleCopyWhatsapp,
-    handleDeleteGroupBtn,
-    handleExportPdf,
-  } = useGroupDetailContext();
+  const { group, isWhatsappCopied, handleCopyWhatsapp, handleDeleteGroupBtn, handleExportPdf, readOnly } =
+    useGroupDetailContext();
 
   return (
     <header className="flex flex-col gap-4 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient backdrop-blur md:flex-row md:items-center md:justify-between">
@@ -20,7 +15,7 @@ export function GroupDetailHeader() {
 
       <div className="flex flex-wrap items-center gap-2 md:w-auto">
         <Link
-          to={buildVisaDetailPath(group.code)}
+          to={readOnly ? `/agent/visa-process` : buildVisaDetailPath(group.code)}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-3.5 py-2 text-xs font-bold text-on-primary transition hover:bg-primary-container"
         >
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -46,22 +41,16 @@ export function GroupDetailHeader() {
           <span>{isWhatsappCopied ? "Copied" : "Copy WhatsApp"}</span>
         </Button>
 
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={handleDeleteGroupBtn}
-        >
-          <span className="material-symbols-outlined text-base" aria-hidden="true">
-            delete
-          </span>
-          <span>Delete Group</span>
-        </Button>
+        {!readOnly ? (
+          <Button variant="danger" size="sm" onClick={handleDeleteGroupBtn}>
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              delete
+            </span>
+            <span>Delete Group</span>
+          </Button>
+        ) : null}
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleExportPdf}
-        >
+        <Button variant="secondary" size="sm" onClick={handleExportPdf}>
           <span className="material-symbols-outlined text-base" aria-hidden="true">
             picture_as_pdf
           </span>

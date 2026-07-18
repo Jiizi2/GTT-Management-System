@@ -1,141 +1,222 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
-import { EmptyState, ErrorState, LoadingState, StatusChip } from "../components/data-state";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { PageHeroSection } from "../../components/page-hero-section";
+import { PaginationControls } from "../../components/pagination-controls";
+import { SereneSelect } from "../../components/serene-select";
+import {
+  InvoiceCardList,
+  InvoiceSummaryBadges,
+  InvoiceTable,
+} from "../../pages/invoice/components/InvoiceListComponents";
+import type { InvoiceRow } from "../../pages/invoice/helpers/invoice-page-shared";
+import { useThemeMode } from "../../theme/theme-provider";
+import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
 import type { InvoiceStatus, InvoiceSummary, Page } from "../data/contracts";
-import { formatDate } from "../data/format";
 import { buildInvoiceListPath } from "../data/invoice-query";
 import { portalGet } from "../data/portal-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
 
-export function InvoicesPage({ principalId }: { principalId: string }) {
+const PAGE_SIZE = 20;
+
+const statusMap: Record<InvoiceStatus, InvoiceRow["status"]> = {
+  PAID: "Paid",
+  PARTIALLY_PAID: "Partially Paid",
+  PENDING: "Pending",
+  OVERDUE: "Overdue",
+  CANCELLED: "Cancelled",
+};
+
+function mapInvoice(invoice: InvoiceSummary, agentId: string, agentName: string): InvoiceRow {
+  const clientName = invoice.group?.name ?? "General Invoice";
+  return {
+    id: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    clientId: invoice.group?.id ?? invoice.id,
+    agentId,
+    agentName,
+    clientName,
+    clientLabel: clientName,
+    clientInitials: clientName.slice(0, 2).toUpperCase(),
+    groupCode: invoice.group?.code,
+    groupName: invoice.group?.name,
+    issuedDateIso: invoice.issuedDate.slice(0, 10),
+    dueDateIso: invoice.dueDate.slice(0, 10),
+    amount: 0,
+    downPaymentIdr: 0,
+    status: statusMap[invoice.status],
+    monthKey: invoice.dueDate.slice(0, 7),
+    description: invoice.group ? `Group ${invoice.group.code}` : "Invoice",
+  };
+}
+
+export function InvoicesPage({
+  principalId,
+  agentId,
+  agentName,
+}: {
+  principalId: string;
+  agentId: string;
+  agentName: string;
+}) {
   const client = useQueryClient();
+  const navigate = useNavigate();
+  const { theme } = useThemeMode();
   const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState("");
   const page = Math.max(1, Number(params.get("page")) || 1);
   const status = params.get("status") ?? "";
-  const filters = { status, page, pageSize: 20 };
+  const filters = { status, page, pageSize: PAGE_SIZE };
   const query = useQuery({
     queryKey: agentQueryKeys.invoices(principalId, filters),
     queryFn: () => portalGet<Page<InvoiceSummary>>(client, buildInvoiceListPath(filters)),
     staleTime: 60_000,
   });
-  const setStatus = (value: string) =>
+  const rows = useMemo(
+    () =>
+      (query.data?.items ?? [])
+        .map((invoice) => mapInvoice(invoice, agentId, agentName))
+        .filter((row) =>
+          [row.invoiceNumber, row.clientName, row.groupCode ?? ""].some((value) =>
+            value.toLowerCase().includes(search.trim().toLowerCase()),
+          ),
+        ),
+    [agentId, agentName, query.data?.items, search],
+  );
+  const counts = (value: InvoiceRow["status"]) => rows.filter((row) => row.status === value).length;
+  const setStatus = (value: string) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
       value ? next.set("status", value) : next.delete("status");
       next.set("page", "1");
       return next;
     });
+  };
+  const goToInvoice = (row: InvoiceRow) => navigate(`/agent/invoices/${encodeURIComponent(row.id)}`);
+
   return (
-    <div className="page-stack">
-      <section className="page-heading">
-        <p className="eyebrow">Dokumen tagihan</p>
-        <h1>Invoices</h1>
-        <p className="muted">Nominal dan line item belum ditampilkan pada portal.</p>
+    <div className="mx-auto max-w-[88rem] space-y-5 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+      <header className="serene-page-toolbar">
+        <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
+          <label className="serene-page-search" aria-label="Search invoices">
+            <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
+              search
+            </span>
+            <input
+              type="text"
+              className="serene-page-search-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search invoices or clients..."
+            />
+          </label>
+        </div>
+      </header>
+
+      <PageHeroSection eyebrow="Invoice Workspace" title="Invoice List" description={<>Track all issued invoices.</>} />
+
+      <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
+        <article className="serene-filter-panel">
+          <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
+            <label className="space-y-1">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
+                Agent
+              </span>
+              <span className="serene-input flex h-11 items-center rounded-xl bg-surface-container-lowest text-sm font-bold">
+                {agentName}
+              </span>
+            </label>
+            <label className="space-y-1">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
+                Status
+              </span>
+              <SereneSelect
+                className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                <option value="">All Statuses</option>
+                <option value="PAID">Paid</option>
+                <option value="PARTIALLY_PAID">Partially Paid</option>
+                <option value="PENDING">Pending</option>
+                <option value="OVERDUE">Overdue</option>
+                <option value="CANCELLED">Cancelled</option>
+              </SereneSelect>
+            </label>
+            <label className="space-y-1">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
+                Access
+              </span>
+              <span className="flex h-11 items-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 text-sm font-bold text-on-surface-variant">
+                <span className="material-symbols-outlined text-base">visibility</span>Read-only
+              </span>
+            </label>
+          </div>
+          <InvoiceSummaryBadges
+            paidCount={counts("Paid")}
+            partiallyPaidCount={counts("Partially Paid")}
+            pendingCount={counts("Pending")}
+            overdueCount={counts("Overdue")}
+            cancelledCount={counts("Cancelled")}
+            isDarkMode={theme === "dark"}
+          />
+        </article>
+
+        <article className="serene-accent-card bg-primary text-on-primary">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/85">Financial Visibility</p>
+          <strong className="mt-2 block text-3xl font-extrabold leading-tight">Restricted</strong>
+          <p className="mt-3 text-xs text-on-primary/85">Nominal dan line item tidak ditampilkan pada portal Agent.</p>
+          <span
+            className="material-symbols-outlined absolute -bottom-4 -right-3 text-8xl text-on-primary/15"
+            aria-hidden="true"
+          >
+            pentagon
+          </span>
+        </article>
       </section>
-      <div className="filter-bar">
-        <label>
-          Status invoice
-          <select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="">Semua status</option>
-            {(["PAID", "PARTIALLY_PAID", "PENDING", "OVERDUE", "CANCELLED"] satisfies InvoiceStatus[]).map((value) => (
-              <option key={value} value={value}>
-                {value.replaceAll("_", " ")}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      {query.isPending ? (
-        <LoadingState label="Memuat invoices..." />
-      ) : query.isError ? (
-        <ErrorState retry={() => void query.refetch()} />
-      ) : query.data.items.length === 0 ? (
-        <EmptyState title={status ? "Tidak ada invoice dengan status ini" : "Belum ada invoice"} />
-      ) : (
+
+      {query.isPending ? <LoadingState label="Memuat invoices..." /> : null}
+      {query.isError ? <ErrorState retry={() => void query.refetch()} /> : null}
+      {!query.isPending && !query.isError && rows.length === 0 ? <EmptyState title="No invoices found" /> : null}
+      {rows.length ? (
         <>
-          <p className="result-count" aria-live="polite">
-            {query.data.total} invoice ditemukan
-          </p>
-          <div className="table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nomor invoice</th>
-                  <th>Group</th>
-                  <th>Terbit</th>
-                  <th>Jatuh tempo</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {query.data.items.map((invoice) => (
-                  <tr key={invoice.id}>
-                    <td>
-                      <Link to={`/agent/invoices/${encodeURIComponent(invoice.id)}`}>
-                        <strong>{invoice.invoiceNumber}</strong>
-                      </Link>
-                    </td>
-                    <td>
-                      {invoice.group ? (
-                        <Link to={`/agent/groups/${encodeURIComponent(invoice.group.code)}`}>{invoice.group.code}</Link>
-                      ) : (
-                        "Tidak terkait group"
-                      )}
-                    </td>
-                    <td>{formatDate(invoice.issuedDate)}</td>
-                    <td>{formatDate(invoice.dueDate)}</td>
-                    <td>
-                      <StatusChip value={invoice.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="card-list mobile-only">
-            {query.data.items.map((invoice) => (
-              <Link className="list-card" key={invoice.id} to={`/agent/invoices/${encodeURIComponent(invoice.id)}`}>
-                <div>
-                  <strong>{invoice.invoiceNumber}</strong>
-                  <span>
-                    {invoice.group?.code ?? "Tanpa group"} · jatuh tempo {formatDate(invoice.dueDate)}
-                  </span>
-                </div>
-                <StatusChip value={invoice.status} />
-              </Link>
-            ))}
-          </div>
-          <nav className="pagination" aria-label="Pagination invoice">
-            <button
-              className="secondary-button"
-              disabled={page <= 1}
-              onClick={() =>
-                setParams((current) => {
-                  const next = new URLSearchParams(current);
-                  next.set("page", String(page - 1));
-                  return next;
-                })
-              }
-            >
-              Sebelumnya
-            </button>
-            <span>Halaman {page}</span>
-            <button
-              className="secondary-button"
-              disabled={page * query.data.pageSize >= query.data.total}
-              onClick={() =>
-                setParams((current) => {
-                  const next = new URLSearchParams(current);
-                  next.set("page", String(page + 1));
-                  return next;
-                })
-              }
-            >
-              Berikutnya
-            </button>
-          </nav>
+          <InvoiceCardList
+            rows={rows}
+            isDarkMode={theme === "dark"}
+            isInvoiceBackendAvailable={false}
+            onViewPdf={goToInvoice}
+            onEditInvoice={() => undefined}
+            onDeleteInvoice={() => undefined}
+            readOnly
+            hideAmounts
+          />
+          <InvoiceTable
+            rows={rows}
+            isDarkMode={theme === "dark"}
+            isInvoiceBackendAvailable={false}
+            onViewPdf={goToInvoice}
+            onEditInvoice={() => undefined}
+            onDeleteInvoice={() => undefined}
+            readOnly
+            hideAmounts
+          />
         </>
-      )}
+      ) : null}
+      <PaginationControls
+        currentPage={page}
+        totalPages={Math.max(1, Math.ceil((query.data?.total ?? 0) / PAGE_SIZE))}
+        totalItems={query.data?.total ?? 0}
+        rangeStart={(page - 1) * PAGE_SIZE + (rows.length ? 1 : 0)}
+        rangeEnd={(page - 1) * PAGE_SIZE + rows.length}
+        itemLabel="invoices"
+        onPageChange={(nextPage) =>
+          setParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set("page", String(nextPage));
+            return next;
+          })
+        }
+      />
     </div>
   );
 }

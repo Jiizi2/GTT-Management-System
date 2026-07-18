@@ -5,6 +5,7 @@ import { ThemeToggleButton } from "../components/theme-toggle-button";
 import type { AgentSession } from "./auth/agent-session";
 import { useAgentLogout } from "./auth/use-agent-auth";
 import { ChecklistPage } from "./pages/checklist-page";
+import { AgreementsPage } from "./pages/agreements-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { GroupDetailPage } from "./pages/group-detail-page";
 import { GroupsPage } from "./pages/groups-page";
@@ -33,21 +34,6 @@ const navigation: ReadonlyArray<{
   { to: "/agent/profile", label: "Profile", icon: "person", permission: PERMISSIONS.profileRead },
 ];
 
-function AgreementReadOnlyPage() {
-  return (
-    <div className="mx-auto max-w-5xl space-y-5 py-6">
-      <section className="serene-hero">
-        <p className="text-xs font-black uppercase tracking-[.18em] text-primary">Read-only</p>
-        <h1 className="mt-2 text-3xl font-extrabold">Agreement</h1>
-        <p className="mt-2 text-on-surface-variant">
-          Status agreement hotel ditampilkan per group. Buka My Groups untuk melihat agreement Makkah dan Madinah pada
-          detail group.
-        </p>
-      </section>
-    </div>
-  );
-}
-
 export function AgentShell({ session }: { session: AgentSession }) {
   const [collapsed, setCollapsed] = useState(false);
   const logout = useAgentLogout();
@@ -55,6 +41,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
   const nav = navigation.filter((item) => can(principal, item.permission));
   const principalId = session.user.portalUserId;
   const location = useLocation();
+  const pageOwnsThemeToggle = location.pathname === "/agent/overview" || location.pathname.startsWith("/agent/groups");
   const primaryNav = nav.slice(0, 3);
   const toolNav = nav.slice(3, -1);
   const profileNav = nav.at(-1);
@@ -189,7 +176,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
         </div>
       </aside>
 
-      {location.pathname !== "/agent/overview" ? (
+      {!pageOwnsThemeToggle ? (
         <div className="pointer-events-none fixed right-6 top-4 z-[120] sm:right-8 sm:top-5 lg:right-10">
           <ThemeToggleButton variant="floating" className="pointer-events-auto" />
         </div>
@@ -212,11 +199,43 @@ export function AgentShell({ session }: { session: AgentSession }) {
               />
             }
           />
-          <Route path="groups" element={<GroupsPage principalId={principalId} />} />
-          <Route path="groups/:identity" element={<GroupDetailPage principalId={principalId} />} />
+          <Route
+            path="groups"
+            element={
+              <GroupsPage principalId={principalId} agentId={session.user.agentId} agentName={session.user.agentName} />
+            }
+          />
+          <Route
+            path="groups/:identity"
+            element={
+              <GroupDetailPage
+                principalId={principalId}
+                agentId={session.user.agentId}
+                agentName={session.user.agentName}
+              />
+            }
+          />
           <Route path="visa-process" element={<VisaApplicationsPage principalId={principalId} />} />
-          <Route path="agreements" element={<AgreementReadOnlyPage />} />
-          <Route path="invoices" element={<InvoicesPage principalId={principalId} />} />
+          <Route
+            path="agreements"
+            element={
+              <AgreementsPage
+                principalId={principalId}
+                agentId={session.user.agentId}
+                agentName={session.user.agentName}
+              />
+            }
+          />
+          <Route
+            path="invoices"
+            element={
+              <InvoicesPage
+                principalId={principalId}
+                agentId={session.user.agentId}
+                agentName={session.user.agentName}
+              />
+            }
+          />
           <Route path="invoices/:id" element={<InvoiceDetailPage principalId={principalId} />} />
           <Route path="checklist" element={<ChecklistPage principalId={principalId} />} />
           <Route path="profile" element={<ProfilePage principalId={principalId} />} />

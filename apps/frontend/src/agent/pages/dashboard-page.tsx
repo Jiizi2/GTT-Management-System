@@ -57,7 +57,15 @@ function mapTimeline(group: GroupSummary): [TimelineItem, TimelineItem] {
   return [rows[0], rows[1]];
 }
 
-function mapGroup(group: GroupSummary, agentId: string, agentName: string): GroupData {
+export function mapAgentGroup(
+  group: GroupSummary,
+  agentId: string,
+  agentName: string,
+  visa?: {
+    facet: import("../data/contracts").VisaFacet;
+    hotels: import("../data/contracts").HotelAgreement[];
+  },
+): GroupData {
   const itinerary = mapItinerary(group);
   const next = itinerary[0];
   const durationDays = Math.max(
@@ -95,6 +103,55 @@ function mapGroup(group: GroupSummary, agentId: string, agentName: string): Grou
     itinerary,
     notes: group.notes.map((note) => note.text),
     musyrif: group.musyrif ?? { name: "Belum ditentukan", phone: "-", avatar: "" },
+    visaSetup: visa
+      ? {
+          visaStatus: visa.facet.status === "ISSUED" ? "Issued" : visa.facet.status === "PENDING" ? "Pending" : "Draft",
+          issuedDate: visa.facet.issuedDate ?? undefined,
+          syarikah: visa.facet.syarikah ?? "",
+          busStatus: visa.facet.busStatus === "VISA_PLUS" ? "Visa+" : "Visa Only",
+          paymentStatus:
+            visa.facet.paymentStatus === "PAID"
+              ? "Paid"
+              : visa.facet.paymentStatus === "PARTIAL"
+                ? "Partial"
+                : "Unpaid",
+          makkahHotels: visa.hotels
+            .filter((hotel) => hotel.city === "MAKKAH")
+            .map((hotel) => ({
+              id: hotel.id,
+              hotelName: hotel.hotelName,
+              agreementNumber: hotel.agreementNumber,
+              pax: hotel.pax,
+              status:
+                hotel.status === "APPROVED"
+                  ? "Approved"
+                  : hotel.status === "REJECTED"
+                    ? "Rejected"
+                    : "Waiting for Approval",
+              stayStartIso: hotel.stayStart?.slice(0, 10) ?? "",
+              stayEndIso: hotel.stayEnd?.slice(0, 10) ?? "",
+              ownerGroupCode: group.code,
+            })),
+          madinahHotels: visa.hotels
+            .filter((hotel) => hotel.city === "MADINAH")
+            .map((hotel) => ({
+              id: hotel.id,
+              hotelName: hotel.hotelName,
+              agreementNumber: hotel.agreementNumber,
+              pax: hotel.pax,
+              status:
+                hotel.status === "APPROVED"
+                  ? "Approved"
+                  : hotel.status === "REJECTED"
+                    ? "Rejected"
+                    : "Waiting for Approval",
+              stayStartIso: hotel.stayStart?.slice(0, 10) ?? "",
+              stayEndIso: hotel.stayEnd?.slice(0, 10) ?? "",
+              ownerGroupCode: group.code,
+            })),
+          raudhahAppointments: [],
+        }
+      : undefined,
   };
 }
 
@@ -129,7 +186,7 @@ export function DashboardPage({
   const [month, setMonth] = useState("all");
 
   const groups = useMemo(
-    () => (query.data?.groups ?? []).map((group) => mapGroup(group, agentId, agentName)),
+    () => (query.data?.groups ?? []).map((group) => mapAgentGroup(group, agentId, agentName)),
     [agentId, agentName, query.data?.groups],
   );
   const filteredGroups = useMemo(() => {
