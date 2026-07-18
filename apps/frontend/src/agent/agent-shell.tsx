@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { PERMISSIONS, can, createAgentPrincipal, type Permission } from "../access/permissions";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -41,7 +41,9 @@ export function AgentShell({ session }: { session: AgentSession }) {
   const nav = navigation.filter((item) => can(principal, item.permission));
   const principalId = session.user.portalUserId;
   const location = useLocation();
-  const pageOwnsThemeToggle = location.pathname === "/agent/overview" || location.pathname.startsWith("/agent/groups");
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+  }, [location.pathname]);
   const primaryNav = nav.slice(0, 3);
   const toolNav = nav.slice(3, -1);
   const profileNav = nav.at(-1);
@@ -176,11 +178,9 @@ export function AgentShell({ session }: { session: AgentSession }) {
         </div>
       </aside>
 
-      {!pageOwnsThemeToggle ? (
-        <div className="pointer-events-none fixed right-6 top-4 z-[120] sm:right-8 sm:top-5 lg:right-10">
-          <ThemeToggleButton variant="floating" className="pointer-events-auto" />
-        </div>
-      ) : null}
+      <div className="pointer-events-none fixed right-6 top-4 z-[120] sm:right-8 sm:top-5 lg:right-10">
+        <ThemeToggleButton variant="floating" className="pointer-events-auto" />
+      </div>
       <main
         id="main-content"
         className={`relative px-0 pb-28 pt-0 transition-[margin] duration-200 xl:pb-8 xl:pt-0 ${

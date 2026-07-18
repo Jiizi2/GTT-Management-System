@@ -6,6 +6,8 @@ import type { GroupSummary, TransportationItem } from "../data/contracts";
 import { getAllAgentGroups } from "../data/all-groups-query";
 import { formatDate } from "../data/format";
 import { ErrorState, LoadingState } from "../components/data-state";
+import { PageLayout } from "../../components/page-layout";
+import { PageHeader } from "../../components/page-header";
 
 type ChecklistRow = TransportationItem & { group: GroupSummary };
 const jakartaDate = (offset: number) => {
@@ -53,29 +55,28 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
   if (query.isPending) return <LoadingState label="Memuat checklist H-1..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-0 pb-20 pt-4 sm:px-2 lg:px-4">
-      <header className="serene-page-toolbar pr-14">
-        <label className="serene-page-search max-w-xl">
-          <span className="material-symbols-outlined text-on-surface-variant/70">search</span>
-          <input
-            className="serene-page-search-input"
-            placeholder="Search group number, e.g. 901794508"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-      </header>
-      <header className="serene-card rounded-3xl p-5">
-        <h1 className="text-3xl font-bold tracking-tight">H-1 Checklist</h1>
-        <p className="mt-2 text-sm text-on-surface-variant">
-          Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
-        </p>
-      </header>
+    <PageLayout width="standard">
+      <PageHeader
+        eyebrow="Departure Readiness"
+        title="H-1 Checklist"
+        description="Kesiapan driver untuk perjalanan hari ini, besok, dan lusa."
+        toolbar={
+          <label className="serene-page-search max-w-xl">
+            <span className="material-symbols-outlined text-on-surface-variant/70">search</span>
+            <input
+              className="serene-page-search-input"
+              placeholder="Search group number, e.g. 901794508"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+        }
+      />
       {rows.length === 0 ? (
         <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl">event_busy</span>
-          <h2 className="mt-3 text-xl font-bold">No upcoming trips in the next 3 days</h2>
-          <p className="mt-2 text-sm">No itinerary is scheduled for today, tomorrow, and the day after tomorrow.</p>
+          <h2 className="mt-3 text-xl font-bold">Tidak ada perjalanan dalam 3 hari ke depan</h2>
+          <p className="mt-2 text-sm">Belum ada itinerary untuk hari ini, besok, atau lusa.</p>
         </article>
       ) : (
         <>
@@ -114,7 +115,7 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
           </section>
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }
 

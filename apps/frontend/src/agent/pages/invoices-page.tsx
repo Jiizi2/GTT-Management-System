@@ -1,7 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { PageHeroSection } from "../../components/page-hero-section";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
+import { FilterField, FilterPanel, FixedValueField } from "../../components/filter-panel";
+import { ReadOnlyIndicator } from "../../components/read-only-indicator";
+import { StatePanel } from "../../components/state-panel";
 import { PaginationControls } from "../../components/pagination-controls";
 import { SereneSelect } from "../../components/serene-select";
 import {
@@ -11,7 +15,7 @@ import {
 } from "../../pages/invoice/components/InvoiceListComponents";
 import type { InvoiceRow } from "../../pages/invoice/helpers/invoice-page-shared";
 import { useThemeMode } from "../../theme/theme-provider";
-import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
+import { ErrorState, LoadingState } from "../components/data-state";
 import type { InvoiceStatus, InvoiceSummary, Page } from "../data/contracts";
 import { buildInvoiceListPath } from "../data/invoice-query";
 import { portalGet } from "../data/portal-query";
@@ -95,41 +99,35 @@ export function InvoicesPage({
   const goToInvoice = (row: InvoiceRow) => navigate(`/agent/invoices/${encodeURIComponent(row.id)}`);
 
   return (
-    <div className="mx-auto max-w-[88rem] space-y-5 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <header className="serene-page-toolbar">
-        <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
-          <label className="serene-page-search" aria-label="Search invoices">
-            <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
-              search
-            </span>
-            <input
-              type="text"
-              className="serene-page-search-input"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search invoices or clients..."
-            />
-          </label>
-        </div>
-      </header>
-
-      <PageHeroSection eyebrow="Invoice Workspace" title="Invoice List" description={<>Track all issued invoices.</>} />
+    <PageLayout width="wide">
+      <PageHeader
+        eyebrow="Invoice Workspace"
+        title="Invoice List"
+        description="Pantau seluruh invoice yang telah diterbitkan untuk group Anda."
+        actions={<ReadOnlyIndicator />}
+        toolbar={
+          <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
+            <label className="serene-page-search" aria-label="Search invoices">
+              <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
+                search
+              </span>
+              <input
+                type="text"
+                className="serene-page-search-input"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search invoices or clients..."
+              />
+            </label>
+          </div>
+        }
+      />
 
       <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
-        <article className="serene-filter-panel">
+        <FilterPanel>
           <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
-            <label className="space-y-1">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-                Agent
-              </span>
-              <span className="serene-input flex h-11 items-center rounded-xl bg-surface-container-lowest text-sm font-bold">
-                {agentName}
-              </span>
-            </label>
-            <label className="space-y-1">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-                Status
-              </span>
+            <FixedValueField label="Agent" value={agentName} icon="business" />
+            <FilterField label="Status">
               <SereneSelect
                 className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium"
                 value={status}
@@ -142,15 +140,8 @@ export function InvoicesPage({
                 <option value="OVERDUE">Overdue</option>
                 <option value="CANCELLED">Cancelled</option>
               </SereneSelect>
-            </label>
-            <label className="space-y-1">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-                Access
-              </span>
-              <span className="flex h-11 items-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 text-sm font-bold text-on-surface-variant">
-                <span className="material-symbols-outlined text-base">visibility</span>Read-only
-              </span>
-            </label>
+            </FilterField>
+            <FixedValueField label="Akses" value="Read-only" icon="visibility" />
           </div>
           <InvoiceSummaryBadges
             paidCount={counts("Paid")}
@@ -160,7 +151,7 @@ export function InvoicesPage({
             cancelledCount={counts("Cancelled")}
             isDarkMode={theme === "dark"}
           />
-        </article>
+        </FilterPanel>
 
         <article className="serene-accent-card bg-primary text-on-primary">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/85">Financial Visibility</p>
@@ -177,7 +168,14 @@ export function InvoicesPage({
 
       {query.isPending ? <LoadingState label="Memuat invoices..." /> : null}
       {query.isError ? <ErrorState retry={() => void query.refetch()} /> : null}
-      {!query.isPending && !query.isError && rows.length === 0 ? <EmptyState title="No invoices found" /> : null}
+      {!query.isPending && !query.isError && rows.length === 0 ? (
+        <StatePanel
+          state="empty"
+          icon="receipt_long"
+          title="Belum ada invoice"
+          description="Invoice akan muncul setelah diterbitkan oleh tim Ops."
+        />
+      ) : null}
       {rows.length ? (
         <>
           <InvoiceCardList
@@ -217,6 +215,6 @@ export function InvoicesPage({
           })
         }
       />
-    </div>
+    </PageLayout>
   );
 }

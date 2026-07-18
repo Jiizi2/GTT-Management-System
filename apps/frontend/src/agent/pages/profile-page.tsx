@@ -1,4 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DetailItem, DetailList } from "../../components/detail-list";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
+import { ReadOnlyIndicator } from "../../components/read-only-indicator";
 import type { Profile } from "../data/contracts";
 import { portalGet } from "../data/portal-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
@@ -11,31 +15,28 @@ export function ProfilePage({ principalId }: { principalId: string }) {
     queryFn: () => portalGet<Profile>(client, "/profile"),
     staleTime: 60_000,
   });
-  if (query.isPending) return <LoadingState label="Memuat profil…" />;
-  if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
   return (
-    <div className="page-stack">
-      <section className="page-heading">
-        <p className="eyebrow">Akun read-only</p>
-        <h1>Profile</h1>
-      </section>
-      <section className="serene-section profile-card">
-        <dl>
-          <div>
-            <dt>Nama pengguna</dt>
-            <dd>{query.data.account.displayName}</dd>
-          </div>
-          <div>
-            <dt>Kode Partner</dt>
-            <dd>{query.data.agent.code}</dd>
-          </div>
-          <div>
-            <dt>Nama Partner</dt>
-            <dd>{query.data.agent.name}</dd>
-          </div>
-        </dl>
-        <p className="muted">Perubahan data dilakukan melalui administrator GTT.</p>
-      </section>
-    </div>
+    <PageLayout width="standard">
+      <PageHeader
+        eyebrow="Akun Partner"
+        title="Profile"
+        description="Informasi akun dan identitas Partner yang terhubung dengan portal Agent."
+        actions={<ReadOnlyIndicator />}
+      />
+      {query.isPending ? <LoadingState label="Memuat profil…" /> : null}
+      {query.isError ? <ErrorState retry={() => void query.refetch()} /> : null}
+      {query.data ? (
+        <section className="serene-section">
+          <DetailList>
+            <DetailItem label="Nama pengguna" value={query.data.account.displayName} />
+            <DetailItem label="Kode Partner" value={query.data.agent.code} />
+            <DetailItem label="Nama Partner" value={query.data.agent.name} />
+          </DetailList>
+          <p className="mt-5 rounded-2xl bg-primary/8 p-4 text-sm leading-relaxed text-on-surface-variant">
+            Perubahan data dilakukan melalui administrator GTT.
+          </p>
+        </section>
+      ) : null}
+    </PageLayout>
   );
 }

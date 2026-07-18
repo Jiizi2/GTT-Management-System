@@ -1,5 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { DetailItem, DetailList } from "../../components/detail-list";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
+import { ReadOnlyIndicator } from "../../components/read-only-indicator";
 import { LoadingState, ResourceErrorState, StatusChip } from "../components/data-state";
 import type { InvoiceSummary } from "../data/contracts";
 import { formatDate } from "../data/format";
@@ -14,48 +18,49 @@ export function InvoiceDetailPage({ principalId }: { principalId: string }) {
     queryFn: () => portalGet<InvoiceSummary>(client, `/invoices/${encodeURIComponent(id)}`),
     staleTime: 60_000,
   });
-  if (query.isPending) return <LoadingState label="Memuat invoice…" />;
-  if (query.isError) return <ResourceErrorState error={query.error} retry={() => void query.refetch()} />;
-  const invoice = query.data;
   return (
-    <div className="page-stack">
-      <Link className="back-link" to="/agent/invoices">
-        ← Kembali ke Invoices
+    <PageLayout width="standard">
+      <Link className="serene-btn-secondary w-fit" to="/agent/invoices">
+        <span className="material-symbols-outlined text-base">arrow_back</span>Kembali
       </Link>
-      <section className="serene-section invoice-detail">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Invoice read-only</p>
-            <h1>{invoice.invoiceNumber}</h1>
-          </div>
-          <StatusChip value={invoice.status} />
-        </div>
-        <dl>
-          <div>
-            <dt>Tanggal terbit</dt>
-            <dd>{formatDate(invoice.issuedDate)}</dd>
-          </div>
-          <div>
-            <dt>Jatuh tempo</dt>
-            <dd>{formatDate(invoice.dueDate)}</dd>
-          </div>
-          <div>
-            <dt>Group</dt>
-            <dd>
-              {invoice.group ? (
-                <Link to={`/agent/groups/${encodeURIComponent(invoice.group.code)}`}>
-                  {invoice.group.code} — {invoice.group.name}
-                </Link>
-              ) : (
-                "Tidak terkait group"
-              )}
-            </dd>
-          </div>
-        </dl>
-        <aside className="policy-note">
-          Nominal, rincian item, dan dokumen approval belum tersedia sesuai kebijakan keamanan portal.
-        </aside>
-      </section>
-    </div>
+      {query.isPending ? <LoadingState label="Memuat invoice…" /> : null}
+      {query.isError ? <ResourceErrorState error={query.error} retry={() => void query.refetch()} /> : null}
+      {query.data ? (
+        <>
+          <PageHeader
+            variant="detail"
+            eyebrow="Invoice"
+            title={query.data.invoiceNumber}
+            actions={
+              <>
+                <StatusChip value={query.data.status} />
+                <ReadOnlyIndicator />
+              </>
+            }
+          />
+          <section className="serene-section">
+            <DetailList>
+              <DetailItem label="Tanggal terbit" value={formatDate(query.data.issuedDate)} />
+              <DetailItem label="Jatuh tempo" value={formatDate(query.data.dueDate)} />
+              <DetailItem
+                label="Group"
+                value={
+                  query.data.group ? (
+                    <Link className="text-primary" to={`/agent/groups/${encodeURIComponent(query.data.group.code)}`}>
+                      {query.data.group.code} — {query.data.group.name}
+                    </Link>
+                  ) : (
+                    "Tidak terkait group"
+                  )
+                }
+              />
+            </DetailList>
+            <aside className="mt-5 rounded-2xl bg-primary/8 p-4 text-sm leading-relaxed text-on-surface-variant">
+              Nominal, rincian item, dan dokumen approval tidak ditampilkan sesuai kebijakan keamanan portal.
+            </aside>
+          </section>
+        </>
+      ) : null}
+    </PageLayout>
   );
 }
