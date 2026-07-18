@@ -42,7 +42,8 @@ export function AgentShell({ session }: { session: AgentSession }) {
   const principalId = session.user.portalUserId;
   const location = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0 });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, [location.pathname]);
   const primaryNav = nav.slice(0, 3);
   const toolNav = nav.slice(3, -1);

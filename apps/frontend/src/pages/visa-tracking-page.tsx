@@ -233,7 +233,6 @@ export function VisaTrackingScreen({
       </section>
 
       <VisaTrackingStats
-        isDarkMode={isDarkMode}
         actionRequiredCount={actionRequiredCount}
         visaRowsCount={visaRows.length}
         issuedPaxCount={issuedPaxCount}

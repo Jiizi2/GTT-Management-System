@@ -91,7 +91,8 @@ export function InvoicesPage({
   const setStatus = (value: string) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
-      value ? next.set("status", value) : next.delete("status");
+      if (value) next.set("status", value);
+      else next.delete("status");
       next.set("page", "1");
       return next;
     });
