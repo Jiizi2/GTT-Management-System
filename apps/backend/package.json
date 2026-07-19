@@ -8,6 +8,8 @@
     "build": "npm run db:generate && tsc -p tsconfig.json",
     "predev": "node scripts/release-dev-port.js",
     "dev": "node scripts/dev.js",
+    "predev:local": "node scripts/release-dev-port.js",
+    "dev:local": "node scripts/dev-local.js",
     "start": "node dist/main.js",
     "auth:bootstrap:superadmin": "node dist/bootstrap-super-admin.js",
     "check": "tsc --noEmit -p tsconfig.json --tsBuildInfoFile tsconfig.check.tsbuildinfo",
