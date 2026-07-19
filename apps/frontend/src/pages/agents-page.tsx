@@ -102,10 +102,62 @@ function AgentForm({
   );
 }
 
+function AgentActionGroup({
+  agent,
+  isStatusPending,
+  fullWidth = false,
+  onEdit,
+  onToggleStatus,
+}: {
+  agent: AgentOption;
+  isStatusPending: boolean;
+  fullWidth?: boolean;
+  onEdit: () => void;
+  onToggleStatus: () => void;
+}) {
+  const isActive = agent.status === "ACTIVE";
+
+  return (
+    <div
+      className={`inline-flex h-8 overflow-hidden rounded-lg border border-outline-variant/45 bg-surface-container-lowest shadow-sm ${
+        fullWidth ? "w-full" : ""
+      }`}
+      aria-label={`Actions for ${agent.name}`}
+    >
+      <button
+        type="button"
+        className={`inline-flex items-center justify-center gap-1.5 px-2.5 text-xs font-bold text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface ${
+          fullWidth ? "flex-1" : ""
+        }`}
+        onClick={onEdit}
+      >
+        <span className="material-symbols-outlined text-sm" aria-hidden="true">edit</span>
+        <span>Edit</span>
+      </button>
+      <button
+        type="button"
+        className={`inline-flex items-center justify-center gap-1.5 border-l border-outline-variant/45 px-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant/45 ${
+          isActive
+            ? "text-amber-700 hover:bg-amber-50"
+            : "text-emerald-700 hover:bg-emerald-50"
+        } ${fullWidth ? "flex-1" : ""}`}
+        disabled={agent.type === "DIRECT" || isStatusPending}
+        onClick={onToggleStatus}
+        title={agent.type === "DIRECT" ? "GTT Direct selalu aktif" : undefined}
+      >
+        <span className="material-symbols-outlined text-sm" aria-hidden="true">
+          {isActive ? "cancel" : "check_circle"}
+        </span>
+        <span>{isActive ? "Deactivate" : "Activate"}</span>
+      </button>
+    </div>
+  );
+}
+
 export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
   const queryClient = useQueryClient();
   const agentsQuery = useAgentsQuery();
-  const [includeInactive, setIncludeInactive] = useState(false);
+  const [includeInactive, setIncludeInactive] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
 
@@ -136,18 +188,25 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
     onSuccess: refreshAgents,
   });
   const mutationError = createMutation.isError || updateMutation.isError || statusMutation.isError;
+  const mutationErrorValue = createMutation.error ?? updateMutation.error ?? statusMutation.error;
+  const mutationErrorMessage =
+    mutationErrorValue instanceof Error && /already exists/i.test(mutationErrorValue.message)
+      ? "Kode Agent tersebut sudah terdaftar. Cari Agent berstatus Inactive lalu aktifkan kembali, atau gunakan kode lain."
+      : mutationErrorValue instanceof Error
+        ? mutationErrorValue.message
+        : "Perubahan Agent gagal disimpan. Periksa kembali data yang dimasukkan.";
 
   return (
     <article className={`overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5 ${embedded ? "" : "mx-auto max-w-7xl"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 px-4 py-3 sm:px-5">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Agent Table</p>
-          <h2 className="mt-1 text-xl font-bold text-on-surface">Agents</h2>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Daftar agen</p>
+          <h2 className="mt-1 text-xl font-bold text-on-surface">Agen</h2>
           <p className="mt-0.5 text-xs text-on-surface-variant">
-            Kelola Agent pemilik Group dan transaksi operasional.
+            Kelola agen pemilik grup dan transaksi operasional.
           </p>
           <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
-            Menampilkan {agents.length} Agent{includeInactive ? " (termasuk inactive)." : "."}
+            Menampilkan {agents.length} agen{includeInactive ? " termasuk yang nonaktif." : "."}
           </p>
         </div>
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
@@ -158,7 +217,7 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
               checked={includeInactive}
               onChange={(event) => setIncludeInactive(event.target.checked)}
             />
-            Show inactive
+            Tampilkan nonaktif
           </label>
           <button
             type="button"
@@ -169,14 +228,14 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
               createMutation.reset();
             }}
           >
-            {isCreateOpen ? "Close Form" : "Add Option"}
+            {isCreateOpen ? "Tutup formulir" : "Tambah agen"}
           </button>
         </div>
       </div>
 
       {mutationError ? (
         <p className="mx-4 mt-4 rounded-xl border border-error/25 bg-error-container/60 px-4 py-3 text-sm font-semibold text-on-error-container sm:mx-5">
-          Perubahan Agent gagal disimpan. Periksa kembali data yang dimasukkan.
+          {mutationErrorMessage}
         </p>
       ) : null}
 
@@ -185,7 +244,7 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
           <AgentForm
             key="create-agent"
             initialValues={EMPTY_AGENT_FORM}
-            submitLabel="Simpan Option"
+            submitLabel="Simpan agen"
             isSubmitting={createMutation.isPending}
             onSubmit={(values) => createMutation.mutate(normalizeAgentForm(values))}
           />
@@ -210,29 +269,42 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
                       <p className="mt-1 text-sm font-semibold text-on-surface">{agent.name}</p>
                       <p className="mt-1 text-xs text-on-surface-variant">{agent.picName || "PIC belum diisi"} · {agent.groupCount ?? 0} groups</p>
                     </div>
-                    <button
-                      type="button"
-                      className="serene-btn-secondary shrink-0"
-                      disabled={agent.type === "DIRECT" || statusMutation.isPending}
-                      onClick={() => statusMutation.mutate({ id: agent.id, status: agent.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}
+                    <span
+                      className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                        agent.status === "ACTIVE"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-600"
+                      }`}
                     >
                       {agent.status === "ACTIVE" ? "Active" : "Inactive"}
-                    </button>
+                    </span>
                   </div>
-                  <div className="mt-3 flex justify-end">
-                    <button type="button" className="serene-btn-secondary" onClick={() => { setEditingAgentId(agent.id); setIsCreateOpen(false); }}>
-                      Edit
-                    </button>
+                  <div className="mt-3">
+                    <AgentActionGroup
+                      agent={agent}
+                      isStatusPending={statusMutation.isPending}
+                      fullWidth
+                      onEdit={() => {
+                        setEditingAgentId(agent.id);
+                        setIsCreateOpen(false);
+                      }}
+                      onToggleStatus={() =>
+                        statusMutation.mutate({
+                          id: agent.id,
+                          status: agent.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+                        })
+                      }
+                    />
                   </div>
                 </article>
               ))}
             </div>
 
             <div className="hidden overflow-x-auto sm:block">
-              <table className="w-full min-w-[840px] table-fixed border-collapse text-left text-sm">
-                <colgroup><col className="w-[16%]" /><col className="w-[27%]" /><col className="w-[20%]" /><col className="w-[10%]" /><col className="w-[13%]" /><col className="w-[14%]" /></colgroup>
+              <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-sm">
+                <colgroup><col className="w-[16%]" /><col className="w-[23%]" /><col className="w-[18%]" /><col className="w-[9%]" /><col className="w-[12%]" /><col className="w-[22%]" /></colgroup>
                 <thead className="border-b border-outline-variant/30 bg-surface-container-low">
-                  <tr>{["Code", "Agent", "Contact", "Groups", "Status", "Action"].map((label) => <th key={label} className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">{label}</th>)}</tr>
+                  <tr>{["Kode", "Agen", "Kontak", "Grup", "Status", "Aksi"].map((label) => <th key={label} className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">{label}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/20">
                   {agents.map((agent) => (
@@ -241,8 +313,33 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
                       <td className="px-4 py-3"><p className="font-semibold text-on-surface">{agent.name}</p><p className="mt-0.5 text-xs text-on-surface-variant">{agent.picName || "PIC belum diisi"}</p></td>
                       <td className="px-4 py-3 text-xs text-on-surface-variant"><p>{agent.phone || "-"}</p><p className="mt-0.5 break-all">{agent.email || "-"}</p></td>
                       <td className="px-4 py-3 text-xs font-semibold text-on-surface-variant">{agent.groupCount ?? 0}</td>
-                      <td className="px-4 py-3"><button type="button" className="serene-btn-secondary" disabled={agent.type === "DIRECT" || statusMutation.isPending} onClick={() => statusMutation.mutate({ id: agent.id, status: agent.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>{agent.status === "ACTIVE" ? "Active" : "Inactive"}</button></td>
-                      <td className="px-4 py-3"><button type="button" className="serene-btn-secondary" onClick={() => { setEditingAgentId(agent.id); setIsCreateOpen(false); }}>Edit</button></td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                            agent.status === "ACTIVE"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {agent.status === "ACTIVE" ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <AgentActionGroup
+                          agent={agent}
+                          isStatusPending={statusMutation.isPending}
+                          onEdit={() => {
+                            setEditingAgentId(agent.id);
+                            setIsCreateOpen(false);
+                          }}
+                          onToggleStatus={() =>
+                            statusMutation.mutate({
+                              id: agent.id,
+                              status: agent.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+                            })
+                          }
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

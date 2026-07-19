@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchBackendParsed } from "../shared/api-client";
+import { formatBackendRequestError } from "../shared/api-error";
 
 export type AgentOption = {
   id: string;
@@ -21,7 +22,7 @@ export async function fetchAgents(): Promise<AgentOption[]> {
 
 export async function createAgent(payload: { code: string; name: string; picName?: string; phone?: string; email?: string }): Promise<AgentOption> {
   const result = await fetchBackendParsed("/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, type: "PARTNER" }) });
-  if (!result.response.ok) throw new Error(`Agent save failed (${result.response.status}).`);
+  if (!result.response.ok) throw new Error(formatBackendRequestError(result.response.status, result.payload, result.responseText, "Agent save failed"));
   return result.payload as AgentOption;
 }
 
@@ -34,13 +35,13 @@ export async function updateAgent(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!result.response.ok) throw new Error(`Agent update failed (${result.response.status}).`);
+  if (!result.response.ok) throw new Error(formatBackendRequestError(result.response.status, result.payload, result.responseText, "Agent update failed"));
   return result.payload as AgentOption;
 }
 
 export async function setAgentStatus(id: string, status: "ACTIVE" | "INACTIVE"): Promise<void> {
   const result = await fetchBackendParsed(`/agents/${encodeURIComponent(id)}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
-  if (!result.response.ok) throw new Error(`Agent status update failed (${result.response.status}).`);
+  if (!result.response.ok) throw new Error(formatBackendRequestError(result.response.status, result.payload, result.responseText, "Agent status update failed"));
 }
 
 export function useAgentsQuery() {
