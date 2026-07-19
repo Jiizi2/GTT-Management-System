@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useForm, useFieldArray, UseFormReturn } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import * as Domain from "../../../shared/app-domain";
@@ -836,6 +836,16 @@ export function useAddGroupWorkspaceForm({
         phone: effectiveMusyrifPhone.trim(),
         avatar: musyrifAvatar,
       },
+      visaSetup: {
+        visaStatus: "Draft",
+        issuedDate: "",
+        syarikah: "Not assigned",
+        busStatus: effectiveBusStatus,
+        paymentStatus: "Unpaid",
+        makkahHotels: [],
+        madinahHotels: [],
+        raudhahAppointments: [],
+      },
     });
   };
 
@@ -940,6 +950,7 @@ export function useAddGroupWorkspaceForm({
     effectiveEndDate,
     effectiveMusyrifName,
     effectiveMusyrifPhone,
+    effectiveBusStatus,
     itineraryItems,
     emitIdentityInDraft,
     onItineraryDraftChange,

@@ -24,6 +24,7 @@ export const draftSchema = z
   .object({
     city: z.enum(["makkah", "madinah"]),
     agentId: z.string().trim().min(1, "Agent wajib dipilih."),
+    groupName: z.string().trim().min(1, "Nama group wajib diisi."),
     hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
     agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
     pax: z
@@ -50,6 +51,7 @@ export function createDefaultDraftForm(): HotelAgreementDraftFormState {
   return {
     city: "makkah",
     agentId: "",
+    groupName: "",
     hotelName: "",
     agreementNumber: "",
     pax: "1",
@@ -79,7 +81,7 @@ export function useAgreementInbox() {
   const [deleteDraftTarget, setDeleteDraftTarget] = useState<HotelAgreementDraft | null>(null);
   const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
-  
+
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
   const normalizedSearchQuery = query.trim();
   const isSearchingAcrossStatuses = normalizedSearchQuery.length > 0;
@@ -87,8 +89,11 @@ export function useAgreementInbox() {
   const hasDatesSelected = startDateFilter !== "" && endDateFilter !== "";
   const isDateRangeInvalid = hasDatesSelected && startDateFilter > endDateFilter;
 
-  const effectiveStatusFilter: AgreementDraftStatusFilter =
-    hasDatesSelected ? "all" : (isSearchingAcrossStatuses ? "all" : statusFilter);
+  const effectiveStatusFilter: AgreementDraftStatusFilter = hasDatesSelected
+    ? "all"
+    : isSearchingAcrossStatuses
+      ? "all"
+      : statusFilter;
   const draftsQuery = useAgreementDraftsQuery(query, effectiveStatusFilter);
   const drafts = draftsQuery.data ?? [];
 
@@ -122,7 +127,8 @@ export function useAgreementInbox() {
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
   const paginatedDrafts = filteredDrafts.slice(pageStartIndex, pageStartIndex + AGREEMENT_DRAFT_PAGE_SIZE);
   const rangeStart = filteredDrafts.length === 0 ? 0 : pageStartIndex + 1;
-  const rangeEnd = filteredDrafts.length === 0 ? 0 : Math.min(filteredDrafts.length, pageStartIndex + paginatedDrafts.length);
+  const rangeEnd =
+    filteredDrafts.length === 0 ? 0 : Math.min(filteredDrafts.length, pageStartIndex + paginatedDrafts.length);
 
   const saveDraftMutation = useMutation({
     mutationFn: saveAgreementDraftInBackend,
@@ -146,7 +152,13 @@ export function useAgreementInbox() {
     defaultValues: createDefaultDraftForm(),
   });
 
-  const { control, register, handleSubmit, reset, formState: { errors } } = form;
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = form;
 
   const isSaving = saveDraftMutation.isPending;
 

@@ -142,6 +142,9 @@ export function AgreementDraftCard({
             ) : (
               <p className="text-sm font-semibold text-on-surface-variant">Agent belum diisi</p>
             )}
+            {draft.groupName ? (
+              <p className="truncate text-sm font-semibold text-on-surface-variant">Group: {draft.groupName}</p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="inline-flex rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] text-slate-800">
                 {draft.city === "makkah" ? "Makkah" : "Madinah"}

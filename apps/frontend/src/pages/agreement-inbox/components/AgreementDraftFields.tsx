@@ -23,6 +23,7 @@ export function AgreementDraftFields({
 
   const cityErrorMessage = errors.city?.message;
   const agentIdErrorMessage = errors.agentId?.message;
+  const groupNameErrorMessage = errors.groupName?.message;
   const hotelNameErrorMessage = errors.hotelName?.message;
   const agreementNumberErrorMessage = errors.agreementNumber?.message;
   const paxErrorMessage = errors.pax?.message;
@@ -32,7 +33,7 @@ export function AgreementDraftFields({
 
   return (
     <div className="grid gap-4 lg:grid-cols-12">
-      <div className="grid gap-1.5 lg:col-span-3">
+      <div className="order-4 grid gap-1.5 lg:col-span-2">
         <label className={fieldClassName}>
           <span>City</span>
           <Controller
@@ -58,20 +59,55 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-city`} message={cityErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-3">
+      <div className="order-1 grid gap-1.5 lg:col-span-4">
         <label className={fieldClassName}>
           <span>Agent</span>
-          <Controller control={control} name="agentId" render={({ field }) => (
-            <SereneSelect id={`${idPrefix}-agent`} className="serene-select" value={field.value} onChange={(event) => field.onChange(event.target.value)}>
-              <option value="" disabled>Select Agent</option>
-              {(agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE").map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-            </SereneSelect>
-          )} />
+          <Controller
+            control={control}
+            name="agentId"
+            render={({ field }) => (
+              <SereneSelect
+                id={`${idPrefix}-agent`}
+                className="serene-select"
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+              >
+                <option value="" disabled>
+                  Select Agent
+                </option>
+                {(agentsQuery.data ?? [])
+                  .filter((agent) => agent.status === "ACTIVE")
+                  .map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name}
+                    </option>
+                  ))}
+              </SereneSelect>
+            )}
+          />
         </label>
         <FieldErrorMessage fieldId={`${idPrefix}-agent`} message={agentIdErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-6">
+      <div className="order-2 grid gap-1.5 lg:col-span-6">
+        <label className={fieldClassName}>
+          <span>Group Name</span>
+          <input
+            id={`${idPrefix}-group-name`}
+            type="text"
+            className={inputClassName}
+            placeholder="Group Al Falah April"
+            {...register("groupName")}
+            aria-invalid={getFieldAriaInvalid(groupNameErrorMessage)}
+            aria-describedby={getFieldDescribedBy(`${idPrefix}-group-name`, {
+              errorMessage: groupNameErrorMessage,
+            })}
+          />
+        </label>
+        <FieldErrorMessage fieldId={`${idPrefix}-group-name`} message={groupNameErrorMessage} />
+      </div>
+
+      <div className="order-5 grid gap-1.5 lg:col-span-5">
         <label className={fieldClassName}>
           <span>Hotel Name</span>
           <input
@@ -89,7 +125,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-hotel`} message={hotelNameErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-5">
+      <div className="order-6 grid gap-1.5 lg:col-span-5">
         <label className={fieldClassName}>
           <span>Agreement Number</span>
           <input
@@ -107,7 +143,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-number`} message={agreementNumberErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-2">
+      <div className="order-3 grid gap-1.5 lg:col-span-2">
         <label className={fieldClassName}>
           <span>Pax</span>
           <input
@@ -125,7 +161,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-pax`} message={paxErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-3">
+      <div className="order-7 grid gap-1.5 lg:col-span-4">
         <label className={fieldClassName}>
           <span>Approval Status</span>
           <Controller
@@ -152,7 +188,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-status`} message={statusErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-2">
+      <div className="order-8 grid gap-1.5 lg:col-span-4">
         <label className={fieldClassName}>
           <span>Stay Start</span>
           <Controller
@@ -175,7 +211,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-stay-start`} message={stayStartErrorMessage} />
       </div>
 
-      <div className="grid gap-1.5 lg:col-span-2">
+      <div className="order-9 grid gap-1.5 lg:col-span-4">
         <label className={fieldClassName}>
           <span>Stay End</span>
           <Controller
@@ -198,7 +234,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-stay-end`} message={stayEndErrorMessage} />
       </div>
 
-      <label className={`${fieldClassName} lg:col-span-12`}>
+      <label className={`${fieldClassName} order-10 lg:col-span-12`}>
         <span>Notes</span>
         <textarea className={textareaClassName} placeholder="Optional notes" {...register("notes")} />
       </label>

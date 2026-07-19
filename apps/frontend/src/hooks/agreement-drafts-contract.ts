@@ -16,6 +16,7 @@ export const backendHotelAgreementDraftRecordSchema = z
     agentName: z.string().nullable().optional(),
     agentId: z.string().optional(),
     agent: z.object({ id: z.string(), code: z.string(), name: z.string() }).optional(),
+    groupName: z.string().optional(),
     hotelName: z.string().optional(),
     agreementNumber: z.string().optional(),
     pax: z.number().optional(),
@@ -43,10 +44,7 @@ function formatContractError(context: string, error: z.ZodError): Error {
   return new Error(`${context}: invalid backend response${paths ? ` (${paths})` : ""}.`);
 }
 
-export function parseBackendAgreementDraftRecord(
-  payload: unknown,
-  context: string,
-): BackendHotelAgreementDraftRecord {
+export function parseBackendAgreementDraftRecord(payload: unknown, context: string): BackendHotelAgreementDraftRecord {
   const result = backendHotelAgreementDraftRecordSchema.safeParse(payload);
   if (!result.success) {
     throw formatContractError(context, result.error);

@@ -13,6 +13,7 @@ function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormSt
   return {
     city: draft.city,
     agentId: draft.agentId,
+    groupName: draft.groupName ?? "",
     hotelName: draft.hotelName,
     agreementNumber: draft.agreementNumber,
     pax: draft.pax.toString(),
@@ -144,12 +145,7 @@ export function DeleteAgreementDraftModal({
   const descriptionId = useId();
 
   return (
-    <DialogShell
-      isOpen={true}
-      onClose={onClose}
-      title="Hapus Draft Agreement"
-      size="sm"
-    >
+    <DialogShell isOpen={true} onClose={onClose} title="Hapus Draft Agreement" size="sm">
       <div className="serene-dialog-body px-5 py-4">
         <div className="flex items-start gap-3">
           <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
