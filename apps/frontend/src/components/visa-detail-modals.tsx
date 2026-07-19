@@ -7,6 +7,7 @@ import { DatePickerInput } from "./date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "./form-accessibility";
 import { SereneSelect } from "./serene-select";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
+import type { AgentOption } from "../hooks/use-agents-backend";
 import type {
   VisaHotelEditFormState,
   VisaPaymentStatus,
@@ -40,6 +41,10 @@ const visaStatusModalSchema = z.object({
 
 const paymentStatusModalSchema = z.object({
   value: z.enum(["Paid", "Unpaid", "Partial"]),
+});
+
+const agentAssignmentModalSchema = z.object({
+  agentId: z.string().trim().min(1, "Agent wajib dipilih."),
 });
 
 const hotelModalSchema = z
@@ -362,6 +367,102 @@ export function SyarikahModal({
         />
       </label>
       <FieldErrorMessage fieldId="visa-syarikah" message={valueErrorMessage} className={modalErrorClassName} />
+    </ModalShell>
+  );
+}
+
+export function AgentAssignmentModal({
+  initialValue,
+  agents,
+  isLoading = false,
+  loadError,
+  onClose,
+  onSave,
+}: {
+  initialValue: string;
+  agents: AgentOption[];
+  isLoading?: boolean;
+  loadError?: string;
+  onClose: () => void;
+  onSave: (agentId: string) => void | Promise<void>;
+}) {
+  const {
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<{ agentId: string }>({
+    resolver: zodResolver(agentAssignmentModalSchema),
+    defaultValues: { agentId: initialValue },
+  });
+  const agentErrorMessage = errors.agentId?.message;
+  const saveErrorMessage = errors.root?.message;
+  const options = [
+    <option key="empty" value="" disabled>
+      {isLoading ? "Loading agents..." : "Select Agent"}
+    </option>,
+    ...agents.map((agent) => (
+      <option key={agent.id} value={agent.id}>
+        {agent.name}{agent.status === "INACTIVE" ? " (Inactive)" : ""}
+      </option>
+    )),
+  ];
+
+  const submit = handleSubmit(async ({ agentId }) => {
+    try {
+      await onSave(agentId);
+    } catch (error: unknown) {
+      setError("root", {
+        message: error instanceof Error ? error.message : "Agent belum berhasil diperbarui.",
+      });
+    }
+  });
+
+  return (
+    <ModalShell
+      title={initialValue ? "Edit Agent" : "Assign Agent"}
+      description="Choose the agent responsible for this visa group."
+      icon="business"
+      widthClassName="max-w-lg"
+      onClose={onClose}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() => void submit()}
+          saveLabel={initialValue ? "Save Changes" : "Assign Agent"}
+          isSaveDisabled={isLoading || agents.length === 0}
+          isSaving={isSubmitting}
+        />
+      }
+    >
+      <label className={modalFieldClassName}>
+        <span>Agent</span>
+        <div className="relative">
+          <Controller
+            control={control}
+            name="agentId"
+            render={({ field }) => (
+              <SereneSelect
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                disabled={isLoading}
+                aria-invalid={getFieldAriaInvalid(agentErrorMessage)}
+                aria-describedby={getFieldDescribedBy("visa-agent", { errorMessage: agentErrorMessage })}
+              >
+                {options}
+              </SereneSelect>
+            )}
+          />
+        </div>
+      </label>
+      <FieldErrorMessage fieldId="visa-agent" message={agentErrorMessage} className={modalErrorClassName} />
+      {loadError ? <p className={modalErrorClassName}>{loadError}</p> : null}
+      {saveErrorMessage ? (
+        <p className={modalErrorClassName} role="alert">
+          {saveErrorMessage}
+        </p>
+      ) : null}
     </ModalShell>
   );
 }

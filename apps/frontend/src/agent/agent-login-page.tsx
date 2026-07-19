@@ -21,5 +21,5 @@ export function AgentLoginPage() {
       : login.isError
         ? "Login gagal. Periksa kembali email dan password Anda."
         : "";
-  return <LoginScreen onSubmit={submit} isSubmitting={login.isPending} errorMessage={errorMessage} />;
+  return <LoginScreen productName="Portal Agent" onSubmit={submit} isSubmitting={login.isPending} errorMessage={errorMessage} />;
 }

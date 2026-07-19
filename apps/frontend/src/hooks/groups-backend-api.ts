@@ -143,6 +143,42 @@ export async function replaceGroupInBackend(groupCode: string, group: GroupData)
   }
 }
 
+export async function reassignGroupAgentInBackend(
+  groupCode: string,
+  agentId: string,
+  reason = "Updated from Visa Detail",
+): Promise<GroupData> {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}/reassign-agent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      agentId: agentId.trim(),
+      reason: reason.trim() || "Updated from Visa Detail",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Agent reassignment failed"),
+    );
+  }
+
+  const mappedGroup = mapBackendGroupToFrontend(
+    parseBackendGroupRecord(responsePayload, "Agent reassignment failed"),
+  );
+  if (!mappedGroup) {
+    throw new Error("Agent reassignment failed: response is not a group record.");
+  }
+
+  return mappedGroup;
+}
+
 export async function deleteGroupInBackend(groupCode: string): Promise<void> {
   const {
     response,

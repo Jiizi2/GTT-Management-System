@@ -20,12 +20,6 @@ const quickActions: QuickAction[] = [
     icon: "add_circle",
   },
   {
-    id: "raudhah-reminder",
-    label: "Raudhah Reminder",
-    description: "Buka daftar reminder Raudhah dan template copy cepat.",
-    icon: "notifications_active",
-  },
-  {
     id: "agreement-inbox",
     label: "Agreement Inbox",
     description: "Input agreement hotel sebelum group number tersedia.",

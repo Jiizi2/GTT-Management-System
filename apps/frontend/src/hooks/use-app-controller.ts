@@ -25,42 +25,42 @@ function resolveDocumentTitle({
   }
 
   if (activeNav === "checklist") {
-    return "GTT | H-1 Checklist";
+    return "GTT Ops | H-1 Checklist";
   }
 
   if (activeNav === "visa") {
-    return "GTT | Visa Tracking";
+    return "GTT Ops | Visa Tracking";
   }
 
   if (activeNav === "agreement-inbox") {
-    return "GTT | Agreement Inbox";
+    return "GTT Ops | Agreement Inbox";
   }
 
   if (activeNav === "new-group" || activeNav === "input") {
-    return "GTT | Add New Group";
+    return "GTT Ops | Add New Group";
   }
 
   if (activeNav === "invoice") {
-    return "GTT | Invoice List";
+    return "GTT Ops | Invoice List";
   }
 
   if (activeNav === "raudhah-reminder") {
-    return "GTT | Raudhah Reminder";
+    return "GTT Ops | Raudhah Reminder";
   }
 
   if (activeNav === "user-management") {
-    return "GTT | User Management";
+    return "GTT Ops | User Management";
   }
 
   if (activeNav === "master-data") {
-    return "GTT | Master Data";
+    return "GTT Ops | Master Data";
   }
 
   if (activeNav === "profile") {
-    return "GTT | Operator Profile";
+    return "GTT Ops | Operator Profile";
   }
 
-  return "GTT | Itinerary Overview";
+  return "GTT Ops | Itinerary Overview";
 }
 
 function isLocalDevelopmentHost(): boolean {

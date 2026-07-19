@@ -282,6 +282,7 @@ export type HotelAgreementDraft = {
   agentId: string;
   city: "makkah" | "madinah";
   agentName: string;
+  groupName?: string;
   hotelName: string;
   agreementNumber: string;
   pax: number;
@@ -299,6 +300,7 @@ export type HotelAgreementDraft = {
 export type HotelAgreementDraftFormState = {
   city: "makkah" | "madinah";
   agentId: string;
+  groupName: string;
   hotelName: string;
   agreementNumber: string;
   pax: string;

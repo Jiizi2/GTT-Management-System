@@ -15,7 +15,7 @@ export function GroupDetailHeader() {
 
       <div className="flex flex-wrap items-center gap-2 md:w-auto">
         <Link
-          to={readOnly ? `/agent/visa-process` : buildVisaDetailPath(group.code)}
+          to={readOnly ? `/agent/visa/${encodeURIComponent(group.code)}` : buildVisaDetailPath(group.code)}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-3.5 py-2 text-xs font-bold text-on-primary transition hover:bg-primary-container"
         >
           <span className="material-symbols-outlined text-sm" aria-hidden="true">

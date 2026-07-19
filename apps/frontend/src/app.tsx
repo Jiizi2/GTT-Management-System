@@ -46,7 +46,7 @@ function RestoringSessionScreen() {
         <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary">Secure Session</p>
         <h1 className="mt-3 text-2xl font-semibold text-on-surface">Memverifikasi sesi</h1>
         <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-          Dashboard sedang memastikan sesi login Anda masih valid.
+          Ops sedang memastikan sesi login Anda masih valid.
         </p>
       </div>
     </div>

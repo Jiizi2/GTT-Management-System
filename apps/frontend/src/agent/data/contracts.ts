@@ -1,5 +1,4 @@
 export type LifecycleStatus = "ENTRY_ONLY" | "ACTIVE" | "INACTIVE" | "COMPLETED" | "ARCHIVED";
-export type InvoiceStatus = "PAID" | "PARTIALLY_PAID" | "PENDING" | "OVERDUE" | "CANCELLED";
 
 export type GroupSummary = {
   id: string;
@@ -85,45 +84,4 @@ export type TransportationItem = {
   verifiedDriverCount: number;
 };
 
-export type InvoiceSummary = {
-  id: string;
-  invoiceNumber: string;
-  status: InvoiceStatus;
-  issuedDate: string;
-  dueDate: string;
-  group: { id: string; code: string; name: string } | null;
-};
 export type Profile = { account: { displayName: string }; agent: { code: string; name: string } };
-export type VisaApplicationDocumentType = "PASSPORT" | "VACCINE_CERTIFICATE" | "MANIFEST" | "PACKAGE_INFORMATION";
-export type VisaApplication = {
-  id: string;
-  applicationNumber: string;
-  departureDate: string;
-  returnDate: string;
-  departureCity: string;
-  providerName: string | null;
-  packageName: string;
-  passengerCount: number;
-  status: string;
-  documentStatus: string;
-  agreementStatus: string;
-  nusukStatus: string;
-  paymentStatus: string;
-  visaStatus: string;
-  nusukGroupNumber: string | null;
-  nusukReferenceNumber: string | null;
-  adminNote: string | null;
-  submittedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  agent: { code: string; name: string };
-  documents: Array<{
-    id: string;
-    type: VisaApplicationDocumentType;
-    originalName: string;
-    mimeType: string;
-    sizeBytes: number;
-    status: string;
-    reviewNote: string | null;
-  }>;
-};

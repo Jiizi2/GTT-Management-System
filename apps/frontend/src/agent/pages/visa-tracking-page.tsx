@@ -3,7 +3,7 @@ import { VisaTrackingScreen } from "../../pages/visa-tracking-page";
 import { ErrorState, LoadingState } from "../components/data-state";
 import { useAgentGroupData } from "../data/use-agent-group-data";
 
-export function GroupsPage({
+export function AgentVisaTrackingPage({
   principalId,
   agentId,
   agentName,
@@ -14,7 +14,7 @@ export function GroupsPage({
 }) {
   const navigate = useNavigate();
   const query = useAgentGroupData({ principalId, agentId, agentName });
-  if (query.isPending) return <LoadingState label="Memuat group..." />;
+  if (query.isPending) return <LoadingState label="Memuat Visa Tracking..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
 
   return (
@@ -23,7 +23,7 @@ export function GroupsPage({
       fixedAgentName={agentName}
       readOnly
       showThemeToggle={false}
-      onOpenDetail={(row) => navigate(`/agent/groups/${encodeURIComponent(row.groupCode)}`)}
+      onOpenDetail={(row) => navigate(`/agent/visa/${encodeURIComponent(row.groupCode)}`)}
       onUpdateAgreementStatus={() => undefined}
     />
   );

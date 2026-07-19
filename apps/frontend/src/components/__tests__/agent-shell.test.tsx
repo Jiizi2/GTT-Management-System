@@ -9,6 +9,10 @@ vi.mock("../../theme/theme-provider", () => ({
   useThemeMode: () => ({ theme: "light", toggleTheme: vi.fn() }),
 }));
 
+vi.mock("../../agent/pages/checklist-page", () => ({
+  ChecklistPage: () => <h1>H-1 Checklist</h1>,
+}));
+
 const session: AgentSession = {
   expiresAt: "2026-07-19T00:00:00.000Z",
   user: {
@@ -28,18 +32,21 @@ describe("AgentShell routes", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/agent/agreements"]}>
+        <MemoryRouter initialEntries={["/agent/checklist"]}>
           <Routes>
             <Route path="/agent/*" element={<AgentShell session={session} />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("heading", { name: "Agreement Inbox" })).toBeInTheDocument();
-    const trackerLinks = screen.getAllByRole("link", { name: /Visa Process Tracker/i });
+    expect(screen.getByRole("heading", { name: "H-1 Checklist" })).toBeInTheDocument();
+    const trackerLinks = screen.getAllByRole("link", { name: /Visa Tracking/i });
     expect(trackerLinks).toHaveLength(2);
     for (const link of trackerLinks) {
-      expect(link).toHaveAttribute("href", "/agent/visa-process");
+      expect(link).toHaveAttribute("href", "/agent/visa");
     }
+    expect(screen.queryByRole("link", { name: /My Groups/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Agreement$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Invoice$/i })).not.toBeInTheDocument();
   });
 });

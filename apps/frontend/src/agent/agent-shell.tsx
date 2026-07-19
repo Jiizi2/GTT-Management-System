@@ -5,14 +5,11 @@ import { ThemeToggleButton } from "../components/theme-toggle-button";
 import type { AgentSession } from "./auth/agent-session";
 import { useAgentLogout } from "./auth/use-agent-auth";
 import { ChecklistPage } from "./pages/checklist-page";
-import { AgreementsPage } from "./pages/agreements-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { GroupDetailPage } from "./pages/group-detail-page";
-import { GroupsPage } from "./pages/groups-page";
-import { InvoiceDetailPage } from "./pages/invoice-detail-page";
-import { InvoicesPage } from "./pages/invoices-page";
 import { ProfilePage } from "./pages/profile-page";
-import { VisaApplicationsPage } from "./pages/visa-applications-page";
+import { AgentVisaDetailPage } from "./pages/visa-detail-page";
+import { AgentVisaTrackingPage } from "./pages/visa-tracking-page";
 
 const navigation: ReadonlyArray<{
   to: string;
@@ -21,15 +18,12 @@ const navigation: ReadonlyArray<{
   permission: Permission;
 }> = [
   { to: "/agent/overview", label: "Overview", icon: "dashboard", permission: PERMISSIONS.overviewRead },
-  { to: "/agent/groups", label: "My Groups", icon: "groups", permission: PERMISSIONS.groupsRead },
   {
-    to: "/agent/visa-process",
-    label: "Visa Process Tracker",
+    to: "/agent/visa",
+    label: "Visa Tracking",
     icon: "monitoring",
-    permission: PERMISSIONS.visaProcessRead,
+    permission: PERMISSIONS.visaTrackingRead,
   },
-  { to: "/agent/agreements", label: "Agreement", icon: "hotel", permission: PERMISSIONS.agreementsRead },
-  { to: "/agent/invoices", label: "Invoice", icon: "receipt_long", permission: PERMISSIONS.invoicesRead },
   { to: "/agent/checklist", label: "Checklist", icon: "fact_check", permission: PERMISSIONS.checklistRead },
   { to: "/agent/profile", label: "Profile", icon: "person", permission: PERMISSIONS.profileRead },
 ];
@@ -45,11 +39,11 @@ export function AgentShell({ session }: { session: AgentSession }) {
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [location.pathname]);
-  const primaryNav = nav.slice(0, 3);
-  const toolNav = nav.slice(3, -1);
+  const primaryNav = nav.filter((item) => ["/agent/overview", "/agent/visa"].includes(item.to));
+  const toolNav = nav.filter((item) => item.to === "/agent/checklist");
   const profileNav = nav.at(-1);
   const mobileNav = nav.filter((item) =>
-    ["/agent/overview", "/agent/groups", "/agent/visa-process", "/agent/checklist", "/agent/profile"].includes(item.to),
+    ["/agent/overview", "/agent/visa", "/agent/checklist", "/agent/profile"].includes(item.to),
   );
   const navLinkClass = (isActive: boolean) =>
     `group flex items-center gap-3.5 rounded-full text-on-surface-variant transition ${
@@ -66,7 +60,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
         className={`fixed inset-y-0 left-0 z-10 hidden flex-col bg-surface-container-low pb-7 pt-4 shadow-ambient transition-[width,padding] duration-200 xl:flex ${
           collapsed ? "w-[104px] px-3.5" : "w-[280px] pl-6 pr-5"
         }`}
-        aria-label="Navigasi Agent"
+        aria-label="Navigasi Portal Agent"
       >
         <div className={`mb-9 flex gap-3 ${collapsed ? "flex-col items-center" : "items-start justify-between"}`}>
           <div className={`min-w-0 ${collapsed ? "p-0 text-center" : "px-2"}`}>
@@ -77,12 +71,10 @@ export function AgentShell({ session }: { session: AgentSession }) {
               GTT
             </h2>
             {!collapsed ? (
-              <p
-                className="mt-1.5 text-xs font-bold text-on-surface-variant/75"
-                style={{ fontFamily: '"Noto Naskh Arabic", serif' }}
-              >
-                Ghaniya Tour and Travel
-              </p>
+              <div className="mt-1.5">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Portal Agent</p>
+                <p className="mt-0.5 text-[11px] font-bold text-on-surface-variant/75">Ghaniya Tour and Travel</p>
+              </div>
             ) : null}
           </div>
           <button
@@ -155,7 +147,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
                       {session.user.displayName}
                     </strong>
                     <span className="mt-0.5 block truncate text-[0.72rem] font-medium text-on-surface-variant/75">
-                      Agent
+                      Portal Agent
                     </span>
                   </div>
                   <span className="material-symbols-outlined text-on-surface-variant/35">chevron_right</span>
@@ -201,12 +193,6 @@ export function AgentShell({ session }: { session: AgentSession }) {
             }
           />
           <Route
-            path="groups"
-            element={
-              <GroupsPage principalId={principalId} agentId={session.user.agentId} agentName={session.user.agentName} />
-            }
-          />
-          <Route
             path="groups/:identity"
             element={
               <GroupDetailPage
@@ -216,28 +202,14 @@ export function AgentShell({ session }: { session: AgentSession }) {
               />
             }
           />
-          <Route path="visa-process" element={<VisaApplicationsPage principalId={principalId} />} />
           <Route
-            path="agreements"
-            element={
-              <AgreementsPage
-                principalId={principalId}
-                agentId={session.user.agentId}
-                agentName={session.user.agentName}
-              />
-            }
+            path="visa"
+            element={<AgentVisaTrackingPage principalId={principalId} agentId={session.user.agentId} agentName={session.user.agentName} />}
           />
           <Route
-            path="invoices"
-            element={
-              <InvoicesPage
-                principalId={principalId}
-                agentId={session.user.agentId}
-                agentName={session.user.agentName}
-              />
-            }
+            path="visa/:identity"
+            element={<AgentVisaDetailPage principalId={principalId} agentId={session.user.agentId} agentName={session.user.agentName} />}
           />
-          <Route path="invoices/:id" element={<InvoiceDetailPage principalId={principalId} />} />
           <Route path="checklist" element={<ChecklistPage principalId={principalId} />} />
           <Route path="profile" element={<ProfilePage principalId={principalId} />} />
           <Route path="*" element={<Navigate to="/agent/overview" replace />} />
@@ -248,7 +220,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
         className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 xl:hidden"
         aria-label="Mobile navigation"
       >
-        <div className="mx-auto grid max-w-md grid-cols-5 items-end rounded-[1.7rem] bg-surface-container-lowest/95 px-3 pb-2 pt-3 shadow-ambient backdrop-blur-serene">
+        <div className="mx-auto grid max-w-md grid-cols-4 items-end rounded-[1.7rem] bg-surface-container-lowest/95 px-3 pb-2 pt-3 shadow-ambient backdrop-blur-serene">
           {mobileNav.map((item) => (
             <NavLink
               key={item.to}

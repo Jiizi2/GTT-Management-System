@@ -19,7 +19,6 @@ export function OverviewScreen({
   overviewMonthFilter,
   overviewMonthOptions,
   statCards,
-  summaryMessage,
   onQueryChange,
   onToggleActiveOnly,
   onOverviewMonthFilterChange,
@@ -43,7 +42,6 @@ export function OverviewScreen({
     icon: string;
     tone: "primary" | "secondary" | "tertiary";
   }>;
-  summaryMessage: string;
   onQueryChange: (value: string) => void;
   onToggleActiveOnly: (value: boolean) => void;
   onOverviewMonthFilterChange: (value: string) => void;
@@ -93,7 +91,6 @@ export function OverviewScreen({
             query,
             isActiveOnly,
             monthLabel: selectedOverviewMonthLabel,
-            summaryMessage,
           },
           {
             printWindow: printableWindow,
@@ -183,7 +180,7 @@ export function OverviewScreen({
             label={card.label}
             value={card.value}
             supportingText={card.subtitle}
-            tone={card.tone === "primary" ? "primary" : card.tone === "tertiary" ? "danger" : "neutral"}
+            tone="primary"
           />
         ))}
       </section>

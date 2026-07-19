@@ -97,12 +97,10 @@ export function AppSidebar({
               GTT
             </h2>
             {!isCollapsed ? (
-              <p
-                className="mt-1.5 text-xs font-bold text-on-surface-variant/75"
-                style={{ fontFamily: '"Noto Naskh Arabic", serif' }}
-              >
-                Ghaniya Tour and Travel
-              </p>
+              <div className="mt-1.5">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Ops</p>
+                <p className="mt-0.5 text-[11px] font-bold text-on-surface-variant/75">Ghaniya Tour and Travel</p>
+              </div>
             ) : null}
           </div>
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Domain from "../../../shared/app-domain";
+import { calculateIssuedVisaStatistics } from "../../../shared/group-visa-domain";
 import type {
   AgreementApprovalStatus,
   GroupData,
@@ -173,7 +174,7 @@ export function useVisaTracking({
   const currentIssuedMonthKey = useMemo(() => formatLocalIsoDate(new Date()).slice(0, 7), []);
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<VisaFilterId>("all");
-  const [issuedMonthFilter, setIssuedMonthFilter] = useState(() => currentIssuedMonthKey);
+  const [issuedStatsMonth, setIssuedStatsMonth] = useState(() => currentIssuedMonthKey);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedRowGroupKeys, setExpandedRowGroupKeys] = useState<Set<string>>(() => new Set());
 
@@ -290,20 +291,15 @@ export function useVisaTracking({
         if (activeFilter === "all") return true;
         return doesRowMatchActiveFilter(rowGroup.mainRow) || rowGroup.followerRows.some(f => doesRowMatchActiveFilter(f));
       })
-      .filter(rowGroup => {
-        if (issuedMonthFilter === "all") return true;
-        const mainMonth = resolveIssuedMonthKey(rowGroup.mainRow.departureIso);
-        if (mainMonth === issuedMonthFilter) return true;
-        return rowGroup.followerRows.some(f => resolveIssuedMonthKey(f.departureIso) === issuedMonthFilter);
-      });
-  }, [allGroupedRows, normalizedQuery, activeFilter, issuedMonthFilter, doesRowMatchQuery, doesRowMatchActiveFilter]);
+  }, [allGroupedRows, normalizedQuery, activeFilter, doesRowMatchQuery, doesRowMatchActiveFilter]);
 
   const issuedMonthOptions = useMemo<IssuedMonthOption[]>(() => {
     const monthCounter = new Map<string, number>();
     monthCounter.set(currentIssuedMonthKey, 0);
 
     visaRows.forEach((row) => {
-      const issuedMonthKey = resolveIssuedMonthKey(row.departureIso);
+      if (row.visaStatus !== "Issued") return;
+      const issuedMonthKey = resolveIssuedMonthKey(row.issuedDateIso);
       if (!issuedMonthKey) {
         return;
       }
@@ -311,12 +307,13 @@ export function useVisaTracking({
       monthCounter.set(issuedMonthKey, (monthCounter.get(issuedMonthKey) ?? 0) + 1);
     });
 
-    return Array.from(monthCounter.entries())
+    const monthOptions = Array.from(monthCounter.entries())
       .sort((left, right) => right[0].localeCompare(left[0]))
       .map(([value]) => ({
         value,
         label: formatIssuedMonthLabel(value),
       }));
+    return [{ value: "all", label: "Semua Bulan" }, ...monthOptions];
   }, [currentIssuedMonthKey, visaRows]);
 
   const notIssuedCount = visaRows.filter((row) => row.visaStatus !== "Issued").length;
@@ -330,17 +327,14 @@ export function useVisaTracking({
     const group = groupByCode.get(row.groupCode);
     return resolveVisaTypeLabel(group) === "Visa+";
   }).length;
-  const issuedPaxCount = useMemo(() => {
-    return visaRows
-      .filter((row) => row.visaStatus === "Issued")
-      .reduce((sum, row) => sum + row.pax, 0);
-  }, [visaRows]);
+  const issuedStatistics = useMemo(
+    () => calculateIssuedVisaStatistics(visaRows, issuedStatsMonth),
+    [issuedStatsMonth, visaRows],
+  );
   
   const hasRowsForExport = filteredGroupedRows.length > 0;
   const selectedIssuedMonthLabel =
-    issuedMonthFilter === "all"
-      ? "All Months"
-      : (issuedMonthOptions.find((option) => option.value === issuedMonthFilter)?.label ?? issuedMonthFilter);
+    issuedMonthOptions.find((option) => option.value === issuedStatsMonth)?.label ?? issuedStatsMonth;
   const actionRequiredCount = visaRows.filter((row) => isVisaRowActionRequired(row)).length;
 
   const totalPages = Math.max(1, Math.ceil(filteredGroupedRows.length / VISA_PAGE_SIZE));
@@ -351,18 +345,14 @@ export function useVisaTracking({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, activeFilter, issuedMonthFilter]);
+  }, [query, activeFilter]);
 
   useEffect(() => {
-    if (issuedMonthFilter === "all") {
-      return;
-    }
-
-    const isSelectedMonthAvailable = issuedMonthOptions.some((option) => option.value === issuedMonthFilter);
+    const isSelectedMonthAvailable = issuedMonthOptions.some((option) => option.value === issuedStatsMonth);
     if (!isSelectedMonthAvailable) {
-      setIssuedMonthFilter(currentIssuedMonthKey);
+      setIssuedStatsMonth(currentIssuedMonthKey);
     }
-  }, [currentIssuedMonthKey, issuedMonthFilter, issuedMonthOptions]);
+  }, [currentIssuedMonthKey, issuedStatsMonth, issuedMonthOptions]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -424,8 +414,8 @@ export function useVisaTracking({
     setQuery,
     activeFilter,
     setActiveFilter,
-    issuedMonthFilter,
-    setIssuedMonthFilter,
+    issuedStatsMonth,
+    setIssuedStatsMonth,
     currentPage,
     setCurrentPage,
     expandedRowGroupKeys,
@@ -440,7 +430,7 @@ export function useVisaTracking({
     unpaidCount,
     visaOnlyCount,
     visaPlusCount,
-    issuedPaxCount,
+    issuedStatistics,
     hasRowsForExport,
     selectedIssuedMonthLabel,
     actionRequiredCount,

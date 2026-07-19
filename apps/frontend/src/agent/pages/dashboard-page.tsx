@@ -7,6 +7,7 @@ import type { Dashboard, GroupSummary } from "../data/contracts";
 import { agentQueryKeys } from "../query/agent-query-boundary";
 import { portalGet } from "../data/portal-query";
 import { getAllAgentGroups } from "../data/all-groups-query";
+import { normalizeDateOnly } from "../data/format";
 import { ErrorState, LoadingState } from "../components/data-state";
 
 const iconByCategory: Record<string, string> = {
@@ -106,7 +107,7 @@ export function mapAgentGroup(
     visaSetup: visa
       ? {
           visaStatus: visa.facet.status === "ISSUED" ? "Issued" : visa.facet.status === "PENDING" ? "Pending" : "Draft",
-          issuedDate: visa.facet.issuedDate ?? undefined,
+          issuedDate: normalizeDateOnly(visa.facet.issuedDate),
           syarikah: visa.facet.syarikah ?? "",
           busStatus: visa.facet.busStatus === "VISA_PLUS" ? "Visa+" : "Visa Only",
           paymentStatus:
@@ -242,7 +243,6 @@ export function DashboardPage({
           tone: "tertiary",
         },
       ]}
-      summaryMessage={`${filteredGroups.length} group milik ${agentName} ditampilkan.`}
       onQueryChange={setSearch}
       onToggleActiveOnly={setActiveOnly}
       onOverviewMonthFilterChange={setMonth}

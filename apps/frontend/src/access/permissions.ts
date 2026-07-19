@@ -4,9 +4,7 @@ import type { AgentPrincipal } from "../agent/auth/agent-session";
 export const PERMISSIONS = {
   overviewRead: "overview.read",
   groupsRead: "groups.read",
-  visaProcessRead: "visa-process.read",
-  agreementsRead: "agreements.read",
-  invoicesRead: "invoices.read",
+  visaTrackingRead: "visa-tracking.read",
   checklistRead: "checklist.read",
   profileRead: "profile.read",
   operationsWrite: "operations.write",
@@ -21,9 +19,7 @@ export type AppPrincipal =
 const AGENT_READ_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.overviewRead,
   PERMISSIONS.groupsRead,
-  PERMISSIONS.visaProcessRead,
-  PERMISSIONS.agreementsRead,
-  PERMISSIONS.invoicesRead,
+  PERMISSIONS.visaTrackingRead,
   PERMISSIONS.checklistRead,
   PERMISSIONS.profileRead,
 ];

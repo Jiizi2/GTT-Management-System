@@ -30,7 +30,7 @@ export function GroupDetailPage({
       groups={query.data}
       readOnly
       showThemeToggle={false}
-      onBack={() => navigate("/agent/groups")}
+      onBack={() => navigate("/agent/overview")}
       onDeleteGroup={() => undefined}
       onSaveGroup={readOnlyResult}
       onPatchGroup={readOnlyResult}

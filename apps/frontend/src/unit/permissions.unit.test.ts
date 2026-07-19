@@ -13,7 +13,7 @@ describe("central permission resolver", () => {
       mustChangePassword: false,
       exp: 1,
     });
-    expect(can(principal, PERMISSIONS.visaProcessRead)).toBe(true);
+    expect(can(principal, PERMISSIONS.visaTrackingRead)).toBe(true);
     expect(can(principal, PERMISSIONS.operationsWrite)).toBe(false);
   });
 

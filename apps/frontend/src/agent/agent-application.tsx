@@ -17,7 +17,7 @@ export function AgentApplication() {
   if (session.isError && !unauthorized) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-container-low" role="alert">
-        Workspace Agent tidak dapat dimuat.
+        Portal Agent tidak dapat dimuat.
       </main>
     );
   }

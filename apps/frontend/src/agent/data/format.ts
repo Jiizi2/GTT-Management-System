@@ -8,6 +8,11 @@ export function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
+export function normalizeDateOnly(value: string | null | undefined): string | undefined {
+  const matched = value?.trim().match(/^(\d{4}-\d{2}-\d{2})(?:T.*)?$/);
+  return matched?.[1];
+}
+
 export const statusLabel = (value: string): string =>
   value
     .toLowerCase()

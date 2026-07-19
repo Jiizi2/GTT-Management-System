@@ -7,12 +7,8 @@ export const agentQueryKeys = {
   dashboard: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "dashboard"] as const,
   checklist: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "checklist"] as const,
   visaTracking: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "visa-tracking"] as const,
-  visaApplications: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "visa-applications"] as const,
   groups: (principalId: string, filters: unknown) => [AGENT_PORTAL_QUERY_ROOT, principalId, "groups", filters] as const,
   group: (principalId: string, identity: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "group", identity] as const,
-  invoices: (principalId: string, filters: unknown) =>
-    [AGENT_PORTAL_QUERY_ROOT, principalId, "invoices", filters] as const,
-  invoice: (principalId: string, id: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "invoice", id] as const,
   profile: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "profile"] as const,
 };
 

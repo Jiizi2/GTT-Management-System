@@ -82,7 +82,7 @@ describe('AppSidebar', () => {
     render(<AppSidebar {...defaultProps} isCollapsed={false} />);
     expect(screen.getByText('Agreement Inbox')).toBeInTheDocument();
     expect(screen.getByText('Invoice')).toBeInTheDocument();
-    expect(screen.getByText('Raudhah Reminder')).toBeInTheDocument();
+    expect(screen.queryByText('Raudhah Reminder')).not.toBeInTheDocument();
   });
 
   it('calls onNavigate when nav item is clicked', () => {

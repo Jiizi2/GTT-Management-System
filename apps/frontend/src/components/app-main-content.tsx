@@ -37,9 +37,6 @@ const LazyProfileScreen = lazy(async () => ({
 const LazyMasterDataScreen = lazy(async () => ({
   default: (await import("../pages/master-data-page")).MasterDataScreen,
 }));
-const LazyRaudhahReminderScreen = lazy(async () => ({
-  default: (await import("../pages/raudhah-reminder-page")).RaudhahReminderScreen,
-}));
 const LazyVisaTrackingDetailScreen = lazy(async () => ({
   default: (await import("../pages/visa-detail-page")).VisaTrackingDetailScreen,
 }));
@@ -102,7 +99,6 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 overviewMonthFilter={controller.overviewMonthFilter}
                 overviewMonthOptions={controller.overviewMonthOptions}
                 statCards={controller.statCards}
-                summaryMessage={controller.summaryMessage}
                 onQueryChange={controller.handleQueryChange}
                 onToggleActiveOnly={controller.handleToggleActiveOnly}
                 onOverviewMonthFilterChange={controller.handleOverviewMonthFilterChange}
@@ -209,16 +205,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
             path="/invoice"
             element={<LazyInvoiceScreen groups={controller.groupRecords} onOpenDetail={controller.handleOpenDetail} />}
           />
-          <Route
-            path="/raudhah-reminder"
-            element={
-              <LazyRaudhahReminderScreen
-                groups={controller.groupRecords}
-                onOpenVisaDetail={controller.handleOpenVisaDetail}
-                onSetRaudhahTasrehPrinted={controller.handleSetRaudhahTasrehPrinted}
-              />
-            }
-          />
+          <Route path="/raudhah-reminder" element={<Navigate to="/overview" replace />} />
           <Route
             path="/user-management"
             element={
