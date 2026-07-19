@@ -329,7 +329,7 @@ async function loginViaUi(
     password: DEV_SUPERADMIN_PASSWORD,
   },
 ): Promise<void> {
-  const loginButton = page.getByRole("button", { name: "Login to Dashboard" });
+  const loginButton = page.getByRole("button", { name: "Login to Ops" });
   if ((await loginButton.count()) === 0) {
     return;
   }
@@ -350,7 +350,7 @@ async function logoutViaUi(page: Page): Promise<void> {
     .first();
   await expect(logoutDialog).toBeVisible();
   await logoutDialog.locator("button:has-text('Logout')").click();
-  await expect(page.getByRole("button", { name: "Login to Dashboard" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Login to Ops" })).toBeVisible();
 }
 
 function isManagedUserPasswordPath(url: string): boolean {
@@ -710,7 +710,7 @@ test("super-admin provisions managed user passwords and admin stays restricted f
 
   await page.getByLabel("Email or Username").fill(managedUserEmail);
   await page.locator("#login-password").fill(initialPassword);
-  await page.getByRole("button", { name: "Login to Dashboard" }).click();
+  await page.getByRole("button", { name: "Login to Ops" }).click();
   await expect(page.getByText("Invalid username/email or password.")).toBeVisible();
 
   await loginViaUi(page, {
