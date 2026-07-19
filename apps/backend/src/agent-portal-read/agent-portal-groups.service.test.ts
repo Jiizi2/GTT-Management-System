@@ -54,7 +54,7 @@ describe("AgentPortalGroupsService", () => {
     expect(result.items[0]).toMatchObject({
       packageName: "PRIVATE PACKAGE",
       musyrif: { name: "PRIVATE MUSYRIF", phone: "08123" },
-      notes: [{ text: "PRIVATE GROUP NOTE", pinned: true }],
+      notes: [],
       itinerary: [{ title: "Scheduled arrival" }],
     });
     expect(JSON.stringify(result)).not.toMatch(/OTHER-1|agentId|PRIVATE DRIVER|08999|B SECRET/i);
@@ -86,10 +86,10 @@ describe("AgentPortalGroupsService", () => {
     expect(facets.detail).toMatchObject({
       packageName: "PRIVATE PACKAGE",
       musyrif: { name: "PRIVATE MUSYRIF", phone: "08123" },
-      notes: [{ text: "PRIVATE GROUP NOTE", pinned: true }],
+      notes: [],
       itinerary: [{ title: "Scheduled arrival" }],
     });
-    expect(serialized).not.toMatch(/PRIVATE NEXT|PRIVATE META|PRIVATE ITINERARY NOTE|PRIVATE DRIVER|08999|B SECRET/i);
+    expect(serialized).not.toMatch(/PRIVATE GROUP NOTE|PRIVATE NEXT|PRIVATE META|PRIVATE ITINERARY NOTE|PRIVATE DRIVER|08999|B SECRET/i);
     expect(facets.visa).toMatchObject({ status: "PENDING", syarikah: "PRIVATE SYARIKAH" });
     expect(facets.hotels[0]).toMatchObject({ agreementNumber: "PRIVATE-AGREEMENT" });
     expect(facets.transportation[0]).toMatchObject({ assignedDriverCount: 1, verifiedDriverCount: 1 });

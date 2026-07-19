@@ -268,12 +268,9 @@ export class AgentPortalGroupsService {
       musyrif: group.musyrif
         ? { name: group.musyrif.name, phone: group.musyrif.phone, avatar: group.musyrif.avatar }
         : null,
-      notes: (group.notes ?? []).map(({ id, sortOrder = 0, text, pinned = false }) => ({
-        id: id ?? `${group.id}-note-${sortOrder}`,
-        sortOrder,
-        text,
-        pinned,
-      })),
+      // Group notes are internal Ops data. Keep the stable array contract without
+      // exposing note text to Portal Agent.
+      notes: [],
       itinerary: (group.itinerary ?? []).map((item) => this.projectItinerary(item)),
     };
   }

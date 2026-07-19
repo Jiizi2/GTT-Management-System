@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { VisaBusStatus } from "@prisma/client";
 import {
   IsDateString,
   IsInt,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -68,8 +70,8 @@ export class CreateGroupIdentityDto {
   @Type(() => CreateMusyrifDto)
   musyrif?: CreateMusyrifDto;
 
-  @ApiPropertyOptional({ example: "Visa Only" })
+  @ApiPropertyOptional({ enum: VisaBusStatus, example: VisaBusStatus.VISA_ONLY })
   @IsOptional()
-  @IsString()
-  busStatus?: string;
+  @IsEnum(VisaBusStatus)
+  busStatus?: VisaBusStatus;
 }

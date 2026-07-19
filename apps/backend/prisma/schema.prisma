@@ -166,6 +166,7 @@ model AuthUser {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   agentPortalAccountAuditLogs AgentPortalAccountAuditLog[]
+  visaApplicationProgressAuditLogs VisaApplicationProgressAuditLog[]
 
   @@index([role])
   @@index([isActive])
@@ -259,6 +260,7 @@ model VisaApplication {
   id                   String                          @id @default(cuid())
   applicationNumber    String                          @unique
   agentId              String
+  groupId              String?                         @unique
   createdByPortalUserId String
   departureDate        DateTime
   returnDate           DateTime
@@ -280,11 +282,28 @@ model VisaApplication {
   createdAt            DateTime                        @default(now())
   updatedAt            DateTime                        @updatedAt
   agent                Agent                           @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  group                Group?                          @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdByPortalUser  AgentPortalUser                 @relation(fields: [createdByPortalUserId], references: [id], onDelete: Restrict)
   documents            VisaApplicationDocument[]
+  progressAuditLogs    VisaApplicationProgressAuditLog[]
 
   @@index([agentId, createdAt(sort: Desc)])
+  @@index([agentId, updatedAt(sort: Desc)])
   @@index([status, updatedAt(sort: Desc)])
+}
+
+model VisaApplicationProgressAuditLog {
+  id                String          @id @default(cuid())
+  visaApplicationId String
+  actorAuthUserId   String
+  action            String
+  changes           Json
+  createdAt         DateTime        @default(now())
+  visaApplication   VisaApplication @relation(fields: [visaApplicationId], references: [id], onDelete: Cascade)
+  actorAuthUser     AuthUser        @relation(fields: [actorAuthUserId], references: [id], onDelete: Restrict)
+
+  @@index([visaApplicationId, createdAt(sort: Desc)])
+  @@index([actorAuthUserId, createdAt(sort: Desc)])
 }
 
 model VisaApplicationDocument {
@@ -352,6 +371,7 @@ model Group {
   parentGroup        Group?                @relation("GroupToGroup", fields: [parentGroupId], references: [id], onDelete: SetNull)
   childGroups        Group[]               @relation("GroupToGroup")
   agent              Agent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  visaApplication    VisaApplication?
 
   @@index([createdAt])
   @@index([lifecycleStatus])
@@ -563,6 +583,7 @@ model HotelAgreementDraft {
   id              String                  @id @default(cuid())
   city            AgreementCity
   agentId         String
+  groupName       String                  @default("")
   hotelName       String
   agreementNumber String
   pax             Int

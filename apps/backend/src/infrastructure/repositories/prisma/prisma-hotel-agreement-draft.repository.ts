@@ -15,6 +15,7 @@ type PrismaHotelAgreementDraftRecord = {
   id: string;
   city: UpsertHotelAgreementDraftDto["city"];
   agentId: string;
+  groupName: string;
   agent?: { id: string; code: string; name: string };
   hotelName: string;
   agreementNumber: string;
@@ -163,6 +164,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     return {
       city,
       agentId: payload.agentId?.trim() || "agent_gtt_direct",
+      groupName: payload.groupName?.trim() || "",
       hotelName,
       agreementNumber,
       pax,
@@ -253,6 +255,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       agentName: draft.agent?.name,
       agentId: draft.agentId,
       agent: draft.agent,
+      groupName: draft.groupName,
       hotelName: draft.hotelName,
       agreementNumber: draft.agreementNumber,
       pax: draft.pax,
@@ -292,8 +295,9 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         const matchNumber = draft.agreementNumber.toLowerCase().includes(normalizedQuery);
         const matchHotel = draft.hotelName.toLowerCase().includes(normalizedQuery);
         const matchAgent = draft.agentName?.toLowerCase().includes(normalizedQuery) ?? false;
+        const matchGroupName = draft.groupName.toLowerCase().includes(normalizedQuery);
         const matchGroup = draft.assignedGroups.some((g: any) => g.groupCode.toLowerCase().includes(normalizedQuery));
-        return matchNumber || matchHotel || matchAgent || matchGroup;
+        return matchNumber || matchHotel || matchAgent || matchGroupName || matchGroup;
       }
 
       return true;
@@ -306,6 +310,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       data: {
         city: normalizedPayload.city,
         agentId: normalizedPayload.agentId,
+        groupName: normalizedPayload.groupName,
         hotelName: normalizedPayload.hotelName,
         agreementNumber: normalizedPayload.agreementNumber,
         pax: normalizedPayload.pax,
@@ -336,6 +341,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       data: {
         city: normalizedPayload.city,
         agentId: normalizedPayload.agentId,
+        groupName: normalizedPayload.groupName,
         hotelName: normalizedPayload.hotelName,
         agreementNumber: normalizedPayload.agreementNumber,
         pax: normalizedPayload.pax,

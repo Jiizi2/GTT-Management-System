@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { GroupLifecycleStatus, GroupTone } from "@prisma/client";
+import { GroupLifecycleStatus, GroupTone, VisaPaymentStatus, VisaStatus } from "@prisma/client";
 import { createStructuredLogger } from "../../logging/create-structured-logger";
 import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
 import type { CreateGroupIdentityDto } from "../dto/create-group-identity.dto";
@@ -461,6 +461,14 @@ export class GroupsService {
             ]
           : []),
       ],
+      visaSetup: payload.busStatus
+        ? {
+            visaStatus: VisaStatus.DRAFT,
+            syarikah: "Not assigned",
+            busStatus: payload.busStatus,
+            paymentStatus: VisaPaymentStatus.UNPAID,
+          }
+        : undefined,
       checklistAssignments: [],
     };
   }

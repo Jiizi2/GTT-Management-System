@@ -17,6 +17,11 @@ export class UpsertHotelAgreementDraftDto {
   @IsNotEmpty()
   agentId?: string;
 
+  @ApiPropertyOptional({ example: "Group Al Falah April" })
+  @IsOptional()
+  @IsString()
+  groupName?: string;
+
   @ApiProperty({ enum: AgreementCity, example: AgreementCity.MAKKAH })
   @IsEnum(AgreementCity)
   city!: AgreementCity;
@@ -87,6 +92,9 @@ export class HotelAgreementDraftResponseDto {
 
   @ApiPropertyOptional({ example: "PT Al Falah Agent" })
   agentName?: string;
+
+  @ApiPropertyOptional({ example: "Group Al Falah April" })
+  groupName?: string;
 
   @ApiProperty({ example: "Swissotel Al Maqam" })
   hotelName!: string;

@@ -16,6 +16,7 @@ type MemoryHotelAgreementDraft = {
   city: UpsertHotelAgreementDraftDto["city"];
   agentName?: string;
   agentId: string;
+  groupName: string;
   hotelName: string;
   agreementNumber: string;
   pax: number;
@@ -161,6 +162,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       city: payload.city,
       agentId: payload.agentId?.trim() || "agent_gtt_direct",
       agentName: payload.agentId === "agent_gtt_direct" || !payload.agentId ? "GTT Direct" : undefined,
+      groupName: payload.groupName?.trim() || "",
       hotelName: payload.hotelName.trim(),
       agreementNumber: payload.agreementNumber.trim(),
       pax: payload.pax,
@@ -201,6 +203,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       id: draft.id,
       city: draft.city,
       agentName: draft.agentName,
+      groupName: draft.groupName,
       hotelName: draft.hotelName,
       agreementNumber: draft.agreementNumber,
       pax: draft.pax,
@@ -314,6 +317,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
         return [
           draft.agreementNumber,
           draft.agentName ?? "",
+          draft.groupName,
           draft.hotelName,
           draft.notes ?? "",
         ].some((value) => value.toLowerCase().includes(normalizedQuery)) || matchGroup;
