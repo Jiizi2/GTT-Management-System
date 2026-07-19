@@ -28,6 +28,8 @@ export type InvoiceWorkspaceInitialData = {
   clientName: string;
   clientLabel: string;
   clientId: string;
+  agentId: string;
+  agentName?: string;
   groupCode: string;
   issuedDateIso: string;
   dueDateIso: string;
@@ -349,6 +351,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     clientName: row.clientName,
     clientLabel: row.clientLabel,
     clientId: row.clientId,
+    agentId: row.agentId,
     groupCode: row.groupCode ?? "",
     issuedDateIso: row.issuedDateIso,
     dueDateIso: row.dueDateIso,
@@ -901,6 +904,7 @@ export function buildInvoicePayload({
   }
 
   return {
+    agentId: values.agentId,
     clientId: clientSelection.clientId,
     clientName: clientSelection.clientName,
     groupCode: linkedGroupCode || undefined,

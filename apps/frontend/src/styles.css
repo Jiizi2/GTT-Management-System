@@ -948,3 +948,240 @@ img {
     scroll-behavior: auto !important;
   }
 }
+
+/* Unified Agent workspace: read-only list and resource states. */
+.data-state {
+  min-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  color: rgb(var(--color-on-surface-variant));
+}
+
+.data-state strong {
+  color: rgb(var(--color-on-surface));
+  font-size: 1.1rem;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid rgb(var(--color-outline-variant) / 0.25);
+  border-top-color: rgb(var(--color-primary));
+  border-radius: 9999px;
+  animation: spin 0.8s linear infinite;
+}
+
+.secondary-button {
+  border: 1px solid rgb(var(--color-outline-variant) / 0.5);
+  border-radius: 0.85rem;
+  color: inherit;
+  background: rgb(var(--color-surface-container-lowest));
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+}
+
+.page-stack {
+  width: min(100%, 80rem);
+  margin-inline: auto;
+  padding-block: 1.5rem 6rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.page-heading,
+.serene-section,
+.filter-bar {
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  border-radius: 1.25rem;
+  background: rgb(var(--color-surface-container-lowest));
+  padding: 1.25rem;
+  box-shadow: var(--serene-shadow-ambient);
+}
+
+.page-heading h1 {
+  margin-top: 0.25rem;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 800;
+}
+
+.eyebrow {
+  color: rgb(var(--color-primary));
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.muted,
+.result-count {
+  color: rgb(var(--color-on-surface-variant));
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.filter-bar label {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 0.4rem;
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.filter-bar input,
+.filter-bar select,
+.overview-select {
+  min-height: 2.75rem;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.4);
+  border-radius: 0.75rem;
+  background: rgb(var(--color-surface-container-low));
+  padding: 0.55rem 0.75rem;
+  color: rgb(var(--color-on-surface));
+}
+
+.primary-button {
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--color-primary));
+  padding: 0.55rem 1rem;
+  color: rgb(var(--color-on-primary));
+  font-weight: 800;
+}
+
+.table-shell {
+  overflow-x: auto;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  border-radius: 1.25rem;
+  background: rgb(var(--color-surface-container-lowest));
+}
+
+.table-shell table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-shell th,
+.table-shell td {
+  padding: 1rem;
+  border-bottom: 1px solid rgb(var(--color-outline-variant) / 0.16);
+  text-align: left;
+}
+
+.table-shell th {
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.table-shell td a,
+.table-shell td a span {
+  display: block;
+}
+
+.status-chip {
+  display: inline-flex;
+  width: max-content;
+  border-radius: 9999px;
+  background: rgb(var(--color-primary-fixed));
+  padding: 0.35rem 0.65rem;
+  color: rgb(var(--color-primary));
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.card-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.list-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.2);
+  border-radius: 1rem;
+  background: rgb(var(--color-surface-container-lowest));
+  padding: 1rem;
+}
+
+.list-card span {
+  display: block;
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 0.78rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.back-link {
+  color: rgb(var(--color-primary));
+  font-weight: 800;
+}
+
+.invoice-detail dl,
+.profile-card dl {
+  display: grid;
+  gap: 1rem;
+}
+
+.invoice-detail dl div,
+.profile-card dl div {
+  border-radius: 0.9rem;
+  background: rgb(var(--color-surface-container-low));
+  padding: 0.9rem;
+}
+
+.invoice-detail dt,
+.profile-card dt {
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 0.75rem;
+}
+
+.invoice-detail dd,
+.profile-card dd {
+  margin-top: 0.25rem;
+  font-weight: 800;
+}
+
+.policy-note {
+  display: block;
+  margin-top: 1rem;
+  border-radius: 0.9rem;
+  background: rgb(var(--color-primary-fixed) / 0.55);
+  padding: 1rem;
+  color: rgb(var(--color-on-primary-fixed-variant));
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .table-shell {
+    display: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -53,4 +53,14 @@ describe("app-route", () => {
     assert.equal(buildVisaDetailPath("901794508"), "/visa/901794508");
     assert.equal(buildLoginPath(), "/login");
   });
+
+  runCase("redirects the temporarily disabled Raudhah reminder route to overview", () => {
+    assert.equal(buildDashboardPath("raudhah-reminder"), "/overview");
+    assert.deepEqual(resolveDashboardRouteFromPathname("/raudhah-reminder"), {
+      activeNav: "overview",
+      selectedGroupCode: null,
+      selectedVisaGroupCode: null,
+      canonicalPath: "/overview",
+    });
+  });
 });

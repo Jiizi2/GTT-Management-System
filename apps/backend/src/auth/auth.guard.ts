@@ -19,6 +19,7 @@ import { extractAuthCookieToken } from "./auth-cookie";
 import { AuthService } from "./auth.service";
 import { IS_PUBLIC_ROUTE_KEY } from "./auth.public";
 import type { AuthTokenPayload } from "./auth.types";
+import { IS_AGENT_PORTAL_ROUTE_KEY } from "../agent-auth/agent-portal-route";
 
 type AuthTransport = "header" | "cookie";
 
@@ -51,6 +52,14 @@ export class AuthGuard implements CanActivate {
     ]);
 
     if (isPublicRoute) {
+      return true;
+    }
+
+    const isAgentPortalRoute = this.reflector.getAllAndOverride<boolean>(
+      IS_AGENT_PORTAL_ROUTE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (isAgentPortalRoute) {
       return true;
     }
 

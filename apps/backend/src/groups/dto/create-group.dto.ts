@@ -433,6 +433,11 @@ export class CreateChecklistAssignmentDto {
 }
 
 export class CreateGroupDto {
+  @ApiProperty({ example: "agent_gtt_direct" })
+  @IsString()
+  @IsNotEmpty()
+  agentId?: string;
+
   @ApiProperty({ example: "9017001001" })
   @IsString()
   @IsNotEmpty()

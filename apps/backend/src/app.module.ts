@@ -16,6 +16,10 @@ import { RuntimeMaintenanceModule } from "./runtime-maintenance/runtime-maintena
 import { AppThrottlerGuard } from "./throttling/app-throttler.guard";
 import { AppThrottlerStorage } from "./throttling/app-throttler.storage";
 import { RepositoriesModule } from "./infrastructure/repositories/repositories.module";
+import { AgentsModule } from "./agents/agents.module";
+import { AgentAuthModule } from "./agent-auth/agent-auth.module";
+import { AgentPortalReadModule } from "./agent-portal-read/agent-portal-read.module";
+import { VisaApplicationsModule } from "./visa-applications/visa-applications.module";
 
 type HttpLogRequest = {
   id?: unknown;
@@ -219,6 +223,10 @@ function resolveHttpSuccessMessage(
       },
     }),
     AuthModule,
+    AgentsModule,
+    AgentAuthModule,
+    AgentPortalReadModule,
+    VisaApplicationsModule,
     PrismaModule,
     RuntimeMaintenanceModule,
     HealthModule,

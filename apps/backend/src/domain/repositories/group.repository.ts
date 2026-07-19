@@ -29,6 +29,7 @@ export interface GroupRepository {
   replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord>;
   update(idOrCode: string, payload: UpdateGroupDto): Promise<GroupDetailRecord>;
   remove(idOrCode: string): Promise<void>;
+  reassignAgent(idOrCode: string, agentId: string): Promise<GroupDetailRecord>;
   addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<GroupDetailRecord>;
   updateItineraryItem(
     idOrCode: string,

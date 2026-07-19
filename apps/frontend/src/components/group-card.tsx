@@ -308,6 +308,9 @@ export function GroupCard({
         <h2 className="mt-2 truncate font-display text-lg font-bold leading-tight text-on-surface-variant">
           {group.name}
         </h2>
+        <span className="mt-2 inline-flex rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-primary">
+          {group.agent?.name ?? "GTT Direct"}
+        </span>
       </div>
 
       {/* Row 2: Linked Groups Summary (Optional) */}

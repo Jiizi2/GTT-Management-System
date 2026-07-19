@@ -14,7 +14,9 @@ type DraftStatusFilter = "assigned" | "unassigned";
 type PrismaHotelAgreementDraftRecord = {
   id: string;
   city: UpsertHotelAgreementDraftDto["city"];
-  agentName: string | null;
+  agentId: string;
+  groupName: string;
+  agent?: { id: string; code: string; name: string };
   hotelName: string;
   agreementNumber: string;
   pax: number;
@@ -161,7 +163,8 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
 
     return {
       city,
-      agentName: payload.agentName?.trim(),
+      agentId: payload.agentId?.trim() || "agent_gtt_direct",
+      groupName: payload.groupName?.trim() || "",
       hotelName,
       agreementNumber,
       pax,
@@ -249,7 +252,10 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     return {
       id: draft.id,
       city: draft.city,
-      agentName: draft.agentName ?? undefined,
+      agentName: draft.agent?.name,
+      agentId: draft.agentId,
+      agent: draft.agent,
+      groupName: draft.groupName,
       hotelName: draft.hotelName,
       agreementNumber: draft.agreementNumber,
       pax: draft.pax,
@@ -263,12 +269,12 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     };
   }
 
-  async findAll(query?: string, rawStatus?: string): Promise<unknown[]> {
+  async findAll(query?: string, rawStatus?: string, agentId?: string): Promise<unknown[]> {
     const status = this.normalizeStatusFilter(rawStatus);
     const normalizedQuery = query?.trim().toLowerCase();
 
     const drafts = await this.prisma.hotelAgreementDraft.findMany({
-      orderBy: { createdAt: "desc" },
+      where: agentId ? { agentId } : undefined, orderBy: { createdAt: "desc" }, include: { agent: { select: { id: true, code: true, name: true } } },
     });
 
     const mapped = await Promise.all(
@@ -289,8 +295,9 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         const matchNumber = draft.agreementNumber.toLowerCase().includes(normalizedQuery);
         const matchHotel = draft.hotelName.toLowerCase().includes(normalizedQuery);
         const matchAgent = draft.agentName?.toLowerCase().includes(normalizedQuery) ?? false;
+        const matchGroupName = draft.groupName.toLowerCase().includes(normalizedQuery);
         const matchGroup = draft.assignedGroups.some((g: any) => g.groupCode.toLowerCase().includes(normalizedQuery));
-        return matchNumber || matchHotel || matchAgent || matchGroup;
+        return matchNumber || matchHotel || matchAgent || matchGroupName || matchGroup;
       }
 
       return true;
@@ -302,7 +309,8 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     const created = await this.prisma.hotelAgreementDraft.create({
       data: {
         city: normalizedPayload.city,
-        agentName: normalizedPayload.agentName ?? null,
+        agentId: normalizedPayload.agentId,
+        groupName: normalizedPayload.groupName,
         hotelName: normalizedPayload.hotelName,
         agreementNumber: normalizedPayload.agreementNumber,
         pax: normalizedPayload.pax,
@@ -311,6 +319,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         stayEnd: toUtcMidnightDate(normalizedPayload.stayEnd),
         notes: normalizedPayload.notes ?? null,
       },
+      include: { agent: { select: { id: true, code: true, name: true } } },
     });
 
     const { remainingPax, assignedGroups } = await this.getPrismaDraftRemainingAndGroups(created);
@@ -331,7 +340,8 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       where: { id: draftId },
       data: {
         city: normalizedPayload.city,
-        agentName: normalizedPayload.agentName ?? null,
+        agentId: normalizedPayload.agentId,
+        groupName: normalizedPayload.groupName,
         hotelName: normalizedPayload.hotelName,
         agreementNumber: normalizedPayload.agreementNumber,
         pax: normalizedPayload.pax,
@@ -340,6 +350,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         stayEnd: toUtcMidnightDate(normalizedPayload.stayEnd),
         notes: normalizedPayload.notes ?? null,
       },
+      include: { agent: { select: { id: true, code: true, name: true } } },
     });
 
     await this.prisma.visaHotelAgreement.updateMany({
@@ -405,6 +416,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       select: {
         id: true,
         code: true,
+        agentId: true,
         pax: true,
         arrivalDate: true,
         returnDate: true,
@@ -423,6 +435,9 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       },
         });
         if (!targetGroup) throw new NotFoundException(`Group '${normalizedGroupCode}' not found.`);
+        if (targetGroup.agentId !== draft.agentId) {
+          throw new BadRequestException("Hotel agreement dan Group harus berasal dari Agent yang sama.");
+        }
 
     const customStart = payload.stayStart ? toIsoDateOnly(payload.stayStart) : undefined;
     const customEnd = payload.stayEnd ? toIsoDateOnly(payload.stayEnd) : undefined;

@@ -220,8 +220,12 @@ function resolveBusStatusFromNotes(notes: string[]): GroupVisaSetup["busStatus"]
     return "Visa+";
   }
 
-  if (/visa\s*\+/i.test(marker) || /visa\s*plus/i.test(marker)) {
+  if (/visa\s*\+/i.test(marker) || /visa[\s_-]*plus/i.test(marker)) {
     return "Visa+";
+  }
+
+  if (/visa[\s_-]*only/i.test(marker)) {
+    return "Visa Only";
   }
 
   return undefined;
@@ -429,16 +433,16 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
     defaultPax: pax,
   });
 
-  const mappedVisaSetup = group.visaSetup
+  const mappedVisaSetup = group.visaSetup || resolvedBusStatus
     ? {
-      visaStatus: mapBackendVisaStatus(group.visaSetup.visaStatus),
-      issuedDate: toIsoDate(group.visaSetup.issuedDate) ?? "",
-      syarikah: readString(group.visaSetup.syarikah, "Not assigned"),
+      visaStatus: mapBackendVisaStatus(group.visaSetup?.visaStatus),
+      issuedDate: toIsoDate(group.visaSetup?.issuedDate) ?? "",
+      syarikah: readString(group.visaSetup?.syarikah, "Not assigned"),
       busStatus: resolvedBusStatus,
-      paymentStatus: mapBackendPaymentStatus(group.visaSetup.paymentStatus),
+      paymentStatus: mapBackendPaymentStatus(group.visaSetup?.paymentStatus),
       makkahHotels: mappedHotelsByCity.makkahHotels,
       madinahHotels: mappedHotelsByCity.madinahHotels,
-      raudhahAppointments: (group.visaSetup.raudhahAppointments ?? [])
+      raudhahAppointments: (group.visaSetup?.raudhahAppointments ?? [])
         .map((item, index) => {
           const parsedDateIso = toIsoDate(item.date);
           if (!parsedDateIso || !isIsoDateOnly(parsedDateIso)) {
@@ -513,6 +517,13 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
 
   return {
     id: group.id,
+    agentId: readString(group.agentId, "agent_gtt_direct"),
+    agent: group.agent ? {
+      id: readString(group.agent.id), code: readString(group.agent.code), name: readString(group.agent.name),
+      type: group.agent.type === "PARTNER" ? "PARTNER" : "DIRECT",
+      status: group.agent.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      picName: group.agent.picName ?? null, phone: group.agent.phone ?? null, email: group.agent.email ?? null,
+    } : undefined,
     code,
     name,
     status: resolvedStatus,

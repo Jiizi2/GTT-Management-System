@@ -150,6 +150,7 @@ type MemoryGroupPayloadFields = Pick<
   | "visaSetup"
   | "checklistAssignments"
   | "parentGroupId"
+  | "agentId"
 >;
 
 function toIsoDateOnlyLocal(value: string): string {
@@ -177,6 +178,7 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
     totalBuses: payload.totalBuses ?? null,
     packageName: payload.packageName.trim(),
     durationDays: payload.durationDays,
+    agentId: payload.agentId?.trim() || "agent_gtt_direct",
     parentGroupId: payload.parentGroupId?.trim() || null,
     musyrif: payload.musyrif
       ? {
@@ -243,6 +245,7 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
           visaStatus: payload.visaSetup.visaStatus ?? VisaStatus.DRAFT,
           issuedDate: payload.visaSetup.issuedDate?.trim() || undefined,
           syarikah: payload.visaSetup.syarikah.trim(),
+          busStatus: payload.visaSetup.busStatus,
           paymentStatus: payload.visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
           hotelAgreements: (payload.visaSetup.hotelAgreements ?? []).map((hotel) => ({
             id: randomUUID(),
@@ -1235,4 +1238,3 @@ export function paginateGroupItems<T>(
     pageSize: pageState.pageSize,
   };
 }
-

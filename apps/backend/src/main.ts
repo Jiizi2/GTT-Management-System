@@ -7,6 +7,7 @@ import express from "express";
 import helmet from "helmet";
 import { Logger, PinoLogger } from "nestjs-pino";
 import { AUTH_COOKIE_NAME } from "./auth/auth-cookie";
+import { AGENT_AUTH_COOKIE_NAME } from "./agent-auth/agent-auth-cookie";
 import { AppModule } from "./app.module";
 import { ApiExceptionFilter } from "./http/api-exception.filter";
 import { isOriginAllowed, resolveCorsOrigins } from "./http-origin";
@@ -139,6 +140,24 @@ async function bootstrap(): Promise<void> {
         description: "HttpOnly browser session cookie used by the dashboard frontend.",
       },
       "auth-cookie",
+    )
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Agent portal bearer token.",
+      },
+      "agent-access-token",
+    )
+    .addCookieAuth(
+      AGENT_AUTH_COOKIE_NAME,
+      {
+        type: "apiKey",
+        in: "cookie",
+        description: "Dedicated HttpOnly agent portal session cookie.",
+      },
+      "agent-auth-cookie",
     )
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);

@@ -131,6 +131,7 @@ export type FindAllOptions = {
   filter?: string;
   activeOnly?: boolean;
   projection?: GroupResponseProjection;
+  agentId?: string;
 };
 
 export type PaginatedGroupList<T> = {

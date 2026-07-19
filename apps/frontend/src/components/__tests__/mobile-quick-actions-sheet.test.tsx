@@ -64,7 +64,7 @@ describe('MobileQuickActionsSheet', () => {
   it('shows non-admin actions for admin user', () => {
     render(<MobileQuickActionsSheet {...defaultProps} />);
     expect(screen.getByText('Tambah Group')).toBeInTheDocument();
-    expect(screen.getByText('Raudhah Reminder')).toBeInTheDocument();
+    expect(screen.queryByText('Raudhah Reminder')).not.toBeInTheDocument();
     expect(screen.getByText('Agreement Inbox')).toBeInTheDocument();
     expect(screen.getByText('Invoice List')).toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe('MobileQuickActionsSheet', () => {
   it('displays action descriptions', () => {
     render(<MobileQuickActionsSheet {...defaultProps} />);
     expect(screen.getByText('Buat group baru dan isi itinerary dalam satu alur.')).toBeInTheDocument();
-    expect(screen.getByText('Buka daftar reminder Raudhah dan template copy cepat.')).toBeInTheDocument();
+    expect(screen.queryByText('Buka daftar reminder Raudhah dan template copy cepat.')).not.toBeInTheDocument();
   });
 
   it('has aria-modal attribute', () => {
@@ -144,7 +144,7 @@ describe('MobileQuickActionsSheet', () => {
   it('renders all non-admin actions', () => {
     render(<MobileQuickActionsSheet {...defaultProps} />);
     expect(screen.getByText('Tambah Group')).toBeInTheDocument();
-    expect(screen.getByText('Raudhah Reminder')).toBeInTheDocument();
+    expect(screen.queryByText('Raudhah Reminder')).not.toBeInTheDocument();
     expect(screen.getByText('Agreement Inbox')).toBeInTheDocument();
     expect(screen.getByText('Invoice List')).toBeInTheDocument();
   });
@@ -152,7 +152,7 @@ describe('MobileQuickActionsSheet', () => {
   it('renders action icons', () => {
     render(<MobileQuickActionsSheet {...defaultProps} />);
     expect(screen.getByText('add_circle')).toBeInTheDocument();
-    expect(screen.getByText('notifications_active')).toBeInTheDocument();
+    expect(screen.queryByText('notifications_active')).not.toBeInTheDocument();
     expect(screen.getByText('inventory_2')).toBeInTheDocument();
     expect(screen.getByText('request_quote')).toBeInTheDocument();
   });

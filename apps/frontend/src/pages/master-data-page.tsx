@@ -8,21 +8,27 @@ import {
   useUpdateMasterDataOptionMutation,
 } from "../hooks/use-master-data-query";
 import type { MasterDataCategoryKey, MasterDataOption } from "../hooks/use-master-data-backend";
+import { useAgentsQuery } from "../hooks/use-agents-backend";
 import { useThemeMode } from "../theme/theme-provider";
+import { AgentsScreen } from "./agents-page";
 import {
   EMPTY_FORM,
   parseMetadataJson,
   MasterDataOptionForm,
+  MasterDataFormDrawer,
   MasterDataCategoryTabs,
   MasterDataOptionTable,
   type MasterDataOptionFormValues,
   type CategoryFormConfig,
+  type MasterDataCategoryTabKey,
 } from "./master-data/components/MasterDataComponents";
 
 type NoticeState = {
   tone: "success" | "error";
   message: string;
 };
+
+type OptionStatusFilter = "active" | "inactive" | "all";
 
 
 
@@ -138,8 +144,10 @@ export function MasterDataScreen() {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
   const categoriesQuery = useMasterDataCategoriesQuery();
-  const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryKey | null>(null);
-  const [includeInactive, setIncludeInactive] = useState(false);
+  const agentsQuery = useAgentsQuery();
+  const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryTabKey | null>(null);
+  const [statusFilter, setStatusFilter] = useState<OptionStatusFilter>("active");
+  const [optionSearch, setOptionSearch] = useState("");
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
@@ -151,29 +159,66 @@ export function MasterDataScreen() {
     () => [...(categoriesQuery.data ?? [])].sort((left, right) => left.label.localeCompare(right.label)),
     [categoriesQuery.data],
   );
+  const categoryTabs = useMemo(() => {
+    const agents = agentsQuery.data ?? [];
+    return [
+      ...sortedCategories,
+      {
+        key: "agents" as const,
+        label: "Agen",
+        description: "Kelola agen pemilik grup dan transaksi operasional.",
+        activeOptions: agents.filter((agent) => agent.status === "ACTIVE").length,
+        totalOptions: agents.length,
+      },
+    ];
+  }, [agentsQuery.data, sortedCategories]);
 
   useEffect(() => {
     setActiveCategoryKey((current) => {
-      if (current && sortedCategories.some((category) => category.key === current)) {
+      if (current && categoryTabs.some((category) => category.key === current)) {
         return current;
       }
 
-      return sortedCategories[0]?.key ?? null;
+      const firstMasterDataCategory = categoryTabs.find((category) => category.key !== "agents");
+      if (firstMasterDataCategory) {
+        return firstMasterDataCategory.key;
+      }
+
+      return categoriesQuery.isLoading ? null : (categoryTabs[0]?.key ?? null);
     });
-  }, [sortedCategories]);
+  }, [categoriesQuery.isLoading, categoryTabs]);
 
   const activeCategory =
-    activeCategoryKey !== null
+    activeCategoryKey !== null && activeCategoryKey !== "agents"
       ? (sortedCategories.find((category) => category.key === activeCategoryKey) ?? null)
       : null;
-  const activeCategoryFormConfig = activeCategoryKey !== null ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
+  const activeCategoryFormConfig =
+    activeCategoryKey !== null && activeCategoryKey !== "agents" ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
 
   const optionsQuery = useMasterDataOptionsQuery({
-    categoryKey: activeCategoryKey ?? "invoice-issuing-office",
-    includeInactive,
-    enabled: activeCategoryKey !== null,
+    categoryKey: activeCategoryKey && activeCategoryKey !== "agents" ? activeCategoryKey : "invoice-issuing-office",
+    includeInactive: statusFilter !== "active",
+    enabled: activeCategoryKey !== null && activeCategoryKey !== "agents",
   });
   const options = useMemo(() => optionsQuery.data ?? [], [optionsQuery.data]);
+  const filteredOptions = useMemo(() => {
+    const normalizedSearch = optionSearch.trim().toLocaleLowerCase("id-ID");
+    return options.filter((option) => {
+      if (statusFilter === "active" && !option.isActive) {
+        return false;
+      }
+      if (statusFilter === "inactive" && option.isActive) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [option.value, option.label, option.description ?? ""]
+        .some((value) => value.toLocaleLowerCase("id-ID").includes(normalizedSearch));
+    });
+  }, [optionSearch, options, statusFilter]);
   const editingOption = useMemo(
     () => options.find((option) => option.id === editingOptionId) ?? null,
     [editingOptionId, options],
@@ -229,15 +274,17 @@ export function MasterDataScreen() {
     });
   }, [optionsQuery.error]);
 
-  const handleSelectCategory = (categoryKey: MasterDataCategoryKey) => {
+  const handleSelectCategory = (categoryKey: MasterDataCategoryTabKey) => {
     setActiveCategoryKey(categoryKey);
     setIsCreateOpen(false);
     setEditingOptionId(null);
+    setOptionSearch("");
+    setStatusFilter("active");
     setCreateFormResetToken((current) => current + 1);
   };
 
   const handleCreateSubmit = async (values: MasterDataOptionFormValues) => {
-    if (!activeCategoryKey) {
+    if (!activeCategoryKey || activeCategoryKey === "agents") {
       return;
     }
 
@@ -339,106 +386,125 @@ export function MasterDataScreen() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[0.92fr_2.08fr]">
+      <section className="grid min-w-0 gap-4 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <MasterDataCategoryTabs
-          categories={sortedCategories}
+          categories={categoryTabs}
           activeCategoryKey={activeCategoryKey}
           onSelectCategory={handleSelectCategory}
           isLoading={categoriesQuery.isLoading}
         />
 
-        <article className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 px-4 py-3 sm:px-5">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Option Table</p>
+        {activeCategoryKey === "agents" ? (
+          <AgentsScreen embedded />
+        ) : (
+        <article className="min-w-0 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
+          <div className="border-b border-outline-variant/30 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Daftar data</p>
               <h2 className="mt-1 text-xl font-bold text-on-surface">{activeCategory?.label ?? "Select category"}</h2>
               <p className="mt-0.5 text-xs text-on-surface-variant">
                 {activeCategory?.description ?? "Pilih kategori di panel kiri."}
               </p>
               <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
-                Menampilkan {options.length} option
-                {includeInactive ? " (termasuk inactive)." : "."}
+                Menampilkan {filteredOptions.length} dari {options.length} data.
               </p>
             </div>
-
-            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-outline-variant/55"
-                  checked={includeInactive}
-                  onChange={(event) => setIncludeInactive(event.target.checked)}
-                />
-                Show inactive
-              </label>
               <button
                 type="button"
-                className="serene-btn-primary min-h-[38px] w-full px-3 py-1.5 text-xs sm:w-auto sm:px-4"
+                className="serene-btn-primary serene-focus-ring inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs"
                 onClick={() => {
-                  setIsCreateOpen((current) => !current);
+                  setIsCreateOpen(true);
+                  setEditingOptionId(null);
                   setCreateFormResetToken((current) => current + 1);
                 }}
                 disabled={!activeCategoryKey}
               >
-                {isCreateOpen ? "Close Form" : "Add Option"}
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">add</span>
+                Tambah data
               </button>
             </div>
-          </div>
 
-          {isCreateOpen && activeCategoryFormConfig ? (
-            <div className="mx-4 mt-4 sm:mx-5">
-              <MasterDataOptionForm
-                categoryKey={activeCategoryKey ?? ""}
-                config={activeCategoryFormConfig}
-                initialValues={EMPTY_FORM}
-                resetToken={`${activeCategoryKey ?? "none"}-${createFormResetToken}`}
-                submitLabel="Simpan Option"
-                isSubmitting={createMutation.isPending}
-                onSubmit={handleCreateSubmit}
-              />
+            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <label className="relative block min-w-0 flex-1 xl:max-w-md">
+                <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant" aria-hidden="true">search</span>
+                <input
+                  className="serene-input serene-input-md w-full pl-10"
+                  value={optionSearch}
+                  onChange={(event) => setOptionSearch(event.target.value)}
+                  placeholder="Cari nilai, nama, atau deskripsi..."
+                  aria-label="Cari data pada kategori aktif"
+                />
+              </label>
+              <div className="grid grid-cols-3 rounded-xl bg-surface-container-low p-1" aria-label="Filter status">
+                {(["active", "inactive", "all"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    className={`serene-focus-ring rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                      statusFilter === filter
+                        ? "bg-surface-container-lowest text-primary shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                    onClick={() => setStatusFilter(filter)}
+                    aria-pressed={statusFilter === filter}
+                  >
+                    {filter === "active" ? "Aktif" : filter === "inactive" ? "Nonaktif" : "Semua"}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : null}
+          </div>
 
           <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
             {optionsQuery.isLoading ? (
               <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">Memuat option...</div>
-            ) : options.length === 0 ? (
+            ) : filteredOptions.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
-                Belum ada option untuk kategori ini.
+                {options.length === 0 ? "Belum ada data untuk kategori ini." : "Tidak ada data yang sesuai pencarian atau filter."}
               </div>
             ) : (
-              <>
                 <MasterDataOptionTable
-                  options={options}
+                  options={filteredOptions}
                   isDarkMode={isDarkMode}
                   updatePending={updateMutation.isPending}
                   onToggleActive={handleToggleActive}
-                  onEditOption={setEditingOptionId}
+                  onEditOption={(optionId) => {
+                    setEditingOptionId(optionId);
+                    setIsCreateOpen(false);
+                  }}
                 />
-              </>
             )}
           </div>
-
-          {editingOptionId && activeCategoryFormConfig ? (
-            <section className="mx-4 mt-4 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-4 sm:mx-5 sm:mb-5">
-              <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-on-surface-variant">Edit Option</h3>
-
-              <div className="mt-3">
-                <MasterDataOptionForm
-                  categoryKey={activeCategoryKey ?? ""}
-                  config={activeCategoryFormConfig}
-                  initialValues={editingInitialValues}
-                  resetToken={editingOptionId}
-                  submitLabel="Simpan Perubahan"
-                  isSubmitting={updateMutation.isPending}
-                  onSubmit={handleSaveEdit}
-                  onCancel={() => setEditingOptionId(null)}
-                />
-              </div>
-            </section>
-          ) : null}
         </article>
+        )}
       </section>
+
+      {activeCategoryFormConfig ? (
+        <MasterDataFormDrawer
+          isOpen={isCreateOpen || Boolean(editingOptionId)}
+          title={editingOptionId ? `Edit ${editingOption?.label ?? "data"}` : `Tambah ${activeCategory?.label ?? "data"}`}
+          description={editingOptionId ? "Perbarui informasi data tanpa meninggalkan daftar." : "Tambahkan data baru pada kategori yang sedang aktif."}
+          onClose={() => {
+            setIsCreateOpen(false);
+            setEditingOptionId(null);
+          }}
+        >
+          <MasterDataOptionForm
+            categoryKey={activeCategoryKey ?? ""}
+            config={activeCategoryFormConfig}
+            initialValues={editingOptionId ? editingInitialValues : EMPTY_FORM}
+            resetToken={editingOptionId ?? `${activeCategoryKey ?? "none"}-${createFormResetToken}`}
+            submitLabel={editingOptionId ? "Simpan perubahan" : "Simpan data"}
+            isSubmitting={editingOptionId ? updateMutation.isPending : createMutation.isPending}
+            onSubmit={editingOptionId ? handleSaveEdit : handleCreateSubmit}
+            onCancel={() => {
+              setIsCreateOpen(false);
+              setEditingOptionId(null);
+            }}
+          />
+        </MasterDataFormDrawer>
+      ) : null}
     </div>
   );
 }

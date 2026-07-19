@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { VisaBusStatus } from "@prisma/client";
 import {
   IsDateString,
   IsInt,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -13,6 +15,11 @@ import { Type } from "class-transformer";
 import { CreateMusyrifDto } from "./create-group.dto";
 
 export class CreateGroupIdentityDto {
+  @ApiProperty({ example: "agent_gtt_direct" })
+  @IsString()
+  @IsNotEmpty()
+  agentId?: string;
+
   @ApiProperty({ example: "9017001001" })
   @IsString()
   @IsNotEmpty()
@@ -63,8 +70,8 @@ export class CreateGroupIdentityDto {
   @Type(() => CreateMusyrifDto)
   musyrif?: CreateMusyrifDto;
 
-  @ApiPropertyOptional({ example: "Visa Only" })
+  @ApiPropertyOptional({ enum: VisaBusStatus, example: VisaBusStatus.VISA_ONLY })
   @IsOptional()
-  @IsString()
-  busStatus?: string;
+  @IsEnum(VisaBusStatus)
+  busStatus?: VisaBusStatus;
 }

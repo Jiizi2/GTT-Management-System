@@ -14,6 +14,7 @@ export function GroupVisaTab() {
     handleCopyMusyrif,
     handleOpenMusyrifModal,
     compactAgreementSummaries,
+    readOnly,
   } = useGroupDetailContext();
 
   return (
@@ -43,7 +44,7 @@ export function GroupVisaTab() {
             </p>
           ) : null}
 
-          {!group.parentGroupId && (
+          {!readOnly && !group.parentGroupId && (
             <Button
               variant="secondary"
               size="sm"
@@ -93,7 +94,7 @@ export function GroupVisaTab() {
             </p>
           </div>
           <Link
-            to={buildVisaDetailPath(group.code)}
+            to={readOnly ? `/agent/visa/${encodeURIComponent(group.code)}` : buildVisaDetailPath(group.code)}
             className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-primary transition hover:text-brand-primary/75"
           >
             <span>Detail</span>

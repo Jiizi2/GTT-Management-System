@@ -9,6 +9,7 @@ import type {
 } from "../../../shared/app-domain";
 
 export interface GroupDetailContextType {
+  readOnly: boolean;
   group: GroupData;
   groups: GroupData[];
   familyGroups: GroupData[];
@@ -39,7 +40,7 @@ export interface GroupDetailContextType {
   isEditModalOpen: boolean;
   isDeleteModalOpen: boolean;
   isUnlinkModalOpen: boolean;
-  
+
   // Handlers
   handleSaveSchedule: () => void;
   handleCloseScheduleModal: () => void;
@@ -70,7 +71,7 @@ export interface GroupDetailContextType {
   handleOpenUnlinkModal: (g: GroupData) => void;
   handleCloseUnlinkModal: () => void;
   handleConfirmUnlink: () => void;
-  
+
   // Helpers/Autofill properties
   isScheduleSaveDisabled: boolean;
   showScheduleFridayCityTourWarning: boolean;

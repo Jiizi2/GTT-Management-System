@@ -9,6 +9,7 @@ import {
 import { buildRaudhahReminderTemplate } from "../../../shared/raudhah-reminder-template.js";
 import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-keys";
 import { useModalFocusTrap } from "../../../components/use-modal-focus-trap";
+import { reassignGroupAgentInBackend } from "../../../hooks/groups-backend-api";
 import type {
   GroupAgreementHotel,
   GroupData,
@@ -111,7 +112,7 @@ export function useVisaTrackingDetail({
   }, [activeRow.groupCode, activeRow.paymentStatus]);
 
   const [activeModal, setActiveModal] = useState<
-    "visa-status" | "payment-status" | "syarikah" | "hotel" | "raudhah" | "visa-type" | null
+    "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | null
   >(null);
   const [hotelCityDraft, setHotelCityDraft] = useState<"makkah" | "madinah">("makkah");
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
@@ -370,6 +371,10 @@ export function useVisaTrackingDetail({
     setActiveModal("syarikah");
   };
 
+  const openAgentModal = () => {
+    setActiveModal("agent");
+  };
+
   const openHotelModal = useCallback((
     city: "makkah" | "madinah",
     mode: "add" | "edit",
@@ -534,6 +539,17 @@ export function useVisaTrackingDetail({
   const savePaymentStatus = (nextValue: VisaPaymentStatus) => {
     onUpdatePaymentStatus(row.groupCode, nextValue);
     setPaymentStatus(nextValue);
+    closeModal();
+  };
+
+  const saveAgentAssignment = async (agentId: string) => {
+    const normalizedAgentId = agentId.trim();
+    if (!normalizedAgentId) {
+      throw new Error("Pilih agent terlebih dahulu.");
+    }
+
+    await reassignGroupAgentInBackend(activeGroupCode, normalizedAgentId);
+    await queryClient.invalidateQueries({ queryKey: groupQueryKeys.all });
     closeModal();
   };
 
@@ -818,6 +834,7 @@ export function useVisaTrackingDetail({
     openVisaTypeModal,
     openPaymentStatusModal,
     openSyarikahModal,
+    openAgentModal,
     openHotelModal,
     openAgreementEditor,
     openDeleteAgreementConfirm,
@@ -837,6 +854,7 @@ export function useVisaTrackingDetail({
     saveVisaStatus,
     saveVisaType,
     savePaymentStatus,
+    saveAgentAssignment,
     saveSyarikah,
     saveHotel,
     saveRaudhah,

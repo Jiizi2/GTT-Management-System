@@ -15,7 +15,7 @@ const DASHBOARD_PATH_BY_NAV: Record<NavId, string> = {
   "agreement-inbox": "/agreement-inbox",
   "new-group": "/new-group",
   invoice: "/invoice",
-  "raudhah-reminder": "/raudhah-reminder",
+  "raudhah-reminder": "/overview",
   "user-management": "/user-management",
   "master-data": "/master-data",
   profile: "/profile",
@@ -179,10 +179,19 @@ export function resolveDashboardRouteFromPathname(pathname: string): DashboardRo
 
   if (normalizedLowerPathname === "/raudhah-reminder") {
     return {
-      activeNav: "raudhah-reminder",
+      activeNav: "overview",
       selectedGroupCode: null,
       selectedVisaGroupCode: null,
-      canonicalPath: "/raudhah-reminder",
+      canonicalPath: "/overview",
+    };
+  }
+
+  if (normalizedLowerPathname === "/agents") {
+    return {
+      activeNav: "master-data",
+      selectedGroupCode: null,
+      selectedVisaGroupCode: null,
+      canonicalPath: "/master-data",
     };
   }
 

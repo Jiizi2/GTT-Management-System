@@ -49,10 +49,35 @@ describe("EnvironmentValidation", () => {
         DATA_SOURCE: "prisma",
         DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public",
         AUTH_SECRET: "x".repeat(32),
+        AGENT_AUTH_SECRET: "y".repeat(32),
         CORS_ORIGINS: "https://app.example.com",
         AUTH_BOOTSTRAP_DEFAULT_USERS: "true",
       }),
     ).toThrow(/AUTH_BOOTSTRAP_DEFAULT_USERS must be false in production/i);
+  });
+
+  runCase("requires a distinct Agent auth secret in production", () => {
+    const productionConfig = {
+      NODE_ENV: "production",
+      PORT: "3001",
+      DATA_SOURCE: "prisma",
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/gtt_ops?schema=public",
+      AUTH_SECRET: "x".repeat(32),
+      CORS_ORIGINS: "https://app.example.com",
+      AUTH_BOOTSTRAP_DEFAULT_USERS: "false",
+    };
+
+    expect(() => validateEnvironment(productionConfig)).toThrow(
+      /AGENT_AUTH_SECRET is required in production/i,
+    );
+    expect(() => validateEnvironment({
+      ...productionConfig,
+      AGENT_AUTH_SECRET: "x".repeat(32),
+    })).toThrow(/must be distinct from AUTH_SECRET/i);
+    expect(validateEnvironment({
+      ...productionConfig,
+      AGENT_AUTH_SECRET: "y".repeat(32),
+    }).AGENT_AUTH_SECRET).toBe("y".repeat(32));
   });
 
   runCase("requires bootstrap passwords in prisma mode", () => {

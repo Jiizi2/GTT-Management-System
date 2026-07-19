@@ -67,6 +67,8 @@ Group
 * **`agent_id IS NULL`:** Menandakan grup milik divisi retail B2C GTT.
 * **`agent_id = <UUID>`:** Menandakan grup milik Agen Mitra (B2B). Sistem secara otomatis menyaring hak akses dan kalkulasi biaya berdasarkan relasi ini.
 
+> **Keputusan tahap internal yang lebih ketat:** implementasi awal tidak memakai `NULL` sebagai penanda B2C. Semua Group wajib memilih Agent, dan B2C direpresentasikan oleh record khusus `GTT Direct` bertipe `DIRECT`. Pendekatan ini mencegah Group tanpa klasifikasi dan dijelaskan dalam roadmap tahap internal yang ditautkan di atas.
+
 ---
 
 ## 4. Kebijakan Hak Akses & Multi-Tenancy

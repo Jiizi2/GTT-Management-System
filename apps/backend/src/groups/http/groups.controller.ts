@@ -49,6 +49,7 @@ import {
   PaginatedGroupSummaryResponseDto,
 } from "../dto/group-response.dto";
 import type { GroupResponseProjection } from "../groups.service-types";
+import { ReassignGroupAgentDto } from "../dto/reassign-group-agent.dto";
 
 function normalizeGroupProjection(
   rawProjection?: string,
@@ -91,6 +92,7 @@ export class GroupsController {
   @ApiQuery({ name: "filter", required: false, example: "missing-hotel" })
   @ApiQuery({ name: "activeOnly", required: false, example: true })
   @ApiQuery({ name: "projection", required: false, example: "summary" })
+  @ApiQuery({ name: "agentId", required: false, example: "agent_gtt_direct" })
   @ApiOkResponse({
     description: "Daftar group berhasil dibaca.",
     schema: {
@@ -124,6 +126,7 @@ export class GroupsController {
     @Query("filter") filter?: string,
     @Query("activeOnly") activeOnly?: string,
     @Query("projection") projection?: string,
+    @Query("agentId") agentId?: string,
   ) {
     const parsedPage = Number.parseInt(page ?? "", 10);
     const parsedPageSize = Number.parseInt(pageSize ?? "", 10);
@@ -138,6 +141,7 @@ export class GroupsController {
       filter,
       activeOnly: normalizeBooleanQuery(activeOnly),
       projection: normalizeGroupProjection(projection),
+      agentId: agentId?.trim() || undefined,
     });
   }
 
@@ -250,6 +254,11 @@ export class GroupsController {
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
   update(@Param("idOrCode") idOrCode: string, @Body() payload: UpdateGroupDto) {
     return this.groupsService.update(idOrCode, payload);
+  }
+
+  @Post(":idOrCode/reassign-agent")
+  reassignAgent(@Param("idOrCode") idOrCode: string, @Body() payload: ReassignGroupAgentDto) {
+    return this.groupsService.reassignAgent(idOrCode, payload.agentId, payload.reason);
   }
 
   @Post(":idOrCode/itinerary")

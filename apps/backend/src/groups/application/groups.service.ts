@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
-import { GroupLifecycleStatus, GroupTone } from "@prisma/client";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { GroupLifecycleStatus, GroupTone, VisaPaymentStatus, VisaStatus } from "@prisma/client";
 import { createStructuredLogger } from "../../logging/create-structured-logger";
 import type { ConfirmChecklistDriverDto } from "../dto/confirm-checklist-driver.dto";
 import type { CreateGroupIdentityDto } from "../dto/create-group-identity.dto";
@@ -30,6 +30,7 @@ import { GroupsQueryService } from "./groups-query.service";
 import { ConfigService } from "@nestjs/config";
 import { resolveConfiguredDataSource } from "../../config/app-config";
 import { GroupRepository } from "../../domain/repositories/group.repository";
+import { AgentsService, GTT_DIRECT_AGENT_ID } from "../../agents/agents.service";
 
 @Injectable()
 export class GroupsService {
@@ -41,6 +42,7 @@ export class GroupsService {
   constructor(
     @Inject("GroupRepository") private readonly groupRepo: GroupRepository,
     private readonly configService?: ConfigService,
+    private readonly agentsService?: AgentsService,
   ) {
     this.dataSource = resolveConfiguredDataSource(this.configService);
 
@@ -60,7 +62,8 @@ export class GroupsService {
   }
 
   async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
-    const created = await this.commandService.create(payload);
+    const normalizedPayload = await this.withValidatedAgent(payload);
+    const created = await this.commandService.create(normalizedPayload);
     await this.writeAuditLog("group.created", "group", created, {
       code: payload.code.trim().toUpperCase(),
       name: payload.name.trim(),
@@ -73,7 +76,7 @@ export class GroupsService {
   }
 
   async createIdentity(payload: CreateGroupIdentityDto): Promise<GroupDetailRecord> {
-    const createPayload = this.buildIdentityCreatePayload(payload);
+    const createPayload = await this.withValidatedAgent(this.buildIdentityCreatePayload(payload));
     const created = await this.commandService.create(createPayload);
     await this.writeAuditLog("group.identity.created", "group", created, {
       code: createPayload.code,
@@ -87,7 +90,12 @@ export class GroupsService {
   }
 
   async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
-    const replaced = await this.commandService.replace(idOrCode, payload);
+    const existing = await this.findOneByIdOrCode(idOrCode);
+    if (payload.agentId?.trim() && (existing as any).agentId && payload.agentId.trim() !== (existing as any).agentId) {
+      throw new BadRequestException("Gunakan endpoint Reassign Agent untuk mengubah Agent Group.");
+    }
+    const normalizedPayload = await this.withValidatedAgent(payload);
+    const replaced = await this.commandService.replace(idOrCode, normalizedPayload);
     await this.writeAuditLog("group.replaced", "group", replaced, {
       idOrCode,
       code: payload.code.trim().toUpperCase(),
@@ -396,6 +404,7 @@ export class GroupsService {
 
     return {
       code: normalizedCode,
+      agentId: payload.agentId,
       name: groupName,
       status: "Entry Only",
       lifecycleStatus: GroupLifecycleStatus.ENTRY_ONLY,
@@ -452,8 +461,34 @@ export class GroupsService {
             ]
           : []),
       ],
+      visaSetup: payload.busStatus
+        ? {
+            visaStatus: VisaStatus.DRAFT,
+            syarikah: "Not assigned",
+            busStatus: payload.busStatus,
+            paymentStatus: VisaPaymentStatus.UNPAID,
+          }
+        : undefined,
       checklistAssignments: [],
     };
+  }
+
+  async reassignAgent(idOrCode: string, agentId: string, reason: string): Promise<GroupDetailRecord> {
+    if (this.agentsService) await this.agentsService.assertActive(agentId);
+    const previous = await this.findOneByIdOrCode(idOrCode);
+    const updated = await this.groupRepo.reassignAgent(idOrCode, agentId.trim());
+    await this.writeAuditLog("group.agent.reassigned", "group", updated, {
+      previousAgentId: (previous as any).agentId,
+      nextAgentId: agentId.trim(),
+      reason: reason.trim(),
+    });
+    return updated;
+  }
+
+  private async withValidatedAgent(payload: CreateGroupDto): Promise<CreateGroupDto> {
+    const agentId = payload.agentId?.trim() || GTT_DIRECT_AGENT_ID;
+    if (this.agentsService) await this.agentsService.assertActive(agentId);
+    return { ...payload, agentId };
   }
 
   private addDaysToIsoDate(isoDate: string, dayOffset: number): string {

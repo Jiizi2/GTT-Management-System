@@ -15,6 +15,8 @@ type MemoryHotelAgreementDraft = {
   id: string;
   city: UpsertHotelAgreementDraftDto["city"];
   agentName?: string;
+  agentId: string;
+  groupName: string;
   hotelName: string;
   agreementNumber: string;
   pax: number;
@@ -158,7 +160,9 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
 
     return {
       city: payload.city,
-      agentName: payload.agentName?.trim() || undefined,
+      agentId: payload.agentId?.trim() || "agent_gtt_direct",
+      agentName: payload.agentId === "agent_gtt_direct" || !payload.agentId ? "GTT Direct" : undefined,
+      groupName: payload.groupName?.trim() || "",
       hotelName: payload.hotelName.trim(),
       agreementNumber: payload.agreementNumber.trim(),
       pax: payload.pax,
@@ -199,6 +203,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       id: draft.id,
       city: draft.city,
       agentName: draft.agentName,
+      groupName: draft.groupName,
       hotelName: draft.hotelName,
       agreementNumber: draft.agreementNumber,
       pax: draft.pax,
@@ -257,7 +262,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     };
   }
 
-  async findAll(query?: string, rawStatus?: string): Promise<unknown[]> {
+  async findAll(query?: string, rawStatus?: string, agentId?: string): Promise<unknown[]> {
     const status = this.normalizeStatusFilter(rawStatus);
     const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
     
@@ -289,6 +294,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     const normalizedQuery = query?.trim().toLowerCase() ?? "";
     return this.memoryDrafts
       .filter((draft) => {
+        if (agentId && draft.agentId !== agentId) return false;
         if (status === "assigned" && !draft.groupCode) {
           // In memory, draft.groupCode might be checked or we check assignedGroupsMap
           const key = `${draft.city.toUpperCase()}_${draft.agreementNumber.trim().toUpperCase()}`;
@@ -311,6 +317,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
         return [
           draft.agreementNumber,
           draft.agentName ?? "",
+          draft.groupName,
           draft.hotelName,
           draft.notes ?? "",
         ].some((value) => value.toLowerCase().includes(normalizedQuery)) || matchGroup;
@@ -411,6 +418,9 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     const targetGroup = (await this.groupsService.findOneByIdOrCode(normalizedGroupCode)) as any;
     if (!targetGroup) {
       throw new NotFoundException(`Group '${normalizedGroupCode}' not found.`);
+    }
+    if (targetGroup.agentId !== draft.agentId) {
+      throw new BadRequestException("Hotel agreement dan Group harus berasal dari Agent yang sama.");
     }
 
     const customStart = payload.stayStart ? toIsoDateOnly(payload.stayStart) : undefined;

@@ -9,6 +9,7 @@ describe("DTO Validation", () => {
   describe("CreateInvoiceDto", () => {
     it("should pass validation with a valid payload", async () => {
       const payload = {
+        agentId: "agent_gtt_direct",
         clientName: "Client A",
         issuedDate: "2026-04-12",
         amount: 100000,

@@ -2,10 +2,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { HotelAgreementDraft, HotelAgreementDraftFormState } from "../shared/app-domain";
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
-import {
-  mapAgreementStatusToBackend,
-  mapBackendAgreementStatus,
-} from "../shared/backend-enums";
+import { mapAgreementStatusToBackend, mapBackendAgreementStatus } from "../shared/backend-enums";
 import { agreementDraftQueryKeys } from "../shared/query-keys";
 import {
   parseBackendAgreementDraftRecord,
@@ -66,8 +63,10 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
 
   return {
     id,
+    agentId: readString(record.agentId, "agent_gtt_direct"),
     city,
-    agentName: readString(record.agentName ?? "", ""),
+    agentName: readString(record.agent?.name ?? record.agentName ?? "", ""),
+    groupName: readString(record.groupName ?? "", ""),
     hotelName: readString(record.hotelName),
     agreementNumber: readString(record.agreementNumber),
     pax: Math.max(1, readNumber(record.pax, 1)),
@@ -94,7 +93,8 @@ function buildDraftPayload(form: HotelAgreementDraftFormState) {
   const parsedPax = Number.parseInt(form.pax, 10);
   return {
     city: form.city === "madinah" ? "MADINAH" : "MAKKAH",
-    agentName: form.agentName.trim() || undefined,
+    agentId: form.agentId.trim(),
+    groupName: form.groupName.trim(),
     hotelName: form.hotelName.trim(),
     agreementNumber: form.agreementNumber.trim(),
     pax: Number.isFinite(parsedPax) ? parsedPax : 1,

@@ -150,6 +150,8 @@ export function buildChecklistItemsFromGroups(
         groupCode: group.code,
         groupName: group.name,
         groupPax: group.pax,
+        agentId: group.agentId,
+        agentName: group.agent?.name ?? "GTT Direct",
         tripDate,
         activity: buildChecklistActivityLabel(item, categoryKey, dependencies.inferCityTourCity),
         trip:

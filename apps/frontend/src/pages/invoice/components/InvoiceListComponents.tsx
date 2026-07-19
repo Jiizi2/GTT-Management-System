@@ -1,5 +1,6 @@
 import { Badge } from "../../../components/badge";
 import { SereneSelect } from "../../../components/serene-select";
+import { AgentFilterSelect } from "../../../components/agent-filter-select";
 import {
   formatDateLabel,
   getAvatarToneByStatus,
@@ -90,12 +91,16 @@ export function InvoiceSummaryBadges({
 // ==========================================
 
 export function InvoiceListFilters({
+  agentFilter,
+  setAgentFilter,
   statusFilter,
   setStatusFilter,
   dueMonthFilter,
   setDueMonthFilter,
   dueMonthOptions,
 }: {
+  agentFilter: string;
+  setAgentFilter: (value: string) => void;
   statusFilter: "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled";
   setStatusFilter: (value: "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled") => void;
   dueMonthFilter: string;
@@ -103,7 +108,8 @@ export function InvoiceListFilters({
   dueMonthOptions: DueMonthOption[];
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-[1fr_0.9fr_auto] md:items-end">
+    <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
+      <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" />
       <label className="space-y-1">
         <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
           Status
@@ -111,9 +117,7 @@ export function InvoiceListFilters({
         <SereneSelect
           className="serene-select rounded-xl bg-surface-container-lowest text-sm font-medium text-on-surface-variant"
           value={statusFilter}
-          onChange={(event) =>
-            setStatusFilter(event.target.value as any)
-          }
+          onChange={(event) => setStatusFilter(event.target.value as any)}
         >
           <option value="all">All Statuses</option>
           <option value="paid">Paid</option>
@@ -156,6 +160,8 @@ export function InvoiceCardList({
   onViewPdf,
   onEditInvoice,
   onDeleteInvoice,
+  readOnly = false,
+  hideAmounts = false,
 }: {
   rows: InvoiceRow[];
   isDarkMode: boolean;
@@ -163,6 +169,8 @@ export function InvoiceCardList({
   onViewPdf: (row: InvoiceRow) => void;
   onEditInvoice: (row: InvoiceRow) => void;
   onDeleteInvoice: (row: InvoiceRow) => void;
+  readOnly?: boolean;
+  hideAmounts?: boolean;
 }) {
   return (
     <section className="space-y-3 lg:hidden" aria-label="Invoice cards">
@@ -179,9 +187,7 @@ export function InvoiceCardList({
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
-                Invoice ID
-              </p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">Invoice ID</p>
               <p className="truncate text-sm font-bold text-primary">{row.invoiceNumber}</p>
             </div>
             <Badge
@@ -211,37 +217,38 @@ export function InvoiceCardList({
                 )}
               </div>
               <p className="truncate text-xs text-on-surface-variant mt-0.5">
-                {row.groupCode ? `Group ${row.groupCode}` : "No group"}
+                {row.agentName} · {row.groupCode ? `Group ${row.groupCode}` : "No group"}
               </p>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-xl bg-surface-container-low px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">
-                Due Date
-              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">Due Date</p>
               <p className="mt-1 font-semibold text-on-surface">{formatDateLabel(row.dueDateIso)}</p>
             </div>
             <div className="rounded-xl bg-surface-container-low px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">
-                Amount
-              </p>
-              {(() => {
-                const displayTotals = resolveInvoiceDisplayTotals(row);
-                return (
-                  <>
-                    <p className="mt-1 font-extrabold text-on-surface">
-                      {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
-                    </p>
-                    {displayTotals.downPayment > 0 && (
-                      <p className="text-[9px] text-on-surface-variant font-semibold mt-0.5">
-                        Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | Terbayar: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant/70">Amount</p>
+              {hideAmounts ? (
+                <p className="mt-1 font-extrabold text-on-surface">Restricted</p>
+              ) : (
+                (() => {
+                  const displayTotals = resolveInvoiceDisplayTotals(row);
+                  return (
+                    <>
+                      <p className="mt-1 font-extrabold text-on-surface">
+                        {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
                       </p>
-                    )}
-                  </>
-                );
-              })()}
+                      {displayTotals.downPayment > 0 && (
+                        <p className="text-[9px] text-on-surface-variant font-semibold mt-0.5">
+                          Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} | Terbayar:{" "}
+                          {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()
+              )}
             </div>
           </div>
 
@@ -257,28 +264,30 @@ export function InvoiceCardList({
               </span>
             </button>
 
-            <button
-              type="button"
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
-                isInvoiceBackendAvailable
-                  ? "bg-surface-container-low"
-                  : "cursor-not-allowed bg-surface-container-high"
-              }`}
-              aria-label={`Edit ${row.invoiceNumber}`}
-              onClick={() => onEditInvoice(row)}
-              disabled={!isInvoiceBackendAvailable}
-              title={
-                isInvoiceBackendAvailable
-                  ? "Edit"
-                  : "Backend invoice/database belum terhubung, edit invoice dinonaktifkan."
-              }
-            >
-              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                edit
-              </span>
-            </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary ${
+                  isInvoiceBackendAvailable
+                    ? "bg-surface-container-low"
+                    : "cursor-not-allowed bg-surface-container-high"
+                }`}
+                aria-label={`Edit ${row.invoiceNumber}`}
+                onClick={() => onEditInvoice(row)}
+                disabled={!isInvoiceBackendAvailable}
+                title={
+                  isInvoiceBackendAvailable
+                    ? "Edit"
+                    : "Backend invoice/database belum terhubung, edit invoice dinonaktifkan."
+                }
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  edit
+                </span>
+              </button>
+            ) : null}
 
-            {isInvoiceBackendAvailable && (
+            {!readOnly && isInvoiceBackendAvailable && (
               <button
                 type="button"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container-low text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"
@@ -309,6 +318,8 @@ export function InvoiceTable({
   onViewPdf,
   onEditInvoice,
   onDeleteInvoice,
+  readOnly = false,
+  hideAmounts = false,
 }: {
   rows: InvoiceRow[];
   isDarkMode: boolean;
@@ -316,6 +327,8 @@ export function InvoiceTable({
   onViewPdf: (row: InvoiceRow) => void;
   onEditInvoice: (row: InvoiceRow) => void;
   onDeleteInvoice: (row: InvoiceRow) => void;
+  readOnly?: boolean;
+  hideAmounts?: boolean;
 }) {
   return (
     <section className="serene-table-shell hidden lg:block" aria-label="Invoice list table">
@@ -361,35 +374,41 @@ export function InvoiceTable({
                       {row.clientName}
                     </p>
                     <p className="text-[10px] text-on-surface-variant truncate leading-none mt-0.5">
-                      {row.groupCode ? `Group ${row.groupCode}` : "No group"}
+                      {row.agentName} · {row.groupCode ? `Group ${row.groupCode}` : "No group"}
                     </p>
                   </div>
                 </div>
 
-                <div className="min-w-0 text-sm text-on-surface font-medium whitespace-normal break-words" title={row.description || ""}>
+                <div
+                  className="min-w-0 text-sm text-on-surface font-medium whitespace-normal break-words"
+                  title={row.description || ""}
+                >
                   {row.description || "-"}
                 </div>
 
-                <div className="text-sm font-medium text-on-surface">
-                  {formatDateLabel(row.dueDateIso)}
-                </div>
+                <div className="text-sm font-medium text-on-surface">{formatDateLabel(row.dueDateIso)}</div>
 
                 <div className="text-sm leading-normal">
-                  {(() => {
-                    const displayTotals = resolveInvoiceDisplayTotals(row);
-                    return (
-                      <>
-                        <p className="font-extrabold text-on-surface">
-                          {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
-                        </p>
-                        {displayTotals.downPayment > 0 && (
-                          <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
-                            Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} (DP: {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)})
+                  {hideAmounts ? (
+                    <p className="font-extrabold text-on-surface">Restricted</p>
+                  ) : (
+                    (() => {
+                      const displayTotals = resolveInvoiceDisplayTotals(row);
+                      return (
+                        <>
+                          <p className="font-extrabold text-on-surface">
+                            {formatCurrencyLabel(displayTotals.remainingBalance, displayTotals.currency)}
                           </p>
-                        )}
-                      </>
-                    );
-                  })()}
+                          {displayTotals.downPayment > 0 && (
+                            <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
+                              Total: {formatCurrencyLabel(displayTotals.subtotal, displayTotals.currency)} (DP:{" "}
+                              {formatCurrencyLabel(displayTotals.downPayment, displayTotals.currency)})
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()
+                  )}
                 </div>
 
                 <div>
@@ -413,28 +432,30 @@ export function InvoiceTable({
                     </span>
                   </button>
 
-                  <button
-                    type="button"
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition ${
-                      isInvoiceBackendAvailable
-                        ? "hover:bg-slate-100 hover:text-primary"
-                        : "cursor-not-allowed text-on-surface-variant/40"
-                    }`}
-                    aria-label={`Edit ${row.invoiceNumber}`}
-                    onClick={() => onEditInvoice(row)}
-                    disabled={!isInvoiceBackendAvailable}
-                    title={
-                      isInvoiceBackendAvailable
-                        ? "Edit"
-                        : "Backend invoice/database belum terhubung, edit invoice dinonaktifkan."
-                    }
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      edit
-                    </span>
-                  </button>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition ${
+                        isInvoiceBackendAvailable
+                          ? "hover:bg-slate-100 hover:text-primary"
+                          : "cursor-not-allowed text-on-surface-variant/40"
+                      }`}
+                      aria-label={`Edit ${row.invoiceNumber}`}
+                      onClick={() => onEditInvoice(row)}
+                      disabled={!isInvoiceBackendAvailable}
+                      title={
+                        isInvoiceBackendAvailable
+                          ? "Edit"
+                          : "Backend invoice/database belum terhubung, edit invoice dinonaktifkan."
+                      }
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        edit
+                      </span>
+                    </button>
+                  ) : null}
 
-                  {isInvoiceBackendAvailable && (
+                  {!readOnly && isInvoiceBackendAvailable && (
                     <button
                       type="button"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-rose-50 hover:text-rose-600"

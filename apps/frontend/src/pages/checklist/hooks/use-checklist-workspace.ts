@@ -250,6 +250,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   const copiedItemTimerRef = useRef<any | null>(null);
   const [cancelTargetItemId, setCancelTargetItemId] = useState<string | null>(null);
   const [groupCodeQuery, setGroupCodeQuery] = useState("");
+  const [agentFilter, setAgentFilter] = useState("all");
   const [pendingPage, setPendingPage] = useState(1);
   const [completedPage, setCompletedPage] = useState(1);
   const normalizedGroupCodeQuery = groupCodeQuery.trim().toLowerCase();
@@ -266,6 +267,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   const isTwoDaysAwayChecklistItem = (item: ChecklistItem): boolean => item.tripDate === dayAfterTomorrowIso;
   
   const searchedChecklistItems = checklistItems.filter((item) => {
+    if (agentFilter !== "all" && item.agentId !== agentFilter) return false;
     if (!normalizedGroupCodeQuery) return true;
     const codes = item.groupCodes ?? [item.groupCode];
     return codes.some((code) => code.toLowerCase().includes(normalizedGroupCodeQuery));
@@ -359,7 +361,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   useEffect(() => {
     setPendingPage(1);
     setCompletedPage(1);
-  }, [normalizedGroupCodeQuery]);
+  }, [normalizedGroupCodeQuery, agentFilter]);
 
   useEffect(() => {
     if (!cancelTargetItem) {
@@ -485,6 +487,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
       "```",
       `🏷️ GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
       `👥 GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
+      `🏢 AGENT        : ${(checklistItem.agentName || "GTT Direct").toUpperCase()}`,
       `🚌 TOTAL BUS    : ${checklistItem.requiredBusCount}`,
       `🛣️ TRIP         : ${tripLabel}`,
       `⏰ SCHEDULE     : ${scheduleDetails}`,
@@ -537,6 +540,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
       "```",
       `🏷️ GROUP NUMBER : ${(checklistItem.groupCodes ?? [checklistItem.groupCode]).join(" - ")}`,
       `👥 GROUP NAME   : ${checklistItem.groupName.toUpperCase()}`,
+      `🏢 AGENT        : ${(checklistItem.agentName || "GTT Direct").toUpperCase()}`,
       `🚌 TOTAL BUS    : ${checklistItem.requiredBusCount}`,
       `🛣️ TRIP         : ${tripLabel}`,
       `⏰ SCHEDULE     : ${scheduleDetails}`,
@@ -620,6 +624,8 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
     copiedItemId,
     cancelTargetItemId,
     groupCodeQuery,
+    agentFilter,
+    setAgentFilter,
     setGroupCodeQuery,
     pendingPage,
     setPendingPage,

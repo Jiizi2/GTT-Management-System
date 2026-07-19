@@ -71,7 +71,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     }));
   }
 
-  async findAll(): Promise<InvoiceListItem[]> {
+  async findAll(agentId?: string): Promise<InvoiceListItem[]> {
     const canReadInlineDownPayment = await this.ensureInvoiceDownPaymentColumn();
 
     // Lazy sync overdue invoices in the database
@@ -95,6 +95,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     });
 
     const invoices = (await this.prisma.invoice.findMany({
+      where: agentId ? { agentId } : undefined,
       select: canReadInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
     })) as PrismaInvoiceSummaryRowWithOptionalDownPayment[];
@@ -105,7 +106,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     });
   }
 
-  async findAllPaginated(pagination: PaginationDto): Promise<PaginatedResponseDto<InvoiceListItem>> {
+  async findAllPaginated(pagination: PaginationDto, agentId?: string): Promise<PaginatedResponseDto<InvoiceListItem>> {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
 
@@ -131,6 +132,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     });
 
     const invoices = (await this.prisma.invoice.findMany({
+      where: agentId ? { agentId } : undefined,
       select: canReadInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
       skip: (page - 1) * limit,
@@ -142,7 +144,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       return this.mapPrismaInvoiceToListItem(invoice, downPaymentIdr);
     });
 
-    const total = await this.prisma.invoice.count();
+    const total = await this.prisma.invoice.count({ where: agentId ? { agentId } : undefined });
 
     return {
       data,
@@ -167,6 +169,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       : normalizeIsoDate(payload.dueDate!, "dueDate");
     const invoiceYear = this.generator.extractYearFromIsoDate(dueDateIso);
     const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
+    let resolvedAgentId = getTrimmedString(payload.agentId) || "agent_gtt_direct";
     let resolvedGroupId: string | null = client.groupId ?? null;
     const normalizedItems = normalizeInvoiceLineItems(payload.items, payload.notes);
 
@@ -177,6 +180,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         },
         select: {
           id: true,
+          agentId: true,
         },
       });
 
@@ -186,7 +190,28 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         throw new NotFoundException(`Group '${requestedGroupCode}' not found.`);
       }
 
+      if (payload.agentId && resolvedAgentId !== matchedGroup.agentId) {
+        throw new BadRequestException("Invoice dan Group harus berasal dari Agent yang sama.");
+      }
       resolvedGroupId = matchedGroup.id;
+      resolvedAgentId = matchedGroup.agentId;
+    }
+    if (resolvedGroupId && !requestedGroupCode) {
+      const linkedGroup = await this.prisma.group.findUnique({
+        where: { id: resolvedGroupId },
+        select: { agentId: true },
+      });
+      if (linkedGroup) {
+        if (payload.agentId && resolvedAgentId !== linkedGroup.agentId) {
+          throw new BadRequestException("Invoice dan Group harus berasal dari Agent yang sama.");
+        }
+        resolvedAgentId = linkedGroup.agentId;
+      }
+    }
+    const agentDelegate = (this.prisma as any).agent;
+    if (agentDelegate?.findFirst) {
+      const activeAgent = await agentDelegate.findFirst({ where: { id: resolvedAgentId, status: "ACTIVE" }, select: { id: true } });
+      if (!activeAgent) throw new BadRequestException("Agent invoice tidak ditemukan atau tidak aktif.");
     }
     Telemetry.end(queryTracker, { action: "create_pre_queries_success" });
 
@@ -220,6 +245,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
             data: {
               invoiceNumber: nextInvoiceNumber,
               clientId: client.id,
+              agentId: resolvedAgentId,
               groupId: resolvedGroupId,
               issuedDate: createUtcDateFromIso(issuedDateIso),
               dueDate: createUtcDateFromIso(dueDateIso),
@@ -288,6 +314,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       select: {
         id: true,
         clientId: true,
+        agentId: true,
         groupId: true,
         invoiceNumber: true,
         dueDate: true,
@@ -335,6 +362,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
           ? issuedDateIso
           : normalizeIsoDate(payload.dueDate!, "dueDate"));
     const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
+    let resolvedAgentId = getTrimmedString(payload.agentId) || existing.agentId;
     let resolvedGroupId: string | null = existing.groupId;
     const normalizedItems = payload.items === undefined
       ? undefined
@@ -347,6 +375,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         },
         select: {
           id: true,
+          agentId: true,
         },
       });
 
@@ -356,11 +385,35 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         throw new NotFoundException(`Group '${requestedGroupCode}' not found.`);
       }
 
+      if (payload.agentId && resolvedAgentId !== matchedGroup.agentId) {
+        throw new BadRequestException("Invoice dan Group harus berasal dari Agent yang sama.");
+      }
       resolvedGroupId = matchedGroup.id;
+      resolvedAgentId = matchedGroup.agentId;
     } else if (payload.groupCode !== undefined) {
       resolvedGroupId = null;
     } else if ((payload.clientId !== undefined || payload.clientName !== undefined) && client.groupId) {
       resolvedGroupId = client.groupId;
+    }
+    if (resolvedGroupId) {
+      const linkedGroup = await this.prisma.group.findUnique({
+        where: { id: resolvedGroupId },
+        select: { agentId: true },
+      });
+      if (linkedGroup) {
+        if (payload.agentId && resolvedAgentId !== linkedGroup.agentId) {
+          throw new BadRequestException("Invoice dan Group harus berasal dari Agent yang sama.");
+        }
+        resolvedAgentId = linkedGroup.agentId;
+      }
+    }
+    const agentDelegate = (this.prisma as any).agent;
+    if (agentDelegate?.findFirst) {
+      const activeAgent = await agentDelegate.findFirst({
+        where: { id: resolvedAgentId, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (!activeAgent) throw new BadRequestException("Agent invoice tidak ditemukan atau tidak aktif.");
     }
     Telemetry.end(queryTracker, { action: "update_queries_success" });
 
@@ -393,6 +446,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       updated = await this.prisma.$transaction(async (tx) => {
         const scalarDataClause: Prisma.InvoiceUncheckedUpdateManyInput = {
           clientId: client.id,
+          agentId: resolvedAgentId,
           groupId: resolvedGroupId,
           issuedDate: createUtcDateFromIso(issuedDateIso),
           dueDate: createUtcDateFromIso(dueDateIso),
@@ -604,6 +658,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       clientId: invoice.clientId,
+      agentId: invoice.agentId || "agent_gtt_direct",
+      agentName: invoice.agent?.name ?? "GTT Direct",
       clientName: invoice.client.name,
       clientLabel: formatClientLabel(invoice.client.sortOrder, invoice.client.name),
       clientInitials: getInitials(invoice.client.name),

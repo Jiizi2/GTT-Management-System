@@ -22,6 +22,7 @@ import {
 } from "../shared/backend-enums";
 
 type BackendCreateGroupPayload = {
+  agentId: string;
   code: string;
   name: string;
   status: string;
@@ -126,6 +127,7 @@ type BackendCreateGroupPayload = {
 };
 
 export type GroupIdentityDraftPayload = {
+  agentId?: string;
   groupCode: string;
   groupName?: string;
   packageName?: string;
@@ -145,6 +147,7 @@ export function mapToneToBackend(tone: GroupData["tone"]): "ACTIVE" | "INACTIVE"
 
 export function mapGroupIdentityDraftToBackendPayload(identity: GroupIdentityDraftPayload) {
   return {
+    agentId: identity.agentId?.trim() || "agent_gtt_direct",
     code: identity.groupCode.trim().toUpperCase(),
     name: identity.groupName?.trim() || undefined,
     packageName: identity.packageName?.trim() || undefined,
@@ -314,6 +317,7 @@ export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPa
     normalizeStoredTimeLabel(group.itinerary.find((item) => item.time?.trim())?.time?.trim() ?? "") ||
     "09:00";
   const payload: BackendCreateGroupPayload = {
+    agentId: group.agentId?.trim() || group.agent?.id || "agent_gtt_direct",
     code: group.code.trim().toUpperCase(),
     name: group.name.trim(),
     status: group.status.trim(),

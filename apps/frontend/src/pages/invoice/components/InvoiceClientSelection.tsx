@@ -3,6 +3,7 @@ import { SereneSelect } from "../../../components/serene-select";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../../../components/form-accessibility";
 import { MANUAL_CLIENT_OPTION_ID, type InvoiceClientOption } from "../helpers/invoice-page-shared";
 import type { GroupData } from "../../../shared/app-domain";
+import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 
 export function InvoiceClientSelection({
   clients,
@@ -16,6 +17,9 @@ export function InvoiceClientSelection({
   const { control, register, setValue, clearErrors, watch, formState: { errors: formErrors } } = useFormContext();
 
   const selectedClientId = watch("selectedClientId");
+  const selectedAgentId = watch("agentId");
+  const agentsQuery = useAgentsQuery();
+  const scopedGroups = groups.filter((group) => group.agentId === selectedAgentId);
   const isManualClientSelected = selectedClientId === MANUAL_CLIENT_OPTION_ID;
 
   const selectedClientErrorMessage = formErrors.selectedClientId?.message as string | undefined;
@@ -31,6 +35,17 @@ export function InvoiceClientSelection({
       </h3>
 
       <div className="grid grid-cols-1 gap-3">
+        <label className="space-y-1">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">Agent</span>
+          <Controller name="agentId" control={control} render={({ field }) => (
+            <SereneSelect className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold" value={field.value} onChange={(event) => {
+              field.onChange(event.target.value); setValue("selectedGroupCode", "", { shouldDirty: true });
+            }}>
+              <option value="" disabled>Select Agent</option>
+              {(agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE").map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+            </SereneSelect>
+          )} />
+        </label>
         <label className="space-y-1">
           <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
             Client Name
@@ -146,7 +161,7 @@ export function InvoiceClientSelection({
                 onChange={(event) => field.onChange(event.target.value)}
               >
                 <option value="">No linked group</option>
-                {groups.map((group) => (
+                {scopedGroups.map((group) => (
                   <option key={group.code} value={group.code}>
                     {group.code} - {group.name}
                   </option>

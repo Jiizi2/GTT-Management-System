@@ -5,6 +5,7 @@ import {
   AgreementCity,
   GroupRaudhahStatus,
   GroupTone,
+  VisaBusStatus,
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
@@ -302,6 +303,31 @@ describe("GroupsService", () => {
       expect(
         logs.some((entry) => entry.action === "group.identity.created"),
       ).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  runCase("group identity preserves Visa+ in visa setup", async () => {
+    const { service, restore } = await createMemoryService();
+
+    try {
+      const created = (await service.createIdentity({
+        code: "g-visa-plus",
+        name: "Visa Plus Group",
+        pax: 20,
+        busStatus: VisaBusStatus.VISA_PLUS,
+      })) as {
+        visaSetup?: {
+          busStatus?: VisaBusStatus;
+          visaStatus?: VisaStatus;
+          paymentStatus?: VisaPaymentStatus;
+        };
+      };
+
+      expect(created.visaSetup?.busStatus).toBe(VisaBusStatus.VISA_PLUS);
+      expect(created.visaSetup?.visaStatus).toBe(VisaStatus.DRAFT);
+      expect(created.visaSetup?.paymentStatus).toBe(VisaPaymentStatus.UNPAID);
     } finally {
       restore();
     }

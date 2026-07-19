@@ -373,6 +373,7 @@ function buildScenarioGroupPayload(args: {
   }));
 
   return {
+    agentId: "agent_gtt_direct",
     code: args.code,
     name: args.name,
     status: args.status,
@@ -415,6 +416,7 @@ function createGroupPayload(groupCode: string) {
   const returnIso = addUtcDays(arrivalIso, 8);
 
   return {
+    agentId: "agent_gtt_direct",
     code: groupCode,
     name: "E2E Integration Group",
     status: "Active",
@@ -533,6 +535,7 @@ async function testBackendApiFlow(): Promise<void> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
+        agentId: "agent_gtt_direct",
         clientId: invoiceClients[0]?.id,
         groupCode,
         issuedDate: invoiceIssuedIso,
@@ -570,6 +573,7 @@ async function testBackendApiFlow(): Promise<void> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
+        agentId: "agent_gtt_direct",
         clientName: "Manual E2E Client",
         issuedDate: manualInvoiceIssuedIso,
         dueDate: manualInvoiceDueIso,
@@ -1286,6 +1290,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(invoiceClients.length >= 1, true);
 
     const pendingInvoiceResponse = await postJson("/api/invoices", {
+      agentId: "agent_gtt_direct",
       clientId: invoiceClients[0]?.id,
       groupCode: groupCodes.activeIssued,
       issuedDate: todayIso,
@@ -1299,6 +1304,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(pendingInvoice.downPaymentIdr, 1_500_000);
 
     const overdueInvoiceResponse = await postJson("/api/invoices", {
+      agentId: "agent_gtt_direct",
       clientName: "Scenario Overdue Client",
       groupCode: groupCodes.inactivePending,
       issuedDate: addUtcDays(todayIso, -7),
@@ -1312,6 +1318,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(overdueInvoice.downPaymentIdr, 250_000);
 
     const paidInvoiceResponse = await postJson("/api/invoices", {
+      agentId: "agent_gtt_direct",
       clientName: "Scenario Paid Client",
       groupCode: groupCodes.activeUnpaid,
       issuedDate: addUtcDays(todayIso, -6),
@@ -1326,6 +1333,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(paidInvoice.downPaymentIdr, 2_300_000);
 
     const cancelledInvoiceResponse = await postJson("/api/invoices", {
+      agentId: "agent_gtt_direct",
       clientName: "Scenario Cancelled Client",
       issuedDate: todayIso,
       dueDate: addUtcDays(todayIso, 5),
@@ -1344,6 +1352,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(cancelledInvoice.downPaymentIdr, 120_000);
 
     const invalidClientInvoiceResponse = await postJson("/api/invoices", {
+      agentId: "agent_gtt_direct",
       clientId: "unknown-client-id",
       issuedDate: todayIso,
       dueDate: addUtcDays(todayIso, 1),
@@ -1352,6 +1361,7 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
     assert.equal(invalidClientInvoiceResponse.status, 404, "Unknown client should return 404.");
 
     const missingClientInvoiceResponse = await postJson("/api/invoices", {
+      agentId: "agent_gtt_direct",
       issuedDate: todayIso,
       dueDate: addUtcDays(todayIso, 1),
       amount: 10_000,
@@ -1412,6 +1422,358 @@ async function testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow(): Promise
   }
 }
 
+async function testAgentAuthBoundaryAndMutationFirewall(): Promise<void> {
+  const server = await startBackendServer();
+  try {
+    await authenticateDevSession(server.baseUrl);
+    const internalCookie = activeAuthCookie;
+    assert.ok(internalCookie, "Internal authentication cookie should be available.");
+
+    const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+    const agentResponse = await requestJson(server.baseUrl, "/api/agents", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: `PORTAL-${uniqueSuffix}`,
+        name: `Portal Partner ${uniqueSuffix}`,
+        type: "PARTNER",
+      }),
+    });
+    assert.equal(agentResponse.status, 201, `Partner creation failed: ${agentResponse.text}`);
+    const agentId = (agentResponse.json as { id?: string }).id;
+    assert.ok(agentId, "Partner creation should return an id.");
+
+    const identifier = `portal-${uniqueSuffix}@example.com`;
+    const password = "PortalBoundary#2026";
+    const accountResponse = await requestJson(server.baseUrl, "/api/agent-portal-accounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        agentId,
+        displayName: "Portal Boundary Operator",
+        email: identifier,
+        password,
+      }),
+    });
+    assert.equal(accountResponse.status, 201, `Portal account creation failed: ${accountResponse.text}`);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(accountResponse.json as object, "passwordHash"),
+      false,
+      "Provisioning response must not expose passwordHash.",
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(accountResponse.json as object, "tokenVersion"),
+      false,
+      "Provisioning response must not expose tokenVersion.",
+    );
+
+    const agentLogin = await requestJson(server.baseUrl, "/api/agent/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: "" },
+      body: JSON.stringify({ identifier, password }),
+    });
+    assert.equal(agentLogin.status, 200, `Agent login failed: ${agentLogin.text}`);
+    const agentCookie = (agentLogin.headers.get("set-cookie") ?? "").split(";")[0]?.trim();
+    assert.ok(agentCookie?.startsWith("gtt_agent_session="), "Agent login should set its dedicated cookie.");
+    assert.equal(
+      (agentLogin.headers.get("set-cookie") ?? "").includes("Path=/api/agent"),
+      true,
+      "Agent cookie should be scoped to /api/agent.",
+    );
+
+    const agentSession = await requestJson(server.baseUrl, "/api/agent/auth/session", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(agentSession.status, 200, `Agent session failed: ${agentSession.text}`);
+    assert.equal(
+      (agentSession.json as { user?: { agentId?: string } }).user?.agentId,
+      agentId,
+      "Agent session should derive the provisioned tenant.",
+    );
+
+    const foreignAgentResponse = await requestJson(server.baseUrl, "/api/agents", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: internalCookie },
+      body: JSON.stringify({
+        code: `FOREIGN-${uniqueSuffix}`,
+        name: `Foreign Partner ${uniqueSuffix}`,
+        type: "PARTNER",
+      }),
+    });
+    assert.equal(foreignAgentResponse.status, 201, `Foreign Partner creation failed: ${foreignAgentResponse.text}`);
+    const foreignAgentId = (foreignAgentResponse.json as { id?: string }).id;
+    assert.ok(foreignAgentId, "Foreign Partner creation should return an id.");
+
+    const ownGroupCode = `OWN-${uniqueSuffix}`;
+    const foreignGroupCode = `OTHER-${uniqueSuffix}`;
+    for (const groupPayload of [
+      {
+        ...createGroupPayload(ownGroupCode),
+        agentId,
+        name: "Owned Portal Group",
+        notes: [{ sortOrder: 0, text: "OWN PRIVATE NOTE", pinned: true }],
+      },
+      {
+        ...createGroupPayload(foreignGroupCode),
+        agentId: foreignAgentId,
+        name: "Foreign Portal Group",
+        pax: 999,
+        notes: [{ sortOrder: 0, text: "FOREIGN PRIVATE NOTE", pinned: true }],
+      },
+    ]) {
+      const groupResponse = await requestJson(server.baseUrl, "/api/groups", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: internalCookie },
+        body: JSON.stringify(groupPayload),
+      });
+      assert.equal(groupResponse.status, 201, `Portal boundary group creation failed: ${groupResponse.text}`);
+    }
+
+    const invoiceDate = toIsoDateOnly(new Date());
+    const invoiceDueDate = addUtcDays(invoiceDate, 14);
+    let ownInvoiceId = "";
+    let foreignInvoiceId = "";
+    for (const invoicePayload of [
+      {
+        agentId,
+        groupCode: ownGroupCode,
+        clientName: `Owned Portal Client ${uniqueSuffix}`,
+        amount: 88_000_000,
+        notes: "OWN PRIVATE INVOICE NOTE",
+        description: "OWN PRIVATE DESCRIPTION",
+        recipientName: "OWN PRIVATE RECIPIENT",
+      },
+      {
+        agentId: foreignAgentId,
+        groupCode: foreignGroupCode,
+        clientName: `Foreign Portal Client ${uniqueSuffix}`,
+        amount: 999_000_000,
+        notes: "FOREIGN PRIVATE INVOICE NOTE",
+      },
+    ]) {
+      const invoiceResponse = await requestJson(server.baseUrl, "/api/invoices", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: internalCookie },
+        body: JSON.stringify({ ...invoicePayload, issuedDate: invoiceDate, dueDate: invoiceDueDate }),
+      });
+      assert.equal(invoiceResponse.status, 201, `Portal boundary invoice creation failed: ${invoiceResponse.text}`);
+      const createdId = (invoiceResponse.json as { id?: string }).id ?? "";
+      assert.notEqual(createdId, "", "Portal boundary invoice should return an id.");
+      if (invoicePayload.agentId === agentId) ownInvoiceId = createdId;
+      else foreignInvoiceId = createdId;
+    }
+
+    const profileResponse = await requestJson(server.baseUrl, "/api/agent/profile", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(profileResponse.status, 200, `Agent profile failed: ${profileResponse.text}`);
+    assert.deepEqual(profileResponse.json, {
+      account: { displayName: "Portal Boundary Operator" },
+      agent: { code: `PORTAL-${uniqueSuffix}`, name: `Portal Partner ${uniqueSuffix}` },
+    });
+    assert.equal(profileResponse.headers.get("cache-control"), "private, no-store");
+
+    const dashboardResponse = await requestJson(server.baseUrl, "/api/agent/dashboard", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(dashboardResponse.status, 200, `Agent dashboard failed: ${dashboardResponse.text}`);
+    const dashboard = dashboardResponse.json as {
+      groups?: { total?: number; totalPax?: number };
+      upcomingGroups?: Array<{ code?: string }>;
+    };
+    assert.equal(dashboard.groups?.total, 1, "Dashboard total must include only the session Agent.");
+    assert.equal(dashboard.groups?.totalPax, 25, "Dashboard pax must exclude the foreign Agent.");
+    assert.deepEqual(dashboard.upcomingGroups?.map((group) => group.code), [ownGroupCode]);
+    assert.equal(dashboardResponse.text.includes(foreignGroupCode), false, "Dashboard must not expose another Agent's group.");
+    assert.equal(dashboardResponse.text.includes("PRIVATE NOTE"), false, "Dashboard must not expose internal notes.");
+    assert.equal(dashboardResponse.headers.get("cache-control"), "private, no-store");
+
+    const portalGroupsResponse = await requestJson(
+      server.baseUrl,
+      "/api/agent/groups?q=Owned&page=1&pageSize=10&sortBy=code&sortDirection=asc",
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(portalGroupsResponse.status, 200, `Agent group list failed: ${portalGroupsResponse.text}`);
+    const portalGroups = portalGroupsResponse.json as { items?: Array<{ code?: string }>; total?: number };
+    assert.equal(portalGroups.total, 1, "Agent group result count must remain tenant-scoped.");
+    assert.deepEqual(portalGroups.items?.map((group) => group.code), [ownGroupCode]);
+    assert.equal(portalGroupsResponse.text.includes(foreignGroupCode), false);
+    assert.equal(portalGroupsResponse.text.includes("PRIVATE NOTE"), false);
+
+    const ownDetailResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/groups/${encodeURIComponent(ownGroupCode)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(ownDetailResponse.status, 200, `Agent group detail failed: ${ownDetailResponse.text}`);
+    assert.equal((ownDetailResponse.json as { code?: string }).code, ownGroupCode);
+    assert.equal(ownDetailResponse.text.includes("PRIVATE NOTE"), false);
+
+    const foreignDetailResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/groups/${encodeURIComponent(foreignGroupCode)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    const missingDetailResponse = await requestJson(server.baseUrl, "/api/agent/groups/MISSING-PORTAL-GROUP", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(foreignDetailResponse.status, 404);
+    assert.equal(missingDetailResponse.status, 404);
+    assert.deepEqual(foreignDetailResponse.json, missingDetailResponse.json, "Cross-tenant and missing groups must be indistinguishable.");
+
+    for (const facet of ["itinerary", "timeline", "visa", "hotel-agreements", "transportation"]) {
+      const facetResponse = await requestJson(
+        server.baseUrl,
+        `/api/agent/groups/${encodeURIComponent(ownGroupCode)}/${facet}`,
+        { headers: { cookie: agentCookie } },
+      );
+      assert.equal(facetResponse.status, 200, `Agent group ${facet} failed: ${facetResponse.text}`);
+      assert.equal(facetResponse.text.includes("PRIVATE NOTE"), false, `${facet} must not expose internal notes.`);
+    }
+
+    const unknownGroupQuery = await requestJson(server.baseUrl, "/api/agent/groups?debug=1", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(unknownGroupQuery.status, 400, "Unknown Agent group query fields must be rejected.");
+
+    const portalInvoicesResponse = await requestJson(
+      server.baseUrl,
+      "/api/agent/invoices?page=1&pageSize=10&sortBy=dueDate&sortDirection=desc",
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(portalInvoicesResponse.status, 200, `Agent invoice list failed: ${portalInvoicesResponse.text}`);
+    const portalInvoices = portalInvoicesResponse.json as { items?: Array<{ id?: string }>; total?: number };
+    assert.equal(portalInvoices.total, 1, "Agent invoice count must remain tenant-scoped.");
+    assert.deepEqual(portalInvoices.items?.map((invoice) => invoice.id), [ownInvoiceId]);
+    assert.equal(portalInvoicesResponse.text.includes(foreignInvoiceId), false);
+    assert.equal(portalInvoicesResponse.text.includes("PRIVATE"), false);
+    assert.equal(portalInvoicesResponse.text.includes("88000000"), false);
+
+    const ownInvoiceResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/invoices/${encodeURIComponent(ownInvoiceId)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(ownInvoiceResponse.status, 200, `Agent invoice detail failed: ${ownInvoiceResponse.text}`);
+    assert.equal((ownInvoiceResponse.json as { id?: string }).id, ownInvoiceId);
+    assert.equal(ownInvoiceResponse.text.includes("PRIVATE"), false);
+    assert.equal(ownInvoiceResponse.text.includes("88000000"), false);
+
+    const foreignInvoiceResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/invoices/${encodeURIComponent(foreignInvoiceId)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    const missingInvoiceResponse = await requestJson(server.baseUrl, "/api/agent/invoices/MISSING-INVOICE", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(foreignInvoiceResponse.status, 404);
+    assert.equal(missingInvoiceResponse.status, 404);
+    assert.deepEqual(foreignInvoiceResponse.json, missingInvoiceResponse.json);
+
+    const invoiceTenantSubstitution = await requestJson(
+      server.baseUrl,
+      `/api/agent/invoices?agentId=${encodeURIComponent(foreignAgentId)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(invoiceTenantSubstitution.status, 400, "Invoice tenant substitution must be rejected.");
+
+    const querySubstitution = await requestJson(
+      server.baseUrl,
+      `/api/agent/dashboard?agentId=${encodeURIComponent(foreignAgentId)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(querySubstitution.status, 400, "Agent Portal must reject query tenant substitution.");
+    const headerSubstitution = await requestJson(server.baseUrl, "/api/agent/profile", {
+      headers: { cookie: agentCookie, "x-agent-id": foreignAgentId },
+    });
+    assert.equal(headerSubstitution.status, 400, "Agent Portal must reject header tenant substitution.");
+
+    const internalCookieOnAgentRoute = await requestJson(server.baseUrl, "/api/agent/auth/session", {
+      headers: { cookie: internalCookie },
+    });
+    assert.equal(internalCookieOnAgentRoute.status, 401, "Internal cookie must not authenticate an Agent route.");
+
+    const groupsBefore = ensureArray<GroupRecord>(
+      (await requestJson(server.baseUrl, "/api/groups", { headers: { cookie: internalCookie } })).json,
+      "Internal group list should be an array.",
+    );
+    const agentsBefore = ensureArray<unknown>(
+      (await requestJson(server.baseUrl, "/api/agents", { headers: { cookie: internalCookie } })).json,
+      "Internal Agent list should be an array.",
+    );
+
+    const deniedMutations: Array<{ method: string; path: string }> = [
+      { method: "POST", path: "/api/agents" },
+      { method: "PATCH", path: `/api/agents/${agentId}` },
+      { method: "PATCH", path: `/api/agents/${agentId}/status` },
+      { method: "POST", path: "/api/agent-portal-accounts" },
+      { method: "PATCH", path: "/api/agent-portal-accounts/account/status" },
+      { method: "PUT", path: "/api/agent-portal-accounts/account/password" },
+      { method: "POST", path: "/api/agent-portal-accounts/account/revoke" },
+      { method: "POST", path: "/api/master-data/options" },
+      { method: "PATCH", path: "/api/master-data/options/option" },
+      { method: "POST", path: "/api/auth/users" },
+      { method: "PATCH", path: "/api/auth/users/user" },
+      { method: "PUT", path: "/api/auth/users/user/password" },
+      { method: "DELETE", path: "/api/auth/users/user" },
+      { method: "POST", path: "/api/groups" },
+      { method: "POST", path: "/api/groups/identity" },
+      { method: "PUT", path: "/api/groups/UNKNOWN" },
+      { method: "PATCH", path: "/api/groups/UNKNOWN" },
+      { method: "POST", path: "/api/groups/UNKNOWN/reassign-agent" },
+      { method: "POST", path: "/api/groups/UNKNOWN/itinerary" },
+      { method: "PATCH", path: "/api/groups/UNKNOWN/itinerary/item" },
+      { method: "DELETE", path: "/api/groups/UNKNOWN/itinerary/item" },
+      { method: "POST", path: "/api/groups/UNKNOWN/checklist/confirm-driver" },
+      { method: "POST", path: "/api/groups/UNKNOWN/checklist/reset-driver" },
+      { method: "POST", path: "/api/groups/UNKNOWN/visa/hotels" },
+      { method: "PATCH", path: "/api/groups/UNKNOWN/visa/hotels/hotel" },
+      { method: "DELETE", path: "/api/groups/UNKNOWN/visa/hotels/hotel" },
+      { method: "PUT", path: "/api/groups/UNKNOWN/visa/raudhah" },
+      { method: "DELETE", path: "/api/groups/UNKNOWN" },
+      { method: "POST", path: "/api/visa/agreement-drafts" },
+      { method: "PATCH", path: "/api/visa/agreement-drafts/draft" },
+      { method: "DELETE", path: "/api/visa/agreement-drafts/draft" },
+      { method: "POST", path: "/api/visa/agreement-drafts/draft/assign" },
+      { method: "POST", path: "/api/visa/agreement-drafts/draft/unassign" },
+      { method: "POST", path: "/api/invoices" },
+      { method: "PATCH", path: "/api/invoices/invoice" },
+      { method: "DELETE", path: "/api/invoices/invoice" },
+    ];
+    for (const mutation of deniedMutations) {
+      const denied = await requestJson(server.baseUrl, mutation.path, {
+        method: mutation.method,
+        headers: {
+          cookie: agentCookie,
+          origin: server.baseUrl,
+          "content-type": "application/json",
+        },
+        body: mutation.method === "DELETE" ? undefined : "{}",
+      });
+      assert.equal(
+        denied.status,
+        401,
+        `Agent cookie should be rejected before internal mutation ${mutation.method} ${mutation.path}: ${denied.text}`,
+      );
+    }
+
+    const groupsAfter = ensureArray<GroupRecord>(
+      (await requestJson(server.baseUrl, "/api/groups", { headers: { cookie: internalCookie } })).json,
+      "Internal group list should be an array.",
+    );
+    const agentsAfter = ensureArray<unknown>(
+      (await requestJson(server.baseUrl, "/api/agents", { headers: { cookie: internalCookie } })).json,
+      "Internal Agent list should be an array.",
+    );
+    assert.equal(groupsAfter.length, groupsBefore.length, "Denied Agent mutations must not create groups.");
+    assert.equal(agentsAfter.length, agentsBefore.length, "Denied Agent mutations must not create Agents.");
+  } finally {
+    activeAuthCookie = null;
+    await server.shutdown();
+  }
+}
+
 describe("backend api e2e tests", () => {
   it("should run backend api e2e flow", async () => {
     await testBackendApiFlow();
@@ -1423,5 +1785,9 @@ describe("backend api e2e tests", () => {
 
   it("should run backend comprehensive add-group overview invoice raudhah flow", async () => {
     await testComprehensiveAddGroupOverviewInvoiceAndRaudhahFlow();
+  });
+
+  it("should isolate Agent auth and reject all internal mutations", async () => {
+    await testAgentAuthBoundaryAndMutationFirewall();
   });
 });

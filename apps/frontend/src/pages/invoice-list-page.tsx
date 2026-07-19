@@ -9,12 +9,7 @@ import { useInvoiceDashboardQuery, useDeleteInvoiceMutation } from "../hooks/use
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { useThemeMode } from "../theme/theme-provider";
 import { Button } from "../components/button";
-import {
-  InvoiceSummaryBadges,
-  InvoiceListFilters,
-  InvoiceCardList,
-  InvoiceTable,
-} from "./invoice/components/InvoiceListComponents";
+import { InvoiceListFilters, InvoiceCardList, InvoiceTable } from "./invoice/components/InvoiceListComponents";
 import {
   createInvoiceWorkspaceInitialData,
   defaultBankDisbursementOptions,
@@ -71,8 +66,6 @@ function InvoiceWorkspaceFallback() {
   );
 }
 
-
-
 export function InvoiceScreen({
   groups,
   onOpenDetail,
@@ -83,8 +76,11 @@ export function InvoiceScreen({
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "paid" | "partially-paid" | "pending" | "overdue" | "cancelled"
+  >("all");
   const [dueMonthFilter, setDueMonthFilter] = useState("all");
+  const [agentFilter, setAgentFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [workspaceMode, setWorkspaceMode] = useState<"list" | "create" | "edit">("list");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWorkspaceInitialData | null>(null);
@@ -144,7 +140,9 @@ export function InvoiceScreen({
   const targetRow = lastId ? invoiceRows.find((r) => r.id === lastId) : null;
   console.log(`[${new Date().toISOString()}] InvoiceScreen render (workspaceMode: ${workspaceMode})`);
   if (targetRow) {
-    console.log(`[${new Date().toISOString()}] Rendered target invoice:\nid=${targetRow.id}\ninvoiceNumber=${targetRow.invoiceNumber}\nstatus=${targetRow.status}\namount=${targetRow.amount}`);
+    console.log(
+      `[${new Date().toISOString()}] Rendered target invoice:\nid=${targetRow.id}\ninvoiceNumber=${targetRow.invoiceNumber}\nstatus=${targetRow.status}\namount=${targetRow.amount}`,
+    );
   }
   const systemFeedback = useMemo(() => {
     if (invoiceDashboardQuery.error) {
@@ -191,6 +189,7 @@ export function InvoiceScreen({
   }, [invoiceRows]);
 
   const filteredRows = searchedRows
+    .filter((row) => agentFilter === "all" || row.agentId === agentFilter)
     .filter((row) => (statusFilter === "all" ? true : getStatusValue(row.status) === statusFilter))
     .filter((row) => (dueMonthFilter === "all" ? true : row.monthKey === dueMonthFilter));
 
@@ -200,12 +199,9 @@ export function InvoiceScreen({
   const rangeStart = filteredRows.length === 0 ? 0 : pageStartIndex + 1;
   const rangeEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, pageStartIndex + paginatedRows.length);
 
-  const totalRevenue = filteredRows.filter((row) => row.status !== "Cancelled").reduce((total, row) => total + row.amount, 0);
-  const paidCount = filteredRows.filter((row) => row.status === "Paid").length;
-  const partiallyPaidCount = filteredRows.filter((row) => row.status === "Partially Paid").length;
-  const pendingCount = filteredRows.filter((row) => row.status === "Pending").length;
-  const overdueCount = filteredRows.filter((row) => row.status === "Overdue").length;
-  const cancelledCount = filteredRows.filter((row) => row.status === "Cancelled").length;
+  const totalRevenue = filteredRows
+    .filter((row) => row.status !== "Cancelled")
+    .reduce((total, row) => total + row.amount, 0);
   const currentMonthKey = Domain.formatLocalIsoDate(new Date()).slice(0, 7);
   const previousMonthKey = shiftMonthKey(currentMonthKey, -1);
   const currentMonthRevenue = invoiceRows
@@ -225,19 +221,6 @@ export function InvoiceScreen({
     dueMonthFilter === "all"
       ? resolveDateRangeLabel(invoiceRows)
       : resolveDateRangeLabel(invoiceRows.filter((row) => row.monthKey === dueMonthFilter));
-  const paidSummaryBadgeClassName = isDarkMode
-    ? "inline-flex items-center gap-1 rounded-lg border border-primary/35 bg-primary/16 px-3 py-1 text-xs font-bold leading-none text-primary"
-    : "inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold leading-none text-emerald-700";
-  const pendingSummaryBadgeClassName = isDarkMode
-    ? "inline-flex items-center gap-1 rounded-lg border border-secondary/35 bg-secondary/16 px-3 py-1 text-xs font-bold leading-none text-secondary"
-    : "inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold leading-none text-amber-700";
-  const overdueSummaryBadgeClassName = isDarkMode
-    ? "inline-flex items-center gap-1 rounded-lg border border-tertiary/35 bg-tertiary/16 px-3 py-1 text-xs font-bold leading-none text-tertiary"
-    : "inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold leading-none text-rose-700";
-  const partiallyPaidSummaryBadgeClassName = isDarkMode
-    ? "inline-flex items-center gap-1 rounded-lg border border-sky-500/35 bg-sky-500/16 px-3 py-1 text-xs font-bold leading-none text-sky-400"
-    : "inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold leading-none text-sky-700";
-
   const handleViewPdf = (row: InvoiceRow) => {
     setActionFeedback("Menyiapkan PDF...");
     void viewInvoicePdfFromRow({ row, groups, bankDisbursementOptions, issuingOfficeOptions })
@@ -268,7 +251,6 @@ export function InvoiceScreen({
     setDeletingInvoice(row);
   };
 
-
   useEffect(() => {
     if (!actionFeedback) {
       return undefined;
@@ -285,7 +267,7 @@ export function InvoiceScreen({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, dueMonthFilter]);
+  }, [query, statusFilter, dueMonthFilter, agentFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -476,9 +458,9 @@ export function InvoiceScreen({
         }
       />
 
-      <section className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
-        <article className="serene-filter-panel">
-          <div className="grid gap-4 md:grid-cols-[1fr_0.9fr_auto] md:items-end">
+      <section className="grid items-start gap-4 xl:grid-cols-[1.8fr_1fr]">
+        <article className="serene-filter-panel self-start">
+          <div className="grid gap-4 xl:grid-cols-[0.7fr_2.3fr] xl:items-end">
             <label className="space-y-1">
               <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
                 Date Range
@@ -492,6 +474,8 @@ export function InvoiceScreen({
             </label>
 
             <InvoiceListFilters
+              agentFilter={agentFilter}
+              setAgentFilter={setAgentFilter}
               statusFilter={statusFilter}
               setStatusFilter={setStatusFilter}
               dueMonthFilter={dueMonthFilter}
@@ -499,30 +483,24 @@ export function InvoiceScreen({
               dueMonthOptions={dueMonthOptions}
             />
           </div>
-
-          <InvoiceSummaryBadges
-            paidCount={paidCount}
-            partiallyPaidCount={partiallyPaidCount}
-            pendingCount={pendingCount}
-            overdueCount={overdueCount}
-            cancelledCount={cancelledCount}
-            isDarkMode={isDarkMode}
-          />
         </article>
 
-        <article className="serene-accent-card bg-primary text-on-primary">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/85">
-            <span className="sm:hidden">Monthly Revenue</span>
-            <span className="hidden sm:inline">Total Monthly Revenue</span>
-          </p>
-          <strong className="mt-2 block text-3xl font-extrabold leading-tight">{formatIdr(totalRevenue)}</strong>
-          <p className="mt-3 inline-flex rounded-lg bg-surface-container-lowest/20 px-2 py-1 text-xs font-bold">
-            {monthlyGrowthLabel}
-          </p>
-          <p className="mt-1 text-xs text-on-primary/85">
-            <span className="sm:hidden">vs last month</span>
-            <span className="hidden sm:inline">vs previous month</span>
-          </p>
+        <article className="serene-accent-card flex min-h-[6.5rem] items-center justify-between gap-4 self-start bg-primary text-on-primary">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-primary/85">
+              <span className="sm:hidden">Monthly Revenue</span>
+              <span className="hidden sm:inline">Total Monthly Revenue</span>
+            </p>
+            <strong className="mt-2 block truncate text-2xl font-extrabold leading-tight sm:text-3xl">
+              {formatIdr(totalRevenue)}
+            </strong>
+          </div>
+          <div className="relative z-10 shrink-0 text-right">
+            <p className="inline-flex rounded-lg bg-surface-container-lowest/20 px-2 py-1 text-xs font-bold">
+              {monthlyGrowthLabel}
+            </p>
+            <p className="mt-1 text-[11px] text-on-primary/80">vs last month</p>
+          </div>
           <span
             className="material-symbols-outlined absolute -right-3 -bottom-4 text-8xl text-on-primary/15"
             aria-hidden="true"

@@ -134,6 +134,7 @@ export class AuthController {
   }
 
   @Get("session")
+  @SkipThrottle()
   @ApiBearerAuth("access-token")
   @ApiCookieAuth("auth-cookie")
   @ApiOperation({

@@ -41,19 +41,21 @@ export function LoginScreen({
   errorMessage,
   isSubmitting = false,
   developmentAccounts = [],
+  productName = "Ops",
 }: {
   onSubmit?: (credentials: LoginCredentials) => void | Promise<void>;
   errorMessage?: string;
   isSubmitting?: boolean;
   developmentAccounts?: DevelopmentLoginAccountHint[];
+  productName?: "Ops" | "Portal Agent";
 }) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [values, setValues] = useState<LoginCredentials>(DEFAULT_LOGIN_VALUES);
   const [errors, setErrors] = useState<LoginFieldErrors>({});
 
   useEffect(() => {
-    document.title = "Login | Ghaniya Tour and Travel";
-  }, []);
+    document.title = `Login ${productName} | Ghaniya Tour and Travel`;
+  }, [productName]);
 
   const handleChange = <Key extends keyof LoginCredentials>(field: Key, nextValue: LoginCredentials[Key]) => {
     setValues((current) => ({
@@ -111,6 +113,7 @@ export function LoginScreen({
             <h1 className="font-display text-5xl font-extrabold leading-tight tracking-tight text-primary-container">
               Ghaniya Tour and Travel
             </h1>
+            <p className="text-sm font-black uppercase tracking-[0.24em] text-primary">{productName}</p>
             <p className="px-4 text-xl leading-relaxed text-on-surface-variant">
               Manage your travel and Umrah operations with clarity and ease.
             </p>
@@ -156,7 +159,7 @@ export function LoginScreen({
 
           <header>
             <h2 className="font-display text-3xl font-bold text-on-surface">Welcome Back</h2>
-            <p className="mt-2 text-on-surface-variant">Please login to continue to your dashboard.</p>
+            <p className="mt-2 text-on-surface-variant">Please login to continue to {productName}.</p>
           </header>
 
           <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 text-left shadow-ambient">
@@ -254,7 +257,7 @@ export function LoginScreen({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                aria-label={isSubmitting ? "Signing in" : "Login to Dashboard"}
+                aria-label={isSubmitting ? "Signing in" : `Login to ${productName}`}
                 className="flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-on-primary shadow-sm transition-all hover:bg-primary-container active:scale-[0.99] disabled:opacity-70"
               >
                 <span>{isSubmitting ? "Signing In..." : "Login"}</span>

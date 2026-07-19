@@ -62,6 +62,8 @@ export function GroupDetail({
   onDeleteGroup,
   onSaveGroup,
   onPatchGroup,
+  readOnly = false,
+  showThemeToggle = true,
 }: {
   group: GroupData;
   groups?: GroupData[];
@@ -69,8 +71,10 @@ export function GroupDetail({
   onDeleteGroup: (groupCode: string) => void;
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   onPatchGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
+  readOnly?: boolean;
+  showThemeToggle?: boolean;
 }) {
-  const contextValue = useGroupDetailDashboard({
+  const dashboard = useGroupDetailDashboard({
     group,
     groups,
     onBack,
@@ -78,6 +82,7 @@ export function GroupDetail({
     onSaveGroup,
     onPatchGroup,
   });
+  const contextValue = { ...dashboard, readOnly };
 
   const {
     hasOpenModal,
@@ -131,16 +136,20 @@ export function GroupDetail({
             <span className="hidden sm:inline">Back to Groups</span>
           </Button>
 
-          <ThemeToggleButton className="ml-auto sm:mr-5" />
+          {showThemeToggle ? <ThemeToggleButton className="ml-auto sm:mr-5" /> : null}
         </div>
 
         {group.parentGroupId && (
           <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-sm">
-            <span className="material-symbols-outlined text-sky-700" aria-hidden="true">info</span>
+            <span className="material-symbols-outlined text-sky-700" aria-hidden="true">
+              info
+            </span>
             <div>
               <strong>Grup Operasional Terhubung</strong>
               <p className="mt-0.5 text-[11px] text-sky-700 font-medium">
-                Grup ini mewarisi data operasional dari Group ({groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}) (Musyrif & Itinerary) secara otomatis. Anda tidak dapat mengedit data operasional di grup ini.
+                Grup ini mewarisi data operasional dari Group (
+                {groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)?.code}) (Musyrif &
+                Itinerary) secara otomatis. Anda tidak dapat mengedit data operasional di grup ini.
               </p>
             </div>
           </div>
@@ -168,13 +177,15 @@ export function GroupDetail({
 
           <footer className="rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-3 text-center text-xs font-medium text-on-surface-variant/80">
             <p>
-              <span className="sm:hidden">GTT Operations Desk</span>
-              <span className="hidden sm:inline">Ghaniya Tour and Travel Management System | GTT Operations Desk</span>
+              <span className="sm:hidden">{readOnly ? "GTT Agent Portal" : "GTT Operations Desk"}</span>
+              <span className="hidden sm:inline">
+                Ghaniya Tour and Travel Management System | {readOnly ? "GTT Agent Portal" : "GTT Operations Desk"}
+              </span>
             </p>
           </footer>
         </div>
 
-        {hasOpenModal ? (
+        {!readOnly && hasOpenModal ? (
           <Suspense fallback={<GroupDetailModalFallback />}>
             {isScheduleModalOpen ? (
               <LazyScheduleModal

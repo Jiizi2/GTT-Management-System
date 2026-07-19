@@ -23,7 +23,8 @@ import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-k
 export const draftSchema = z
   .object({
     city: z.enum(["makkah", "madinah"]),
-    agentName: z.string(),
+    agentId: z.string().trim().min(1, "Agent wajib dipilih."),
+    groupName: z.string().trim().min(1, "Nama group wajib diisi."),
     hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
     agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
     pax: z
@@ -49,7 +50,8 @@ export const AGREEMENT_DRAFT_PAGE_SIZE = 8;
 export function createDefaultDraftForm(): HotelAgreementDraftFormState {
   return {
     city: "makkah",
-    agentName: "",
+    agentId: "",
+    groupName: "",
     hotelName: "",
     agreementNumber: "",
     pax: "1",
@@ -70,6 +72,7 @@ export function useAgreementInbox() {
   const linkedGroupCode = searchParams.get("groupCode")?.trim().toUpperCase() ?? "";
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
+  const [agentFilter, setAgentFilter] = useState("all");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,7 +81,7 @@ export function useAgreementInbox() {
   const [deleteDraftTarget, setDeleteDraftTarget] = useState<HotelAgreementDraft | null>(null);
   const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
-  
+
   const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
   const normalizedSearchQuery = query.trim();
   const isSearchingAcrossStatuses = normalizedSearchQuery.length > 0;
@@ -86,13 +89,17 @@ export function useAgreementInbox() {
   const hasDatesSelected = startDateFilter !== "" && endDateFilter !== "";
   const isDateRangeInvalid = hasDatesSelected && startDateFilter > endDateFilter;
 
-  const effectiveStatusFilter: AgreementDraftStatusFilter =
-    hasDatesSelected ? "all" : (isSearchingAcrossStatuses ? "all" : statusFilter);
+  const effectiveStatusFilter: AgreementDraftStatusFilter = hasDatesSelected
+    ? "all"
+    : isSearchingAcrossStatuses
+      ? "all"
+      : statusFilter;
   const draftsQuery = useAgreementDraftsQuery(query, effectiveStatusFilter);
   const drafts = draftsQuery.data ?? [];
 
   const filteredDrafts = useMemo(() => {
     let result = drafts;
+    if (agentFilter !== "all") result = result.filter((draft) => draft.agentId === agentFilter);
 
     if (hasDatesSelected && !isDateRangeInvalid) {
       result = result.filter((draft) => {
@@ -114,13 +121,14 @@ export function useAgreementInbox() {
     }
 
     return result;
-  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter]);
+  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter, agentFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDrafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
   const paginatedDrafts = filteredDrafts.slice(pageStartIndex, pageStartIndex + AGREEMENT_DRAFT_PAGE_SIZE);
   const rangeStart = filteredDrafts.length === 0 ? 0 : pageStartIndex + 1;
-  const rangeEnd = filteredDrafts.length === 0 ? 0 : Math.min(filteredDrafts.length, pageStartIndex + paginatedDrafts.length);
+  const rangeEnd =
+    filteredDrafts.length === 0 ? 0 : Math.min(filteredDrafts.length, pageStartIndex + paginatedDrafts.length);
 
   const saveDraftMutation = useMutation({
     mutationFn: saveAgreementDraftInBackend,
@@ -144,7 +152,13 @@ export function useAgreementInbox() {
     defaultValues: createDefaultDraftForm(),
   });
 
-  const { control, register, handleSubmit, reset, formState: { errors } } = form;
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = form;
 
   const isSaving = saveDraftMutation.isPending;
 
@@ -308,7 +322,7 @@ export function useAgreementInbox() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, startDateFilter, endDateFilter]);
+  }, [query, statusFilter, startDateFilter, endDateFilter, agentFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -319,6 +333,8 @@ export function useAgreementInbox() {
     query,
     setQuery,
     statusFilter,
+    agentFilter,
+    setAgentFilter,
     setStatusFilter,
     startDateFilter,
     setStartDateFilter,

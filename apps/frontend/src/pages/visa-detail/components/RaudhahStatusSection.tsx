@@ -4,23 +4,23 @@ import { getToneTextClass, getRaudhahStatusBadgeClasses } from "../visa-detail-h
 export function RaudhahStatusSection() {
   const {
     row,
+    group,
     raudhahTone,
-    paymentTone,
     raudhahAppointments,
     hasRaudhahDates,
     raudhahStatusText,
     raudhahSecondaryText,
     raudhahSecondaryTextMobile,
     providerName,
-    paymentStatus,
-    setPaymentStatus,
     isRaudhahTemplateCopied,
     openRaudhahModal,
     setIsClearRaudhahConfirmOpen,
     openSyarikahModal,
-    onUpdatePaymentStatus,
+    openAgentModal,
     handleCopyRaudhahReminder,
   } = useVisaDetailContext();
+
+  const assignedAgentName = group?.agent?.name?.trim() || "Not assigned";
 
   return (
     <section className="grid gap-4 lg:grid-cols-3">
@@ -134,39 +134,25 @@ export function RaudhahStatusSection() {
       <article className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
-            payments
+            business
           </span>
-          <h3 className="text-lg font-bold text-slate-900">Payment</h3>
+          <h3 className="text-lg font-bold text-slate-900">Agent</h3>
         </div>
 
         <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
-          <strong className={`block text-base font-semibold ${getToneTextClass(paymentTone)}`}>
-            {paymentStatus}
-          </strong>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Agent</p>
+          <strong className="block text-base font-semibold text-slate-900">{assignedAgentName}</strong>
           <small className="text-xs text-slate-500">
-            <span className="sm:hidden">
-              {paymentStatus === "Paid" ? "Payment complete" : "Need follow-up"}
-            </span>
-            <span className="hidden sm:inline">
-              {paymentStatus === "Paid" ? "Payment is complete" : "Payment still requires follow-up"}
-            </span>
+            {group?.agent ? `Responsible for ${row.groupCode}` : "Select an agent for this visa group"}
           </small>
         </div>
 
         <button
           type="button"
-          className="mt-4 inline-flex rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-bold leading-none text-on-primary transition hover:bg-primary-container"
-          onClick={() => {
-            const nextStatus = paymentStatus === "Paid" ? "Unpaid" : "Paid";
-            setPaymentStatus(nextStatus);
-            onUpdatePaymentStatus(row.groupCode, nextStatus);
-          }}
+          className="mt-4 inline-flex rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-3 py-1.5 text-xs font-bold leading-none text-brand-primary transition hover:bg-brand-primary/15"
+          onClick={openAgentModal}
         >
-          <span className="sm:hidden">{paymentStatus === "Paid" ? "Mark Unpaid" : "Mark Paid"}</span>
-          <span className="hidden sm:inline">
-            {paymentStatus === "Paid" ? "Mark as Unpaid" : "Toggle to Paid"}
-          </span>
+          {group?.agent ? "Edit Agent" : "Assign Agent"}
         </button>
       </article>
     </section>

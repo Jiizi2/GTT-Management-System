@@ -11,6 +11,9 @@ const LazyDashboardWorkspaceShell = lazy(async () => ({
 const LazyLoginScreen = lazy(async () => ({
   default: (await import("./pages/login-page")).LoginScreen,
 }));
+const LazyAgentApplication = lazy(async () => ({
+  default: (await import("./agent/agent-application")).AgentApplication,
+}));
 
 const DEVELOPMENT_LOGIN_ACCOUNTS: DevelopmentLoginAccountHint[] = [
   {
@@ -43,14 +46,14 @@ function RestoringSessionScreen() {
         <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary">Secure Session</p>
         <h1 className="mt-3 text-2xl font-semibold text-on-surface">Memverifikasi sesi</h1>
         <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-          Dashboard sedang memastikan sesi login Anda masih valid.
+          Ops sedang memastikan sesi login Anda masih valid.
         </p>
       </div>
     </div>
   );
 }
 
-export function App() {
+function InternalApplication() {
   const location = useLocation();
   const authSessionQuery = useAuthSessionQuery();
   const loginMutation = useLoginMutation();
@@ -127,4 +130,16 @@ export function App() {
       />
     </Routes>
   );
+}
+
+export function App() {
+  const location = useLocation();
+  if (location.pathname === "/agent" || location.pathname.startsWith("/agent/")) {
+    return (
+      <Suspense fallback={<RestoringSessionScreen />}>
+        <LazyAgentApplication />
+      </Suspense>
+    );
+  }
+  return <InternalApplication />;
 }

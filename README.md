@@ -1,8 +1,8 @@
-# GTT Management System
+# GTT Ops & Portal Agent
 
-> Dashboard operasional Umrah untuk tim internal **Ghaniya Tour and Travel**.
+> **Ops** untuk tim internal dan **Portal Agent** untuk akses Agent di **Ghaniya Tour and Travel**.
 
-Monorepo ini berisi aplikasi web untuk monitoring grup perjalanan, penyusunan itinerary, checklist keberangkatan, tracking visa & hotel agreement, manajemen invoice, serta administrasi user dan master data.
+Monorepo ini memakai satu frontend production: area internal berada di route utama, sedangkan Portal Agent berada di `/agent`. Keduanya berbagi design system dan domain, dengan boundary autentikasi dan scope data yang tetap terpisah.
 
 ---
 
@@ -33,6 +33,7 @@ Monorepo memakai **npm workspaces** (`apps/*`):
 | Modul | Deskripsi |
 |---|---|
 | **Overview** | Statistik, daftar grup, pencarian, filter aktif/non-aktif |
+| **Visa Tracking** | Monitoring status visa di Ops dan tampilan read-only yang external-friendly di Portal Agent |
 | **Add New Group** | Wizard pembuatan grup dengan itinerary dan data visa awal |
 | **Group Detail** | Detail lengkap grup: itinerary builder, timeline, notes, visa, checklist |
 | **H-1 Checklist** | Tugas keberangkatan dekat (driver/bus assignment) |

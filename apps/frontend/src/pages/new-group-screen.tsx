@@ -143,6 +143,7 @@ export function AddGroupWorkspaceScreen({
   const [identityDraft, setIdentityDraft] = useState<NewGroupItineraryDraft | null>(null);
 
   const isIdentityStepComplete = Boolean(
+    identityDraft?.agentId?.trim() &&
     identityDraft?.groupCode?.trim() &&
     identityDraft?.groupName?.trim() &&
     identityDraft?.packageName?.trim() &&
@@ -162,6 +163,7 @@ export function AddGroupWorkspaceScreen({
     }
 
     onSaveIdentity({
+      agentId: identityDraft.agentId?.trim(),
       groupCode: identityDraft.groupCode?.trim().toUpperCase() ?? "",
       groupName: identityDraft.groupName?.trim(),
       packageName: identityDraft.packageName?.trim(),

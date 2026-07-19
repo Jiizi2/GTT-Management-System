@@ -6,6 +6,7 @@ apps/*/node_modules/
 dist/
 apps/*/dist/
 apps/*/build-meta/
+apps/agent-portal/
 *.tsbuildinfo
 
 # Test artifacts
@@ -14,9 +15,11 @@ coverage/
 apps/frontend/playwright-report/
 apps/frontend/test-results/
 apps/frontend/test-results-*/
+apps/*/test-results/
 
 # Logs
 *.log
+.codex-logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -31,6 +34,7 @@ apps/*/.env.*
 
 # Sensitive local database dumps
 .local-backups/
+gtt-backups/
 *.dump
 *.backup
 production_backup*.sql

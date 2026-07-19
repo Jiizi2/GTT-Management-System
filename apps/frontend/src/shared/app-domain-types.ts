@@ -112,6 +112,17 @@ export type GroupVisaSetup = {
 
 export type GroupData = {
   id?: string;
+  agentId?: string;
+  agent?: {
+    id: string;
+    code: string;
+    name: string;
+    type: "DIRECT" | "PARTNER";
+    status: "ACTIVE" | "INACTIVE";
+    picName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
   code: string;
   name: string;
   status: string;
@@ -210,6 +221,8 @@ export type ChecklistItem = {
   groupCode: string;
   groupName: string;
   groupPax: number;
+  agentId?: string;
+  agentName?: string;
   tripDate: string;
   activity: string;
   trip: string;
@@ -266,8 +279,10 @@ export type AgreementDraftAssignmentStatus = "Unassigned" | "Assigned" | "Partia
 
 export type HotelAgreementDraft = {
   id: string;
+  agentId: string;
   city: "makkah" | "madinah";
   agentName: string;
+  groupName?: string;
   hotelName: string;
   agreementNumber: string;
   pax: number;
@@ -284,7 +299,8 @@ export type HotelAgreementDraft = {
 
 export type HotelAgreementDraftFormState = {
   city: "makkah" | "madinah";
-  agentName: string;
+  agentId: string;
+  groupName: string;
   hotelName: string;
   agreementNumber: string;
   pax: string;
@@ -353,6 +369,7 @@ export type InputItineraryFormState = {
 };
 
 export type NewGroupItineraryDraft = {
+  agentId?: string;
   groupCode?: string;
   groupName?: string;
   pax?: number;

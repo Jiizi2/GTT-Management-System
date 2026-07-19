@@ -43,12 +43,12 @@ export class InvoicesService implements OnModuleInit {
     return this.queryService.listClients();
   }
 
-  async findAll(): Promise<InvoiceListItem[]> {
-    return this.queryService.findAll();
+  async findAll(agentId?: string): Promise<InvoiceListItem[]> {
+    return this.queryService.findAll(agentId);
   }
 
-  async findAllPaginated(pagination: PaginationDto): Promise<PaginatedResponseDto<InvoiceListItem>> {
-    return this.queryService.findAllPaginated(pagination);
+  async findAllPaginated(pagination: PaginationDto, agentId?: string): Promise<PaginatedResponseDto<InvoiceListItem>> {
+    return this.queryService.findAllPaginated(pagination, agentId);
   }
 
   async create(payload: CreateInvoiceDto): Promise<InvoiceListItem> {

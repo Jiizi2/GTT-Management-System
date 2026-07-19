@@ -17,6 +17,7 @@ const DEV_AUTH_PASSWORD =
   process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "DevSuperAdmin#2026";
 const DEV_AUTH_ADMIN_PASSWORD =
   process.env.DEV_AUTH_ADMIN_PASSWORD?.trim() || "DevAdmin#2026";
+const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
 
@@ -331,6 +332,7 @@ async function testPrismaIntegrationFlow(): Promise<void> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
+        agentId: GTT_DIRECT_AGENT_ID,
         clientName: testClientName,
         issuedDate: todayIso,
         dueDate: dueDateIso,
@@ -432,6 +434,7 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
             "content-type": "application/json",
           },
           body: JSON.stringify({
+            agentId: GTT_DIRECT_AGENT_ID,
             clientName: `${testClientPrefix}-${leftIndex + 1}`,
             issuedDate: "2026-01-15",
             dueDate: `${2030 + leftIndex}-01-15`,
@@ -444,6 +447,7 @@ async function testPrismaConcurrentInvoiceCreateFlow(): Promise<void> {
             "content-type": "application/json",
           },
           body: JSON.stringify({
+            agentId: GTT_DIRECT_AGENT_ID,
             clientName: `${testClientPrefix}-${rightIndex + 1}`,
             issuedDate: "2026-01-15",
             dueDate: `${2030 + rightIndex}-01-15`,
@@ -634,6 +638,254 @@ async function testPrismaManagedUserPasswordFlow(): Promise<void> {
   }
 }
 
+async function testPrismaAgentPortalAuthenticationFlow(): Promise<void> {
+  const server = await startBackendServerWithPrisma();
+  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+  let agentId: string | null = null;
+  let foreignAgentId: string | null = null;
+  let portalUserId: string | null = null;
+  const groupIds: string[] = [];
+  const invoiceIds: string[] = [];
+  const invoiceClientIds: string[] = [];
+
+  try {
+    await authenticateDevSession(server.baseUrl);
+
+    const agentResponse = await requestJson(server.baseUrl, "/api/agents", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: `PRISMA-PORTAL-${uniqueSuffix}`,
+        name: `Prisma Portal Partner ${uniqueSuffix}`,
+        type: "PARTNER",
+      }),
+    });
+    assert.equal(agentResponse.status, 201, `Partner creation failed: ${agentResponse.text}`);
+    agentId = (agentResponse.json as { id?: string }).id ?? null;
+    assert.ok(agentId, "Partner creation should return an id.");
+
+    const identifier = `prisma-portal-${uniqueSuffix}@example.com`;
+    const password = "PrismaPortal#2026";
+    const accountResponse = await requestJson(server.baseUrl, "/api/agent-portal-accounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        agentId,
+        displayName: "Prisma Portal Operator",
+        email: identifier,
+        password,
+      }),
+    });
+    assert.equal(accountResponse.status, 201, `Portal account creation failed: ${accountResponse.text}`);
+    portalUserId = (accountResponse.json as { id?: string }).id ?? null;
+    assert.ok(portalUserId, "Portal account creation should return an id.");
+
+    const loginResponse = await requestJson(server.baseUrl, "/api/agent/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: "" },
+      body: JSON.stringify({ identifier, password }),
+    });
+    assert.equal(loginResponse.status, 200, `Agent login failed: ${loginResponse.text}`);
+    const agentCookie = (loginResponse.headers.get("set-cookie") ?? "").split(";")[0]?.trim();
+    assert.ok(agentCookie?.startsWith("gtt_agent_session="), "Agent login should set its dedicated cookie.");
+
+    const sessionResponse = await requestJson(server.baseUrl, "/api/agent/auth/session", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(sessionResponse.status, 200, `Agent session failed: ${sessionResponse.text}`);
+    assert.equal(
+      (sessionResponse.json as { user?: { agentId?: string } }).user?.agentId,
+      agentId,
+      "Agent session should remain scoped to the provisioned Partner.",
+    );
+
+    const foreignAgent = await prisma.agent.create({
+      data: {
+        code: `PRISMA-FOREIGN-${uniqueSuffix}`,
+        name: `Prisma Foreign Partner ${uniqueSuffix}`,
+        type: "PARTNER",
+      },
+    });
+    foreignAgentId = foreignAgent.id;
+    const todayIso = toIsoDateOnly(new Date());
+    const arrivalDate = new Date(`${addUtcDays(todayIso, 1)}T00:00:00.000Z`);
+    const returnDate = new Date(`${addUtcDays(todayIso, 8)}T00:00:00.000Z`);
+    for (const data of [
+      {
+        code: `PRISMA-OWN-${uniqueSuffix}`,
+        name: "Prisma Owned Portal Group",
+        agentId,
+        pax: 22,
+      },
+      {
+        code: `PRISMA-OTHER-${uniqueSuffix}`,
+        name: "Prisma Foreign Portal Group",
+        agentId: foreignAgentId,
+        pax: 999,
+      },
+    ]) {
+      const created = await prisma.group.create({
+        data: {
+          ...data,
+          status: "Active",
+          arrivalDate,
+          returnDate,
+          packageName: "Private package",
+          durationDays: 8,
+        },
+      });
+      groupIds.push(created.id);
+    }
+    assert.equal(groupIds.length, 2, "Prisma Agent Portal scenario should create two groups.");
+    for (const [index, data] of [
+      { agentId, groupId: groupIds[0], suffix: "OWN", amount: 88_000_000 },
+      { agentId: foreignAgentId, groupId: groupIds[1], suffix: "OTHER", amount: 999_000_000 },
+    ].entries()) {
+      const client = await prisma.invoiceClient.create({
+        data: {
+          name: `Prisma Portal ${data.suffix} Client ${uniqueSuffix}`,
+          sortOrder: 90_000 + index,
+          groupId: data.groupId,
+        },
+      });
+      invoiceClientIds.push(client.id);
+      const created = await prisma.invoice.create({
+        data: {
+          invoiceNumber: `GTT/PORTAL/${data.suffix}/${uniqueSuffix}`,
+          clientId: client.id,
+          groupId: data.groupId,
+          agentId: data.agentId,
+          issuedDate: arrivalDate,
+          dueDate: returnDate,
+          amount: data.amount,
+          notes: `${data.suffix} PRIVATE INVOICE NOTE`,
+          description: `${data.suffix} PRIVATE DESCRIPTION`,
+          recipientName: `${data.suffix} PRIVATE RECIPIENT`,
+        },
+      });
+      invoiceIds.push(created.id);
+    }
+
+    const profileResponse = await requestJson(server.baseUrl, "/api/agent/profile", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(profileResponse.status, 200, `Agent profile failed: ${profileResponse.text}`);
+    assert.deepEqual(profileResponse.json, {
+      account: { displayName: "Prisma Portal Operator" },
+      agent: {
+        code: `PRISMA-PORTAL-${uniqueSuffix}`,
+        name: `Prisma Portal Partner ${uniqueSuffix}`,
+      },
+    });
+
+    const dashboardResponse = await requestJson(server.baseUrl, "/api/agent/dashboard", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(dashboardResponse.status, 200, `Agent dashboard failed: ${dashboardResponse.text}`);
+    assert.equal(
+      (dashboardResponse.json as { groups?: { total?: number; totalPax?: number } }).groups?.total,
+      1,
+      "Prisma dashboard must count only the session Agent.",
+    );
+    assert.equal(
+      (dashboardResponse.json as { groups?: { totalPax?: number } }).groups?.totalPax,
+      22,
+      "Prisma dashboard pax must exclude the foreign Agent.",
+    );
+    assert.equal(
+      dashboardResponse.text.includes(`PRISMA-OTHER-${uniqueSuffix}`),
+      false,
+      "Prisma dashboard must not expose another Agent's group.",
+    );
+
+    const groupListResponse = await requestJson(server.baseUrl, "/api/agent/groups?page=1&pageSize=10", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(groupListResponse.status, 200, `Prisma Agent group list failed: ${groupListResponse.text}`);
+    assert.equal((groupListResponse.json as { total?: number }).total, 1);
+    assert.equal(groupListResponse.text.includes(`PRISMA-OTHER-${uniqueSuffix}`), false);
+
+    const ownGroupResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/groups/${encodeURIComponent(`PRISMA-OWN-${uniqueSuffix}`)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(ownGroupResponse.status, 200, `Prisma Agent group detail failed: ${ownGroupResponse.text}`);
+    const foreignGroupResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/groups/${encodeURIComponent(`PRISMA-OTHER-${uniqueSuffix}`)}`,
+      { headers: { cookie: agentCookie } },
+    );
+    const missingGroupResponse = await requestJson(server.baseUrl, "/api/agent/groups/PRISMA-MISSING", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(foreignGroupResponse.status, 404);
+    assert.equal(missingGroupResponse.status, 404);
+    assert.deepEqual(foreignGroupResponse.json, missingGroupResponse.json);
+
+    const invoiceListResponse = await requestJson(server.baseUrl, "/api/agent/invoices?page=1&pageSize=10", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(invoiceListResponse.status, 200, `Prisma Agent invoice list failed: ${invoiceListResponse.text}`);
+    assert.equal((invoiceListResponse.json as { total?: number }).total, 1);
+    assert.equal(invoiceListResponse.text.includes(invoiceIds[1] ?? "missing-foreign-id"), false);
+    assert.equal(invoiceListResponse.text.includes("PRIVATE"), false);
+    assert.equal(invoiceListResponse.text.includes("88000000"), false);
+
+    const ownInvoiceResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/invoices/${encodeURIComponent(invoiceIds[0] ?? "")}`,
+      { headers: { cookie: agentCookie } },
+    );
+    assert.equal(ownInvoiceResponse.status, 200, `Prisma Agent invoice detail failed: ${ownInvoiceResponse.text}`);
+    const foreignInvoiceResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent/invoices/${encodeURIComponent(invoiceIds[1] ?? "")}`,
+      { headers: { cookie: agentCookie } },
+    );
+    const missingInvoiceResponse = await requestJson(server.baseUrl, "/api/agent/invoices/PRISMA-MISSING", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(foreignInvoiceResponse.status, 404);
+    assert.equal(missingInvoiceResponse.status, 404);
+    assert.deepEqual(foreignInvoiceResponse.json, missingInvoiceResponse.json);
+
+    const revokeResponse = await requestJson(
+      server.baseUrl,
+      `/api/agent-portal-accounts/${encodeURIComponent(portalUserId)}/revoke`,
+      { method: "POST" },
+    );
+    assert.equal(revokeResponse.status, 200, `Agent session revocation failed: ${revokeResponse.text}`);
+
+    const revokedSessionResponse = await requestJson(server.baseUrl, "/api/agent/auth/session", {
+      headers: { cookie: agentCookie },
+    });
+    assert.equal(revokedSessionResponse.status, 401, "A revoked Agent session must be rejected.");
+  } finally {
+    activeAuthCookie = null;
+    if (invoiceIds.length > 0) {
+      await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+    }
+    if (invoiceClientIds.length > 0) {
+      await prisma.invoiceClient.deleteMany({ where: { id: { in: invoiceClientIds } } });
+    }
+    if (groupIds.length > 0) {
+      await prisma.group.deleteMany({ where: { id: { in: groupIds } } });
+    }
+    if (portalUserId) {
+      await prisma.agentPortalAccountAuditLog.deleteMany({ where: { portalUserId } });
+      await prisma.agentPortalUser.deleteMany({ where: { id: portalUserId } });
+    }
+    if (agentId) {
+      await prisma.agent.deleteMany({ where: { id: agentId } });
+    }
+    if (foreignAgentId) {
+      await prisma.agent.deleteMany({ where: { id: foreignAgentId } });
+    }
+    await server.shutdown();
+  }
+}
+
 describe("backend prisma integration tests", () => {
   afterAll(async () => {
     await prisma.$disconnect();
@@ -649,6 +901,10 @@ describe("backend prisma integration tests", () => {
 
   it("should run backend prisma managed user password flow", async () => {
     await testPrismaManagedUserPasswordFlow();
+  });
+
+  it("should run backend prisma Agent Portal authentication flow", async () => {
+    await testPrismaAgentPortalAuthenticationFlow();
   });
 
   it("should preserve one active Super Admin during concurrent demotions", async () => {

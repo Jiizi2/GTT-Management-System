@@ -5,8 +5,8 @@ import { InvoiceListItem, InvoiceClientListItem } from "../../invoices/invoices-
 
 export interface InvoiceRepository {
   listClients(): Promise<InvoiceClientListItem[]>;
-  findAll(): Promise<InvoiceListItem[]>;
-  findAllPaginated(pagination: PaginationDto): Promise<PaginatedResponseDto<InvoiceListItem>>;
+  findAll(agentId?: string): Promise<InvoiceListItem[]>;
+  findAllPaginated(pagination: PaginationDto, agentId?: string): Promise<PaginatedResponseDto<InvoiceListItem>>;
   create(payload: CreateInvoiceDto): Promise<InvoiceListItem>;
   update(id: string, payload: UpdateInvoiceDto): Promise<InvoiceListItem>;
   delete(id: string): Promise<void>;

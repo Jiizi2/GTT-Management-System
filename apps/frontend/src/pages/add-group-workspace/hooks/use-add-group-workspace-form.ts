@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useForm, useFieldArray, UseFormReturn } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import * as Domain from "../../../shared/app-domain";
@@ -50,6 +50,7 @@ const {
 function createIdentityFormSchema(requireIdentityFields: boolean) {
   return z
     .object({
+      agentId: requireIdentityFields ? z.string().trim().min(1, "Agent wajib dipilih.") : z.string(),
       groupNumber: requireIdentityFields ? z.string().trim().min(1, "Group number wajib diisi.") : z.string(),
       groupName: requireIdentityFields ? z.string().trim().min(1, "Group name wajib diisi.") : z.string(),
       packageType: requireIdentityFields ? z.string().trim().min(1, "Package type wajib diisi.") : z.string(),
@@ -245,6 +246,7 @@ export function useAddGroupWorkspaceForm({
     resolver: zodResolver(identityFormSchema),
     mode: "onChange",
     defaultValues: {
+      agentId: "",
       groupNumber: "",
       groupName: "",
       packageType: "",
@@ -290,6 +292,7 @@ export function useAddGroupWorkspaceForm({
   const baseTripSuggestedHotelByIdRef = useRef<Record<string, string>>({});
 
   const groupNumber = identityMethods.watch("groupNumber");
+  const agentId = identityMethods.watch("agentId");
   const groupName = identityMethods.watch("groupName");
   const packageType = identityMethods.watch("packageType");
   const paxCount = identityMethods.watch("paxCount");
@@ -356,7 +359,8 @@ export function useAddGroupWorkspaceForm({
   const isFirstBaseTripStep = currentBaseTripStepIndex === 0;
   const isLastBaseTripStep = currentBaseTripStepIndex === maxBaseTripStepIndex;
   const isActiveBaseTripInvalid = activeBaseTrip ? isBaseTripDraftInvalid(activeBaseTrip) : true;
-  const isGroupSaveDisabled = !isGroupReadyForItinerary || itineraryItems.length === 0;
+  const effectiveAgentId = agentId.trim() || identityDraft?.agentId?.trim() || "";
+  const isGroupSaveDisabled = !isGroupReadyForItinerary || !effectiveAgentId || itineraryItems.length === 0;
   const showFridayCityTourWarning = shouldShowFridayCityTourWarning(form.category, form.date);
   const itineraryPrefillSeed = JSON.stringify(itineraryPrefill ?? {});
   const schedulePrefillSeed = `${effectiveStartDate}|${effectiveEndDate}|${itineraryPrefillSeed}`;
@@ -812,6 +816,7 @@ export function useAddGroupWorkspaceForm({
     const groupTone = resolveGroupToneByItinerary(itinerary);
 
     onSaveGroup({
+      agentId: effectiveAgentId,
       code: effectiveGroupCode.trim().toUpperCase(),
       name: effectiveGroupName.trim(),
       status: getStatusByTone(groupTone),
@@ -830,6 +835,16 @@ export function useAddGroupWorkspaceForm({
         name: effectiveMusyrifName.trim(),
         phone: effectiveMusyrifPhone.trim(),
         avatar: musyrifAvatar,
+      },
+      visaSetup: {
+        visaStatus: "Draft",
+        issuedDate: "",
+        syarikah: "Not assigned",
+        busStatus: effectiveBusStatus,
+        paymentStatus: "Unpaid",
+        makkahHotels: [],
+        madinahHotels: [],
+        raudhahAppointments: [],
       },
     });
   };
@@ -881,6 +896,7 @@ export function useAddGroupWorkspaceForm({
     const parsedDraftPax = Number.parseInt(effectivePaxCountValue, 10);
     const parsedDraftTotalBuses = Number.parseInt(effectiveTotalBusRequiredValue, 10);
     const baseDraft: NewGroupItineraryDraft = {
+      agentId: effectiveAgentId,
       groupCode: effectiveGroupCode.trim().toUpperCase(),
       groupName: effectiveGroupName.trim(),
       pax: Number.isFinite(parsedDraftPax) && parsedDraftPax > 0 ? parsedDraftPax : undefined,
@@ -925,6 +941,7 @@ export function useAddGroupWorkspaceForm({
     });
   }, [
     effectiveGroupCode,
+    effectiveAgentId,
     effectiveGroupName,
     effectivePaxCountValue,
     effectiveTotalBusRequiredValue,
@@ -933,6 +950,7 @@ export function useAddGroupWorkspaceForm({
     effectiveEndDate,
     effectiveMusyrifName,
     effectiveMusyrifPhone,
+    effectiveBusStatus,
     itineraryItems,
     emitIdentityInDraft,
     onItineraryDraftChange,

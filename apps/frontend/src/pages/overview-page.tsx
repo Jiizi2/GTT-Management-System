@@ -7,20 +7,10 @@ import { Button } from "../components/button";
 import { PageHeroSection } from "../components/page-hero-section";
 import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
+import { MetricCard } from "../components/metric-card";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 
 const { OVERVIEW_PAGE_SIZE } = Domain;
-
-function getStatToneClasses(tone: "primary" | "secondary" | "tertiary"): string {
-  if (tone === "primary") {
-    return "bg-primary text-on-primary shadow-ambient";
-  }
-
-  if (tone === "secondary") {
-    return "bg-secondary text-on-primary shadow-ambient";
-  }
-
-  return "bg-tertiary text-on-primary shadow-ambient";
-}
 
 export function OverviewScreen({
   query,
@@ -29,12 +19,13 @@ export function OverviewScreen({
   overviewMonthFilter,
   overviewMonthOptions,
   statCards,
-  summaryMessage,
   onQueryChange,
   onToggleActiveOnly,
   onOverviewMonthFilterChange,
   onOpenDetail,
   groups = [],
+  fixedAgentName,
+  showThemeToggle = true,
 }: {
   query: string;
   filteredGroups: GroupData[];
@@ -51,29 +42,35 @@ export function OverviewScreen({
     icon: string;
     tone: "primary" | "secondary" | "tertiary";
   }>;
-  summaryMessage: string;
   onQueryChange: (value: string) => void;
   onToggleActiveOnly: (value: boolean) => void;
   onOverviewMonthFilterChange: (value: string) => void;
   onOpenDetail: (groupCode: string) => void;
   groups?: GroupData[];
+  fixedAgentName?: string;
+  showThemeToggle?: boolean;
 }) {
   const hasQuery = query.trim().length > 0;
   const [currentPage, setCurrentPage] = useState(1);
+  const [agentFilter, setAgentFilter] = useState("all");
+  const agentFilteredGroups =
+    agentFilter === "all" ? filteredGroups : filteredGroups.filter((group) => group.agentId === agentFilter);
   const selectedOverviewMonthLabel =
     overviewMonthOptions.find((option) => option.value === overviewMonthFilter)?.label ??
     (overviewMonthFilter === "all" ? "All Months" : overviewMonthFilter);
-  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / OVERVIEW_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(agentFilteredGroups.length / OVERVIEW_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * OVERVIEW_PAGE_SIZE;
-  const paginatedGroups = filteredGroups.slice(pageStartIndex, pageStartIndex + OVERVIEW_PAGE_SIZE);
-  const visibleRangeStart = filteredGroups.length === 0 ? 0 : pageStartIndex + 1;
+  const paginatedGroups = agentFilteredGroups.slice(pageStartIndex, pageStartIndex + OVERVIEW_PAGE_SIZE);
+  const visibleRangeStart = agentFilteredGroups.length === 0 ? 0 : pageStartIndex + 1;
   const visibleRangeEnd =
-    filteredGroups.length === 0 ? 0 : Math.min(filteredGroups.length, pageStartIndex + paginatedGroups.length);
-  const hasGroupsForExport = filteredGroups.length > 0;
+    agentFilteredGroups.length === 0
+      ? 0
+      : Math.min(agentFilteredGroups.length, pageStartIndex + paginatedGroups.length);
+  const hasGroupsForExport = agentFilteredGroups.length > 0;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [overviewMonthFilter, query, isActiveOnly]);
+  }, [overviewMonthFilter, query, isActiveOnly, agentFilter]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -90,11 +87,10 @@ export function OverviewScreen({
       .then(({ exportOverviewReportPdf }) => {
         const exported = exportOverviewReportPdf(
           {
-            groups: filteredGroups,
+            groups: agentFilteredGroups,
             query,
             isActiveOnly,
             monthLabel: selectedOverviewMonthLabel,
-            summaryMessage,
           },
           {
             printWindow: printableWindow,
@@ -132,7 +128,7 @@ export function OverviewScreen({
           />
         </label>
 
-        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
+        {showThemeToggle ? <ThemeToggleButton className="sm:ml-auto sm:mr-5" /> : null}
       </header>
 
       <PageHeroSection
@@ -148,8 +144,8 @@ export function OverviewScreen({
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.95fr_1fr_1fr_1fr]" aria-label="Weekly summary">
-        <article className="serene-card flex min-h-[11rem] flex-col p-4 sm:min-h-[12.25rem] sm:p-6">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_1fr_1fr]" aria-label="Weekly summary">
+        <article className="serene-card flex min-h-[7rem] flex-col justify-between p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
               <span className="material-symbols-outlined text-xl" aria-hidden="true">
@@ -157,23 +153,17 @@ export function OverviewScreen({
               </span>
             </div>
 
-            <h2 className="font-display text-2xl font-extrabold leading-[1.05] tracking-tight text-primary sm:text-4xl">
-              Weekly
-              <br />
-              Summary
+            <h2 className="font-display text-xl font-extrabold leading-tight tracking-tight text-primary sm:text-2xl">
+              Weekly Summary
             </h2>
           </div>
 
-          <p className="mt-2 text-xs font-medium text-on-surface-variant sm:text-sm">
+          <p className="mt-2 text-xs font-medium text-on-surface-variant">
             Generate and download weekly itinerary report.
           </p>
 
           <div className="mt-auto pt-3">
-            <Button
-              className="w-full"
-              onClick={handleExportReport}
-              disabled={!hasGroupsForExport}
-            >
+            <Button className="w-full" onClick={handleExportReport} disabled={!hasGroupsForExport}>
               <span className="material-symbols-outlined text-base" aria-hidden="true">
                 download
               </span>
@@ -184,42 +174,40 @@ export function OverviewScreen({
         </article>
 
         {statCards.map((card) => (
-          <article
+          <MetricCard
             key={card.label}
-            className={`relative min-h-[11rem] overflow-hidden rounded-2xl p-4 sm:min-h-[12.25rem] sm:p-6 ${getStatToneClasses(
-              card.tone,
-            )}`}
-          >
-            <span className="block text-xs font-bold uppercase tracking-[0.14em] opacity-80">{card.label}</span>
-            <strong className="mt-4 block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
-              {card.value}
-            </strong>
-            {card.subtitle ? (
-              <span className="mt-3 hidden text-xs font-semibold tracking-wide opacity-80 sm:block sm:text-sm">
-                {card.subtitle}
-              </span>
-            ) : null}
-
-            <span
-              className="material-symbols-outlined absolute -bottom-1 right-2 text-6xl opacity-20 sm:text-7xl"
-              aria-hidden="true"
-            >
-              {card.icon}
-            </span>
-          </article>
+            icon={card.icon}
+            label={card.label}
+            value={card.value}
+            supportingText={card.subtitle}
+            tone="primary"
+          />
         ))}
       </section>
 
       <section className="serene-summary-strip" aria-label="Search results summary">
         <div className="flex items-end gap-2 text-sm text-on-surface-variant">
-          <strong className="text-2xl font-bold leading-none text-on-surface">{filteredGroups.length}</strong>
-          <span className="sm:hidden">{filteredGroups.length === 1 ? "group" : "groups"}</span>
+          <strong className="text-2xl font-bold leading-none text-on-surface">{agentFilteredGroups.length}</strong>
+          <span className="sm:hidden">{agentFilteredGroups.length === 1 ? "group" : "groups"}</span>
           <span className="hidden sm:inline">
-            {filteredGroups.length === 1 ? "group displayed" : "groups displayed"}
+            {agentFilteredGroups.length === 1 ? "group displayed" : "groups displayed"}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {fixedAgentName ? (
+            <div className="relative flex h-9 min-w-[10.5rem] items-center rounded-xl border border-outline-variant/45 bg-surface-container-lowest px-3 pr-9 text-sm font-bold text-on-surface-variant shadow-sm">
+              <span className="truncate">{fixedAgentName}</span>
+              <span
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-base"
+                aria-hidden="true"
+              >
+                business
+              </span>
+            </div>
+          ) : (
+            <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="pill" />
+          )}
           <div
             className="inline-flex min-h-9 max-w-full overflow-hidden rounded-xl border border-outline-variant/45 bg-surface-container-lowest shadow-sm"
             aria-label="Overview filters"
@@ -287,8 +275,10 @@ export function OverviewScreen({
         style={{ columnGap: "1.5rem", rowGap: "1.5rem" }}
         aria-label="Group itinerary cards"
       >
-        {filteredGroups.length > 0 ? (
-          paginatedGroups.map((group) => <GroupCard key={group.code} group={group} groups={groups} onOpenDetail={onOpenDetail} />)
+        {agentFilteredGroups.length > 0 ? (
+          paginatedGroups.map((group) => (
+            <GroupCard key={group.code} group={group} groups={groups} onOpenDetail={onOpenDetail} />
+          ))
         ) : (
           <article className="serene-empty-state col-span-full">
             <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
@@ -305,7 +295,7 @@ export function OverviewScreen({
       <PaginationControls
         currentPage={currentPage}
         totalPages={totalPages}
-        totalItems={filteredGroups.length}
+        totalItems={agentFilteredGroups.length}
         rangeStart={visibleRangeStart}
         rangeEnd={visibleRangeEnd}
         itemLabel="groups"

@@ -26,6 +26,34 @@ export type GroupVisaDomainDependencies = {
   resolveValidRaudhahAppointments: (group: GroupData | undefined) => GroupRaudhahAppointment[];
 };
 
+export type IssuedVisaStatistics = {
+  selectedMonthPax: number;
+  selectedMonthGroups: number;
+  overallPax: number;
+  overallGroups: number;
+  missingIssuedDateGroups: number;
+};
+
+export function calculateIssuedVisaStatistics(
+  rows: VisaTrackingRow[],
+  selectedMonthKey: string,
+): IssuedVisaStatistics {
+  const issuedRows = rows.filter((row) => row.visaStatus === "Issued");
+  const selectedMonthRows = selectedMonthKey === "all"
+    ? issuedRows
+    : issuedRows.filter(
+        (row) => isIsoDateValue(row.issuedDateIso) && row.issuedDateIso.slice(0, 7) === selectedMonthKey,
+      );
+
+  return {
+    selectedMonthPax: selectedMonthRows.reduce((sum, row) => sum + row.pax, 0),
+    selectedMonthGroups: selectedMonthRows.length,
+    overallPax: issuedRows.reduce((sum, row) => sum + row.pax, 0),
+    overallGroups: issuedRows.length,
+    missingIssuedDateGroups: issuedRows.filter((row) => !isIsoDateValue(row.issuedDateIso)).length,
+  };
+}
+
 function resolveItineraryBoundaryIsoDates(
   itinerary: ItineraryItem[],
   dependencies: Pick<GroupVisaDomainDependencies, "getItineraryIsoDate" | "parseTimeForInput">,
@@ -322,8 +350,7 @@ export function buildVisaTrackingRowsFromGroups(
     const visaStatus: VisaStatus = visaSetup?.visaStatus ?? "Draft";
     const paymentStatus: VisaPaymentStatus = visaSetup?.paymentStatus ?? "Unpaid";
     const configuredIssuedDate = visaSetup?.issuedDate?.trim() ?? "";
-    const issuedDateIso =
-      visaStatus === "Issued" ? (isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : departureIso) : "";
+    const issuedDateIso = visaStatus === "Issued" && isIsoDateValue(configuredIssuedDate) ? configuredIssuedDate : "";
 
     const pax = Math.max(1, group.pax);
     const verifiedMakkahPax = calculateVerifiedPax(getGroupAgreementHotelsByCity(group, "makkah"), pax);

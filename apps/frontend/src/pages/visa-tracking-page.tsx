@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { AgreementApprovalStatus, GroupData, VisaTrackingRow, VisaFilterId } from "../shared/app-domain";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 import { PaginationControls } from "../components/pagination-controls";
 import { PageHeroSection } from "../components/page-hero-section";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
@@ -13,23 +15,31 @@ export function VisaTrackingScreen({
   groups,
   onOpenDetail,
   onUpdateAgreementStatus,
+  readOnly = false,
+  fixedAgentName,
+  showThemeToggle = true,
 }: {
   groups: GroupData[];
   onOpenDetail: (row: VisaTrackingRow) => void;
   onUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
+  readOnly?: boolean;
+  fixedAgentName?: string;
+  showThemeToggle?: boolean;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
 
-  const state = useVisaTracking({ groups });
+  const [agentFilter, setAgentFilter] = useState("all");
+  const scopedGroups = agentFilter === "all" ? groups : groups.filter((group) => group.agentId === agentFilter);
+  const state = useVisaTracking({ groups: scopedGroups });
 
   const {
     query,
     setQuery,
     activeFilter,
     setActiveFilter,
-    issuedMonthFilter,
-    setIssuedMonthFilter,
+    issuedStatsMonth,
+    setIssuedStatsMonth,
     currentPage,
     setCurrentPage,
     expandedRowGroupKeys,
@@ -43,7 +53,8 @@ export function VisaTrackingScreen({
     unpaidCount,
     visaOnlyCount,
     visaPlusCount,
-    issuedPaxCount,
+    issuedStatistics,
+    selectedIssuedMonthLabel,
     hasRowsForExport,
     actionRequiredCount,
     totalPages,
@@ -72,7 +83,7 @@ export function VisaTrackingScreen({
           </label>
         </div>
 
-        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
+        {showThemeToggle ? <ThemeToggleButton className="sm:ml-auto sm:mr-5" /> : null}
       </header>
 
       <PageHeroSection
@@ -104,116 +115,67 @@ export function VisaTrackingScreen({
         }
       />
 
-      <section className="flex flex-wrap items-center gap-2" aria-label="Visa tracking filters">
-        <div className="relative flex items-center bg-slate-100 dark:bg-surface-container-high/65 p-1 rounded-xl w-full sm:w-[720px] h-9">
-          {/* Sliding background indicator */}
-          <div
-            className="absolute top-1 bottom-1 bg-white dark:bg-surface-container-lowest rounded-lg shadow-sm transition-all duration-200 ease-out"
-            style={{
-              width: "calc(16.666% - 5px)",
-              left:
-                activeFilter === "all"
-                  ? "3px"
-                  : activeFilter === "not-issued"
-                  ? "calc(16.666% + 2px)"
-                  : activeFilter === "missing-hotel"
-                  ? "calc(33.333% + 2px)"
-                  : activeFilter === "visa-only"
-                  ? "calc(50% + 2px)"
-                  : activeFilter === "visa-plus"
-                  ? "calc(66.666% + 2px)"
-                  : "calc(83.333% + 2px)",
-            }}
-          />
-          {(["all", "not-issued", "missing-hotel", "visa-only", "visa-plus", "unpaid"] as VisaFilterId[]).map((filter) => {
-            const isActive = activeFilter === filter;
-            let label = "";
-            let count = 0;
-            if (filter === "all") {
-              label = "All Groups";
-              count = visaRows.length;
-            } else if (filter === "not-issued") {
-              label = "Not Issued";
-              count = notIssuedCount;
-            } else if (filter === "missing-hotel") {
-              label = "Missing Hotel";
-              count = missingHotelCount;
-            } else if (filter === "visa-only") {
-              label = "Visa Only";
-              count = visaOnlyCount;
-            } else if (filter === "visa-plus") {
-              label = "Visa+";
-              count = visaPlusCount;
-            } else {
-              label = "Unpaid";
-              count = unpaidCount;
-            }
-            return (
-              <button
-                key={filter}
-                type="button"
-                className={`relative z-10 flex-1 h-full rounded-lg text-xs font-extrabold transition-colors duration-200 leading-none text-center ${
-                  isActive
-                    ? "text-brand-primary dark:text-primary"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-                onClick={() => setActiveFilter(filter)}
-              >
-                <span className="sm:hidden">
-                  {filter === "all"
-                    ? "All"
-                    : filter === "not-issued"
-                    ? "Pending"
-                    : filter === "missing-hotel"
-                    ? "No Hotel"
-                    : filter === "visa-only"
-                    ? "Visa Only"
-                    : filter === "visa-plus"
-                    ? "Visa+"
-                    : "Unpaid"}{" "}
-                  ({count})
-                </span>
-                <span className="hidden sm:inline">
-                  {label} ({count})
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <div className="relative min-w-[11rem]">
-            <SereneSelect
-              className="serene-select-pill h-9 w-full pr-9"
-              value={issuedMonthFilter}
-              onChange={(event) => setIssuedMonthFilter(event.target.value)}
-              showCaret={false}
-              aria-label="Filter visa month"
-            >
-              <option value="all">All Months</option>
-              {issuedMonthOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </SereneSelect>
-            <span
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-base text-on-surface-variant"
-              aria-hidden="true"
-            >
-              calendar_month
-            </span>
-          </div>
-        </div>
-      </section>
-
       <VisaTrackingStats
-        isDarkMode={isDarkMode}
         actionRequiredCount={actionRequiredCount}
         visaRowsCount={visaRows.length}
-        issuedPaxCount={issuedPaxCount}
+        issuedStatistics={issuedStatistics}
+        selectedMonthLabel={selectedIssuedMonthLabel}
         unpaidCount={unpaidCount}
       />
+
+      <section
+        className="flex flex-col border-y border-outline-variant/40 sm:flex-row sm:items-center"
+        aria-label="Visa tracking filters"
+      >
+        <div className="min-w-0 flex-1 py-1.5 sm:py-0">
+          <SereneSelect
+            className="h-8 w-full bg-transparent px-3 pr-8 text-left text-xs font-semibold text-on-surface-variant outline-none transition hover:text-on-surface"
+            value={activeFilter}
+            onChange={(event) => setActiveFilter(event.target.value as VisaFilterId)}
+            aria-label="Filter visa record view"
+          >
+            <option value="all">All Groups ({visaRows.length})</option>
+            <option value="not-issued">Not Issued ({notIssuedCount})</option>
+            <option value="missing-hotel">Missing Hotel ({missingHotelCount})</option>
+            <option value="visa-only">Visa Only ({visaOnlyCount})</option>
+            <option value="visa-plus">Visa+ ({visaPlusCount})</option>
+            <option value="unpaid">Unpaid ({unpaidCount})</option>
+          </SereneSelect>
+        </div>
+
+        <span className="h-px w-full bg-outline-variant/40 sm:h-5 sm:w-px" aria-hidden="true" />
+
+        {fixedAgentName ? (
+          <div className="flex h-11 min-w-0 flex-1 items-center px-3 text-xs font-semibold text-on-surface-variant sm:h-8">
+            <span className="truncate">{fixedAgentName}</span>
+          </div>
+        ) : (
+          <AgentFilterSelect
+            value={agentFilter}
+            onChange={setAgentFilter}
+            variant="inline"
+            className="w-full flex-1 py-1.5 sm:py-0"
+          />
+        )}
+
+        <span className="h-px w-full bg-outline-variant/40 sm:h-5 sm:w-px" aria-hidden="true" />
+
+        <div className="min-w-0 flex-1 py-1.5 sm:py-0">
+          <SereneSelect
+            className="h-8 w-full bg-transparent px-3 pr-8 text-left text-xs font-semibold text-on-surface-variant outline-none transition hover:text-on-surface"
+            value={issuedStatsMonth}
+            onChange={(event) => setIssuedStatsMonth(event.target.value)}
+            aria-label="Pilih bulan statistik visa issued"
+          >
+            {issuedMonthOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                Issued · {option.label}
+              </option>
+            ))}
+          </SereneSelect>
+        </div>
+
+      </section>
 
       {filteredGroupedRows.length === 0 ? (
         <article className="serene-empty-state">
@@ -243,6 +205,7 @@ export function VisaTrackingScreen({
                   onToggleExpand={toggleRowGroup}
                   onOpenDetail={onOpenDetail}
                   onUpdateAgreementStatus={onUpdateAgreementStatus}
+                  readOnly={readOnly}
                 />
               );
             })}
@@ -281,6 +244,7 @@ export function VisaTrackingScreen({
                         onToggleExpand={toggleRowGroup}
                         onOpenDetail={onOpenDetail}
                         onUpdateAgreementStatus={onUpdateAgreementStatus}
+                        readOnly={readOnly}
                       />
                     );
                   })}
@@ -290,7 +254,6 @@ export function VisaTrackingScreen({
           </section>
         </>
       )}
-
 
       <PaginationControls
         currentPage={currentPage}

@@ -16,6 +16,11 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { InvoiceLineItemDto } from "./invoice-line-item.dto";
 
 export class CreateInvoiceDto {
+  @ApiProperty({ example: "agent_gtt_direct" })
+  @IsString()
+  @IsNotEmpty()
+  agentId?: string;
+
   @ApiPropertyOptional({
     description: "ID client invoice yang sudah ada.",
     example: "clyourinvoiceclientid",

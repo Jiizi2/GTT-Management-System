@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { VisaStatusModal, PaymentStatusModal, SyarikahModal, VisaTypeModal } from '../visa-detail-modals';
+import {
+  AgentAssignmentModal,
+  VisaStatusModal,
+  PaymentStatusModal,
+  SyarikahModal,
+  VisaTypeModal,
+} from '../visa-detail-modals';
 
 // Mock useModalFocusTrap
 vi.mock('../use-modal-focus-trap', () => ({
@@ -88,6 +94,36 @@ describe('PaymentStatusModal', () => {
     const closeButton = screen.getByLabelText('Close edit payment status popup');
     fireEvent.click(closeButton);
     expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+});
+
+describe('AgentAssignmentModal', () => {
+  const agents = [
+    { id: 'agent-1', code: 'A01', name: 'Agent One', type: 'PARTNER' as const, status: 'ACTIVE' as const },
+    { id: 'agent-2', code: 'A02', name: 'Agent Two', type: 'PARTNER' as const, status: 'ACTIVE' as const },
+  ];
+
+  it('renders the current agent in an edit modal', () => {
+    render(
+      <AgentAssignmentModal
+        initialValue="agent-1"
+        agents={agents}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Edit Agent')).toBeInTheDocument();
+    expect(screen.getByText('Agent One')).toBeInTheDocument();
+    expect(screen.getByText('Save Changes')).toBeInTheDocument();
+  });
+
+  it('uses assignment copy when the group has no agent', () => {
+    render(
+      <AgentAssignmentModal initialValue="" agents={agents} onClose={vi.fn()} onSave={vi.fn()} />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Assign Agent' })).toBeInTheDocument();
   });
 });
 

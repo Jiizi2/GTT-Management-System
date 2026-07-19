@@ -6,6 +6,7 @@ import { useChecklistWorkspace } from "./checklist/hooks/use-checklist-workspace
 import { ChecklistNeedAttentionCard } from "./checklist/components/ChecklistNeedAttentionCard";
 import { ChecklistCompletedCard } from "./checklist/components/ChecklistCompletedCard";
 import { ChecklistCancelModal } from "./checklist/components/ChecklistCancelModal";
+import { AgentFilterSelect } from "../components/agent-filter-select";
 
 export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
   const state = useChecklistWorkspace({ groups });
@@ -19,6 +20,8 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     copiedItemId,
     groupCodeQuery,
     setGroupCodeQuery,
+    agentFilter,
+    setAgentFilter,
     pendingPage,
     setPendingPage,
     completedPage,
@@ -117,18 +120,20 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             />
           </label>
         </div>
-
         <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
       </section>
 
-      <header className="serene-card rounded-3xl p-5">
-        <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
-        <p className="mt-2 text-sm text-on-surface-variant">
-          <span className="sm:hidden">Driver readiness for next 3 days.</span>
-          <span className="hidden sm:inline">
-            Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
-          </span>
-        </p>
+      <header className="serene-card flex flex-col gap-4 rounded-3xl p-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            <span className="sm:hidden">Driver readiness for next 3 days.</span>
+            <span className="hidden sm:inline">
+              Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
+            </span>
+          </p>
+        </div>
+        <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" className="w-full sm:w-56" />
       </header>
 
       {hasGroupCodeQuery && searchedChecklistItems.length === 0 ? (

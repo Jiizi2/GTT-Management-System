@@ -75,6 +75,8 @@ export const groupSummarySelection = {
   packageName: true,
   durationDays: true,
   parentGroupId: true,
+  agentId: true,
+  agent: { select: { id: true, code: true, name: true, type: true, status: true, picName: true, phone: true, email: true } },
   nextActivity: {
     select: {
       title: true,
@@ -124,6 +126,8 @@ export const groupDetailSelection = {
   packageName: true,
   durationDays: true,
   parentGroupId: true,
+  agentId: true,
+  agent: { select: { id: true, code: true, name: true, type: true, status: true, picName: true, phone: true, email: true } },
   musyrif: {
     select: {
       name: true,
@@ -245,10 +249,12 @@ export function normalizeGroupListFilter(rawFilter?: string): GroupListFilter {
   return "all";
 }
 
-export function buildGroupWhere(query?: string, rawFilter?: string, activeOnly = false): Prisma.GroupWhereInput | undefined {
+export function buildGroupWhere(query?: string, rawFilter?: string, activeOnly = false, agentId?: string): Prisma.GroupWhereInput | undefined {
   const searchTokens = normalizeGroupSearchTokens(query);
   const filter = normalizeGroupListFilter(rawFilter);
   const conditions: Prisma.GroupWhereInput[] = [];
+
+  if (agentId?.trim()) conditions.push({ agentId: agentId.trim() });
 
   if (searchTokens.length > 0) {
     conditions.push({
@@ -549,6 +555,7 @@ function buildGroupWriteData(
     totalBuses: options.nullifyMissingTotalBuses ? payload.totalBuses ?? null : payload.totalBuses,
     packageName: payload.packageName.trim(),
     durationDays: payload.durationDays,
+    agentId: payload.agentId?.trim() || "agent_gtt_direct",
     parentGroupId: payload.parentGroupId?.trim() || null,
     musyrif: payload.musyrif
       ? {
@@ -583,7 +590,7 @@ function buildGroupWriteData(
 export function buildGroupCreateData(
   payload: CreateGroupDto,
   normalizedCode: string,
-): Prisma.GroupCreateInput {
+): Prisma.GroupUncheckedCreateInput {
   return buildGroupWriteData(payload, normalizedCode, {
     nullifyMissingTotalBuses: false,
     preserveChecklistItineraryLinks: true,
@@ -593,7 +600,7 @@ export function buildGroupCreateData(
 export function buildGroupReplaceData(
   payload: CreateGroupDto,
   normalizedCode: string,
-): Prisma.GroupUpdateInput {
+): Prisma.GroupUncheckedUpdateInput {
   return buildGroupWriteData(payload, normalizedCode, {
     nullifyMissingTotalBuses: true,
     preserveChecklistItineraryLinks: false,

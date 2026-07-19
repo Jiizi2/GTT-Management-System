@@ -1,6 +1,7 @@
 import {
   AgreementApprovalStatus,
   AgreementCity,
+  AgentPortalUserStatus,
   ChecklistAssignmentStatus,
   GroupRaudhahStatus,
   GroupTone,
@@ -9,6 +10,12 @@ import {
   PrismaClient,
   VisaPaymentStatus,
   VisaStatus,
+  VisaApplicationAgreementStatus,
+  VisaApplicationDocumentStatus,
+  VisaApplicationNusukStatus,
+  VisaApplicationPaymentStatus,
+  VisaApplicationStatus,
+  VisaApplicationVisaStatus,
 } from "@prisma/client";
 import {
   createDefaultAuthUserStorageRecordsWithOverrides,
@@ -30,11 +37,17 @@ function assertSeedAllowedInCurrentEnvironment(): void {
 async function resetData(): Promise<void> {
   await prisma.appThrottleBucket.deleteMany();
   await prisma.authLoginRateLimitBucket.deleteMany();
+  await prisma.visaApplicationProgressAuditLog.deleteMany();
+  await prisma.visaApplicationDocument.deleteMany();
+  await prisma.visaApplication.deleteMany();
+  await prisma.agentPortalAccountAuditLog.deleteMany();
+  await prisma.agentPortalUser.deleteMany();
   await prisma.groupAuditLog.deleteMany();
   await prisma.masterDataOption.deleteMany();
   await prisma.authUser.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.invoiceClient.deleteMany();
+  await prisma.hotelAgreementDraft.deleteMany();
   await prisma.checklistDriver.deleteMany();
   await prisma.checklistAssignment.deleteMany();
   await prisma.raudhahAppointment.deleteMany();
@@ -46,6 +59,17 @@ async function resetData(): Promise<void> {
   await prisma.nextActivity.deleteMany();
   await prisma.musyrif.deleteMany();
   await prisma.group.deleteMany();
+  await prisma.agent.deleteMany();
+}
+
+const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
+
+async function seedAgents(): Promise<void> {
+  await prisma.agent.upsert({
+    where: { code: "GTT-DIRECT" },
+    update: { name: "GTT Direct", type: "DIRECT", status: "ACTIVE" },
+    create: { id: GTT_DIRECT_AGENT_ID, code: "GTT-DIRECT", name: "GTT Direct", type: "DIRECT", status: "ACTIVE" },
+  });
 }
 
 async function seedMasterData({ resetDataFirst }: { resetDataFirst: boolean }): Promise<void> {
@@ -176,6 +200,7 @@ function withGroupSearchDocument<
     ...args,
     data: {
       ...args.data,
+      agentId: GTT_DIRECT_AGENT_ID,
       searchDocument: buildGroupSearchDocument(args.data),
     },
   };
@@ -1286,6 +1311,7 @@ async function seedInvoices({ resetDataFirst }: { resetDataFirst: boolean }): Pr
     await prisma.invoice.create({
       data: {
         invoiceNumber: seed.invoiceNumber,
+        agentId: GTT_DIRECT_AGENT_ID,
         clientId,
         groupId,
         issuedDate: toUtcMidnightDate(seed.issuedDateIso),
@@ -1302,6 +1328,111 @@ async function seedInvoices({ resetDataFirst }: { resetDataFirst: boolean }): Pr
   );
 }
 
+const VISA_APPLICATION_FIXTURE_NUMBER = "480900308615";
+const LEGACY_VISA_APPLICATION_FIXTURE_NUMBER = "GTT-VA-20260718-9FF7DFA2";
+
+async function seedVisaApplicationFixture(): Promise<void> {
+  if (process.env.SEED_VISA_APPLICATION_FIXTURES?.trim().toLowerCase() !== "true") {
+    console.log("Visa application fixture skipped: set SEED_VISA_APPLICATION_FIXTURES=true to enable it.");
+    return;
+  }
+
+  const group = await prisma.group.findUnique({
+    where: { code: VISA_APPLICATION_FIXTURE_NUMBER },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      agentId: true,
+      arrivalDate: true,
+      returnDate: true,
+      packageName: true,
+      pax: true,
+    },
+  });
+  if (!group) {
+    throw new Error(
+      `Visa application fixture requires Group '${VISA_APPLICATION_FIXTURE_NUMBER}'. Import or create the canonical JSA Group first.`,
+    );
+  }
+
+  const portalUser = await prisma.agentPortalUser.findFirst({
+    where: { agentId: group.agentId, status: AgentPortalUserStatus.ACTIVE },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (!portalUser) {
+    throw new Error(
+      `Visa application fixture requires an active Portal Agent account for the Agent owning Group '${group.code}'.`,
+    );
+  }
+
+  const conflictingLink = await prisma.visaApplication.findFirst({
+    where: { groupId: group.id, applicationNumber: { not: VISA_APPLICATION_FIXTURE_NUMBER } },
+    select: { applicationNumber: true },
+  });
+  if (conflictingLink) {
+    throw new Error(
+      `Group '${group.code}' is already linked to VisaApplication '${conflictingLink.applicationNumber}'. Resolve the link before seeding the fixture.`,
+    );
+  }
+
+  const legacyFixture = await prisma.visaApplication.findUnique({
+    where: { applicationNumber: LEGACY_VISA_APPLICATION_FIXTURE_NUMBER },
+    select: { id: true },
+  });
+  if (legacyFixture) {
+    await prisma.visaApplication.delete({ where: { id: legacyFixture.id } });
+    console.log(`Removed exact legacy development fixture: ${LEGACY_VISA_APPLICATION_FIXTURE_NUMBER}`);
+  }
+
+  await prisma.visaApplication.upsert({
+    where: { applicationNumber: VISA_APPLICATION_FIXTURE_NUMBER },
+    update: {
+      agentId: group.agentId,
+      groupId: group.id,
+      createdByPortalUserId: portalUser.id,
+      departureDate: group.arrivalDate,
+      returnDate: group.returnDate,
+      departureCity: "Jakarta",
+      providerName: null,
+      packageName: group.packageName,
+      passengerCount: group.pax,
+      status: VisaApplicationStatus.WAITING_DOCUMENT,
+      documentStatus: VisaApplicationDocumentStatus.WAITING_DOCUMENT,
+      agreementStatus: VisaApplicationAgreementStatus.NOT_STARTED,
+      nusukStatus: VisaApplicationNusukStatus.NOT_STARTED,
+      paymentStatus: VisaApplicationPaymentStatus.NOT_STARTED,
+      visaStatus: VisaApplicationVisaStatus.NOT_STARTED,
+      nusukGroupNumber: null,
+      nusukReferenceNumber: null,
+      adminNote: null,
+      submittedAt: null,
+      completedAt: null,
+    },
+    create: {
+      applicationNumber: VISA_APPLICATION_FIXTURE_NUMBER,
+      agentId: group.agentId,
+      groupId: group.id,
+      createdByPortalUserId: portalUser.id,
+      departureDate: group.arrivalDate,
+      returnDate: group.returnDate,
+      departureCity: "Jakarta",
+      providerName: null,
+      packageName: group.packageName,
+      passengerCount: group.pax,
+      status: VisaApplicationStatus.WAITING_DOCUMENT,
+      documentStatus: VisaApplicationDocumentStatus.WAITING_DOCUMENT,
+      agreementStatus: VisaApplicationAgreementStatus.NOT_STARTED,
+      nusukStatus: VisaApplicationNusukStatus.NOT_STARTED,
+      paymentStatus: VisaApplicationPaymentStatus.NOT_STARTED,
+      visaStatus: VisaApplicationVisaStatus.NOT_STARTED,
+    },
+  });
+
+  console.log(`Seeded linked Visa Process fixture: ${VISA_APPLICATION_FIXTURE_NUMBER} (${group.name})`);
+}
+
 async function main(): Promise<void> {
   assertSeedAllowedInCurrentEnvironment();
 
@@ -1316,7 +1447,9 @@ async function main(): Promise<void> {
 
   await seedAuthUsers();
   await seedMasterData({ resetDataFirst });
+  await seedAgents();
   await seedGroups({ resetDataFirst });
+  await seedVisaApplicationFixture();
   await seedInvoiceClients({ resetDataFirst });
   await seedInvoices({ resetDataFirst });
 }

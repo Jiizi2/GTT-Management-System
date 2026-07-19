@@ -16,12 +16,7 @@ import {
   getInclusiveDays,
 } from "./visa-domain.js";
 
-
-import {
-  getStatusByTone,
-  resolveCurrentGroupTone,
-  resolveGroupToneByItinerary,
-} from "./group-status-domain";
+import { getStatusByTone, resolveCurrentGroupTone, resolveGroupToneByItinerary } from "./group-status-domain";
 
 import {
   buildChecklistActivityLabel as buildChecklistActivityLabelDomain,
@@ -72,10 +67,7 @@ import {
   sortInputItineraryItems,
 } from "./itinerary-domain";
 
-import {
-  createBaseGroupsFixture,
-  overviewDummySeeds,
-} from "./app-domain-fixtures";
+import { createBaseGroupsFixture, overviewDummySeeds } from "./app-domain-fixtures";
 
 import type {
   NavItem,
@@ -105,10 +97,7 @@ export {
   resolveGroupToneByItinerary,
   saudiLocationKeywords,
 } from "./group-status-domain";
-export {
-  groups,
-  overviewDummySeeds,
-} from "./app-domain-fixtures";
+export { groups, overviewDummySeeds } from "./app-domain-fixtures";
 
 export type {
   NavId,
@@ -262,7 +251,6 @@ export const sidebarItems: NavItem[] = [
   { id: "visa", label: "Visa Tracking", icon: "fact_check" },
   { id: "agreement-inbox", label: "Agreement Inbox", icon: "inventory_2" },
   { id: "invoice", label: "Invoice", icon: "request_quote" },
-  { id: "raudhah-reminder", label: "Raudhah Reminder", icon: "notifications_active" },
 ];
 
 export const sidebarAccountItem: NavItem = {

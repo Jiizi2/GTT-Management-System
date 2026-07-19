@@ -40,13 +40,16 @@ export class HotelAgreementDraftsController {
   })
   @ApiQuery({ name: "q", required: false, example: "20269017001001" })
   @ApiQuery({ name: "status", required: false, enum: ["unassigned", "assigned"] })
+  @ApiQuery({ name: "agentId", required: false })
   @ApiOkResponse({
     description: "Draft agreement berhasil dibaca.",
     type: HotelAgreementDraftResponseDto,
     isArray: true,
   })
-  findAll(@Query("q") query?: string, @Query("status") status?: string) {
-    return this.hotelAgreementDraftsService.findAll(query, status);
+  findAll(@Query("q") query?: string, @Query("status") status?: string, @Query("agentId") agentId?: string) {
+    return agentId
+      ? this.hotelAgreementDraftsService.findAll(query, status, agentId)
+      : this.hotelAgreementDraftsService.findAll(query, status);
   }
 
   @Post()

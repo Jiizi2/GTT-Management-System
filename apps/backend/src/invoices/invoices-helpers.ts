@@ -22,6 +22,8 @@ export type InvoiceListItem = {
   id: string;
   invoiceNumber: string;
   clientId: string;
+  agentId: string;
+  agentName: string;
   clientName: string;
   clientLabel: string;
   clientInitials: string;
@@ -70,6 +72,7 @@ export type MemoryInvoice = {
   id: string;
   invoiceNumber: string;
   clientId: string;
+  agentId?: string;
   groupId?: string;
   issuedDateIso: string;
   dueDateIso: string;
@@ -87,6 +90,7 @@ export type PrismaInvoiceSummaryRow = {
   id: string;
   invoiceNumber: string;
   clientId: string;
+  agentId: string;
   issuedDate: Date;
   dueDate: Date;
   amount: Prisma.Decimal | number;
@@ -103,6 +107,7 @@ export type PrismaInvoiceSummaryRow = {
     code: string;
     name: string;
   } | null;
+  agent: { name: string };
 };
 
 export type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & {
@@ -398,6 +403,8 @@ export const invoiceSummarySelect = {
   id: true,
   invoiceNumber: true,
   clientId: true,
+  agentId: true,
+  agent: { select: { name: true } },
   issuedDate: true,
   dueDate: true,
   amount: true,

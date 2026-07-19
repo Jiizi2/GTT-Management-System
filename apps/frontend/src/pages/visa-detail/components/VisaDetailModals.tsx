@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
+import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
 
 const LazyDeleteGroupModal = lazy(async () => ({
@@ -16,6 +17,9 @@ const LazyPaymentStatusModal = lazy(async () => ({
 }));
 const LazySyarikahModal = lazy(async () => ({
   default: (await import("../../../components/visa-detail-modals")).SyarikahModal,
+}));
+const LazyAgentAssignmentModal = lazy(async () => ({
+  default: (await import("../../../components/visa-detail-modals")).AgentAssignmentModal,
 }));
 const LazyVisaHotelModal = lazy(async () => ({
   default: (await import("../../../components/visa-detail-modals")).VisaHotelModal,
@@ -76,6 +80,7 @@ export function VisaDetailModals() {
     saveVisaStatus,
     saveVisaType,
     savePaymentStatus,
+    saveAgentAssignment,
     saveSyarikah,
     saveHotel,
     saveRaudhah,
@@ -88,6 +93,14 @@ export function VisaDetailModals() {
     setIsClearRaudhahConfirmOpen,
     clearRaudhah,
   } = useVisaDetailContext();
+
+  const agentsQuery = useAgentsQuery();
+  const activeAgents = (agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE");
+  const assignedAgentId = group?.agent?.id ?? group?.agentId ?? "";
+  const agentOptions =
+    group?.agent && !activeAgents.some((agent) => agent.id === group.agent?.id)
+      ? [group.agent, ...activeAgents]
+      : activeAgents;
 
   const syarikahValue = group?.visaSetup?.syarikah?.trim() ?? "";
 
@@ -146,6 +159,17 @@ export function VisaDetailModals() {
 
           {activeModal === "syarikah" ? (
             <LazySyarikahModal initialValue={syarikahValue} onClose={closeModal} onSave={saveSyarikah} />
+          ) : null}
+
+          {activeModal === "agent" ? (
+            <LazyAgentAssignmentModal
+              initialValue={assignedAgentId}
+              agents={agentOptions}
+              isLoading={agentsQuery.isLoading}
+              loadError={agentsQuery.isError ? "Agent list could not be loaded." : undefined}
+              onClose={closeModal}
+              onSave={saveAgentAssignment}
+            />
           ) : null}
 
           {activeModal === "hotel" ? (

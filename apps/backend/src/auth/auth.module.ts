@@ -28,6 +28,6 @@ import { AuthService } from "./auth.service";
       useClass: AuthRolesGuard,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, AuthLoginRateLimiter],
 })
 export class AuthModule {}

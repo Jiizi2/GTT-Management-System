@@ -123,6 +123,12 @@ const backendChecklistAssignmentSchema = z
 export const backendGroupRecordSchema = z
   .object({
     id: z.string().optional(),
+    agentId: z.string().optional(),
+    agent: z.object({
+      id: z.string(), code: z.string(), name: z.string(),
+      type: z.enum(["DIRECT", "PARTNER"]), status: z.enum(["ACTIVE", "INACTIVE"]),
+      picName: z.string().nullable().optional(), phone: z.string().nullable().optional(), email: z.string().nullable().optional(),
+    }).nullable().optional(),
     code: z.string().min(1),
     name: z.string().min(1),
     status: z.string().optional(),
