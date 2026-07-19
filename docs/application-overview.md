@@ -1,13 +1,15 @@
 # Gambaran Aplikasi
 
-Dashboard operasional Umrah untuk tim internal. Dipakai untuk monitoring grup perjalanan, penyusunan itinerary, checklist keberangkatan, tracking visa dan hotel agreement, manajemen invoice, serta administrasi user dan master data.
+GTT memiliki dua area produk dalam satu frontend: **Ops** untuk tim internal dan **Portal Agent** di route `/agent` untuk akses Agent yang tenant-scoped dan read-only. Keduanya dipakai untuk monitoring grup perjalanan, visa, hotel agreement, checklist, dan invoice sesuai hak akses.
 
 ## Arsitektur
 
 Monorepo npm workspaces:
 
-- `apps/frontend` — React SPA (dashboard web)
+- `apps/frontend` — satu React SPA untuk Ops dan Portal Agent
 - `apps/backend` — NestJS REST API
+
+Direktori frontend lama `apps/agent-portal` telah dihentikan; source Portal Agent aktif berada di `apps/frontend/src/agent`.
 
 ## Modul Fitur
 
@@ -17,6 +19,7 @@ Monorepo npm workspaces:
 | Add New Group | Wizard pembuatan grup dengan itinerary dan data visa awal |
 | H-1 Checklist | Tugas keberangkatan dekat (driver/bus assignment) |
 | Visa Tracking | Status visa, hotel agreement Makkah/Madinah, jadwal Raudhah |
+| Visa Tracking | Monitoring visa internal dan detail read-only yang external-friendly di Portal Agent |
 | Agreement Inbox | Kelola dan assign hotel agreement draft ke grup |
 | Invoice | Daftar invoice, relasi client/grup, create/update invoice |
 | Raudhah Reminder | Ringkasan appointment Raudhah dan status cetak tasreh |
@@ -28,6 +31,7 @@ Monorepo npm workspaces:
 
 - `super-admin` — akses penuh termasuk User Management dan Master Data
 - `admin` — akses operasional standar
+- `agent` — akses Portal Agent ke data milik Agent sendiri, tanpa mutation data operasional
 
 ## Alur Data
 

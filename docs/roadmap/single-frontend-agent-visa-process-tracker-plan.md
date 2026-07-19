@@ -1,6 +1,6 @@
 # Single Frontend Agent Access & Visa Process Tracker
 
-Status: Proposed implementation baseline  
+Status: Superseded by `ops-portal-agent-visa-process-end-to-end-plan.md`
 Document type: Detailed architecture and delivery plan  
 Date: 2026-07-18  
 Scope: Planning only; no runtime behavior is changed by this document
