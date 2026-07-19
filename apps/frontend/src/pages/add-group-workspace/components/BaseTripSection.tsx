@@ -10,7 +10,12 @@ import {
   shouldShowFridayCityTourWarning,
   type InputItineraryFormState,
 } from "../../../shared/app-domain";
-import { isBaseTripDraftInvalid, shouldUseSaudiCityDropdown, type BaseTripDraft } from "../helpers/add-group-workspace-helpers";
+import {
+  isBaseTripDraftInvalid,
+  shouldUseSaudiCityDropdown,
+  type BaseTripDraft,
+} from "../helpers/add-group-workspace-helpers";
+import { OperationalFormSection } from "./OperationalFormSection";
 
 interface BaseTripSectionProps {
   isBaseTripFormVisible: boolean;
@@ -23,7 +28,7 @@ interface BaseTripSectionProps {
   handleBaseTripChange: <Key extends keyof InputItineraryFormState>(
     tripIndex: number,
     field: Key,
-    value: InputItineraryFormState[Key]
+    value: InputItineraryFormState[Key],
   ) => void;
   handleBaseTripStepChange: (direction: "next" | "previous") => void;
   isFirstBaseTripStep: boolean;
@@ -101,7 +106,7 @@ export function BaseTripSection({
     departure: "border-error-container/45 bg-surface-container-lowest text-on-surface",
   };
 
-  const neutralItinerarySectionClass = "border-outline-variant/45 bg-surface-container-high/70";
+  const neutralItinerarySectionClass = "border-outline-variant/45 bg-surface-container-lowest";
   const activityTypeCardClassMap: Record<string, string> = {
     arrival: neutralItinerarySectionClass,
     transfer: neutralItinerarySectionClass,
@@ -109,39 +114,19 @@ export function BaseTripSection({
     departure: neutralItinerarySectionClass,
   };
 
-  const activityTypeBannerClassMap: Record<string, string> = {
-    arrival: "border-primary/35 bg-primary-fixed/12 text-primary",
-    transfer: "border-secondary/35 bg-secondary/12 text-secondary",
-    "city-tour": "border-tertiary-fixed/45 bg-tertiary-fixed/12 text-on-tertiary-fixed-variant",
-    departure: "border-error-container/45 bg-error-container/12 text-on-error-container",
-  };
-
-  const activityTypeTitleClassMap: Record<string, string> = {
-    arrival: "text-on-surface",
-    transfer: "text-on-surface",
-    "city-tour": "text-on-surface",
-    departure: "text-on-surface",
-  };
-
-  const activityTypeFocusLabelMap: Record<string, string> = {
-    arrival: "Start Trip - Arrival (Paling Penting)",
-    transfer: "Activity Focus - Transfer",
-    "city-tour": "Activity Focus - City Tour",
-    departure: "End Trip - Departure",
-  };
-
-  const fieldClassName = "serene-field";
+  const fieldClassName = "serene-field min-w-0";
   const wideFieldClassName = `${fieldClassName} md:col-span-2`;
   const inputClassName = "serene-input";
   const selectClassName = "serene-select";
   const textareaClassName = "serene-textarea";
-  const routeHintClassName = "md:col-span-2 text-xs font-medium leading-relaxed text-on-surface-variant";
+  const routeHintClassName =
+    "md:col-span-2 rounded-xl border border-outline-variant/35 bg-surface-container-low px-3 py-2 text-xs font-medium leading-relaxed text-on-surface-variant";
   const warningClassName =
     "md:col-span-2 flex items-start gap-2 rounded-md bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant";
   const checkClassName =
-    "md:col-span-2 inline-flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-medium text-on-surface-variant";
-  const transferTrainCardClassName = "md:col-span-2 rounded-2xl bg-surface-container-high p-3";
-  const transferTrainGridClassName = "mt-2 grid gap-3 md:grid-cols-2";
+    "md:col-span-2 inline-flex min-h-11 items-center gap-3 rounded-xl bg-surface-container-low px-3 py-2.5 text-sm font-medium text-on-surface-variant";
+  const transferTrainCardClassName = "md:col-span-2 border-l-2 border-primary/35 py-1 pl-4";
+  const transferTrainGridClassName = "mt-3 grid gap-x-5 gap-y-4 md:grid-cols-2";
 
   return (
     <div className="space-y-4">
@@ -164,32 +149,20 @@ export function BaseTripSection({
 
       <div className="space-y-4">
         <div className="rounded-xl bg-surface-container-high p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-on-surface">
               Step {currentBaseTripStepIndex + 1} of {baseTripDrafts.length || 5}
             </p>
-            {activeBaseTrip ? (
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
-                  activityTypeBadgeClassMap[activeBaseTrip.category] ??
-                  "border-outline-variant/45 bg-surface-container-lowest text-on-surface"
-                }`}
-              >
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                  {getScheduleTypeOption(activeBaseTrip.category).icon}
-                </span>
-                <span>
-                  {activeBaseTrip.title} - {enabledBaseTripCount} trip dipakai
-                </span>
-              </span>
-            ) : null}
+            <span className="text-xs font-semibold text-on-surface-variant">
+              {enabledBaseTripCount} of {baseTripDrafts.length || 5} used
+            </span>
           </div>
 
           <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant">
             Activity type per trip
           </p>
 
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-2 flex snap-x gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-5">
             {baseTripDrafts.map((trip, index) => {
               const isCurrentStep = index === currentBaseTripStepIndex;
               const isDisabledStep = !trip.isEnabled;
@@ -211,7 +184,7 @@ export function BaseTripSection({
                 <button
                   key={trip.id}
                   type="button"
-                  className={`relative inline-flex min-h-12 items-center justify-start gap-2 overflow-hidden rounded-xl border-2 px-3 text-left text-sm font-semibold transition ${
+                  className={`relative inline-flex min-h-12 min-w-[9.5rem] snap-start items-center justify-start gap-2 overflow-hidden rounded-xl border-2 px-3 text-left text-sm font-semibold transition sm:min-w-0 ${
                     isCurrentStep
                       ? activeStepToneClass
                       : isDisabledStep
@@ -261,22 +234,14 @@ export function BaseTripSection({
           const showTransferTrainInputs = isTransferActivityType(item.category) && item.transferByTrain;
           const showCityTourCityInput = isCityTourActivityType(item.category);
           const activityCardToneClass =
-            activityTypeCardClassMap[item.category] ??
-            "border-outline-variant/45 bg-surface-container-lowest";
-          const activityBannerToneClass =
-            activityTypeBannerClassMap[item.category] ??
-            "border-outline-variant/45 bg-surface-container-high text-on-surface";
-          const activityTitleToneClass = activityTypeTitleClassMap[item.category] ?? "text-on-surface";
-          const activityFocusLabel =
-            activityTypeFocusLabelMap[item.category] ??
-            `Activity Focus - ${getScheduleTypeOption(item.category).cardLabel}`;
+            activityTypeCardClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-lowest";
           const routeFieldConfigForItem = getRouteFieldConfigByCategory(item.category);
           const showFridayWarningForItem = shouldShowFridayCityTourWarning(item.category, item.date);
 
           return (
             <article
               key={item.id}
-              className={`relative overflow-hidden rounded-2xl border-2 p-4 shadow-sm ${activityCardToneClass}`}
+              className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 ${activityCardToneClass}`}
             >
               <span
                 className={`absolute inset-x-0 top-0 h-0.5 ${
@@ -284,37 +249,15 @@ export function BaseTripSection({
                 }`}
                 aria-hidden="true"
               />
-              <div
-                className={`mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${activityBannerToneClass}`}
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  {getScheduleTypeOption(item.category).icon}
-                </span>
-                <p className="text-xs font-semibold uppercase tracking-[0.08em]">{activityFocusLabel}</p>
-              </div>
-
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h4 className={`text-base font-semibold ${activityTitleToneClass}`}>{item.title}</h4>
-                  <p className="text-xs text-on-surface-variant">{item.description}</p>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-primary">
+                    Editing step {currentBaseTripStepIndex + 1}
+                  </p>
+                  <h4 className="mt-1 text-base font-semibold text-on-surface">Operational details</h4>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{item.description}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold leading-none ${
-                      activityTypeBadgeClassMap[item.category] ??
-                      "border-outline-variant/45 bg-surface-container-high text-on-surface"
-                    }`}
-                  >
-                    <span
-                      className={`material-symbols-outlined text-base ${
-                        activityTypeTextToneClassMap[item.category] ?? "text-primary"
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {getScheduleTypeOption(item.category).icon}
-                    </span>
-                    {getScheduleTypeOption(item.category).cardLabel}
-                  </span>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant/45 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-on-surface">
                     <input
                       className="h-3.5 w-3.5 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
@@ -333,282 +276,285 @@ export function BaseTripSection({
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className={fieldClassName}>
-                  <span>Date</span>
-                  <DatePickerInput
-                    inputClassName={inputClassName}
-                    value={item.date}
-                    onChange={(nextValue: string) =>
-                      handleBaseTripChange(currentBaseTripStepIndex, "date", nextValue)
-                    }
-                    disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                  />
-                </label>
-
-                {!showTransferTrainInputs ? (
+              <div className="mt-5 space-y-5">
+                <OperationalFormSection
+                  step={1}
+                  icon="event"
+                  title="Schedule details"
+                  description="Date, time, accommodation, and activity-specific information."
+                >
                   <label className={fieldClassName}>
-                    <span>
-                      {item.category === "departure" ? "Flight Return Time" : "Time (Optional)"}
-                    </span>
-                    <TimePickerInput
+                    <span>Date</span>
+                    <DatePickerInput
                       inputClassName={inputClassName}
-                      value={item.time}
+                      value={item.date}
                       onChange={(nextValue: string) =>
-                        handleBaseTripChange(currentBaseTripStepIndex, "time", nextValue)
+                        handleBaseTripChange(currentBaseTripStepIndex, "date", nextValue)
                       }
                       disabled={!isGroupReadyForItinerary || !item.isEnabled}
                     />
                   </label>
-                ) : null}
 
-                {showFlightNumberInput ? (
-                  <label className={wideFieldClassName}>
-                    <span>Flight Number</span>
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={item.flightNumber}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        handleBaseTripChange(currentBaseTripStepIndex, "flightNumber", event.target.value)
-                      }
-                      placeholder="e.g. SV-827"
-                      disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                    />
-                  </label>
-                ) : null}
-
-                {showHotelNameInput ? (
-                  <label className={wideFieldClassName}>
-                    <span>Hotel Name</span>
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={item.hotelName ?? ""}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        handleBaseTripChange(currentBaseTripStepIndex, "hotelName", event.target.value)
-                      }
-                      placeholder="e.g. Pullman Zamzam Madinah"
-                      disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                    />
-                  </label>
-                ) : null}
-
-                {showCityTourCityInput ? (
-                  <label className={wideFieldClassName}>
-                    <span>City Tour City</span>
-                    <div className="relative">
-                      <span
-                        className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
-                        aria-hidden="true"
-                      >
-                        location_city
-                      </span>
-                      <SereneSelect
-                        className={`${selectClassName} pl-11`}
-                        value={item.cityTourCity}
-                        onChange={(event: { target: { value: string } }) =>
-                          handleBaseTripChange(currentBaseTripStepIndex, "cityTourCity", event.target.value)
+                  {!showTransferTrainInputs ? (
+                    <label className={fieldClassName}>
+                      <span>{item.category === "departure" ? "Flight Return Time" : "Time (Optional)"}</span>
+                      <TimePickerInput
+                        inputClassName={inputClassName}
+                        value={item.time}
+                        onChange={(nextValue: string) =>
+                          handleBaseTripChange(currentBaseTripStepIndex, "time", nextValue)
                         }
                         disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                      >
-                        <option value="">Select city in Saudi</option>
-                        {saudiCityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </SereneSelect>
-                    </div>
-                    <p className="text-xs text-on-surface-variant">
-                      Select the city where the city tour takes place.
-                    </p>
-                  </label>
-                ) : null}
+                      />
+                    </label>
+                  ) : null}
 
-                {showDeparturePickupRequestInput ? (
-                  <label className={wideFieldClassName}>
-                    <span>Hotel Pickup Request Time</span>
-                    <TimePickerInput
-                      inputClassName={inputClassName}
-                      value={item.hotelPickupRequestTime}
-                      onChange={(nextValue: string) =>
-                        handleBaseTripChange(
-                          currentBaseTripStepIndex,
-                          "hotelPickupRequestTime",
-                          nextValue,
-                        )
-                      }
-                      disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                    />
-                  </label>
-                ) : null}
+                  {showFlightNumberInput ? (
+                    <label className={wideFieldClassName}>
+                      <span>Flight Number</span>
+                      <input
+                        className={inputClassName}
+                        type="text"
+                        value={item.flightNumber}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          handleBaseTripChange(currentBaseTripStepIndex, "flightNumber", event.target.value)
+                        }
+                        placeholder="e.g. SV-827"
+                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                      />
+                    </label>
+                  ) : null}
 
-                <label className={fieldClassName}>
-                  <span>{routeFieldConfigForItem.fromLabel}</span>
-                  {shouldUseSaudiCityDropdown(item.category, "from") ? (
-                    <div className="relative">
-                      <span
-                        className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
-                        aria-hidden="true"
-                      >
-                        location_city
-                      </span>
-                      <SereneSelect
-                        className={`${selectClassName} pl-11`}
+                  {showHotelNameInput ? (
+                    <label className={wideFieldClassName}>
+                      <span>Hotel Name</span>
+                      <input
+                        className={inputClassName}
+                        type="text"
+                        value={item.hotelName ?? ""}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          handleBaseTripChange(currentBaseTripStepIndex, "hotelName", event.target.value)
+                        }
+                        placeholder="e.g. Pullman Zamzam Madinah"
+                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                      />
+                    </label>
+                  ) : null}
+
+                  {showCityTourCityInput ? (
+                    <label className={wideFieldClassName}>
+                      <span>City Tour City</span>
+                      <div className="relative">
+                        <span
+                          className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
+                          aria-hidden="true"
+                        >
+                          location_city
+                        </span>
+                        <SereneSelect
+                          className={`${selectClassName} pl-11`}
+                          value={item.cityTourCity}
+                          onChange={(event: { target: { value: string } }) =>
+                            handleBaseTripChange(currentBaseTripStepIndex, "cityTourCity", event.target.value)
+                          }
+                          disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                        >
+                          <option value="">Select city in Saudi</option>
+                          {saudiCityOptions.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                        </SereneSelect>
+                      </div>
+                      <p className="text-xs text-on-surface-variant">
+                        Select the city where the city tour takes place.
+                      </p>
+                    </label>
+                  ) : null}
+
+                  {showDeparturePickupRequestInput ? (
+                    <label className={wideFieldClassName}>
+                      <span>Hotel Pickup Request Time</span>
+                      <TimePickerInput
+                        inputClassName={inputClassName}
+                        value={item.hotelPickupRequestTime}
+                        onChange={(nextValue: string) =>
+                          handleBaseTripChange(currentBaseTripStepIndex, "hotelPickupRequestTime", nextValue)
+                        }
+                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                      />
+                    </label>
+                  ) : null}
+                </OperationalFormSection>
+
+                <OperationalFormSection
+                  step={2}
+                  icon="route"
+                  title="Route & transportation"
+                  description="Origin, destination, train transfer, pickup, and bus requirements."
+                >
+                  <label className={fieldClassName}>
+                    <span>{routeFieldConfigForItem.fromLabel}</span>
+                    {shouldUseSaudiCityDropdown(item.category, "from") ? (
+                      <div className="relative">
+                        <span
+                          className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
+                          aria-hidden="true"
+                        >
+                          location_city
+                        </span>
+                        <SereneSelect
+                          className={`${selectClassName} pl-11`}
+                          value={item.from}
+                          onChange={(event: { target: { value: string } }) =>
+                            handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)
+                          }
+                          disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                        >
+                          <option value="">Select city in Saudi</option>
+                          {saudiCityOptions.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                        </SereneSelect>
+                      </div>
+                    ) : (
+                      <input
+                        className={inputClassName}
+                        type="text"
                         value={item.from}
-                        onChange={(event: { target: { value: string } }) =>
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                           handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)
                         }
+                        placeholder={routeFieldConfigForItem.fromPlaceholder}
                         disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                      >
-                        <option value="">Select city in Saudi</option>
-                        {saudiCityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </SereneSelect>
-                    </div>
-                  ) : (
-                    <input
-                      className={inputClassName}
-                      type="text"
-                      value={item.from}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        handleBaseTripChange(currentBaseTripStepIndex, "from", event.target.value)
-                      }
-                      placeholder={routeFieldConfigForItem.fromPlaceholder}
-                      disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                    />
-                  )}
-                </label>
+                      />
+                    )}
+                  </label>
 
-                <label className={fieldClassName}>
-                  <span>{routeFieldConfigForItem.toLabel}</span>
-                  {shouldUseSaudiCityDropdown(item.category, "to") ? (
-                    <div className="relative">
-                      <span
-                        className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
-                        aria-hidden="true"
-                      >
-                        location_city
-                      </span>
-                      <SereneSelect
-                        className={`${selectClassName} pl-11`}
+                  <label className={fieldClassName}>
+                    <span>{routeFieldConfigForItem.toLabel}</span>
+                    {shouldUseSaudiCityDropdown(item.category, "to") ? (
+                      <div className="relative">
+                        <span
+                          className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-on-surface-variant"
+                          aria-hidden="true"
+                        >
+                          location_city
+                        </span>
+                        <SereneSelect
+                          className={`${selectClassName} pl-11`}
+                          value={item.to}
+                          onChange={(event: { target: { value: string } }) =>
+                            handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)
+                          }
+                          disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                        >
+                          <option value="">Select city in Saudi</option>
+                          {saudiCityOptions.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                        </SereneSelect>
+                      </div>
+                    ) : (
+                      <input
+                        className={inputClassName}
+                        type="text"
                         value={item.to}
-                        onChange={(event: { target: { value: string } }) =>
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                           handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)
                         }
+                        placeholder={routeFieldConfigForItem.toPlaceholder}
                         disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                      >
-                        <option value="">Select city in Saudi</option>
-                        {saudiCityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </SereneSelect>
+                      />
+                    )}
+                  </label>
+
+                  {routeFieldConfigForItem.helperText ? (
+                    <p className={routeHintClassName}>{routeFieldConfigForItem.helperText}</p>
+                  ) : null}
+
+                  {showTransferTrainInputs ? (
+                    <div className={transferTrainCardClassName}>
+                      <p className="text-sm font-semibold text-primary">
+                        High-speed train transfer operational details
+                      </p>
+
+                      <div className={transferTrainGridClassName}>
+                        <label className={fieldClassName}>
+                          <span>Train Departure Time</span>
+                          <TimePickerInput
+                            inputClassName={inputClassName}
+                            value={item.trainDepartureTime}
+                            onChange={(nextValue: string) =>
+                              handleBaseTripChange(currentBaseTripStepIndex, "trainDepartureTime", nextValue)
+                            }
+                            disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                          />
+                        </label>
+
+                        <label className={fieldClassName}>
+                          <span>Destination Station Pickup Time</span>
+                          <TimePickerInput
+                            inputClassName={inputClassName}
+                            value={item.destinationPickupTime}
+                            onChange={(nextValue: string) =>
+                              handleBaseTripChange(currentBaseTripStepIndex, "destinationPickupTime", nextValue)
+                            }
+                            disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                          />
+                        </label>
+                      </div>
                     </div>
-                  ) : (
+                  ) : null}
+
+                  {showFridayWarningForItem ? (
+                    <div className={warningClassName}>
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        warning
+                      </span>
+                      <p>Friday detected. Please align City Tour timing with Jumu&apos;ah prayer schedule.</p>
+                    </div>
+                  ) : null}
+
+                  <label className={checkClassName}>
                     <input
-                      className={inputClassName}
-                      type="text"
-                      value={item.to}
+                      className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
+                      type="checkbox"
+                      checked={showTransferTrainInputs ? true : item.requiresBus}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        handleBaseTripChange(currentBaseTripStepIndex, "to", event.target.value)
+                        handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
                       }
-                      placeholder={routeFieldConfigForItem.toPlaceholder}
+                      disabled={!isGroupReadyForItinerary || showTransferTrainInputs || !item.isEnabled}
+                    />
+                    <span>{showTransferTrainInputs ? "Bus Required (Luggage + Station Pickup)" : "Requires Bus"}</span>
+                  </label>
+                </OperationalFormSection>
+
+                <OperationalFormSection
+                  step={3}
+                  icon="edit_note"
+                  title="Operational notes"
+                  description="Keep special instructions available to the operations team."
+                >
+                  <label className={wideFieldClassName}>
+                    <span>Notes</span>
+                    <textarea
+                      className={textareaClassName}
+                      rows={2}
+                      value={item.notes}
+                      onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                        handleBaseTripChange(currentBaseTripStepIndex, "notes", event.target.value)
+                      }
+                      placeholder="Enter special instructions or details..."
                       disabled={!isGroupReadyForItinerary || !item.isEnabled}
                     />
-                  )}
-                </label>
-
-                {routeFieldConfigForItem.helperText ? (
-                  <p className={routeHintClassName}>{routeFieldConfigForItem.helperText}</p>
-                ) : null}
-
-                {showTransferTrainInputs ? (
-                  <div className={transferTrainCardClassName}>
-                    <p className="text-sm font-semibold text-primary">
-                      High-speed train transfer operational details
-                    </p>
-
-                    <div className={transferTrainGridClassName}>
-                      <label className={fieldClassName}>
-                        <span>Train Departure Time</span>
-                        <TimePickerInput
-                          inputClassName={inputClassName}
-                          value={item.trainDepartureTime}
-                          onChange={(nextValue: string) =>
-                            handleBaseTripChange(
-                              currentBaseTripStepIndex,
-                              "trainDepartureTime",
-                              nextValue,
-                            )
-                          }
-                          disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                        />
-                      </label>
-
-                      <label className={fieldClassName}>
-                        <span>Destination Station Pickup Time</span>
-                        <TimePickerInput
-                          inputClassName={inputClassName}
-                          value={item.destinationPickupTime}
-                          onChange={(nextValue: string) =>
-                            handleBaseTripChange(
-                              currentBaseTripStepIndex,
-                              "destinationPickupTime",
-                              nextValue,
-                            )
-                          }
-                          disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                ) : null}
-
-                {showFridayWarningForItem ? (
-                  <div className={warningClassName}>
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      warning
-                    </span>
-                    <p>
-                      Friday detected. Please align City Tour timing with Jumu&apos;ah prayer schedule.
-                    </p>
-                  </div>
-                ) : null}
-
-                <label className={checkClassName}>
-                  <input
-                    className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                    type="checkbox"
-                    checked={showTransferTrainInputs ? true : item.requiresBus}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
-                    }
-                    disabled={!isGroupReadyForItinerary || showTransferTrainInputs || !item.isEnabled}
-                  />
-                  <span>
-                    {showTransferTrainInputs ? "Bus Required (Luggage + Station Pickup)" : "Requires Bus"}
-                  </span>
-                </label>
-
-                <label className={wideFieldClassName}>
-                  <span>Notes</span>
-                  <textarea
-                    className={textareaClassName}
-                    rows={2}
-                    value={item.notes}
-                    onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      handleBaseTripChange(currentBaseTripStepIndex, "notes", event.target.value)
-                    }
-                    placeholder="Enter special instructions or details..."
-                    disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                  />
-                </label>
+                  </label>
+                </OperationalFormSection>
               </div>
 
               {!item.isEnabled ? (
@@ -621,7 +567,7 @@ export function BaseTripSection({
         })}
       </div>
 
-      <div className="space-y-2 rounded-xl bg-surface-container-high px-3 py-3">
+      <div className="sticky bottom-0 z-10 space-y-2 rounded-xl border border-outline-variant/35 bg-surface-container-lowest px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 shadow-float sm:bottom-3">
         <p
           className={`text-xs font-medium ${
             isActiveBaseTripInvalid ? "text-on-tertiary-fixed-variant" : "text-primary"
@@ -638,7 +584,7 @@ export function BaseTripSection({
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
             <button
               type="button"
-              className="serene-btn-secondary min-h-10 w-full sm:w-auto"
+              className="serene-btn-secondary min-h-12 w-full sm:min-h-10 sm:w-auto"
               onClick={() => handleBaseTripStepChange("previous")}
               disabled={!isGroupReadyForItinerary || isFirstBaseTripStep}
             >
@@ -655,16 +601,7 @@ export function BaseTripSection({
             </button>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-2 border-t border-outline-variant/35 pt-3 sm:flex sm:w-auto sm:items-center sm:border-0 sm:pt-0">
-            <button
-              type="button"
-              className="serene-btn-primary min-h-10 w-full sm:w-auto"
-              onClick={handleSaveBaseTrips}
-              disabled={isBaseTripSaveDisabled}
-            >
-              <span className="sm:hidden">Save Trips</span>
-              <span className="hidden sm:inline">Save 5 Base Trips</span>
-            </button>
+          <div className="grid w-full grid-cols-2 gap-2 border-t border-outline-variant/35 pt-3 sm:flex sm:w-auto sm:items-center sm:border-0 sm:pt-0">
             <button
               type="button"
               className="serene-btn-secondary min-h-10 w-full sm:w-auto"
@@ -672,6 +609,15 @@ export function BaseTripSection({
               disabled={!isGroupReadyForItinerary}
             >
               Cancel
+            </button>
+            <button
+              type="button"
+              className="serene-btn-primary min-h-12 w-full sm:min-h-10 sm:w-auto"
+              onClick={handleSaveBaseTrips}
+              disabled={isBaseTripSaveDisabled}
+            >
+              <span className="sm:hidden">Save Trips</span>
+              <span className="hidden sm:inline">Save 5 Base Trips</span>
             </button>
           </div>
         </div>
