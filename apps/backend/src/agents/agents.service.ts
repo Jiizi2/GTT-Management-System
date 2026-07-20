@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { AgentStatus, AgentType } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
@@ -29,60 +34,85 @@ const trimOrNull = (value?: string): string | null => value?.trim() || null;
 @Injectable()
 export class AgentsService {
   private readonly dataSource: "memory" | "prisma";
-  private readonly memoryAgents: AgentRecord[] = [{
-    id: GTT_DIRECT_AGENT_ID,
-    code: "GTT-DIRECT",
-    name: "GTT Direct",
-    type: AgentType.DIRECT,
-    status: AgentStatus.ACTIVE,
-    picName: null,
-    phone: null,
-    email: null,
-    address: null,
-    notes: "Internal B2C business owner",
-    groupCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }];
+  private readonly memoryAgents: AgentRecord[] = [
+    {
+      id: GTT_DIRECT_AGENT_ID,
+      code: "GTT-DIRECT",
+      name: "GTT Direct",
+      type: AgentType.DIRECT,
+      status: AgentStatus.ACTIVE,
+      picName: null,
+      phone: null,
+      email: null,
+      address: null,
+      notes: "Internal B2C business owner",
+      groupCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ];
 
-  constructor(config: ConfigService, private readonly prisma: PrismaService) {
+  constructor(
+    config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     this.dataSource = resolveConfiguredDataSource(config);
   }
 
-  async list(query?: string, status?: AgentStatus, type?: AgentType): Promise<AgentRecord[]> {
+  async list(
+    query?: string,
+    status?: AgentStatus,
+    type?: AgentType,
+  ): Promise<AgentRecord[]> {
     const normalizedQuery = query?.trim();
     if (this.dataSource === "memory") {
       return this.memoryAgents
         .filter((agent) => !status || agent.status === status)
         .filter((agent) => !type || agent.type === type)
-        .filter((agent) => !normalizedQuery || `${agent.code} ${agent.name} ${agent.picName ?? ""}`.toLowerCase().includes(normalizedQuery.toLowerCase()))
+        .filter(
+          (agent) =>
+            !normalizedQuery ||
+            `${agent.code} ${agent.name} ${agent.picName ?? ""}`
+              .toLowerCase()
+              .includes(normalizedQuery.toLowerCase()),
+        )
         .sort((a, b) => a.name.localeCompare(b.name));
     }
     const rows = await this.prisma.agent.findMany({
       where: {
         status,
         type,
-        ...(normalizedQuery ? { OR: [
-          { code: { contains: normalizedQuery, mode: "insensitive" } },
-          { name: { contains: normalizedQuery, mode: "insensitive" } },
-          { picName: { contains: normalizedQuery, mode: "insensitive" } },
-        ] } : {}),
+        ...(normalizedQuery
+          ? {
+              OR: [
+                { code: { contains: normalizedQuery, mode: "insensitive" } },
+                { name: { contains: normalizedQuery, mode: "insensitive" } },
+                { picName: { contains: normalizedQuery, mode: "insensitive" } },
+              ],
+            }
+          : {}),
       },
       include: { _count: { select: { groups: true } } },
       orderBy: [{ name: "asc" }],
     });
-    return rows.map(({ _count, ...agent }) => ({ ...agent, groupCount: _count.groups }));
+    return rows.map(({ _count, ...agent }) => ({
+      ...agent,
+      groupCount: _count.groups,
+    }));
   }
 
   async findOne(id: string): Promise<AgentRecord> {
-    const found = (await this.list()).find((agent) => agent.id === id || agent.code === id.trim().toUpperCase());
+    const found = (await this.list()).find(
+      (agent) => agent.id === id || agent.code === id.trim().toUpperCase(),
+    );
     if (!found) throw new NotFoundException(`Agent '${id}' not found.`);
     return found;
   }
 
   async assertActive(agentId?: string): Promise<AgentRecord> {
     const agent = await this.findOne(agentId?.trim() || GTT_DIRECT_AGENT_ID);
-    if (agent.status !== AgentStatus.ACTIVE) throw new BadRequestException(`Agent '${agent.name}' is inactive.`);
+    if (agent.status !== AgentStatus.ACTIVE)
+      throw new BadRequestException(`Agent '${agent.name}' is inactive.`);
     return agent;
   }
 
@@ -92,13 +122,24 @@ export class AgentsService {
       code,
       name: payload.name.trim(),
       type: payload.type ?? AgentType.PARTNER,
-      picName: trimOrNull(payload.picName), phone: trimOrNull(payload.phone), email: trimOrNull(payload.email),
-      address: trimOrNull(payload.address), notes: trimOrNull(payload.notes),
+      picName: trimOrNull(payload.picName),
+      phone: trimOrNull(payload.phone),
+      email: trimOrNull(payload.email),
+      address: trimOrNull(payload.address),
+      notes: trimOrNull(payload.notes),
     };
     if (this.dataSource === "memory") {
-      if (this.memoryAgents.some((agent) => agent.code === code)) throw new ConflictException(`Agent code '${code}' already exists.`);
+      if (this.memoryAgents.some((agent) => agent.code === code))
+        throw new ConflictException(`Agent code '${code}' already exists.`);
       const now = new Date().toISOString();
-      const created: AgentRecord = { id: randomUUID(), ...data, status: AgentStatus.ACTIVE, groupCount: 0, createdAt: now, updatedAt: now };
+      const created: AgentRecord = {
+        id: randomUUID(),
+        ...data,
+        status: AgentStatus.ACTIVE,
+        groupCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
       this.memoryAgents.push(created);
       return created;
     }
@@ -106,7 +147,8 @@ export class AgentsService {
       const created = await this.prisma.agent.create({ data });
       return { ...created, groupCount: 0 };
     } catch (error: any) {
-      if (error?.code === "P2002") throw new ConflictException(`Agent code '${code}' already exists.`);
+      if (error?.code === "P2002")
+        throw new ConflictException(`Agent code '${code}' already exists.`);
       throw error;
     }
   }
@@ -115,35 +157,121 @@ export class AgentsService {
     const existing = await this.findOne(id);
     const code = payload.code?.trim().toUpperCase();
     const data = {
-      ...(code ? { code } : {}), ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
+      ...(code ? { code } : {}),
+      ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
       ...(payload.type !== undefined ? { type: payload.type } : {}),
-      ...(payload.picName !== undefined ? { picName: trimOrNull(payload.picName) } : {}),
-      ...(payload.phone !== undefined ? { phone: trimOrNull(payload.phone) } : {}),
-      ...(payload.email !== undefined ? { email: trimOrNull(payload.email) } : {}),
-      ...(payload.address !== undefined ? { address: trimOrNull(payload.address) } : {}),
-      ...(payload.notes !== undefined ? { notes: trimOrNull(payload.notes) } : {}),
+      ...(payload.picName !== undefined
+        ? { picName: trimOrNull(payload.picName) }
+        : {}),
+      ...(payload.phone !== undefined
+        ? { phone: trimOrNull(payload.phone) }
+        : {}),
+      ...(payload.email !== undefined
+        ? { email: trimOrNull(payload.email) }
+        : {}),
+      ...(payload.address !== undefined
+        ? { address: trimOrNull(payload.address) }
+        : {}),
+      ...(payload.notes !== undefined
+        ? { notes: trimOrNull(payload.notes) }
+        : {}),
     };
     if (this.dataSource === "memory") {
-      if (code && this.memoryAgents.some((agent) => agent.id !== existing.id && agent.code === code)) throw new ConflictException(`Agent code '${code}' already exists.`);
+      if (
+        code &&
+        this.memoryAgents.some(
+          (agent) => agent.id !== existing.id && agent.code === code,
+        )
+      )
+        throw new ConflictException(`Agent code '${code}' already exists.`);
       Object.assign(existing, data, { updatedAt: new Date().toISOString() });
       return existing;
     }
     try {
-      const updated = await this.prisma.agent.update({ where: { id: existing.id }, data });
+      const updated = await this.prisma.agent.update({
+        where: { id: existing.id },
+        data,
+      });
       return { ...updated, groupCount: existing.groupCount };
     } catch (error: any) {
-      if (error?.code === "P2002") throw new ConflictException(`Agent code '${code}' already exists.`);
+      if (error?.code === "P2002")
+        throw new ConflictException(`Agent code '${code}' already exists.`);
       throw error;
     }
   }
 
   async setStatus(id: string, status: AgentStatus): Promise<AgentRecord> {
     const existing = await this.findOne(id);
-    if (existing.type === AgentType.DIRECT && status === AgentStatus.INACTIVE) throw new BadRequestException("GTT Direct cannot be deactivated.");
+    if (existing.type === AgentType.DIRECT && status === AgentStatus.INACTIVE)
+      throw new BadRequestException("GTT Direct cannot be deactivated.");
     if (this.dataSource === "memory") {
-      existing.status = status; existing.updatedAt = new Date().toISOString(); return existing;
+      existing.status = status;
+      existing.updatedAt = new Date().toISOString();
+      return existing;
     }
-    const updated = await this.prisma.agent.update({ where: { id: existing.id }, data: { status } });
+    const updated = await this.prisma.agent.update({
+      where: { id: existing.id },
+      data: { status },
+    });
     return { ...updated, groupCount: existing.groupCount };
+  }
+
+  async remove(id: string): Promise<{ deleted: true; id: string }> {
+    const existing = await this.findOne(id);
+    if (existing.type === AgentType.DIRECT) {
+      throw new BadRequestException("GTT Direct tidak dapat dihapus.");
+    }
+
+    if (this.dataSource === "memory") {
+      if (existing.groupCount > 0) {
+        throw new ConflictException(
+          `Agent '${existing.name}' tidak dapat dihapus karena masih digunakan oleh ${existing.groupCount} group.`,
+        );
+      }
+      const targetIndex = this.memoryAgents.findIndex(
+        (agent) => agent.id === existing.id,
+      );
+      this.memoryAgents.splice(targetIndex, 1);
+      return { deleted: true, id: existing.id };
+    }
+
+    const agentWithUsage = await this.prisma.agent.findUnique({
+      where: { id: existing.id },
+      include: {
+        _count: {
+          select: {
+            groups: true,
+            invoices: true,
+            hotelAgreementDrafts: true,
+            portalUsers: true,
+            portalAccountAuditLogs: true,
+            visaApplications: true,
+          },
+        },
+      },
+    });
+    if (!agentWithUsage) {
+      throw new NotFoundException(`Agent '${id}' not found.`);
+    }
+
+    const dependencyLabels = [
+      [agentWithUsage._count.groups, "group"],
+      [agentWithUsage._count.invoices, "invoice"],
+      [agentWithUsage._count.hotelAgreementDrafts, "hotel agreement"],
+      [agentWithUsage._count.portalUsers, "akun portal"],
+      [agentWithUsage._count.portalAccountAuditLogs, "audit log"],
+      [agentWithUsage._count.visaApplications, "visa application"],
+    ]
+      .filter(([count]) => Number(count) > 0)
+      .map(([count, label]) => `${count} ${label}`);
+
+    if (dependencyLabels.length > 0) {
+      throw new ConflictException(
+        `Agent '${existing.name}' tidak dapat dihapus karena masih digunakan oleh ${dependencyLabels.join(", ")}.`,
+      );
+    }
+
+    await this.prisma.agent.delete({ where: { id: existing.id } });
+    return { deleted: true, id: existing.id };
   }
 }

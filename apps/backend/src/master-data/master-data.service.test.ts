@@ -1,7 +1,11 @@
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { runCase } from "../test/run-case";
 import { withEnv } from "../test/with-env";
-import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import type { PrismaService } from "../prisma/prisma.service";
 import { MasterDataService } from "./master-data.service";
@@ -19,9 +23,9 @@ describe("MasterDataService", () => {
     runCase("list options rejects unsupported category", async () => {
       const service = new MasterDataService({} as PrismaService);
 
-      await expect(
-        service.listOptions("invalid-category"),
-      ).rejects.toThrow(/Unsupported category/i);
+      await expect(service.listOptions("invalid-category")).rejects.toThrow(
+        /Unsupported category/i,
+      );
     });
 
     runCase("list categories returns all defined categories", async () => {
@@ -37,20 +41,23 @@ describe("MasterDataService", () => {
   });
 
   describe("Memory Mode Operations", () => {
-    runCase("list options returns default options for invoice-status", async () => {
-      await withEnv({ DATA_SOURCE: "memory" }, async () => {
-        const service = new MasterDataService({} as PrismaService);
-        const options = await service.listOptions("invoice-status");
+    runCase(
+      "list options returns default options for invoice-status",
+      async () => {
+        await withEnv({ DATA_SOURCE: "memory" }, async () => {
+          const service = new MasterDataService({} as PrismaService);
+          const options = await service.listOptions("invoice-status");
 
-        expect(options.length).toBeGreaterThan(0);
-        expect(options[0]).toHaveProperty("id");
-        expect(options[0]).toHaveProperty("categoryKey", "invoice-status");
-        expect(options[0]).toHaveProperty("value");
-        expect(options[0]).toHaveProperty("label");
-        expect(options[0]).toHaveProperty("sortOrder");
-        expect(options[0]).toHaveProperty("isActive", true);
-      });
-    });
+          expect(options.length).toBeGreaterThan(0);
+          expect(options[0]).toHaveProperty("id");
+          expect(options[0]).toHaveProperty("categoryKey", "invoice-status");
+          expect(options[0]).toHaveProperty("value");
+          expect(options[0]).toHaveProperty("label");
+          expect(options[0]).toHaveProperty("sortOrder");
+          expect(options[0]).toHaveProperty("isActive", true);
+        });
+      },
+    );
 
     runCase("list options filters inactive by default", async () => {
       await withEnv({ DATA_SOURCE: "memory" }, async () => {
@@ -63,8 +70,13 @@ describe("MasterDataService", () => {
           isActive: false,
         });
 
-        const activeOptions = await service.listOptions("invoice-issuing-office");
-        const allOptions = await service.listOptions("invoice-issuing-office", true);
+        const activeOptions = await service.listOptions(
+          "invoice-issuing-office",
+        );
+        const allOptions = await service.listOptions(
+          "invoice-issuing-office",
+          true,
+        );
 
         expect(allOptions.length).toBeGreaterThan(activeOptions.length);
         expect(activeOptions.every((opt) => opt.isActive)).toBe(true);
@@ -241,24 +253,54 @@ describe("MasterDataService", () => {
         expect(updated.sortOrder).toBe(999);
       });
     });
+
+    runCase("delete option removes an unused master data value", async () => {
+      await withEnv({ DATA_SOURCE: "memory" }, async () => {
+        const service = new MasterDataService({} as PrismaService);
+        const created = await service.createOption({
+          categoryKey: "bank-disbursement",
+          value: "test_bank",
+          label: "Test Bank",
+        });
+
+        await expect(service.deleteOption(created.id)).resolves.toEqual({
+          deleted: true,
+          id: created.id,
+        });
+        const options = await service.listOptions("bank-disbursement", true);
+        expect(options.some((option) => option.id === created.id)).toBe(false);
+      });
+    });
+
+    runCase("delete option rejects a missing id", async () => {
+      await withEnv({ DATA_SOURCE: "memory" }, async () => {
+        const service = new MasterDataService({} as PrismaService);
+        await expect(service.deleteOption("missing-option")).rejects.toThrow(
+          /not found/i,
+        );
+      });
+    });
   });
 
   describe("Value Validation", () => {
-    runCase("create option validates allowlist before checking duplicates", async () => {
-      await withEnv({ DATA_SOURCE: "memory" }, async () => {
-        const service = new MasterDataService({} as PrismaService);
+    runCase(
+      "create option validates allowlist before checking duplicates",
+      async () => {
+        await withEnv({ DATA_SOURCE: "memory" }, async () => {
+          const service = new MasterDataService({} as PrismaService);
 
-        // invoice-status has allowlist, and "Pending" already exists as a default
-        // The allowlist validation should pass, but duplicate check should fail
-        await expect(
-          service.createOption({
-            categoryKey: "invoice-status",
-            value: "PENDING",
-            label: "Pending Invoice",
-          }),
-        ).rejects.toThrow(/already exists/i);
-      });
-    });
+          // invoice-status has allowlist, and "Pending" already exists as a default
+          // The allowlist validation should pass, but duplicate check should fail
+          await expect(
+            service.createOption({
+              categoryKey: "invoice-status",
+              value: "PENDING",
+              label: "Pending Invoice",
+            }),
+          ).rejects.toThrow(/already exists/i);
+        });
+      },
+    );
 
     runCase("create option rejects value not in allowlist", async () => {
       await withEnv({ DATA_SOURCE: "memory" }, async () => {
@@ -291,6 +333,50 @@ describe("MasterDataService", () => {
   });
 
   describe("Prisma Mode Fallback", () => {
+    runCase(
+      "delete rejects an invoice client option that is still used",
+      async () => {
+        const option = {
+          id: "client-option-1",
+          categoryKey: "invoice-client-name",
+          value: "USED_CLIENT",
+          label: "Used Client",
+          description: null,
+          metadata: null,
+          sortOrder: 1,
+          isActive: true,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        };
+        const deleteMock = vi.fn();
+        const prisma = {
+          masterDataOption: {
+            findUnique: vi.fn(async (args: { where?: { id?: string } }) =>
+              args.where?.id
+                ? option
+                : { ...option, id: "seed-marker", categoryKey: "__system" },
+            ),
+            delete: deleteMock,
+          },
+          invoiceClient: { count: vi.fn(async () => 2) },
+        } as unknown as PrismaService;
+        const config = {
+          get: (key: string) =>
+            key === "DATA_SOURCE"
+              ? "prisma"
+              : key === "NODE_ENV"
+                ? "test"
+                : undefined,
+        };
+        const service = new MasterDataService(prisma, config as never);
+
+        await expect(service.deleteOption(option.id)).rejects.toThrow(
+          /2 client invoice/i,
+        );
+        expect(deleteMock).not.toHaveBeenCalled();
+      },
+    );
+
     runCase("prisma missing client falls back outside production", async () => {
       await withEnv(
         {
@@ -302,7 +388,9 @@ describe("MasterDataService", () => {
           const options = await service.listOptions("invoice-status", true);
 
           expect(options.length >= 4).toBe(true);
-          expect(options.some((option) => option.value === "Pending")).toBe(true);
+          expect(options.some((option) => option.value === "Pending")).toBe(
+            true,
+          );
         },
       );
     });
@@ -317,67 +405,79 @@ describe("MasterDataService", () => {
           const prisma = {
             masterDataOption: {
               findUnique: async () => {
-                throw new Prisma.PrismaClientKnownRequestError("missing table", {
-                  code: "P2021",
-                  clientVersion: "unit-test",
-                  meta: {
-                    table: "public.MasterDataOption",
+                throw new Prisma.PrismaClientKnownRequestError(
+                  "missing table",
+                  {
+                    code: "P2021",
+                    clientVersion: "unit-test",
+                    meta: {
+                      table: "public.MasterDataOption",
+                    },
                   },
-                });
+                );
               },
               upsert: async () => {
-                throw new Prisma.PrismaClientKnownRequestError("missing table", {
-                  code: "P2021",
-                  clientVersion: "unit-test",
-                  meta: {
-                    table: "public.MasterDataOption",
+                throw new Prisma.PrismaClientKnownRequestError(
+                  "missing table",
+                  {
+                    code: "P2021",
+                    clientVersion: "unit-test",
+                    meta: {
+                      table: "public.MasterDataOption",
+                    },
                   },
-                });
+                );
               },
             },
           } as unknown as PrismaService;
 
           const service = new MasterDataService(prisma);
 
-          await expect(
-            service.listOptions("invoice-status"),
-          ).rejects.toThrow(/MasterDataOption/i);
+          await expect(service.listOptions("invoice-status")).rejects.toThrow(
+            /MasterDataOption/i,
+          );
         },
       );
     });
 
-    runCase("prisma create option fails when table missing in production", async () => {
-      await withEnv(
-        {
-          DATA_SOURCE: "prisma",
-          NODE_ENV: "production",
-        },
-        async () => {
-          const prisma = {
-            masterDataOption: {
-              findUnique: async () => {
-                throw new Prisma.PrismaClientKnownRequestError("missing table", {
-                  code: "P2021",
-                  clientVersion: "unit-test",
-                  meta: {
-                    table: "public.MasterDataOption",
-                  },
-                });
+    runCase(
+      "prisma create option fails when table missing in production",
+      async () => {
+        await withEnv(
+          {
+            DATA_SOURCE: "prisma",
+            NODE_ENV: "production",
+          },
+          async () => {
+            const prisma = {
+              masterDataOption: {
+                findUnique: async () => {
+                  throw new Prisma.PrismaClientKnownRequestError(
+                    "missing table",
+                    {
+                      code: "P2021",
+                      clientVersion: "unit-test",
+                      meta: {
+                        table: "public.MasterDataOption",
+                      },
+                    },
+                  );
+                },
               },
-            },
-          } as unknown as PrismaService;
+            } as unknown as PrismaService;
 
-          const service = new MasterDataService(prisma);
+            const service = new MasterDataService(prisma);
 
-          await expect(
-            service.createOption({
-              categoryKey: "invoice-issuing-office",
-              label: "Test Option",
-            }),
-          ).rejects.toThrow(/MasterDataOption/i);
-        },
-      );
-    });
+            await expect(
+              service.createOption({
+                categoryKey: "invoice-issuing-office",
+                label: "Test Option",
+              }),
+            ).rejects.toThrow(/MasterDataOption/i);
+          },
+        );
+      },
+    );
   });
 
   describe("Edge Cases", () => {
@@ -452,8 +552,12 @@ describe("MasterDataService", () => {
         });
 
         const options = await service.listOptions("invoice-issuing-office");
-        const alphaIndex = options.findIndex((opt) => opt.label === "Alpha Office");
-        const zebraIndex = options.findIndex((opt) => opt.label === "Zebra Office");
+        const alphaIndex = options.findIndex(
+          (opt) => opt.label === "Alpha Office",
+        );
+        const zebraIndex = options.findIndex(
+          (opt) => opt.label === "Zebra Office",
+        );
 
         expect(alphaIndex).toBeLessThan(zebraIndex);
       });

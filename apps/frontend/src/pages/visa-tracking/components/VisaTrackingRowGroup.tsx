@@ -130,7 +130,7 @@ export function VisaTrackingRowGroup({
     return (
       <article
         key={row.id}
-        className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-surface-container-lowest transition-all"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-surface-container-lowest p-3.5 shadow-sm transition-all sm:p-4"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -153,7 +153,7 @@ export function VisaTrackingRowGroup({
             <p className="mt-1 break-words text-sm font-medium leading-snug text-slate-700">{row.groupName}</p>
           </div>
 
-          <div className="flex flex-col gap-1 items-end shrink-0">
+          <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge
               status="neutral"
               className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
@@ -163,60 +163,84 @@ export function VisaTrackingRowGroup({
           </div>
         </div>
 
-        <div className="mt-3 space-y-2">
-          <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Makkah Agreement</p>
+        <div className="mt-3 divide-y divide-outline-variant/40 border-y border-outline-variant/40 sm:grid sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          <div className="min-w-0 py-3 sm:pr-3">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Makkah Agreement</p>
             {renderAgreementCell(row, "makkah", "mobile")}
           </div>
 
-          <div className="rounded-xl bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Madinah Agreement</p>
+          <div className="min-w-0 py-3 sm:pl-3">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Madinah Agreement</p>
             {renderAgreementCell(row, "madinah", "mobile")}
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-surface-container-lowest p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <Badge
-                status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
-                className={`px-2.5 py-1 text-[11px] font-bold w-fit ${
-                  row.visaStatus !== "Issued" && row.visaStatus !== "Pending"
-                    ? "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
-                    : "border-transparent"
-                }`}
-              >
-                {row.visaStatus}
-              </Badge>
+        <section className="grid grid-cols-2 border-b border-outline-variant/40" aria-label="Visa information">
+          <div className="min-w-0 py-3 pr-2" role="group" aria-label="Visa status summary">
+            <div className="flex min-w-0 items-start gap-2.5">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  fact_check
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">Visa</p>
+                <strong className="mt-1 block max-w-full whitespace-normal break-words text-sm font-extrabold leading-tight text-on-surface">
+                  {row.visaStatus}
+                </strong>
+                <small className="mt-1 block text-[10px] font-medium text-on-surface-variant/70">Current status</small>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-xl bg-surface-container-lowest p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <Badge
-                status="neutral"
-                className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-              >
-                {visaTypeLabel}
-              </Badge>
+          <div
+            className="min-w-0 border-l border-outline-variant/40 py-3 pl-3"
+            role="group"
+            aria-label="Visa type summary"
+          >
+            <div className="flex min-w-0 items-start gap-2.5">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  directions_bus
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
+                  Visa Type
+                </p>
+                <strong className="mt-1 block max-w-full whitespace-normal break-words text-sm font-extrabold leading-tight text-on-surface">
+                  {visaTypeLabel}
+                </strong>
+                <small className="mt-1 block text-[10px] font-medium text-on-surface-variant/70">Package setup</small>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-xl bg-surface-container-lowest p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Syarikah</p>
-            <div className="mt-1 flex flex-col gap-1">
-              <Badge
-                status="neutral"
-                className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-                title={group?.visaSetup?.syarikah || "-"}
-              >
-                <span className="truncate max-w-[120px]">{formatSyarikahName(group?.visaSetup?.syarikah)}</span>
-              </Badge>
+          <div
+            className="col-span-2 min-w-0 border-t border-outline-variant/40 py-3"
+            role="group"
+            aria-label="Syarikah summary"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  business
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
+                  Syarikah
+                </p>
+                <strong
+                  className="mt-1 block truncate text-sm font-extrabold leading-tight text-on-surface"
+                  title={group?.visaSetup?.syarikah || "-"}
+                >
+                  {formatSyarikahName(group?.visaSetup?.syarikah)}
+                </strong>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <div className="mt-3 flex flex-col gap-2">
           <Button className="w-full" onClick={() => onOpenDetail(row)}>

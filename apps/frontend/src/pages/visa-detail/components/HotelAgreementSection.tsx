@@ -16,13 +16,13 @@ import * as Domain from "../../../shared/app-domain";
 
 const { isIsoDateValue, formatVisaShortDate } = Domain;
 
-function AgreementSummaryFields({ agreement }: { agreement: GroupAgreementHotel }) {
+export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreementHotel }) {
   const agreementNumber = agreement.agreementNumber?.trim() || "Agreement number pending";
   const paxLabel = Number.isFinite(agreement.pax) ? agreement.pax.toString() : "-";
 
   return (
-    <div className="flex w-full flex-wrap gap-2">
-      <div className="min-w-[13rem] flex-1 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_5.5rem] gap-2 md:grid-cols-[minmax(0,1fr)_5.5rem_minmax(12rem,1fr)]">
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             confirmation_number
@@ -34,7 +34,7 @@ function AgreementSummaryFields({ agreement }: { agreement: GroupAgreementHotel 
         </strong>
       </div>
 
-      <div className="min-w-[5.5rem] rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+      <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             group
@@ -44,14 +44,14 @@ function AgreementSummaryFields({ agreement }: { agreement: GroupAgreementHotel 
         <strong className="mt-1 block text-lg font-black leading-none text-slate-900">{paxLabel}</strong>
       </div>
 
-      <div className="min-w-[12rem] flex-1 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+      <div className="col-span-2 min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2 md:col-span-1">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             event
           </span>
           Stay
         </span>
-        <strong className="mt-1 block text-sm font-extrabold leading-snug text-slate-900">
+        <strong className="mt-1 block break-words text-sm font-extrabold leading-snug text-slate-900">
           {formatAgreementStayRange(agreement)}
         </strong>
       </div>

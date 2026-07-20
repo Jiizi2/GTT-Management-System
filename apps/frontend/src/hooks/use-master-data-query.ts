@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createMasterDataOptionInBackend,
+  deleteMasterDataOptionInBackend,
   fetchMasterDataCategoriesFromBackend,
   fetchMasterDataOptionsFromBackend,
   updateMasterDataOptionInBackend,
@@ -62,6 +63,18 @@ export function useUpdateMasterDataOptionMutation() {
   return useMutation({
     mutationFn: ({ optionId, payload }: { optionId: string; payload: UpdateMasterDataOptionPayload }) =>
       updateMasterDataOptionInBackend(optionId, payload),
+    retry: false,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: masterDataQueryKeys.all });
+    },
+  });
+}
+
+export function useDeleteMasterDataOptionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (optionId: string) => deleteMasterDataOptionInBackend(optionId),
     retry: false,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: masterDataQueryKeys.all });

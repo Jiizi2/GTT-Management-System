@@ -114,8 +114,8 @@ export function RaudhahStatusSection() {
 
         <div className="mt-3 space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Provider Agency</p>
-          <strong className="block text-base font-semibold text-slate-900">{providerName}</strong>
-          <small className="text-xs text-slate-500">
+          <strong className="block break-words text-base font-semibold text-slate-900">{providerName}</strong>
+          <small className="block break-words text-xs text-slate-500">
             <span className="sm:hidden">Package: {row.packageName}</span>
             <span className="hidden sm:inline">Assigned for {row.packageName} package</span>
           </small>
@@ -141,8 +141,8 @@ export function RaudhahStatusSection() {
 
         <div className="mt-3 space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Agent</p>
-          <strong className="block text-base font-semibold text-slate-900">{assignedAgentName}</strong>
-          <small className="text-xs text-slate-500">
+          <strong className="block break-words text-base font-semibold text-slate-900">{assignedAgentName}</strong>
+          <small className="block break-words text-xs text-slate-500">
             {group?.agent ? `Responsible for ${row.groupCode}` : "Select an agent for this visa group"}
           </small>
         </div>
