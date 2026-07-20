@@ -21,7 +21,7 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
   const paxLabel = Number.isFinite(agreement.pax) ? agreement.pax.toString() : "-";
 
   return (
-    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_5.5rem] gap-2 md:grid-cols-[minmax(0,1fr)_5.5rem_minmax(12rem,1fr)]">
+    <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)_5.5rem] gap-2 overflow-hidden md:grid-cols-[minmax(0,1fr)_5.5rem_minmax(12rem,1fr)]">
       <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -373,8 +373,8 @@ export function HotelAgreementSection() {
   const madinahAgreementIdSet = useMemo(() => new Set(madinahAgreements.map((agreement) => agreement.id)), [madinahAgreements]);
 
   return (
-    <section className="grid gap-4 xl:grid-cols-2">
-      <article className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+    <section className="grid min-w-0 gap-4 xl:grid-cols-2">
+      <article className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
@@ -395,7 +395,7 @@ export function HotelAgreementSection() {
           </button>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 min-w-0 space-y-3">
           {makkahAgreements.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-brand-tertiary/45 bg-brand-tertiary/10 px-4 py-4 text-sm text-brand-tertiary">
               <div className="flex items-start gap-2">
@@ -417,9 +417,9 @@ export function HotelAgreementSection() {
             const statusLabel = getAgreementStatusLabel(agreement.status);
 
             return (
-              <details key={agreement.id} className="serene-accordion">
-                <summary className="serene-accordion-summary flex-col">
-                  <div className="flex w-full items-start gap-3">
+              <details key={agreement.id} className="serene-accordion min-w-0 max-w-full">
+                <summary className="serene-accordion-summary min-w-0 max-w-full flex-col">
+                  <div className="flex w-full min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-slate-900">
@@ -428,7 +428,7 @@ export function HotelAgreementSection() {
                         {agreement.ownerGroupCode &&
                           familyGroups.length > 1 &&
                           agreement.ownerGroupCode !== activeGroupCode && (
-                            <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            <span className="inline-flex max-w-full break-all rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
                               Milik: {agreement.ownerGroupCode}
                             </span>
                           )}
@@ -533,7 +533,7 @@ export function HotelAgreementSection() {
         </div>
       </article>
 
-      <article className="rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+      <article className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
@@ -554,7 +554,7 @@ export function HotelAgreementSection() {
           </button>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 min-w-0 space-y-3">
           {madinahAgreements.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-brand-tertiary/45 bg-brand-tertiary/10 px-4 py-4 text-sm text-brand-tertiary">
               <div className="flex items-start gap-2">
@@ -576,9 +576,9 @@ export function HotelAgreementSection() {
             const statusLabel = getAgreementStatusLabel(agreement.status);
 
             return (
-              <details key={agreement.id} className="serene-accordion">
-                <summary className="serene-accordion-summary flex-col">
-                  <div className="flex w-full items-start gap-3">
+              <details key={agreement.id} className="serene-accordion min-w-0 max-w-full">
+                <summary className="serene-accordion-summary min-w-0 max-w-full flex-col">
+                  <div className="flex w-full min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-slate-900">
@@ -587,7 +587,7 @@ export function HotelAgreementSection() {
                         {agreement.ownerGroupCode &&
                           familyGroups.length > 1 &&
                           agreement.ownerGroupCode !== activeGroupCode && (
-                            <span className="inline-flex rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            <span className="inline-flex max-w-full break-all rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
                               Milik: {agreement.ownerGroupCode}
                             </span>
                           )}
