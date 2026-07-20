@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -40,12 +41,16 @@ import { MasterDataService } from "./master-data.service";
 @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
 @Controller("master-data")
 export class MasterDataController {
-  constructor(@Inject(MasterDataService) private readonly masterDataService: MasterDataService) {}
+  constructor(
+    @Inject(MasterDataService)
+    private readonly masterDataService: MasterDataService,
+  ) {}
 
   @Get("categories")
   @ApiOperation({
     summary: "List master data categories",
-    description: "Mengembalikan kategori master data beserta total dan active count masing-masing.",
+    description:
+      "Mengembalikan kategori master data beserta total dan active count masing-masing.",
   })
   @ApiOkResponse({
     description: "Ringkasan kategori master data berhasil dibaca.",
@@ -59,7 +64,8 @@ export class MasterDataController {
   @Get("options")
   @ApiOperation({
     summary: "List master data options",
-    description: "Mengembalikan opsi dalam kategori tertentu, dengan opsi menampilkan item nonaktif.",
+    description:
+      "Mengembalikan opsi dalam kategori tertentu, dengan opsi menampilkan item nonaktif.",
   })
   @ApiQuery({ name: "categoryKey", required: true, example: "agreement-city" })
   @ApiQuery({ name: "includeInactive", required: false, example: true })
@@ -70,14 +76,18 @@ export class MasterDataController {
   })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto })
   listOptions(@Query() query: ListMasterDataOptionsDto) {
-    return this.masterDataService.listOptions(query.categoryKey, query.includeInactive ?? false);
+    return this.masterDataService.listOptions(
+      query.categoryKey,
+      query.includeInactive ?? false,
+    );
   }
 
   @Post("options")
   @Roles("super-admin")
   @ApiOperation({
     summary: "Buat master data option",
-    description: "Membuat option baru di kategori master data. Hanya untuk super-admin.",
+    description:
+      "Membuat option baru di kategori master data. Hanya untuk super-admin.",
   })
   @ApiCreatedResponse({
     description: "Master data option berhasil dibuat.",
@@ -94,7 +104,8 @@ export class MasterDataController {
   @Roles("super-admin")
   @ApiOperation({
     summary: "Update master data option",
-    description: "Memperbarui option master data yang ada. Hanya untuk super-admin.",
+    description:
+      "Memperbarui option master data yang ada. Hanya untuk super-admin.",
   })
   @ApiParam({ name: "optionId", example: "clmasterdataoptionid123" })
   @ApiOkResponse({
@@ -105,7 +116,26 @@ export class MasterDataController {
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
   @ApiConflictResponse({ type: ApiErrorResponseDto })
-  updateOption(@Param("optionId") optionId: string, @Body() payload: UpdateMasterDataOptionDto) {
+  updateOption(
+    @Param("optionId") optionId: string,
+    @Body() payload: UpdateMasterDataOptionDto,
+  ) {
     return this.masterDataService.updateOption(optionId, payload);
+  }
+
+  @Delete("options/:optionId")
+  @Roles("super-admin")
+  @ApiOperation({
+    summary: "Hapus master data option",
+    description:
+      "Menghapus option jika belum dipakai oleh data operasional lain. Hanya untuk super-admin.",
+  })
+  @ApiParam({ name: "optionId", example: "clmasterdataoptionid123" })
+  @ApiOkResponse({ description: "Master data option berhasil dihapus." })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ type: ApiErrorResponseDto })
+  @ApiConflictResponse({ type: ApiErrorResponseDto })
+  deleteOption(@Param("optionId") optionId: string) {
+    return this.masterDataService.deleteOption(optionId);
   }
 }

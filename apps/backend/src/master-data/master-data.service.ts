@@ -8,8 +8,11 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Prisma } from "@prisma/client";
-import { resolveConfiguredDataSource, resolveConfiguredNodeEnv } from "../config/app-config";
+import { AuthUserRole, InvoiceStatus, Prisma } from "@prisma/client";
+import {
+  resolveConfiguredDataSource,
+  resolveConfiguredNodeEnv,
+} from "../config/app-config";
 import { createStructuredLogger } from "../logging/create-structured-logger";
 import { PrismaService } from "../prisma/prisma.service";
 import {
@@ -66,6 +69,23 @@ type PrismaMasterDataOptionRecord = {
   updatedAt: Date;
 };
 
+const MASTER_DATA_SEED_MARKER_CATEGORY = "__system";
+const MASTER_DATA_SEED_MARKER_VALUE = "defaults-v1";
+
+const INVOICE_STATUS_BY_OPTION_VALUE: Record<string, InvoiceStatus> = {
+  pending: InvoiceStatus.PENDING,
+  paid: InvoiceStatus.PAID,
+  overdue: InvoiceStatus.OVERDUE,
+  cancelled: InvoiceStatus.CANCELLED,
+};
+
+const AUTH_ROLE_BY_OPTION_VALUE: Record<string, AuthUserRole> = {
+  "super-admin": AuthUserRole.SUPER_ADMIN,
+  admin: AuthUserRole.ADMIN,
+  "finance-manager": AuthUserRole.FINANCE_MANAGER,
+  "customer-support": AuthUserRole.CUSTOMER_SUPPORT,
+};
+
 function normalizeCategoryKey(rawValue: string): string {
   return rawValue.trim().toLowerCase();
 }
@@ -94,8 +114,13 @@ function createGeneratedValueFromLabel(label: string): string {
   return generated || "OPTION";
 }
 
-function resolveNextSortOrder<T extends { sortOrder: number }>(options: T[]): number {
-  const highest = options.reduce((max, option) => Math.max(max, option.sortOrder), 0);
+function resolveNextSortOrder<T extends { sortOrder: number }>(
+  options: T[],
+): number {
+  const highest = options.reduce(
+    (max, option) => Math.max(max, option.sortOrder),
+    0,
+  );
   return highest + 1;
 }
 
@@ -117,7 +142,9 @@ function isMasterDataTableMissingError(error: unknown): boolean {
   }
 
   const tableName = (error.meta as { table?: unknown } | undefined)?.table;
-  return typeof tableName === "string" && tableName.includes("MasterDataOption");
+  return (
+    typeof tableName === "string" && tableName.includes("MasterDataOption")
+  );
 }
 
 function isMasterDataModelMissingError(error: unknown): boolean {
@@ -136,7 +163,10 @@ function isMasterDataModelMissingError(error: unknown): boolean {
   return message.includes("Prisma client belum memuat model MasterDataOption");
 }
 
-function mapDefaultOptionToMemory(option: MasterDataSeedOption, index: number): MemoryMasterDataOption {
+function mapDefaultOptionToMemory(
+  option: MasterDataSeedOption,
+  index: number,
+): MemoryMasterDataOption {
   const nowIso = new Date().toISOString();
   return {
     id: `mdo-${String(index + 1).padStart(4, "0")}`,
@@ -157,11 +187,12 @@ export class MasterDataService {
   private readonly dataSource: "memory" | "prisma";
   private readonly nodeEnv: string;
   private readonly logger = createStructuredLogger(MasterDataService.name);
-  private readonly memoryOptions = DEFAULT_MASTER_DATA_OPTIONS.map((option, index) =>
-    mapDefaultOptionToMemory(option, index),
+  private readonly memoryOptions = DEFAULT_MASTER_DATA_OPTIONS.map(
+    (option, index) => mapDefaultOptionToMemory(option, index),
   );
   private prismaSeedPromise: Promise<void> | null = null;
-  private prismaReadFallbackReason: "missing-table" | "missing-client" | null = null;
+  private prismaReadFallbackReason: "missing-table" | "missing-client" | null =
+    null;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -175,7 +206,10 @@ export class MasterDataService {
     const countersByCategory = await this.buildCategoryCounters();
 
     return MASTER_DATA_CATEGORY_DEFINITIONS.map((category) => {
-      const counters = countersByCategory.get(category.key) ?? { totalOptions: 0, activeOptions: 0 };
+      const counters = countersByCategory.get(category.key) ?? {
+        totalOptions: 0,
+        activeOptions: 0,
+      };
       return {
         ...category,
         totalOptions: counters.totalOptions,
@@ -184,7 +218,10 @@ export class MasterDataService {
     });
   }
 
-  async listOptions(categoryKey: string, includeInactive = false): Promise<MasterDataOptionItem[]> {
+  async listOptions(
+    categoryKey: string,
+    includeInactive = false,
+  ): Promise<MasterDataOptionItem[]> {
     const normalizedCategoryKey = this.assertSupportedCategory(categoryKey);
 
     if (this.dataSource === "prisma") {
@@ -196,7 +233,11 @@ export class MasterDataService {
             categoryKey: normalizedCategoryKey,
             ...(includeInactive ? {} : { isActive: true }),
           },
-          orderBy: [{ sortOrder: "asc" }, { label: "asc" }, { createdAt: "asc" }],
+          orderBy: [
+            { sortOrder: "asc" },
+            { label: "asc" },
+            { createdAt: "asc" },
+          ],
         });
 
         return options.map((option) => this.mapPrismaOption(option));
@@ -206,8 +247,12 @@ export class MasterDataService {
     return this.listMemoryOptions(normalizedCategoryKey, includeInactive);
   }
 
-  async createOption(payload: CreateMasterDataOptionDto): Promise<MasterDataOptionItem> {
-    const normalizedCategoryKey = this.assertSupportedCategory(payload.categoryKey);
+  async createOption(
+    payload: CreateMasterDataOptionDto,
+  ): Promise<MasterDataOptionItem> {
+    const normalizedCategoryKey = this.assertSupportedCategory(
+      payload.categoryKey,
+    );
     const normalizedLabel = normalizeRequiredLabel(payload.label);
     const normalizedValue = this.resolveValueForCategory({
       categoryKey: normalizedCategoryKey,
@@ -239,7 +284,9 @@ export class MasterDataService {
 
       const sortOrder =
         payload.sortOrder ??
-        (await this.resolveNextSortOrderForPrismaCategory(normalizedCategoryKey));
+        (await this.resolveNextSortOrderForPrismaCategory(
+          normalizedCategoryKey,
+        ));
 
       try {
         const created = await model.create({
@@ -261,7 +308,10 @@ export class MasterDataService {
         });
         return this.mapPrismaOption(created);
       } catch (error: unknown) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
           throw new ConflictException(
             `Option '${normalizedValue}' already exists in category '${normalizedCategoryKey}'.`,
           );
@@ -282,7 +332,9 @@ export class MasterDataService {
       );
     }
 
-    const sameCategory = this.memoryOptions.filter((option) => option.categoryKey === normalizedCategoryKey);
+    const sameCategory = this.memoryOptions.filter(
+      (option) => option.categoryKey === normalizedCategoryKey,
+    );
     const nowIso = new Date().toISOString();
     const created: MemoryMasterDataOption = {
       id: randomUUID(),
@@ -306,7 +358,10 @@ export class MasterDataService {
     return this.mapMemoryOption(created);
   }
 
-  async updateOption(optionId: string, payload: UpdateMasterDataOptionDto): Promise<MasterDataOptionItem> {
+  async updateOption(
+    optionId: string,
+    payload: UpdateMasterDataOptionDto,
+  ): Promise<MasterDataOptionItem> {
     const normalizedOptionId = optionId.trim();
     if (!normalizedOptionId) {
       throw new BadRequestException("Option id is required.");
@@ -323,7 +378,9 @@ export class MasterDataService {
         },
       });
       if (!current) {
-        throw new NotFoundException(`Master data option '${optionId}' not found.`);
+        throw new NotFoundException(
+          `Master data option '${optionId}' not found.`,
+        );
       }
 
       const nextValue =
@@ -334,7 +391,10 @@ export class MasterDataService {
               label: payload.label ?? current.label,
             })
           : current.value;
-      const nextLabel = payload.label !== undefined ? normalizeRequiredLabel(payload.label) : current.label;
+      const nextLabel =
+        payload.label !== undefined
+          ? normalizeRequiredLabel(payload.label)
+          : current.label;
 
       if (nextValue !== current.value) {
         const duplicate = await model.findUnique({
@@ -367,7 +427,8 @@ export class MasterDataService {
             payload.description !== undefined
               ? payload.description.trim() || null
               : current.description,
-          metadata: payload.metadata !== undefined ? payload.metadata : undefined,
+          metadata:
+            payload.metadata !== undefined ? payload.metadata : undefined,
           sortOrder: payload.sortOrder ?? current.sortOrder,
           isActive: payload.isActive ?? current.isActive,
         },
@@ -381,13 +442,20 @@ export class MasterDataService {
       return this.mapPrismaOption(updated);
     }
 
-    const targetIndex = this.memoryOptions.findIndex((option) => option.id === normalizedOptionId);
+    const targetIndex = this.memoryOptions.findIndex(
+      (option) => option.id === normalizedOptionId,
+    );
     if (targetIndex < 0) {
-      throw new NotFoundException(`Master data option '${optionId}' not found.`);
+      throw new NotFoundException(
+        `Master data option '${optionId}' not found.`,
+      );
     }
 
     const current = this.memoryOptions[targetIndex];
-    const nextLabel = payload.label !== undefined ? normalizeRequiredLabel(payload.label) : current.label;
+    const nextLabel =
+      payload.label !== undefined
+        ? normalizeRequiredLabel(payload.label)
+        : current.label;
     const nextValue =
       payload.value !== undefined
         ? this.resolveValueForCategory({
@@ -414,8 +482,11 @@ export class MasterDataService {
       value: nextValue,
       label: nextLabel,
       description:
-        payload.description !== undefined ? payload.description.trim() || undefined : current.description,
-      metadata: payload.metadata !== undefined ? payload.metadata : current.metadata,
+        payload.description !== undefined
+          ? payload.description.trim() || undefined
+          : current.description,
+      metadata:
+        payload.metadata !== undefined ? payload.metadata : current.metadata,
       sortOrder: payload.sortOrder ?? current.sortOrder,
       isActive: payload.isActive ?? current.isActive,
       updatedAtIso: new Date().toISOString(),
@@ -430,10 +501,135 @@ export class MasterDataService {
     return this.mapMemoryOption(next);
   }
 
+  async deleteOption(optionId: string): Promise<{ deleted: true; id: string }> {
+    const normalizedOptionId = optionId.trim();
+    if (!normalizedOptionId) {
+      throw new BadRequestException("Option id is required.");
+    }
+
+    if (this.dataSource === "prisma") {
+      await this.ensurePrismaDefaultsSeeded();
+      this.assertPrismaStorageWritable();
+      const model = this.getPrismaMasterDataModelOrThrow();
+      const current = await model.findUnique({
+        where: { id: normalizedOptionId },
+      });
+      if (
+        !current ||
+        current.categoryKey === MASTER_DATA_SEED_MARKER_CATEGORY
+      ) {
+        throw new NotFoundException(
+          `Master data option '${optionId}' not found.`,
+        );
+      }
+
+      const dependencyMessage = await this.findPrismaOptionDependency(current);
+      if (dependencyMessage) {
+        throw new ConflictException(
+          `Data '${current.label}' tidak dapat dihapus karena masih digunakan oleh ${dependencyMessage}.`,
+        );
+      }
+
+      await model.delete({ where: { id: normalizedOptionId } });
+      this.logMutation("master-data.deleted", {
+        optionId: current.id,
+        categoryKey: current.categoryKey,
+        value: current.value,
+      });
+      return { deleted: true, id: current.id };
+    }
+
+    const targetIndex = this.memoryOptions.findIndex(
+      (option) => option.id === normalizedOptionId,
+    );
+    if (targetIndex < 0) {
+      throw new NotFoundException(
+        `Master data option '${optionId}' not found.`,
+      );
+    }
+    const [deleted] = this.memoryOptions.splice(targetIndex, 1);
+    this.logMutation("master-data.deleted", {
+      optionId: deleted.id,
+      categoryKey: deleted.categoryKey,
+      value: deleted.value,
+    });
+    return { deleted: true, id: deleted.id };
+  }
+
+  private async findPrismaOptionDependency(
+    option: PrismaMasterDataOptionRecord,
+  ): Promise<string | null> {
+    const normalizedValue = option.value.trim().toLowerCase();
+    switch (option.categoryKey) {
+      case "bank-disbursement": {
+        const count = await this.prisma.invoice.count({
+          where: {
+            notes: {
+              contains: `[BankAccount:${option.value}]`,
+              mode: "insensitive",
+            },
+          },
+        });
+        return count > 0 ? `${count} invoice` : null;
+      }
+      case "invoice-issuing-office": {
+        const count = await this.prisma.invoice.count({
+          where: {
+            notes: {
+              contains: `[IssuingOffice:${option.value}]`,
+              mode: "insensitive",
+            },
+          },
+        });
+        return count > 0 ? `${count} invoice` : null;
+      }
+      case "invoice-client-name": {
+        const count = await this.prisma.invoiceClient.count({
+          where: {
+            OR: [
+              { name: { equals: option.label, mode: "insensitive" } },
+              { name: { equals: option.value, mode: "insensitive" } },
+            ],
+          },
+        });
+        return count > 0 ? `${count} client invoice` : null;
+      }
+      case "invoice-status": {
+        const status = INVOICE_STATUS_BY_OPTION_VALUE[normalizedValue];
+        if (!status) return null;
+        const count = await this.prisma.invoice.count({ where: { status } });
+        return count > 0 ? `${count} invoice` : null;
+      }
+      case "user-role":
+      case "role-catalog": {
+        const role = AUTH_ROLE_BY_OPTION_VALUE[normalizedValue];
+        if (!role) return null;
+        const count = await this.prisma.authUser.count({ where: { role } });
+        return count > 0 ? `${count} user` : null;
+      }
+      case "saudi-city": {
+        const count = await this.prisma.itineraryItem.count({
+          where: {
+            OR: [
+              { cityTourCity: { equals: option.label, mode: "insensitive" } },
+              { cityTourCity: { equals: option.value, mode: "insensitive" } },
+            ],
+          },
+        });
+        return count > 0 ? `${count} itinerary` : null;
+      }
+      default:
+        return null;
+    }
+  }
+
   private async buildCategoryCounters(): Promise<
     Map<string, { totalOptions: number; activeOptions: number }>
   > {
-    const counters = new Map<string, { totalOptions: number; activeOptions: number }>();
+    const counters = new Map<
+      string,
+      { totalOptions: number; activeOptions: number }
+    >();
 
     const options =
       this.dataSource === "prisma"
@@ -441,7 +637,10 @@ export class MasterDataService {
         : this.memoryOptions.map((option) => this.mapMemoryOption(option));
 
     for (const option of options) {
-      const current = counters.get(option.categoryKey) ?? { totalOptions: 0, activeOptions: 0 };
+      const current = counters.get(option.categoryKey) ?? {
+        totalOptions: 0,
+        activeOptions: 0,
+      };
       current.totalOptions += 1;
       if (option.isActive) {
         current.activeOptions += 1;
@@ -452,11 +651,15 @@ export class MasterDataService {
     return counters;
   }
 
-  private listMemoryOptions(categoryKey: string, includeInactive: boolean): MasterDataOptionItem[] {
+  private listMemoryOptions(
+    categoryKey: string,
+    includeInactive: boolean,
+  ): MasterDataOptionItem[] {
     return this.memoryOptions
       .filter(
         (option) =>
-          option.categoryKey === categoryKey && (includeInactive ? true : option.isActive),
+          option.categoryKey === categoryKey &&
+          (includeInactive ? true : option.isActive),
       )
       .sort((left, right) => {
         const sortOrderDiff = left.sortOrder - right.sortOrder;
@@ -483,7 +686,9 @@ export class MasterDataService {
     return options.map((option) => this.mapPrismaOption(option));
   }
 
-  private mapMemoryOption(option: MemoryMasterDataOption): MasterDataOptionItem {
+  private mapMemoryOption(
+    option: MemoryMasterDataOption,
+  ): MasterDataOptionItem {
     return {
       id: option.id,
       categoryKey: option.categoryKey,
@@ -498,7 +703,9 @@ export class MasterDataService {
     };
   }
 
-  private mapPrismaOption(option: PrismaMasterDataOptionRecord): MasterDataOptionItem {
+  private mapPrismaOption(
+    option: PrismaMasterDataOptionRecord,
+  ): MasterDataOptionItem {
     return {
       id: option.id,
       categoryKey: option.categoryKey,
@@ -532,7 +739,8 @@ export class MasterDataService {
     }
 
     const matchedAllowlistValue = allowlist.find(
-      (allowedValue) => allowedValue.toLowerCase() === candidateValue.toLowerCase(),
+      (allowedValue) =>
+        allowedValue.toLowerCase() === candidateValue.toLowerCase(),
     );
     if (!matchedAllowlistValue) {
       throw new BadRequestException(
@@ -563,7 +771,9 @@ export class MasterDataService {
   }
 
   private canUsePrismaStorage(): boolean {
-    return this.dataSource === "prisma" && this.prismaReadFallbackReason === null;
+    return (
+      this.dataSource === "prisma" && this.prismaReadFallbackReason === null
+    );
   }
 
   private shouldAllowPrismaReadFallback(): boolean {
@@ -605,8 +815,11 @@ export class MasterDataService {
     findUnique: (args: unknown) => Promise<PrismaMasterDataOptionRecord | null>;
     create: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
     update: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
+    delete: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
     upsert: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
-    aggregate: (args: unknown) => Promise<{ _max: { sortOrder: number | null } }>;
+    aggregate: (
+      args: unknown,
+    ) => Promise<{ _max: { sortOrder: number | null } }>;
   } {
     const prismaRecord = this.prisma as unknown as Record<string, unknown>;
     const model = prismaRecord.masterDataOption;
@@ -619,15 +832,22 @@ export class MasterDataService {
 
     return model as {
       findMany: (args?: unknown) => Promise<PrismaMasterDataOptionRecord[]>;
-      findUnique: (args: unknown) => Promise<PrismaMasterDataOptionRecord | null>;
+      findUnique: (
+        args: unknown,
+      ) => Promise<PrismaMasterDataOptionRecord | null>;
       create: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
       update: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
+      delete: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
       upsert: (args: unknown) => Promise<PrismaMasterDataOptionRecord>;
-      aggregate: (args: unknown) => Promise<{ _max: { sortOrder: number | null } }>;
+      aggregate: (
+        args: unknown,
+      ) => Promise<{ _max: { sortOrder: number | null } }>;
     };
   }
 
-  private async resolveNextSortOrderForPrismaCategory(categoryKey: string): Promise<number> {
+  private async resolveNextSortOrderForPrismaCategory(
+    categoryKey: string,
+  ): Promise<number> {
     const model = this.getPrismaMasterDataModelOrThrow();
     const aggregate = await model.aggregate({
       where: {
@@ -696,6 +916,18 @@ export class MasterDataService {
   private async seedPrismaDefaults(): Promise<void> {
     const model = this.getPrismaMasterDataModelOrThrow();
 
+    const completedSeed = await model.findUnique({
+      where: {
+        categoryKey_value: {
+          categoryKey: MASTER_DATA_SEED_MARKER_CATEGORY,
+          value: MASTER_DATA_SEED_MARKER_VALUE,
+        },
+      },
+    });
+    if (completedSeed) {
+      return;
+    }
+
     for (const option of DEFAULT_MASTER_DATA_OPTIONS) {
       const existing = await model.findUnique({
         where: {
@@ -713,13 +945,26 @@ export class MasterDataService {
             value: option.value,
             label: option.label,
             description: option.description ?? null,
-            metadata: (option.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+            metadata:
+              (option.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
             sortOrder: option.sortOrder,
             isActive: option.isActive ?? true,
           },
         });
       }
     }
+
+    await model.create({
+      data: {
+        categoryKey: MASTER_DATA_SEED_MARKER_CATEGORY,
+        value: MASTER_DATA_SEED_MARKER_VALUE,
+        label: "Master data defaults seeded",
+        description: null,
+        metadata: Prisma.JsonNull,
+        sortOrder: 0,
+        isActive: false,
+      },
+    });
   }
 
   private logMutation(action: string, details: Record<string, unknown>): void {

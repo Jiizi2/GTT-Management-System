@@ -3,6 +3,7 @@ import { PageHeroSection } from "../components/page-hero-section";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import {
   useCreateMasterDataOptionMutation,
+  useDeleteMasterDataOptionMutation,
   useMasterDataCategoriesQuery,
   useMasterDataOptionsQuery,
   useUpdateMasterDataOptionMutation,
@@ -18,6 +19,7 @@ import {
   MasterDataFormDrawer,
   MasterDataCategoryTabs,
   MasterDataOptionTable,
+  MasterDataDeleteConfirmModal,
   type MasterDataOptionFormValues,
   type CategoryFormConfig,
   type MasterDataCategoryTabKey,
@@ -29,8 +31,6 @@ type NoticeState = {
 };
 
 type OptionStatusFilter = "active" | "inactive" | "all";
-
-
 
 const CATEGORY_FORM_CONFIG: Record<MasterDataCategoryKey, CategoryFormConfig> = {
   "bank-disbursement": {
@@ -151,9 +151,11 @@ export function MasterDataScreen() {
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
+  const [deletingOption, setDeletingOption] = useState<MasterDataOption | null>(null);
   const [createFormResetToken, setCreateFormResetToken] = useState(0);
   const createMutation = useCreateMasterDataOptionMutation();
   const updateMutation = useUpdateMasterDataOptionMutation();
+  const deleteMutation = useDeleteMasterDataOptionMutation();
 
   const sortedCategories = useMemo(
     () => [...(categoriesQuery.data ?? [])].sort((left, right) => left.label.localeCompare(right.label)),
@@ -215,8 +217,9 @@ export function MasterDataScreen() {
         return true;
       }
 
-      return [option.value, option.label, option.description ?? ""]
-        .some((value) => value.toLocaleLowerCase("id-ID").includes(normalizedSearch));
+      return [option.value, option.label, option.description ?? ""].some((value) =>
+        value.toLocaleLowerCase("id-ID").includes(normalizedSearch),
+      );
     });
   }, [optionSearch, options, statusFilter]);
   const editingOption = useMemo(
@@ -278,6 +281,7 @@ export function MasterDataScreen() {
     setActiveCategoryKey(categoryKey);
     setIsCreateOpen(false);
     setEditingOptionId(null);
+    setDeletingOption(null);
     setOptionSearch("");
     setStatusFilter("active");
     setCreateFormResetToken((current) => current + 1);
@@ -360,6 +364,20 @@ export function MasterDataScreen() {
     }
   };
 
+  const handleDeleteOption = async () => {
+    if (!deletingOption) return;
+    try {
+      await deleteMutation.mutateAsync(deletingOption.id);
+      setNotice({ tone: "success", message: `Data ${deletingOption.label} berhasil dihapus.` });
+      setDeletingOption(null);
+    } catch (error: unknown) {
+      setNotice({
+        tone: "error",
+        message: readErrorMessage(error, "Data tidak dapat dihapus karena masih digunakan."),
+      });
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-8">
       <PageHeroSection
@@ -397,94 +415,122 @@ export function MasterDataScreen() {
         {activeCategoryKey === "agents" ? (
           <AgentsScreen embedded />
         ) : (
-        <article className="min-w-0 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
-          <div className="border-b border-outline-variant/30 px-4 py-4 sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Daftar data</p>
-              <h2 className="mt-1 text-xl font-bold text-on-surface">{activeCategory?.label ?? "Select category"}</h2>
-              <p className="mt-0.5 text-xs text-on-surface-variant">
-                {activeCategory?.description ?? "Pilih kategori di panel kiri."}
-              </p>
-              <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
-                Menampilkan {filteredOptions.length} dari {options.length} data.
-              </p>
-            </div>
-              <button
-                type="button"
-                className="serene-btn-primary serene-focus-ring inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs"
-                onClick={() => {
-                  setIsCreateOpen(true);
-                  setEditingOptionId(null);
-                  setCreateFormResetToken((current) => current + 1);
-                }}
-                disabled={!activeCategoryKey}
-              >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">add</span>
-                Tambah data
-              </button>
-            </div>
+          <article className="min-w-0 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
+            <div className="border-b border-outline-variant/30 px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+                    Daftar data
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold text-on-surface">
+                    {activeCategory?.label ?? "Select category"}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">
+                    {activeCategory?.description ?? "Pilih kategori di panel kiri."}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
+                    Menampilkan {filteredOptions.length} dari {options.length} data.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="serene-btn-primary serene-focus-ring inline-flex min-h-10 items-center justify-center gap-2 px-4 text-xs"
+                  onClick={() => {
+                    setIsCreateOpen(true);
+                    setEditingOptionId(null);
+                    setCreateFormResetToken((current) => current + 1);
+                  }}
+                  disabled={!activeCategoryKey}
+                >
+                  <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                    add
+                  </span>
+                  Tambah data
+                </button>
+              </div>
 
-            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <label className="relative block min-w-0 flex-1 xl:max-w-md">
-                <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant" aria-hidden="true">search</span>
-                <input
-                  className="serene-input serene-input-md w-full pl-10"
-                  value={optionSearch}
-                  onChange={(event) => setOptionSearch(event.target.value)}
-                  placeholder="Cari nilai, nama, atau deskripsi..."
-                  aria-label="Cari data pada kategori aktif"
-                />
-              </label>
-              <div className="grid grid-cols-3 rounded-xl bg-surface-container-low p-1" aria-label="Filter status">
-                {(["active", "inactive", "all"] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    type="button"
-                    className={`serene-focus-ring rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                      statusFilter === filter
-                        ? "bg-surface-container-lowest text-primary shadow-sm"
-                        : "text-on-surface-variant hover:text-on-surface"
-                    }`}
-                    onClick={() => setStatusFilter(filter)}
-                    aria-pressed={statusFilter === filter}
+              <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <label className="relative block min-w-0 flex-1 xl:max-w-md">
+                  <span
+                    className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant"
+                    aria-hidden="true"
                   >
-                    {filter === "active" ? "Aktif" : filter === "inactive" ? "Nonaktif" : "Semua"}
-                  </button>
-                ))}
+                    search
+                  </span>
+                  <input
+                    className="serene-input serene-input-md w-full pl-10"
+                    value={optionSearch}
+                    onChange={(event) => setOptionSearch(event.target.value)}
+                    placeholder="Cari nilai, nama, atau deskripsi..."
+                    aria-label="Cari data pada kategori aktif"
+                  />
+                </label>
+                <div className="grid grid-cols-3 rounded-xl bg-surface-container-low p-1" aria-label="Filter status">
+                  {(["active", "inactive", "all"] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      className={`serene-focus-ring rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                        statusFilter === filter
+                          ? "bg-surface-container-lowest text-primary shadow-sm"
+                          : "text-on-surface-variant hover:text-on-surface"
+                      }`}
+                      onClick={() => setStatusFilter(filter)}
+                      aria-pressed={statusFilter === filter}
+                    >
+                      {filter === "active" ? "Aktif" : filter === "inactive" ? "Nonaktif" : "Semua"}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
-            {optionsQuery.isLoading ? (
-              <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">Memuat option...</div>
-            ) : filteredOptions.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
-                {options.length === 0 ? "Belum ada data untuk kategori ini." : "Tidak ada data yang sesuai pencarian atau filter."}
-              </div>
-            ) : (
+            <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
+              {optionsQuery.isLoading ? (
+                <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
+                  Memuat option...
+                </div>
+              ) : filteredOptions.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
+                  {options.length === 0
+                    ? "Belum ada data untuk kategori ini."
+                    : "Tidak ada data yang sesuai pencarian atau filter."}
+                </div>
+              ) : (
                 <MasterDataOptionTable
                   options={filteredOptions}
                   isDarkMode={isDarkMode}
                   updatePending={updateMutation.isPending}
+                  deletePending={deleteMutation.isPending}
                   onToggleActive={handleToggleActive}
                   onEditOption={(optionId) => {
                     setEditingOptionId(optionId);
                     setIsCreateOpen(false);
                   }}
+                  onDeleteOption={(option) => {
+                    setDeletingOption(option);
+                    setEditingOptionId(null);
+                    setIsCreateOpen(false);
+                    deleteMutation.reset();
+                  }}
                 />
-            )}
-          </div>
-        </article>
+              )}
+            </div>
+          </article>
         )}
       </section>
 
       {activeCategoryFormConfig ? (
         <MasterDataFormDrawer
           isOpen={isCreateOpen || Boolean(editingOptionId)}
-          title={editingOptionId ? `Edit ${editingOption?.label ?? "data"}` : `Tambah ${activeCategory?.label ?? "data"}`}
-          description={editingOptionId ? "Perbarui informasi data tanpa meninggalkan daftar." : "Tambahkan data baru pada kategori yang sedang aktif."}
+          title={
+            editingOptionId ? `Edit ${editingOption?.label ?? "data"}` : `Tambah ${activeCategory?.label ?? "data"}`
+          }
+          description={
+            editingOptionId
+              ? "Perbarui informasi data tanpa meninggalkan daftar."
+              : "Tambahkan data baru pada kategori yang sedang aktif."
+          }
           onClose={() => {
             setIsCreateOpen(false);
             setEditingOptionId(null);
@@ -505,6 +551,18 @@ export function MasterDataScreen() {
           />
         </MasterDataFormDrawer>
       ) : null}
+
+      <MasterDataDeleteConfirmModal
+        isOpen={Boolean(deletingOption)}
+        itemLabel={deletingOption?.label ?? "data"}
+        itemType="data master"
+        isDeleting={deleteMutation.isPending}
+        errorMessage={deleteMutation.error instanceof Error ? deleteMutation.error.message : undefined}
+        onClose={() => {
+          if (!deleteMutation.isPending) setDeletingOption(null);
+        }}
+        onConfirm={() => void handleDeleteOption()}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod/v4";
 import { SereneSelect } from "../../../components/serene-select";
+import { DialogShell } from "../../../components/dialog-shell";
 import { useModalFocusTrap } from "../../../components/use-modal-focus-trap";
 import type { MasterDataCategoryKey, MasterDataOption } from "../../../hooks/use-master-data-backend";
 
@@ -40,6 +41,67 @@ export const EMPTY_FORM: MasterDataOptionFormValues = {
   isActive: true,
   metadataJson: "",
 };
+
+export function MasterDataDeleteConfirmModal({
+  isOpen,
+  itemLabel,
+  itemType,
+  isDeleting,
+  errorMessage,
+  onClose,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  itemLabel: string;
+  itemType: string;
+  isDeleting: boolean;
+  errorMessage?: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <DialogShell isOpen={isOpen} onClose={onClose} title={`Hapus ${itemType}`} size="sm">
+      <div className="p-5">
+        <div className="flex items-start gap-3 rounded-2xl border border-error/25 bg-error-container/45 p-4 text-on-error-container">
+          <span className="material-symbols-outlined mt-0.5 text-xl" aria-hidden="true">
+            warning
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold">Hapus “{itemLabel}”?</p>
+            <p className="mt-1 text-xs font-medium leading-relaxed">
+              Penghapusan akan ditolak jika data ini masih digunakan oleh group, invoice, user, atau data operasional
+              lain.
+            </p>
+          </div>
+        </div>
+        {errorMessage ? (
+          <p
+            className="mt-3 rounded-xl border border-error/25 bg-error-container/45 px-3 py-2 text-xs font-semibold leading-relaxed text-on-error-container"
+            role="alert"
+          >
+            {errorMessage}
+          </p>
+        ) : null}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" className="serene-btn-secondary" onClick={onClose} disabled={isDeleting}>
+            Batal
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-error px-4 py-2 text-sm font-semibold text-on-error transition disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              delete
+            </span>
+            {isDeleting ? "Menghapus..." : "Ya, hapus"}
+          </button>
+        </div>
+      </div>
+    </DialogShell>
+  );
+}
 
 export function parseMetadataJson(value: string): Record<string, unknown> | undefined {
   const trimmed = value.trim();
@@ -140,7 +202,9 @@ export function MasterDataFormDrawer({
             onClick={onClose}
             aria-label="Tutup formulir"
           >
-            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              close
+            </span>
           </button>
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
@@ -191,7 +255,10 @@ export function MasterDataOptionForm({
   useEffect(() => {
     if (categoryKey === "bank-disbursement") {
       const labelValue = initialValues.label || "";
-      const chunks = labelValue.split(" - ").map((s) => s.trim()).filter(Boolean);
+      const chunks = labelValue
+        .split(" - ")
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (chunks.length >= 2) {
         setBankName(chunks[0]);
         setBankAccountNum(chunks.slice(1).join(" - "));
@@ -251,9 +318,7 @@ export function MasterDataOptionForm({
       {categoryKey === "bank-disbursement" && (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1">
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-              Nama Bank
-            </span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">Nama Bank</span>
             <input
               className="serene-input"
               value={bankName}
@@ -357,7 +422,13 @@ export function MasterDataCategoryTabs({
   onSelectCategory,
   isLoading,
 }: {
-  categories: Array<{ key: MasterDataCategoryTabKey; label: string; description: string; activeOptions: number; totalOptions: number }>;
+  categories: Array<{
+    key: MasterDataCategoryTabKey;
+    label: string;
+    description: string;
+    activeOptions: number;
+    totalOptions: number;
+  }>;
   activeCategoryKey: MasterDataCategoryTabKey | null;
   onSelectCategory: (categoryKey: MasterDataCategoryTabKey) => void;
   isLoading: boolean;
@@ -404,7 +475,9 @@ export function MasterDataCategoryTabs({
     <>
       <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4 shadow-ambient lg:hidden">
         <label className="grid gap-2" htmlFor="master-data-category-mobile">
-          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Kategori data</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
+            Kategori data
+          </span>
           <SereneSelect
             id="master-data-category-mobile"
             className="serene-select min-h-11 w-full pr-10"
@@ -426,15 +499,20 @@ export function MasterDataCategoryTabs({
 
       <article className="hidden self-start overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest shadow-ambient lg:block">
         <div className="border-b border-outline-variant/30 px-4 py-4">
-        <div>
+          <div>
             <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Kategori data</h2>
             <p className="mt-1 text-xs text-on-surface-variant">Pilih data yang akan dikelola.</p>
-        </div>
-        {isLoading ? (
+          </div>
+          {isLoading ? (
             <span className="mt-2 block text-xs font-semibold text-on-surface-variant">Memuat kategori...</span>
-        ) : null}
+          ) : null}
           <label className="relative mt-3 block">
-            <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant" aria-hidden="true">search</span>
+            <span
+              className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant"
+              aria-hidden="true"
+            >
+              search
+            </span>
             <input
               className="serene-input serene-input-sm w-full pl-9"
               value={categorySearch}
@@ -443,18 +521,22 @@ export function MasterDataCategoryTabs({
               aria-label="Cari kategori master data"
             />
           </label>
-      </div>
+        </div>
 
         <nav className="space-y-1 p-2" aria-label="Kategori master data">
           {optionCategories.length > 0 ? (
             <>
-              <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Opsi sistem</p>
+              <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                Opsi sistem
+              </p>
               {optionCategories.map(renderCategoryButton)}
             </>
           ) : null}
           {operationalCategories.length > 0 ? (
             <>
-              <p className="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Entitas operasional</p>
+              <p className="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                Entitas operasional
+              </p>
               {operationalCategories.map(renderCategoryButton)}
             </>
           ) : null}
@@ -475,14 +557,18 @@ export function MasterDataOptionTable({
   options,
   isDarkMode,
   updatePending,
+  deletePending,
   onToggleActive,
   onEditOption,
+  onDeleteOption,
 }: {
   options: MasterDataOption[];
   isDarkMode: boolean;
   updatePending: boolean;
+  deletePending: boolean;
   onToggleActive: (option: MasterDataOption) => void | Promise<void>;
   onEditOption: (optionId: string) => void;
+  onDeleteOption: (option: MasterDataOption) => void;
 }) {
   return (
     <>
@@ -500,9 +586,7 @@ export function MasterDataOptionTable({
                 {option.description ? (
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{option.description}</p>
                 ) : null}
-                <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
-                  Urutan {option.sortOrder}
-                </p>
+                <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">Urutan {option.sortOrder}</p>
               </div>
 
               <button
@@ -515,13 +599,29 @@ export function MasterDataOptionTable({
               </button>
             </div>
 
-            <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex justify-end gap-2">
               <button
                 type="button"
-                className="inline-flex min-h-[34px] items-center rounded-md border border-outline-variant/45 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-primary/45 hover:text-primary"
+                className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
                 onClick={() => onEditOption(option.id)}
+                aria-label={`Edit ${option.label}`}
+                title="Edit data"
               >
-                Edit
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                  edit
+                </span>
+              </button>
+              <button
+                type="button"
+                className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-error/30 bg-surface-container-lowest text-error transition hover:bg-error-container/45 disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => onDeleteOption(option)}
+                disabled={deletePending}
+                aria-label={`Hapus ${option.label}`}
+                title="Hapus data"
+              >
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                  delete
+                </span>
               </button>
             </div>
           </article>
@@ -560,9 +660,7 @@ export function MasterDataOptionTable({
           <tbody className="divide-y divide-outline-variant/20">
             {options.map((option) => (
               <tr key={option.id} className="align-middle transition hover:bg-primary/5">
-                <td className="break-all px-4 py-3 font-mono text-[11px] text-on-surface-variant">
-                  {option.value}
-                </td>
+                <td className="break-all px-4 py-3 font-mono text-[11px] text-on-surface-variant">{option.value}</td>
                 <td className="px-4 py-3">
                   <p className="font-semibold text-on-surface">{option.label}</p>
                   {option.description ? (
@@ -583,14 +681,29 @@ export function MasterDataOptionTable({
                   </button>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <button
-                    type="button"
-                    className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
-                    onClick={() => onEditOption(option.id)}
-                    aria-label={`Edit ${option.label}`}
-                  >
-                    <span className="material-symbols-outlined text-lg" aria-hidden="true">edit</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
+                      onClick={() => onEditOption(option.id)}
+                      aria-label={`Edit ${option.label}`}
+                    >
+                      <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                        edit
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-error/30 bg-surface-container-lowest text-error transition hover:bg-error-container/45 disabled:cursor-not-allowed disabled:opacity-45"
+                      onClick={() => onDeleteOption(option)}
+                      disabled={deletePending}
+                      aria-label={`Hapus ${option.label}`}
+                    >
+                      <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                        delete
+                      </span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

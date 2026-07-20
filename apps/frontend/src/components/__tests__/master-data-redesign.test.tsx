@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   MasterDataCategoryTabs,
+  MasterDataDeleteConfirmModal,
   MasterDataFormDrawer,
   MasterDataOptionTable,
 } from "../../pages/master-data/components/MasterDataComponents";
@@ -45,6 +46,7 @@ describe("master data redesign", () => {
 
   it("menampilkan aksi edit dan status dalam Bahasa Indonesia", () => {
     const onEditOption = vi.fn();
+    const onDeleteOption = vi.fn();
     render(
       <MasterDataOptionTable
         options={[
@@ -61,15 +63,38 @@ describe("master data redesign", () => {
         ]}
         isDarkMode={false}
         updatePending={false}
+        deletePending={false}
         onToggleActive={vi.fn()}
         onEditOption={onEditOption}
+        onDeleteOption={onDeleteOption}
       />,
     );
 
     expect(screen.getAllByText("Aktif").length).toBeGreaterThan(0);
     expect(screen.getByText("Nama tampilan")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Edit BCA IDR" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit BCA IDR" })[0]);
     expect(onEditOption).toHaveBeenCalledWith("bank-1");
+    fireEvent.click(screen.getAllByRole("button", { name: "Hapus BCA IDR" })[0]);
+    expect(onDeleteOption).toHaveBeenCalledWith(expect.objectContaining({ id: "bank-1" }));
+  });
+
+  it("meminta konfirmasi sebelum menghapus data", () => {
+    const onConfirm = vi.fn();
+    render(
+      <MasterDataDeleteConfirmModal
+        isOpen
+        itemLabel="BCA IDR"
+        itemType="data master"
+        isDeleting={false}
+        onClose={vi.fn()}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    expect(screen.getByRole("dialog", { name: "Hapus data master" })).toBeInTheDocument();
+    expect(screen.getByText(/masih digunakan oleh group/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ya, hapus" }));
+    expect(onConfirm).toHaveBeenCalledOnce();
   });
 
   it("membuka formulir di drawer dan menutupnya dari tombol header", () => {

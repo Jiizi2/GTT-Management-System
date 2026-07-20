@@ -21,15 +21,15 @@ export function VisaStatusSection() {
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Quick status">
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Status</p>
             <div
-              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(
+              className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 visaTone
               )}`}
             >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
-              <strong>{row.visaStatus}</strong>
+              <strong className="min-w-0 break-words">{row.visaStatus}</strong>
             </div>
           </div>
           <button
@@ -45,15 +45,15 @@ export function VisaStatusSection() {
         </article>
 
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
             <div
-              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(
+              className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 "success"
               )}`}
             >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
-              <strong>{group?.visaSetup?.busStatus ?? "Visa Only"}</strong>
+              <strong className="min-w-0 break-words">{group?.visaSetup?.busStatus ?? "Visa Only"}</strong>
             </div>
           </div>
           <button
@@ -69,15 +69,15 @@ export function VisaStatusSection() {
         </article>
 
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Status</p>
             <div
-              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(
+              className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 paymentTone
               )}`}
             >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
-              <strong>{paymentStatus}</strong>
+              <strong className="min-w-0 break-words">{paymentStatus}</strong>
             </div>
           </div>
           <button
@@ -93,18 +93,18 @@ export function VisaStatusSection() {
         </article>
 
         <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               <span className="sm:hidden">Raudhah</span>
               <span className="hidden sm:inline">Raudhah Appointment</span>
             </p>
             <div
-              className={`mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-none ${getToneClasses(
+              className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 raudhahTone
               )}`}
             >
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden="true" />
-              <strong>{raudhahStatusText}</strong>
+              <strong className="min-w-0 break-words">{raudhahStatusText}</strong>
             </div>
           </div>
           <button

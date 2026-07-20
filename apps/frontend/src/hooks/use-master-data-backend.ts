@@ -276,3 +276,18 @@ export async function updateMasterDataOptionInBackend(
 
   return mappedOption;
 }
+
+export async function deleteMasterDataOptionInBackend(optionId: string): Promise<void> {
+  const normalizedOptionId = optionId.trim();
+  if (!normalizedOptionId) {
+    throw new Error("Master data delete failed: option id is required.");
+  }
+
+  const { response, payload, responseText } = await fetchBackendParsed(
+    `/master-data/options/${encodeURIComponent(normalizedOptionId)}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    throw new Error(extractBackendErrorMessage(response.status, payload, responseText, "Master data delete failed"));
+  }
+}
