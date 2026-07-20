@@ -67,7 +67,12 @@ describe("mobile visa layouts", () => {
   it("keeps the hotel summary within a shrinking two-column mobile grid", () => {
     const { container } = render(<AgreementSummaryFields agreement={agreement} />);
 
-    expect(container.firstElementChild).toHaveClass("min-w-0", "grid-cols-[minmax(0,1fr)_5.5rem]");
+    expect(container.firstElementChild).toHaveClass(
+      "min-w-0",
+      "max-w-full",
+      "overflow-hidden",
+      "grid-cols-[minmax(0,1fr)_5.5rem]",
+    );
     expect(screen.getByText("25 Jul 2026 - 28 Jul 2026").parentElement).toHaveClass("col-span-2", "min-w-0");
   });
 
