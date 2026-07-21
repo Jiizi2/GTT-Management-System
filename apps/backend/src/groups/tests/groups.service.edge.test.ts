@@ -1,4 +1,4 @@
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { runCase } from "../../test/run-case";
 import {
   BadRequestException,
@@ -10,6 +10,7 @@ import type { CreateGroupDto } from "../dto/create-group.dto";
 import { GroupsService } from "../application/groups.service";
 import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
 import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
+import type { AgentsService } from "../../agents/agents.service";
 
 async function createMemoryService(): Promise<{ service: GroupsService; restore: () => void }> {
   const previous = process.env.DATA_SOURCE;
@@ -57,6 +58,62 @@ function createGroupPayload(overrides: Partial<CreateGroupDto> = {}): CreateGrou
 }
 
 describe("GroupsServiceEdge", () => {
+  runCase("groups replace preserves an inactive owner without revalidating agent status", async () => {
+    const previous = process.env.DATA_SOURCE;
+    process.env.DATA_SOURCE = "memory";
+    const repository = new MemoryGroupRepository(new GroupMemoryStore());
+    const setupService = new GroupsService(repository);
+
+    try {
+      await setupService.create(
+        createGroupPayload({
+          agentId: "agent-inactive",
+          code: "EDGE-700",
+          name: "Inactive Agent Group",
+        }),
+      );
+
+      const assertActive = vi.fn(async () => {
+        throw new BadRequestException("Agent is inactive.");
+      });
+      const service = new GroupsService(
+        repository,
+        undefined,
+        { assertActive } as unknown as AgentsService,
+      );
+
+      const replaced = await service.replace(
+        "EDGE-700",
+        createGroupPayload({
+          agentId: "agent-inactive",
+          code: "EDGE-700",
+          name: "Inactive Agent Group",
+          itinerary: [
+            {
+              dateLabel: "10 Apr",
+              yearLabel: "2026",
+              category: "Arrival",
+              title: "Jeddah Arrival",
+              meta: "09:00 | JED Airport",
+              icon: "flight_land",
+              isoDate: "2026-04-10",
+            },
+          ],
+        }),
+      );
+
+      expect((replaced as { agentId?: string }).agentId).toBe("agent-inactive");
+      expect((replaced as { itinerary?: unknown[] }).itinerary).toHaveLength(1);
+      expect(assertActive).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.DATA_SOURCE;
+      } else {
+        process.env.DATA_SOURCE = previous;
+      }
+    }
+  });
+
   runCase("groups replace/update conflict and date guards", async () => {
     const { service, restore } = await createMemoryService();
 

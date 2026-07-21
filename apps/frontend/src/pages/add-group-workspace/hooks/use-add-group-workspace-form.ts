@@ -14,6 +14,7 @@ import {
   createBaseTripDrafts,
   isBaseTripDraftInvalid,
   resolveEffectiveGroupIdentityState,
+  shouldDisableItinerarySave,
   shouldUseSaudiCityDropdown,
   type BaseTripDraft,
   type ItinerarySectionMode,
@@ -360,7 +361,12 @@ export function useAddGroupWorkspaceForm({
   const isLastBaseTripStep = currentBaseTripStepIndex === maxBaseTripStepIndex;
   const isActiveBaseTripInvalid = activeBaseTrip ? isBaseTripDraftInvalid(activeBaseTrip) : true;
   const effectiveAgentId = agentId.trim() || identityDraft?.agentId?.trim() || "";
-  const isGroupSaveDisabled = !isGroupReadyForItinerary || !effectiveAgentId || itineraryItems.length === 0;
+  const isGroupSaveDisabled = shouldDisableItinerarySave({
+    isGroupReadyForItinerary,
+    isScheduleOnlyMode,
+    effectiveAgentId,
+    itineraryItemCount: itineraryItems.length,
+  });
   const showFridayCityTourWarning = shouldShowFridayCityTourWarning(form.category, form.date);
   const itineraryPrefillSeed = JSON.stringify(itineraryPrefill ?? {});
   const schedulePrefillSeed = `${effectiveStartDate}|${effectiveEndDate}|${itineraryPrefillSeed}`;

@@ -10,6 +10,7 @@ type SaveGroupResult = { ok: true } | { ok: false; message: string };
 
 function buildIdentityDraftFromGroup(group: GroupData): NewGroupItineraryDraft {
   return {
+    agentId: group.agentId?.trim() || group.agent?.id.trim() || "agent_gtt_direct",
     groupCode: group.code,
     groupName: group.name,
     pax: group.pax,
