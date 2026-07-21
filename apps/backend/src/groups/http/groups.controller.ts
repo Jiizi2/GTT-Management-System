@@ -35,6 +35,7 @@ import { GroupsService } from "../application/groups.service";
 import { UpdateGroupDto } from "../dto/update-group.dto";
 import {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupRaudhahDto,
   UpsertGroupVisaHotelDto,
 } from "../dto/group-operations.dto";
@@ -279,6 +280,25 @@ export class GroupsController {
     @Body() payload: UpsertGroupItineraryItemDto,
   ) {
     return this.groupsService.addItineraryItem(idOrCode, payload);
+  }
+
+  @Put(":idOrCode/itinerary")
+  @ApiOperation({
+    summary: "Replace group itinerary",
+    description: "Mengganti seluruh itinerary tanpa mengubah atau memvalidasi ulang detail group lainnya.",
+  })
+  @ApiParam({ name: "idOrCode", example: "9017001001" })
+  @ApiOkResponse({
+    description: "Itinerary group berhasil diganti.",
+    type: GroupDetailResponseDto,
+  })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ type: ApiErrorResponseDto })
+  replaceItinerary(
+    @Param("idOrCode") idOrCode: string,
+    @Body() payload: ReplaceGroupItineraryDto,
+  ) {
+    return this.groupsService.replaceItinerary(idOrCode, payload);
   }
 
   @Patch(":idOrCode/itinerary/:itemId")

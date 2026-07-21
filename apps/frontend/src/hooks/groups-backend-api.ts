@@ -4,6 +4,7 @@ import { formatBackendRequestError } from "../shared/api-error";
 import { mapBackendGroupToFrontend } from "./groups-backend-mapper";
 import {
   mapGroupIdentityDraftToBackendPayload,
+  mapGroupItineraryToBackendPayload,
   mapGroupToBackendPayload,
   mapGroupUpdateToBackendPayload,
   mapVisaHotelEditFormToBackendPayload,
@@ -139,6 +140,26 @@ export async function replaceGroupInBackend(groupCode: string, group: GroupData)
   if (!response.ok) {
     throw new Error(
       formatBackendRequestError(response.status, responsePayload, responseText, "Backend replace failed"),
+    );
+  }
+}
+
+export async function replaceGroupItineraryInBackend(groupCode: string, group: GroupData): Promise<void> {
+  const {
+    response,
+    payload: responsePayload,
+    responseText,
+  } = await fetchBackendParsed(`/groups/${encodeURIComponent(groupCode)}/itinerary`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(mapGroupItineraryToBackendPayload(group)),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      formatBackendRequestError(response.status, responsePayload, responseText, "Backend itinerary replace failed"),
     );
   }
 }

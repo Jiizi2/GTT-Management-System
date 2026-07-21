@@ -7,6 +7,7 @@ import type { CreateGroupIdentityDto } from "../dto/create-group-identity.dto";
 import type { CreateGroupDto } from "../dto/create-group.dto";
 import type {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupRaudhahDto,
   UpsertGroupVisaHotelDto,
 } from "../dto/group-operations.dto";
@@ -168,6 +169,22 @@ export class GroupsService {
     this.logMutation("itinerary.added", updated, {
       idOrCode,
       category: payload.category.trim(),
+    });
+    return updated;
+  }
+
+  async replaceItinerary(
+    idOrCode: string,
+    payload: ReplaceGroupItineraryDto,
+  ): Promise<GroupDetailRecord> {
+    const updated = await this.commandService.replaceItinerary(idOrCode, payload);
+    await this.writeAuditLog("itinerary.replaced", "itinerary", updated, {
+      idOrCode,
+      itemCount: payload.itinerary.length,
+    });
+    this.logMutation("itinerary.replaced", updated, {
+      idOrCode,
+      itemCount: payload.itinerary.length,
     });
     return updated;
   }

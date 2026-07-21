@@ -310,6 +310,36 @@ export function resolveGroupTravelDates(group: GroupData): { arrivalDate: string
   };
 }
 
+export function mapGroupItineraryToBackendPayload(group: GroupData) {
+  return {
+    itinerary: group.itinerary.map((item, index) => ({
+      sortOrder: index,
+      dateLabel: item.date.trim(),
+      yearLabel: item.year.trim(),
+      category: item.category.trim(),
+      categoryKey: item.categoryKey?.trim(),
+      title: item.title.trim(),
+      meta: normalizeTimePrefixInPipeSeparatedText(item.meta.trim()),
+      icon: item.icon.trim(),
+      highlighted: item.highlighted,
+      isoDate: item.isoDate?.trim(),
+      time: normalizeStoredTimeLabel(item.time?.trim() ?? "") || undefined,
+      flightNumber: item.flightNumber?.trim(),
+      hotelName: item.hotelName?.trim(),
+      fromHotelName: item.fromHotelName?.trim(),
+      fromLocation: item.from?.trim(),
+      toLocation: item.to?.trim(),
+      cityTourCity: item.cityTourCity?.trim(),
+      requiresBus: item.requiresBus,
+      notes: item.notes?.trim(),
+      transferByTrain: item.transferByTrain,
+      trainDepartureTime: normalizeStoredTimeLabel(item.trainDepartureTime?.trim() ?? "") || undefined,
+      destinationPickupTime: normalizeStoredTimeLabel(item.destinationPickupTime?.trim() ?? "") || undefined,
+      hotelPickupRequestTime: normalizeStoredTimeLabel(item.hotelPickupRequestTime?.trim() ?? "") || undefined,
+    })),
+  };
+}
+
 export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPayload {
   const { arrivalDate, returnDate } = resolveGroupTravelDates(group);
   const normalizedNextActivityTimeLabel =
@@ -350,31 +380,7 @@ export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPa
       isCurrent: item.isCurrent,
       nextActivity: normalizeTimePrefixInPipeSeparatedText(item.nextActivity?.trim() ?? ""),
     })),
-    itinerary: group.itinerary.map((item, index) => ({
-      sortOrder: index,
-      dateLabel: item.date.trim(),
-      yearLabel: item.year.trim(),
-      category: item.category.trim(),
-      categoryKey: item.categoryKey?.trim(),
-      title: item.title.trim(),
-      meta: normalizeTimePrefixInPipeSeparatedText(item.meta.trim()),
-      icon: item.icon.trim(),
-      highlighted: item.highlighted,
-      isoDate: item.isoDate?.trim(),
-      time: normalizeStoredTimeLabel(item.time?.trim() ?? "") || undefined,
-      flightNumber: item.flightNumber?.trim(),
-      hotelName: item.hotelName?.trim(),
-      fromHotelName: item.fromHotelName?.trim(),
-      fromLocation: item.from?.trim(),
-      toLocation: item.to?.trim(),
-      cityTourCity: item.cityTourCity?.trim(),
-      requiresBus: item.requiresBus,
-      notes: item.notes?.trim(),
-      transferByTrain: item.transferByTrain,
-      trainDepartureTime: normalizeStoredTimeLabel(item.trainDepartureTime?.trim() ?? "") || undefined,
-      destinationPickupTime: normalizeStoredTimeLabel(item.destinationPickupTime?.trim() ?? "") || undefined,
-      hotelPickupRequestTime: normalizeStoredTimeLabel(item.hotelPickupRequestTime?.trim() ?? "") || undefined,
-    })),
+    itinerary: mapGroupItineraryToBackendPayload(group).itinerary,
     notes: (() => {
       const filteredNotes = group.notes.filter((text) => !/^bus status\s*:/i.test(text));
       if (group.visaSetup?.busStatus) {

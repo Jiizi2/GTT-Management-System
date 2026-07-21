@@ -5,6 +5,7 @@ import { CreateGroupDto } from "../../../groups/dto/create-group.dto";
 import { UpdateGroupDto } from "../../../groups/dto/update-group.dto";
 import {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupVisaHotelDto,
   UpsertGroupRaudhahDto,
 } from "../../../groups/dto/group-operations.dto";
@@ -27,6 +28,7 @@ import {
   updateInMemory,
   removeFromMemory,
   addItineraryItemInMemory,
+  replaceItineraryInMemory,
   updateItineraryItemInMemory,
   removeItineraryItemInMemory,
   addVisaHotelAgreementInMemory,
@@ -141,6 +143,11 @@ export class MemoryGroupRepository implements GroupRepository {
   async addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<GroupDetailRecord> {
     await this.ensureNotChildGroup(idOrCode, "itinerary");
     return addItineraryItemInMemory(this.memoryStore.groups, idOrCode, payload);
+  }
+
+  async replaceItinerary(idOrCode: string, payload: ReplaceGroupItineraryDto): Promise<GroupDetailRecord> {
+    await this.ensureNotChildGroup(idOrCode, "itinerary");
+    return replaceItineraryInMemory(this.memoryStore.groups, idOrCode, payload);
   }
 
   async updateItineraryItem(

@@ -107,6 +107,7 @@ const createMockController = (overrides: Partial<AppController> = {}): AppContro
   handleBackToOverview: vi.fn(),
   handleDeleteGroup: vi.fn(),
   handleSaveGroupDetail: vi.fn(),
+  handleSaveGroupItinerary: vi.fn(),
   handlePatchGroupDetail: vi.fn(),
   handleSaveInputGroup: vi.fn(),
   handleSaveGroupIdentity: vi.fn(),

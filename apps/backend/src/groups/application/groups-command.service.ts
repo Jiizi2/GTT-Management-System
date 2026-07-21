@@ -4,6 +4,7 @@ import { CreateGroupDto } from "../dto/create-group.dto";
 import { UpdateGroupDto } from "../dto/update-group.dto";
 import {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupVisaHotelDto,
   UpsertGroupRaudhahDto,
 } from "../dto/group-operations.dto";
@@ -35,6 +36,10 @@ export class GroupsCommandService {
 
   async addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<GroupDetailRecord> {
     return this.groupRepo.addItineraryItem(idOrCode, payload);
+  }
+
+  async replaceItinerary(idOrCode: string, payload: ReplaceGroupItineraryDto): Promise<GroupDetailRecord> {
+    return this.groupRepo.replaceItinerary(idOrCode, payload);
   }
 
   async updateItineraryItem(

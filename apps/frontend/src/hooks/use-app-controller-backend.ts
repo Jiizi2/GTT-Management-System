@@ -5,6 +5,7 @@ export {
   deleteVisaHotelAgreementInBackend,
   fetchGroupsFromBackend,
   replaceGroupInBackend,
+  replaceGroupItineraryInBackend,
   saveVisaHotelAgreementInBackend,
   updateGroupInBackend,
 } from "./groups-backend-api";
