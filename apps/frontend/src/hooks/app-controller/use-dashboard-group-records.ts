@@ -134,12 +134,13 @@ function getMillisecondsUntilNextLocalDay(referenceDate = new Date()): number {
 }
 
 function resolveDashboardSyncFailureMessage(error: unknown, fallbackMessage: string): string {
-  const normalizedMessage = error instanceof Error ? error.message.toLowerCase() : "";
+  const errorMessage = error instanceof Error ? error.message.trim() : "";
+  const normalizedMessage = errorMessage.toLowerCase();
   if (normalizedMessage.includes("group code") && normalizedMessage.includes("already exists")) {
     return "Group number sudah dipakai oleh group lain.";
   }
 
-  return fallbackMessage;
+  return errorMessage ? `${fallbackMessage} Detail: ${errorMessage}` : fallbackMessage;
 }
 
 function useCurrentDashboardDate(): Date {

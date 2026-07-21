@@ -478,6 +478,25 @@ export function BaseTripSection({
                     <p className={routeHintClassName}>{routeFieldConfigForItem.helperText}</p>
                   ) : null}
 
+                  {isTransferActivityType(item.category) ? (
+                    <label className={checkClassName}>
+                      <input
+                        className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
+                        type="checkbox"
+                        checked={item.transferByTrain}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
+                            ...trip,
+                            transferByTrain: event.target.checked,
+                            requiresBus: event.target.checked ? true : trip.requiresBus,
+                          }))
+                        }
+                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                      />
+                      <span>Transfer menggunakan Kereta Cepat (HHR)</span>
+                    </label>
+                  ) : null}
+
                   {showTransferTrainInputs ? (
                     <div className={transferTrainCardClassName}>
                       <p className="text-sm font-semibold text-primary">

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe } from "vitest";
 import { shouldDisableItinerarySave } from "../pages/add-group-workspace/helpers/add-group-workspace-helpers.js";
+import {
+  createBaseTripDrafts,
+  isBaseTripDraftInvalid,
+} from "../pages/add-group-workspace/helpers/add-group-workspace-helpers.js";
 import { runCase } from "../test/run-case.js";
 
 describe("itinerary save state", () => {
@@ -46,6 +50,23 @@ describe("itinerary save state", () => {
         itineraryItemCount: 1,
       }),
       true,
+    );
+  });
+
+  runCase("all five base trips can be validated and saved together", () => {
+    const drafts = createBaseTripDrafts("2026-08-01", "2026-08-10").map((draft) => ({
+      ...draft,
+      isEnabled: true,
+    }));
+    const departure = drafts.find((draft) => draft.category === "departure");
+    assert.ok(departure);
+    departure.time = "20:00";
+    departure.hotelPickupRequestTime = "16:00";
+
+    assert.equal(drafts.length, 5);
+    assert.deepEqual(
+      drafts.filter((draft) => isBaseTripDraftInvalid(draft)).map((draft) => draft.id),
+      [],
     );
   });
 });
