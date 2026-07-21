@@ -30,6 +30,24 @@ export type BaseTripDraft = InputItineraryFormState & {
 
 export type ItinerarySectionMode = "full" | "identity-only" | "schedule-only";
 
+export function shouldDisableItinerarySave({
+  isGroupReadyForItinerary,
+  isScheduleOnlyMode,
+  effectiveAgentId,
+  itineraryItemCount,
+}: {
+  isGroupReadyForItinerary: boolean;
+  isScheduleOnlyMode: boolean;
+  effectiveAgentId: string;
+  itineraryItemCount: number;
+}): boolean {
+  return (
+    !isGroupReadyForItinerary ||
+    (!isScheduleOnlyMode && !effectiveAgentId.trim()) ||
+    itineraryItemCount === 0
+  );
+}
+
 export type EffectiveGroupIdentityState = {
   isIdentityOnlyMode: boolean;
   isScheduleOnlyMode: boolean;

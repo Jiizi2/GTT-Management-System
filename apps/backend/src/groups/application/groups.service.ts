@@ -91,10 +91,21 @@ export class GroupsService {
 
   async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
     const existing = await this.findOneByIdOrCode(idOrCode);
-    if (payload.agentId?.trim() && (existing as any).agentId && payload.agentId.trim() !== (existing as any).agentId) {
+    const existingAgentId =
+      typeof (existing as { agentId?: unknown }).agentId === "string"
+        ? (existing as { agentId: string }).agentId.trim()
+        : "";
+    const requestedAgentId = payload.agentId?.trim() ?? "";
+    if (requestedAgentId && existingAgentId && requestedAgentId !== existingAgentId) {
       throw new BadRequestException("Gunakan endpoint Reassign Agent untuk mengubah Agent Group.");
     }
-    const normalizedPayload = await this.withValidatedAgent(payload);
+    // Replacing operational details (including an itinerary) must not require the
+    // current owner to still be active. Ownership is unchanged here; only create
+    // and the dedicated reassign endpoint are allowed to validate/change it.
+    const normalizedPayload: CreateGroupDto = {
+      ...payload,
+      agentId: existingAgentId || requestedAgentId || GTT_DIRECT_AGENT_ID,
+    };
     const replaced = await this.commandService.replace(idOrCode, normalizedPayload);
     await this.writeAuditLog("group.replaced", "group", replaced, {
       idOrCode,
