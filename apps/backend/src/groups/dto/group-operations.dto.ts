@@ -1,5 +1,6 @@
 import { AgreementApprovalStatus, AgreementCity, GroupRaudhahStatus } from "@prisma/client";
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from "class-validator";
+import { Type } from "class-transformer";
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, ValidateNested } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UpsertGroupItineraryItemDto {
@@ -118,6 +119,14 @@ export class UpsertGroupItineraryItemDto {
   @IsOptional()
   @IsString()
   hotelPickupRequestTime?: string;
+}
+
+export class ReplaceGroupItineraryDto {
+  @ApiProperty({ type: UpsertGroupItineraryItemDto, isArray: true })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpsertGroupItineraryItemDto)
+  itinerary!: UpsertGroupItineraryItemDto[];
 }
 
 export class UpsertGroupVisaHotelDto {

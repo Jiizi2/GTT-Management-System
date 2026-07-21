@@ -34,6 +34,7 @@ const mockController = {
   handleBackToOverview: vi.fn(),
   handleDeleteGroup: vi.fn(),
   handleSaveGroupDetail: vi.fn(),
+  handleSaveGroupItinerary: vi.fn(),
   handlePatchGroupDetail: vi.fn(),
   handleOpenVisaDetail: vi.fn(),
   handleUpdateAgreementStatus: vi.fn(),

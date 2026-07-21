@@ -36,6 +36,7 @@ import {
   fetchGroupsFromBackend,
   getVisaAgreementValidationError,
   replaceGroupInBackend,
+  replaceGroupItineraryInBackend,
   saveVisaHotelAgreementInBackend,
   sortHotelsByStayStart,
   updateGroupInBackend,
@@ -578,6 +579,11 @@ export function useDashboardGroupRecords({
   const replaceGroupMutation = useMutation({
     mutationFn: ({ groupCode, group }: { groupCode: string; group: GroupData }) =>
       replaceGroupInBackend(groupCode, group),
+    retry: false,
+  });
+  const replaceGroupItineraryMutation = useMutation({
+    mutationFn: ({ groupCode, group }: { groupCode: string; group: GroupData }) =>
+      replaceGroupItineraryInBackend(groupCode, group),
     retry: false,
   });
   const updateGroupMutation = useMutation({
@@ -1588,6 +1594,49 @@ export function useDashboardGroupRecords({
     [captureGroupRecordsSnapshot, commitGroupRecords, navigateToGroupDetail, replaceGroupMutation, runBackendSync],
   );
 
+  const handleSaveGroupItinerary = useCallback(
+    (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
+      const normalizedGroup = normalizeGroupStatus(group);
+      const normalizedSourceGroupCode = sourceGroupCode?.trim().toUpperCase();
+      const normalizedNextGroupCode = normalizedGroup.code.trim().toUpperCase();
+      const normalizedNextGroupName = normalizedGroup.name.trim();
+      if (!normalizedNextGroupCode) {
+        return { ok: false, message: "Group number tidak boleh kosong." };
+      }
+      if (!normalizedNextGroupName) {
+        return { ok: false, message: "Group name tidak boleh kosong." };
+      }
+
+      const nextGroup: GroupData = {
+        ...normalizedGroup,
+        code: normalizedNextGroupCode,
+        name: normalizedNextGroupName,
+      };
+      const backendTargetGroupCode = normalizedSourceGroupCode ?? normalizedNextGroupCode;
+      const rollbackSnapshot = captureGroupRecordsSnapshot();
+
+      navigateToGroupDetail(nextGroup.code, { replace: true });
+      commitGroupRecords((current) =>
+        current.map((item) =>
+          item.code.trim().toUpperCase() === backendTargetGroupCode ? nextGroup : item,
+        ),
+      );
+
+      runBackendSync({
+        task: () => replaceGroupItineraryMutation.mutateAsync({
+          groupCode: backendTargetGroupCode,
+          group: nextGroup,
+        }),
+        successMessage: "Itinerary group berhasil disimpan.",
+        failureMessage: (error: unknown) =>
+          resolveDashboardSyncFailureMessage(error, "Itinerary belum berhasil disimpan ke backend."),
+        rollbackSnapshot,
+      });
+      return { ok: true };
+    },
+    [captureGroupRecordsSnapshot, commitGroupRecords, navigateToGroupDetail, replaceGroupItineraryMutation, runBackendSync],
+  );
+
   const handlePatchGroupDetail = useCallback(
     (group: GroupData, sourceGroupCode?: string): { ok: true } | { ok: false; message: string } => {
       const normalizedGroup = normalizeGroupStatus(group);
@@ -1786,6 +1835,7 @@ export function useDashboardGroupRecords({
     handleSaveInputGroup,
     handleSaveGroupIdentity,
     handleSaveGroupDetail,
+    handleSaveGroupItinerary,
     handlePatchGroupDetail,
     handleSaveVisaGroupDetail,
   };

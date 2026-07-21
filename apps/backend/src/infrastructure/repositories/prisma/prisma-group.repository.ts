@@ -13,6 +13,7 @@ import { CreateGroupDto } from "../../../groups/dto/create-group.dto";
 import { UpdateGroupDto } from "../../../groups/dto/update-group.dto";
 import {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupVisaHotelDto,
   UpsertGroupRaudhahDto,
 } from "../../../groups/dto/group-operations.dto";
@@ -625,6 +626,70 @@ export class PrismaGroupRepository implements GroupRepository {
     }
 
     throw new ConflictException("Unable to create itinerary item. Please retry.");
+  }
+
+  async replaceItinerary(idOrCode: string, payload: ReplaceGroupItineraryDto): Promise<GroupDetailRecord> {
+    await this.ensureNotChildGroup(idOrCode, "itinerary");
+    const group = await this.resolvePrismaGroupIdentity(idOrCode);
+    const items = payload.itinerary.map((item, index) => ({
+      item,
+      sortOrder: item.sortOrder ?? index,
+    }));
+    const sortOrders = items.map(({ sortOrder }) => sortOrder);
+    if (new Set(sortOrders).size !== sortOrders.length) {
+      throw new BadRequestException("Setiap itinerary item harus memiliki sort order yang unik.");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.itineraryItem.deleteMany({
+        where: sortOrders.length > 0
+          ? { groupId: group.id, sortOrder: { notIn: sortOrders } }
+          : { groupId: group.id },
+      });
+
+      for (const { item, sortOrder } of items) {
+        const data = {
+          dateLabel: item.dateLabel.trim(),
+          yearLabel: item.yearLabel.trim(),
+          category: item.category.trim(),
+          categoryKey: item.categoryKey?.trim() || null,
+          title: resolveItineraryTitle(item),
+          meta: item.meta.trim(),
+          icon: item.icon.trim(),
+          highlighted: item.highlighted ?? false,
+          isoDate: item.isoDate ? toUtcMidnightDate(item.isoDate) : null,
+          time: item.time?.trim() || null,
+          flightNumber: item.flightNumber?.trim() || null,
+          hotelName: item.hotelName?.trim() || null,
+          fromHotelName: item.fromHotelName?.trim() || null,
+          fromLocation: item.fromLocation?.trim() || null,
+          toLocation: item.toLocation?.trim() || null,
+          cityTourCity: item.cityTourCity?.trim() || null,
+          requiresBus: item.requiresBus ?? false,
+          notes: item.notes?.trim() || null,
+          transferByTrain: item.transferByTrain ?? false,
+          trainDepartureTime: item.trainDepartureTime?.trim() || null,
+          destinationPickupTime: item.destinationPickupTime?.trim() || null,
+          hotelPickupRequestTime: item.hotelPickupRequestTime?.trim() || null,
+        };
+        await tx.itineraryItem.upsert({
+          where: {
+            groupId_sortOrder: {
+              groupId: group.id,
+              sortOrder,
+            },
+          },
+          create: {
+            groupId: group.id,
+            sortOrder,
+            ...data,
+          },
+          update: data,
+        });
+      }
+    });
+
+    return this.findOneByIdOrCode(group.id);
   }
 
   async updateItineraryItem(

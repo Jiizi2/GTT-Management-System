@@ -136,7 +136,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 <LazyGroupItineraryBuilderPage
                   group={controller.selectedGroup}
                   onBack={controller.handleOpenDetail}
-                  onSaveGroup={controller.handleSaveGroupDetail}
+                  onSaveGroup={controller.handleSaveGroupItinerary}
                 />
               ) : (
                 <LazyPlaceholderScreen

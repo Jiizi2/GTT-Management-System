@@ -46,6 +46,7 @@ describe("GroupsController", () => {
       update: vi.fn().mockResolvedValue(mockGroupDetail),
       remove: vi.fn().mockResolvedValue(undefined),
       addItineraryItem: vi.fn().mockResolvedValue(mockGroupDetail),
+      replaceItinerary: vi.fn().mockResolvedValue(mockGroupDetail),
       updateItineraryItem: vi.fn().mockResolvedValue(mockGroupDetail),
       removeItineraryItem: vi.fn().mockResolvedValue(mockGroupDetail),
       addVisaHotelAgreement: vi.fn().mockResolvedValue(mockGroupDetail),
@@ -172,6 +173,17 @@ describe("GroupsController", () => {
     const result = await controller.updateItineraryItem("GRP-001", "item-1", payload);
 
     expect(service.updateItineraryItem).toHaveBeenCalledWith("GRP-001", "item-1", payload);
+    expect(result).toEqual(mockGroupDetail);
+  });
+
+  it("should replace only the group itinerary", async () => {
+    const service = createMockService();
+    const controller = new GroupsController(service);
+    const payload = { itinerary: [] };
+
+    const result = await controller.replaceItinerary("GRP-001", payload);
+
+    expect(service.replaceItinerary).toHaveBeenCalledWith("GRP-001", payload);
     expect(result).toEqual(mockGroupDetail);
   });
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe } from "vitest";
-import { createGroupIdentityInBackend, fetchGroupsFromBackend, updateGroupInBackend } from "../hooks/use-app-controller-backend.js";
+import { createGroupIdentityInBackend, fetchGroupsFromBackend, replaceGroupItineraryInBackend, updateGroupInBackend } from "../hooks/use-app-controller-backend.js";
 import { formatScheduleDate, getLocalIsoDateWithOffset } from "../shared/app-domain.js";
 import type { GroupData } from "../shared/app-domain.js";
 import { runCase } from "../test/run-case.js";
@@ -199,9 +199,50 @@ async function testUpdateGroupUsesPatchPayload(): Promise<void> {
   });
 }
 
+async function testReplaceItinerarySendsOnlyItinerary(): Promise<void> {
+  const group: GroupData = {
+    code: "GRP-ITINERARY",
+    name: "Itinerary Group",
+    status: "Active",
+    tone: "active",
+    pax: 30,
+    packageName: "Regular",
+    durationDays: 5,
+    timeline: [],
+    notes: ["Must not be sent"],
+    itinerary: [{
+      date: "11 Aug",
+      year: "2026",
+      category: "Transfer",
+      title: "Makkah to Madinah",
+      meta: "09:00 | Makkah -> Madinah",
+      icon: "directions_bus",
+      isoDate: "2026-08-11",
+      time: "09:00",
+      transferByTrain: true,
+    }],
+  };
+
+  await withApiBaseOverride("http://127.0.0.1:4100/api", async () => {
+    await withMockFetch(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      async (calls) => {
+        await replaceGroupItineraryInBackend(group.code, group);
+
+        assert.equal(String(calls[0].input), "http://127.0.0.1:4100/api/groups/GRP-ITINERARY/itinerary");
+        assert.equal(calls[0].init?.method, "PUT");
+        const body = JSON.parse(String(calls[0].init?.body)) as Record<string, unknown>;
+        assert.deepEqual(Object.keys(body), ["itinerary"]);
+        assert.equal((body.itinerary as Array<Record<string, unknown>>)[0]?.transferByTrain, true);
+      },
+    );
+  });
+}
+
 describe("use-app-controller-backend", () => {
   runCase("fetch groups marks completed itinerary as inactive", testFetchGroupsMarksCompletedItineraryAsInactive);
   runCase("create group identity posts minimal workspace", testCreateGroupIdentityPostsMinimalWorkspace);
   runCase("update group uses PATCH payload without nested detail", testUpdateGroupUsesPatchPayload);
+  runCase("replace itinerary sends only itinerary detail", testReplaceItinerarySendsOnlyItinerary);
   runCase("fetch groups rejects invalid backend shape", testFetchGroupsRejectsInvalidBackendShape);
 });

@@ -13,6 +13,7 @@ import type { ConfirmChecklistDriverDto } from "../../../../groups/dto/confirm-c
 import type { CreateGroupDto } from "../../../../groups/dto/create-group.dto";
 import type {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupRaudhahDto,
   UpsertGroupVisaHotelDto,
 } from "../../../../groups/dto/group-operations.dto";
@@ -806,6 +807,48 @@ export function addItineraryItemInMemory(
 
   group.itinerary.push(buildMemoryItineraryItem(payload, sortOrder));
   group.itinerary.sort((left, right) => left.sortOrder - right.sortOrder);
+  group.updatedAt = new Date().toISOString();
+  return group;
+}
+
+export function replaceItineraryInMemory(
+  memoryGroups: MemoryGroupRecord[],
+  idOrCode: string,
+  payload: ReplaceGroupItineraryDto,
+): MemoryGroupRecord {
+  const targetIndex = resolveMemoryGroupIndex(memoryGroups, idOrCode);
+  if (targetIndex === -1) {
+    throw new NotFoundException(`Group '${idOrCode}' not found.`);
+  }
+
+  const group = memoryGroups[targetIndex];
+  const requestedSortOrders = payload.itinerary.map(
+    (item, index) => item.sortOrder ?? index,
+  );
+  if (new Set(requestedSortOrders).size !== requestedSortOrders.length) {
+    throw new ConflictException(
+      "Setiap itinerary item harus memiliki sort order yang unik.",
+    );
+  }
+  const existingBySortOrder = new Map(
+    group.itinerary.map((item) => [item.sortOrder, item]),
+  );
+  group.itinerary = payload.itinerary.map((item, index) => {
+    const sortOrder = item.sortOrder ?? index;
+    return buildMemoryItineraryItem(
+      item,
+      sortOrder,
+      existingBySortOrder.get(sortOrder)?.id,
+    );
+  });
+  group.itinerary.sort((left, right) => left.sortOrder - right.sortOrder);
+
+  const validItineraryIds = new Set(group.itinerary.map((item) => item.id));
+  group.checklistAssignments = group.checklistAssignments.map((assignment) =>
+    assignment.itineraryItemId && !validItineraryIds.has(assignment.itineraryItemId)
+      ? { ...assignment, itineraryItemId: undefined }
+      : assignment,
+  );
   group.updatedAt = new Date().toISOString();
   return group;
 }

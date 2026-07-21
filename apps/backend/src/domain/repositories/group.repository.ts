@@ -2,6 +2,7 @@ import { CreateGroupDto } from "../../groups/dto/create-group.dto";
 import { UpdateGroupDto } from "../../groups/dto/update-group.dto";
 import {
   UpsertGroupItineraryItemDto,
+  ReplaceGroupItineraryDto,
   UpsertGroupVisaHotelDto,
   UpsertGroupRaudhahDto,
 } from "../../groups/dto/group-operations.dto";
@@ -31,6 +32,7 @@ export interface GroupRepository {
   remove(idOrCode: string): Promise<void>;
   reassignAgent(idOrCode: string, agentId: string): Promise<GroupDetailRecord>;
   addItineraryItem(idOrCode: string, payload: UpsertGroupItineraryItemDto): Promise<GroupDetailRecord>;
+  replaceItinerary(idOrCode: string, payload: ReplaceGroupItineraryDto): Promise<GroupDetailRecord>;
   updateItineraryItem(
     idOrCode: string,
     itemId: string,
