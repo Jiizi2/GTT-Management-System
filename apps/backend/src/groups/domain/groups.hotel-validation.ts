@@ -129,8 +129,20 @@ function validateHotelAgreementContinuity(
     const previous = combinedAndSorted[index - 1];
     const current = combinedAndSorted[index];
     if (current.stayStart !== previous.stayEnd) {
-      // Soft rules: Do not throw BadRequestException for gaps or disconnected dates.
-      // The frontend will handle displaying warnings to the user.
+      // INTENTIONALLY EMPTY - this is not an unfinished implementation.
+      //
+      // A gap between Makkah and Madinah stay periods is a SOFT WARNING by
+      // product decision (confirmed 2026-07-30): it must never become a
+      // BadRequestException, because operators legitimately save groups whose
+      // agreements are not yet contiguous. Overlaps are different and DO throw,
+      // in validateHotelAgreementRules above.
+      //
+      // Displaying the warning is the frontend's job. Caveat for whoever picks
+      // this up: the only frontend implementation
+      // (validateConnectedAgreementDates / getAgreementSaveValidationError in
+      // pages/new-group/helpers/new-group-screen-helpers.ts) was orphaned when
+      // the new-group wizard was retired, so the warning currently renders
+      // nowhere. The rule is intended but not visible to operators yet.
     }
   }
 }
