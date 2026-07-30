@@ -3,7 +3,7 @@ import { describe } from "vitest";
 import {
   filterOverviewGroups,
   shouldUseRemoteGroupSearch,
-} from "../hooks/app-controller/use-dashboard-group-records.js";
+} from "../hooks/app-controller/group-record-selectors.js";
 import type { GroupData } from "../shared/app-domain.js";
 import { runCase } from "../test/run-case.js";
 
