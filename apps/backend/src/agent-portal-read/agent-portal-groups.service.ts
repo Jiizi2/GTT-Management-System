@@ -26,12 +26,53 @@ function summary(group: {
   };
 }
 
+/**
+ * Source shapes for the Portal Agent projections. Both memory and Prisma records
+ * feed these, so optional fields stay optional and are defaulted at projection
+ * time. Only what the projections actually read is declared.
+ */
+type ItinerarySource = {
+  id: string;
+  sortOrder: number;
+  dateLabel: string;
+  yearLabel: string;
+  category: string;
+  title: string;
+  isoDate?: Date | string | null;
+  time?: string | null;
+  flightNumber?: string | null;
+  hotelName?: string | null;
+  fromHotelName?: string | null;
+  fromLocation?: string | null;
+  toLocation?: string | null;
+  cityTourCity?: string | null;
+  requiresBus?: boolean | null;
+  transferByTrain?: boolean | null;
+  trainDepartureTime?: string | null;
+  destinationPickupTime?: string | null;
+  hotelPickupRequestTime?: string | null;
+};
+
+type TransportSource = {
+  id: string;
+  tripDate?: Date | string | null;
+  activity: string;
+  tripLabel: string;
+  requiredBusCount: number;
+  scheduledTime: string;
+  transferByTrain?: boolean | null;
+  trainDepartureTime?: string | null;
+  stationPickupTime?: string | null;
+  status?: string;
+  drivers?: Array<{ isVerified?: boolean }>;
+};
+
 type OverviewGroup = Parameters<typeof summary>[0] & {
   packageName?: string;
   totalBuses?: number | null;
   musyrif?: { name: string; phone: string; avatar: string } | null;
   notes?: Array<{ id?: string; sortOrder?: number; text: string; pinned?: boolean }>;
-  itinerary?: any[];
+  itinerary?: ItinerarySource[];
 };
 
 @Injectable()
@@ -246,7 +287,7 @@ export class AgentPortalGroupsService {
     return found;
   }
 
-  private projectItinerary(item: any) {
+  private projectItinerary(item: ItinerarySource) {
     return {
       id: item.id, sortOrder: item.sortOrder, dateLabel: item.dateLabel, yearLabel: item.yearLabel,
       category: item.category, title: item.title, isoDate: toIso(item.isoDate), time: item.time ?? null,
@@ -275,7 +316,7 @@ export class AgentPortalGroupsService {
     };
   }
 
-  private projectTransport(item: any) {
+  private projectTransport(item: TransportSource) {
     const drivers = item.drivers ?? [];
     return {
       id: item.id, tripDate: toIso(item.tripDate), activity: item.activity, tripLabel: item.tripLabel,

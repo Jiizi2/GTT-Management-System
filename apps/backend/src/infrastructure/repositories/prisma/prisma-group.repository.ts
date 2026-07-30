@@ -88,7 +88,7 @@ export class PrismaGroupRepository implements GroupRepository {
           createdAt: "desc",
         },
       });
-      return items as any;
+      return items;
     }
 
     const [total, items] = await Promise.all([
@@ -152,11 +152,11 @@ export class PrismaGroupRepository implements GroupRepository {
         group = {
           ...group,
           ...inheritedFields,
-        } as any;
+        };
       }
     }
 
-    return group as any;
+    return group;
   }
 
   async listAuditLogs(groupCode?: string, limit?: number): Promise<MemoryAuditLog[]> {
@@ -238,7 +238,7 @@ export class PrismaGroupRepository implements GroupRepository {
           select: groupDetailSelection,
         });
         return created;
-      }) as any;
+      });
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -410,7 +410,7 @@ export class PrismaGroupRepository implements GroupRepository {
         },
         select: groupDetailSelection,
       });
-    }) as any;
+    });
   }
 
   async update(idOrCode: string, payload: UpdateGroupDto): Promise<GroupDetailRecord> {
@@ -486,7 +486,7 @@ export class PrismaGroupRepository implements GroupRepository {
         parentGroupId,
       },
       select: groupDetailSelection,
-    }) as any;
+    });
   }
 
   async remove(idOrCode: string): Promise<void> {
@@ -825,7 +825,7 @@ export class PrismaGroupRepository implements GroupRepository {
         stayEnd: payload.stayEnd,
       },
     ];
-    validateHotelAgreementRules(nextHotelAgreements as any, {
+    validateHotelAgreementRules(nextHotelAgreements, {
       requireMakkah: false,
     });
 
@@ -888,7 +888,7 @@ export class PrismaGroupRepository implements GroupRepository {
             stayEnd: hotel.stayEnd.toISOString().slice(0, 10),
           },
     );
-    validateHotelAgreementRules(nextHotelAgreements as any, {
+    validateHotelAgreementRules(nextHotelAgreements, {
       requireMakkah: false,
     });
 
@@ -939,7 +939,7 @@ export class PrismaGroupRepository implements GroupRepository {
         stayStart: hotel.stayStart.toISOString().slice(0, 10),
         stayEnd: hotel.stayEnd.toISOString().slice(0, 10),
       }));
-    validateHotelAgreementRules(nextHotelAgreements as any, {
+    validateHotelAgreementRules(nextHotelAgreements, {
       requireMakkah: false,
     });
 
