@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe } from "vitest";
-import { resolveGroupDetailRecord } from "../hooks/app-controller/use-dashboard-group-records.js";
+import { resolveGroupDetailRecord } from "../hooks/app-controller/group-record-selectors.js";
 import type { GroupData } from "../shared/app-domain.js";
 import { runCase } from "../test/run-case.js";
 
