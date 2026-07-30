@@ -4,5 +4,10 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  // tsconfig.json is the BUILD config: it excludes test files so that
+  // `tsc -p tsconfig.json` does not emit them into dist/. That exclude list is
+  // inherited through "extends", which left every backend test source
+  // unchecked by anything. This config is noEmit, so it can see all of them.
+  "exclude": ["dist", "node_modules"]
 }
