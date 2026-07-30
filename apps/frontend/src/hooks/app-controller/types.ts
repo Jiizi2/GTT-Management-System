@@ -1,6 +1,7 @@
 import type {
   AgreementApprovalStatus,
   GroupData,
+  GroupVisaSetup,
   NavId,
   SessionAccessTier,
   VisaHotelEditFormState,
@@ -9,7 +10,10 @@ import type {
   VisaStatus,
   VisaTrackingRow,
 } from "../../shared/app-domain";
-import type { GroupIdentityDraftPayload } from "../use-app-controller-backend";
+import type {
+  GroupFetchProjection,
+  GroupIdentityDraftPayload,
+} from "../use-app-controller-backend";
 
 export type OverviewStatCard = {
   label: string;
@@ -86,3 +90,30 @@ export type AppController = {
   handleOverviewMonthFilterChange: (value: string) => void;
   toggleSidebarCollapse: () => void;
 };
+
+/**
+ * Snapshot of the record list taken before an optimistic mutation, so a failed
+ * backend sync can roll the UI back to exactly what the user last saw.
+ */
+export type GroupRecordsSnapshot = {
+  groupRecords: GroupData[];
+  projection: GroupFetchProjection;
+  activeOnly: boolean;
+};
+
+/** Either a fixed message or one derived from the error the backend returned. */
+export type SyncFailureMessage = string | ((error: unknown) => string);
+
+/**
+ * The optimistic-update primitive the visa and Raudhah mutations are built on:
+ * apply `updater` to a group's visa setup, commit it locally, then sync.
+ * Extracted so those mutation groups can live outside the dashboard hook.
+ */
+export type UpdateVisaSetupForGroupAndSync = (
+  groupCode: string,
+  updater: (args: { group: GroupData; row: VisaTrackingRow; visaSetup: GroupVisaSetup }) => GroupVisaSetup,
+  syncMessages?: {
+    successMessage?: string;
+    failureMessage?: string;
+  },
+) => void;
