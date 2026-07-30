@@ -57,6 +57,7 @@ function createResolvedUser(): AuthTokenPayload {
     accessTier: "super-admin",
     exp: 4_200_000_000,
     rememberSession: false,
+    tokenVersion: 0,
   };
 }
 

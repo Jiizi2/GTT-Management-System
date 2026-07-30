@@ -57,8 +57,8 @@ describe("MasterDataController Unit Tests", () => {
 
     const payload: CreateMasterDataOptionDto = {
       categoryKey: "agreement-city",
-      optionKey: "MADINAH",
-      optionLabel: "Madinah",
+      value: "MADINAH",
+      label: "Madinah",
       sortOrder: 2,
     };
     const result = await controller.createOption(payload);
@@ -72,7 +72,7 @@ describe("MasterDataController Unit Tests", () => {
     const controller = new MasterDataController(service);
 
     const payload: UpdateMasterDataOptionDto = {
-      optionLabel: "Makkah Al Mukarramah",
+      label: "Makkah Al Mukarramah",
       isActive: true,
     };
     const result = await controller.updateOption("opt-1", payload);
