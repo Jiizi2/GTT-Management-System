@@ -1,10 +1,28 @@
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
+
+import { NestFactory, type IEntryNestModule } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { afterEach, describe, expect, it } from "vitest";
 // Import from dist so Swagger/Nest decorator metadata matches the compiled backend runtime.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AppModule } = require("../dist/app.module.js") as { AppModule: unknown };
+const { AppModule } = require("../dist/app.module.js") as { AppModule: IEntryNestModule };
+
+/**
+ * OpenAPI responses are typed ResponseObject | ReferenceObject. These assertions
+ * only ever inspect inline responses, so narrow the $ref branch away instead of
+ * casting it off: a $ref appearing here would be a real regression, and this
+ * returns undefined so the assertion fails rather than silently passing.
+ */
+function jsonSchemaOfResponse(response: unknown): unknown {
+  if (!response || typeof response !== "object" || "$ref" in response) {
+    return undefined;
+  }
+
+  const { content } = response as {
+    content?: Record<string, { schema?: unknown } | undefined>;
+  };
+  return content?.["application/json"]?.schema;
+}
 
 async function withEnv<T>(
   overrides: Record<string, string | undefined>,
@@ -78,8 +96,7 @@ describe("Backend Swagger DTO schema", () => {
         );
         const loginOperation = document.paths["/api/auth/login"]?.post;
         const sessionOperation = document.paths["/api/auth/session"]?.get;
-        const loginResponseSchema =
-          loginOperation?.responses?.["200"]?.content?.["application/json"]?.schema;
+        const loginResponseSchema = jsonSchemaOfResponse(loginOperation?.responses?.["200"]);
         const managedUserSchema = document.components?.schemas?.AuthManagedUserResponseDto;
 
         expect(loginOperation).toBeTruthy();
@@ -110,13 +127,12 @@ describe("Backend Swagger DTO schema", () => {
         const createGroupOperation = document.paths["/api/groups"]?.post;
         const listGroupsOperation = document.paths["/api/groups"]?.get;
         const updateItineraryOperation = document.paths["/api/groups/{idOrCode}/itinerary/{itemId}"]?.patch;
-        const listGroupsResponseSchema =
-          listGroupsOperation?.responses?.["200"]?.content?.["application/json"]?.schema;
+        const listGroupsResponseSchema = jsonSchemaOfResponse(listGroupsOperation?.responses?.["200"]);
 
         expect(createGroupOperation).toBeTruthy();
         expect(createGroupOperation?.summary).toBe("Create group");
         expect(createGroupOperation?.description).toContain("itinerary");
-        expect(createGroupOperation?.responses?.["201"]?.content?.["application/json"]?.schema).toEqual({
+        expect(jsonSchemaOfResponse(createGroupOperation?.responses?.["201"])).toEqual({
           $ref: "#/components/schemas/GroupDetailResponseDto",
         });
         expect(listGroupsResponseSchema).toEqual({

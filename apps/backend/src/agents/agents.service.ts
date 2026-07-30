@@ -13,6 +13,16 @@ import { CreateAgentDto, UpdateAgentDto } from "./dto/agent.dto";
 
 export const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
 
+/** Prisma's unique-constraint violation. Narrowed here so catch blocks stay typed. */
+function isPrismaUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
 export type AgentRecord = {
   id: string;
   code: string;
@@ -146,8 +156,8 @@ export class AgentsService {
     try {
       const created = await this.prisma.agent.create({ data });
       return { ...created, groupCount: 0 };
-    } catch (error: any) {
-      if (error?.code === "P2002")
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error))
         throw new ConflictException(`Agent code '${code}' already exists.`);
       throw error;
     }
@@ -193,8 +203,8 @@ export class AgentsService {
         data,
       });
       return { ...updated, groupCount: existing.groupCount };
-    } catch (error: any) {
-      if (error?.code === "P2002")
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error))
         throw new ConflictException(`Agent code '${code}' already exists.`);
       throw error;
     }

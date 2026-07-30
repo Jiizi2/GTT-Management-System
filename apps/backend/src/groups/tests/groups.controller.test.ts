@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AgreementCity, GroupRaudhahStatus } from "@prisma/client";
 import { GroupsController } from "../http/groups.controller";
 import { GroupsService } from "../application/groups.service";
 import { CreateGroupDto } from "../dto/create-group.dto";
@@ -101,7 +102,12 @@ describe("GroupsController", () => {
     const payload: CreateGroupDto = {
       code: "GRP-001",
       name: "Group A",
+      status: "Active",
+      arrivalDate: "2026-06-10",
+      returnDate: "2026-06-19",
       pax: 10,
+      packageName: "Standard Gold",
+      durationDays: 9,
     };
     const result = await controller.create(payload);
 
@@ -152,8 +158,12 @@ describe("GroupsController", () => {
 
     const payload: UpsertGroupItineraryItemDto = {
       dateLabel: "Hari 1",
-      title: "Arrive",
+      yearLabel: "2026",
+      category: "Flight",
       categoryKey: "flight",
+      title: "Arrive",
+      meta: "08:00 | CGK -> JED",
+      icon: "flight_takeoff",
     };
     const result = await controller.addItineraryItem("GRP-001", payload);
 
@@ -167,8 +177,12 @@ describe("GroupsController", () => {
 
     const payload: UpsertGroupItineraryItemDto = {
       dateLabel: "Hari 1",
-      title: "Arrive",
+      yearLabel: "2026",
+      category: "Flight",
       categoryKey: "flight",
+      title: "Arrive",
+      meta: "08:00 | CGK -> JED",
+      icon: "flight_takeoff",
     };
     const result = await controller.updateItineraryItem("GRP-001", "item-1", payload);
 
@@ -202,7 +216,12 @@ describe("GroupsController", () => {
     const controller = new GroupsController(service);
 
     const payload: UpsertGroupVisaHotelDto = {
-      visaStatus: "ISSUED",
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Al Maqam",
+      agreementNumber: "AG-001",
+      pax: 10,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
     };
     const result = await controller.addVisaHotelAgreement("GRP-001", payload);
 
@@ -215,7 +234,12 @@ describe("GroupsController", () => {
     const controller = new GroupsController(service);
 
     const payload: UpsertGroupVisaHotelDto = {
-      visaStatus: "ISSUED",
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel Al Maqam",
+      agreementNumber: "AG-001",
+      pax: 10,
+      stayStart: "2026-06-10",
+      stayEnd: "2026-06-13",
     };
     const result = await controller.updateVisaHotelAgreement("GRP-001", "hotel-1", payload);
 
@@ -239,7 +263,7 @@ describe("GroupsController", () => {
 
     const payload: UpsertGroupRaudhahDto = {
       date: "2026-07-06T08:00:00.000Z",
-      status: "CONFIRMED",
+      status: GroupRaudhahStatus.BEFORE,
     };
     const result = await controller.upsertPrimaryRaudhahAppointment("GRP-001", payload);
 
@@ -252,11 +276,12 @@ describe("GroupsController", () => {
     const controller = new GroupsController(service);
 
     const payload: ConfirmChecklistDriverDto = {
-      itineraryItemId: "item-1",
-      slotNumber: 1,
-      name: "Driver A",
-      phone: "0812",
-      plateNumber: "B 1234 CD",
+      tripDate: "2026-06-10",
+      activity: "Transfer",
+      tripLabel: "Makkah -> Madinah",
+      requiredBusCount: 1,
+      scheduledTime: "08:00",
+      driver: { name: "Driver A", phone: "0812", plateNumber: "B 1234 CD" },
     };
     const result = await controller.confirmChecklistDriver("GRP-001", payload);
 
@@ -269,8 +294,8 @@ describe("GroupsController", () => {
     const controller = new GroupsController(service);
 
     const payload: ResetChecklistDriverDto = {
-      itineraryItemId: "item-1",
-      slotNumber: 1,
+      tripDate: "2026-06-10",
+      scheduledTime: "08:00",
     };
     const result = await controller.resetChecklistDriver("GRP-001", payload);
 

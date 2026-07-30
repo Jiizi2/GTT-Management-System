@@ -41,12 +41,27 @@ type GroupHotelAgreementSnapshot = {
   stayEnd?: unknown;
 };
 
-function readText(val: any): string {
+/**
+ * The slice of a group this repository reads. GroupsService returns a union
+ * (list or paginated), and the memory records are loosely shaped, so fields stay
+ * `unknown` and go through readText/readNumber - same convention as
+ * GroupHotelAgreementSnapshot above.
+ */
+type GroupSnapshot = {
+  code?: unknown;
+  agentId?: unknown;
+  pax?: unknown;
+  arrivalDate?: Date | string | null;
+  returnDate?: Date | string | null;
+  visaSetup?: { hotelAgreements?: GroupHotelAgreementSnapshot[] } | null;
+};
+
+function readText(val: unknown): string {
   if (typeof val === "string") return val;
   return String(val ?? "");
 }
 
-function readNumber(val: any): number | null {
+function readNumber(val: unknown): number | null {
   if (typeof val === "number") return val;
   if (typeof val === "string") {
     const num = Number(val);
@@ -181,7 +196,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     return draft;
   }
 
-  private toGroupHotelPayload(draft: any, sourceDraftId: string) {
+  private toGroupHotelPayload(draft: MemoryHotelAgreementDraft, sourceDraftId: string) {
     return {
       city: draft.city,
       sourceDraftId: sourceDraftId?.trim() || undefined,
@@ -224,11 +239,11 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
   private async getMemoryDraftRemainingAndGroups(
     draft: MemoryHotelAgreementDraft,
   ): Promise<{ remainingPax: number; assignedGroups: Array<{ groupCode: string; pax: number }> }> {
-    const groups = (await this.groupsService.findAll()) as any[];
+    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
     const assignedAgreements: Array<{ groupCode: string; pax: number; stayStart: string; stayEnd: string }> = [];
     
     for (const g of groups) {
-      const code = g.code;
+      const code = readText(g.code);
       if (!code) continue;
       const agreements = g.visaSetup?.hotelAgreements ?? [];
       for (const h of agreements) {
@@ -272,12 +287,12 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       }
     }
 
-    const groups = (await this.groupsService.findAll()) as any[];
+    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
     const assignedPaxMap = new Map<string, number>();
     const assignedGroupsMap = new Map<string, Array<{ groupCode: string; pax: number }>>();
 
     for (const g of groups) {
-      const code = g.code;
+      const code = readText(g.code);
       if (!code) continue;
       const agreements = g.visaSetup?.hotelAgreements ?? [];
       for (const h of agreements) {
@@ -361,10 +376,10 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     };
 
     // Cascade update to linked group visa agreements in memory
-    const groups = (await this.groupsService.findAll()) as any[];
+    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
     for (const g of groups) {
       const agreements = g.visaSetup?.hotelAgreements ?? [];
-      const matchedAgreement = agreements.find((h: any) =>
+      const matchedAgreement = agreements.find((h: GroupHotelAgreementSnapshot) =>
         doesHotelSnapshotMatchDraftIgnoringPax(h, draft),
       );
 
@@ -376,9 +391,9 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
           status: normalizedPayload.status,
           stayStart: normalizedPayload.stayStart,
           stayEnd: normalizedPayload.stayEnd,
-          pax: matchedAgreement.pax,
+          pax: readNumber(matchedAgreement.pax) ?? 0,
         };
-        await this.groupsService.updateVisaHotelAgreement(g.code, matchedAgreement.id, nextAgreement);
+        await this.groupsService.updateVisaHotelAgreement(readText(g.code), readText(matchedAgreement.id), nextAgreement);
       }
     }
 
@@ -415,7 +430,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       );
     }
 
-    const targetGroup = (await this.groupsService.findOneByIdOrCode(normalizedGroupCode)) as any;
+    const targetGroup = (await this.groupsService.findOneByIdOrCode(normalizedGroupCode)) as GroupSnapshot;
     if (!targetGroup) {
       throw new NotFoundException(`Group '${normalizedGroupCode}' not found.`);
     }
@@ -432,10 +447,10 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       : calculateAllocatedStayDates(
           { arrivalDate: targetGroup.arrivalDate, returnDate: targetGroup.returnDate },
           draft,
-          existingAgreements.map((a: any) => ({ stayStart: readText(a.stayStart), stayEnd: readText(a.stayEnd) })),
+          existingAgreements.map((a: GroupHotelAgreementSnapshot) => ({ stayStart: readText(a.stayStart), stayEnd: readText(a.stayEnd) })),
         );
 
-    const groups = (await this.groupsService.findAll()) as any[];
+    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
     const assignedAgreements: Array<{ pax: number; stayStart: string; stayEnd: string }> = [];
     for (const g of groups) {
       const agreements = g.visaSetup?.hotelAgreements ?? [];
@@ -468,14 +483,14 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       );
     }
 
-    const alreadyAssignedToTarget = existingAgreements.some((h: any) =>
+    const alreadyAssignedToTarget = existingAgreements.some((h: GroupHotelAgreementSnapshot) =>
       doesHotelSnapshotMatchDraftIgnoringPax(h, draft),
     );
     if (alreadyAssignedToTarget) {
       throw new ConflictException(`Agreement ${draft.agreementNumber} is already assigned to group '${targetGroup.code}'.`);
     }
 
-    const paxToAssign = Math.min(targetGroup.pax, minRemaining);
+    const paxToAssign = Math.min(readNumber(targetGroup.pax) ?? 0, minRemaining);
 
     const groupHotelPayload = {
       ...this.toGroupHotelPayload(draft, draft.id),
@@ -494,21 +509,21 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
 
   async unassign(draftId: string, groupCode?: string): Promise<unknown> {
     const draft = this.resolveMemoryDraft(draftId);
-    const groups = (await this.groupsService.findAll()) as any[];
+    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
     const targetGroups = groupCode
-      ? groups.filter((g) => g.code.trim().toUpperCase() === groupCode.trim().toUpperCase())
+      ? groups.filter((g) => readText(g.code).trim().toUpperCase() === groupCode.trim().toUpperCase())
       : groups;
 
     let unassignedAny = false;
 
     for (const g of targetGroups) {
       const agreements = g.visaSetup?.hotelAgreements ?? [];
-      const matchedAgreement = agreements.find((a: any) =>
+      const matchedAgreement = agreements.find((a: GroupHotelAgreementSnapshot) =>
         doesHotelSnapshotMatchDraftIgnoringPax(a, draft),
       );
 
       if (matchedAgreement) {
-        await this.groupsService.removeVisaHotelAgreement(g.code, matchedAgreement.id);
+        await this.groupsService.removeVisaHotelAgreement(readText(g.code), readText(matchedAgreement.id));
         unassignedAny = true;
       }
     }

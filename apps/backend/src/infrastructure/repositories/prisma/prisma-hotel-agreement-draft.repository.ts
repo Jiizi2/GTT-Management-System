@@ -28,6 +28,12 @@ type PrismaHotelAgreementDraftRecord = {
   updatedAt: Date;
 };
 
+/** A group a draft has been allocated to, with the pax taken by that allocation. */
+type AssignedGroupSummary = {
+  groupCode: string;
+  pax: number;
+};
+
 type GroupHotelAgreementSnapshot = {
   id?: unknown;
   sourceDraftId?: unknown;
@@ -175,7 +181,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     };
   }
 
-  private toGroupHotelPayload(draft: any, sourceDraftId: string) {
+  private toGroupHotelPayload(draft: PrismaHotelAgreementDraftRecord, sourceDraftId: string) {
     return {
       sourceDraftId,
       city: draft.city,
@@ -241,7 +247,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     };
   }
 
-  private mapPrismaDraft(draft: PrismaHotelAgreementDraftRecord, remainingPax: number, assignedGroups: any[]) {
+  private mapPrismaDraft(draft: PrismaHotelAgreementDraftRecord, remainingPax: number, assignedGroups: AssignedGroupSummary[]) {
     const isAssigned = assignedGroups.length > 0;
     const assignmentStatus = isAssigned
       ? remainingPax > 0
@@ -296,7 +302,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         const matchHotel = draft.hotelName.toLowerCase().includes(normalizedQuery);
         const matchAgent = draft.agentName?.toLowerCase().includes(normalizedQuery) ?? false;
         const matchGroupName = draft.groupName.toLowerCase().includes(normalizedQuery);
-        const matchGroup = draft.assignedGroups.some((g: any) => g.groupCode.toLowerCase().includes(normalizedQuery));
+        const matchGroup = draft.assignedGroups.some((g: AssignedGroupSummary) => g.groupCode.toLowerCase().includes(normalizedQuery));
         return matchNumber || matchHotel || matchAgent || matchGroupName || matchGroup;
       }
 
@@ -445,7 +451,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     const existingAgreements = targetGroup.visaSetup?.hotelAgreements ?? [];
     const allocatedStay = (customStart && customEnd)
       ? { stayStart: customStart, stayEnd: customEnd }
-      : calculateAllocatedStayDates(targetGroup, draft as any, existingAgreements);
+      : calculateAllocatedStayDates(targetGroup, draft, existingAgreements);
 
         const assignedAgreements = await tx.visaHotelAgreement.findMany({
           where: { sourceDraftId: draft.id },

@@ -52,6 +52,7 @@ describe("AuthRolesGuard", () => {
       accessTier: "admin",
       exp: Math.floor(Date.now() / 1000) + 60,
       rememberSession: false,
+      tokenVersion: 0,
     };
 
     expect(() => guard.canActivate(createExecutionContext(adminUser) as never)).toThrow(
@@ -73,6 +74,7 @@ describe("AuthRolesGuard", () => {
       accessTier: "admin",
       exp: Math.floor(Date.now() / 1000) + 60,
       rememberSession: false,
+      tokenVersion: 0,
     };
 
     expect(guard.canActivate(createExecutionContext(adminUser) as never)).toBe(true);

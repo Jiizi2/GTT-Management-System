@@ -1,5 +1,6 @@
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
+import { NestFactory, type IEntryNestModule } from "@nestjs/core";
+
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
@@ -34,7 +35,7 @@ async function withEnv<T>(
 async function createTestApp(): Promise<INestApplication> {
   // Load after the test environment is installed; ConfigModule reads environment on import.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { AppModule } = require("../dist/app.module.js") as { AppModule: unknown };
+  const { AppModule } = require("../dist/app.module.js") as { AppModule: IEntryNestModule };
   const app = await NestFactory.create(AppModule, {
     logger: false,
   });

@@ -208,7 +208,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         resolvedAgentId = linkedGroup.agentId;
       }
     }
-    const agentDelegate = (this.prisma as any).agent;
+    const agentDelegate = this.prisma.agent;
     if (agentDelegate?.findFirst) {
       const activeAgent = await agentDelegate.findFirst({ where: { id: resolvedAgentId, status: "ACTIVE" }, select: { id: true } });
       if (!activeAgent) throw new BadRequestException("Agent invoice tidak ditemukan atau tidak aktif.");
@@ -407,7 +407,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         resolvedAgentId = linkedGroup.agentId;
       }
     }
-    const agentDelegate = (this.prisma as any).agent;
+    const agentDelegate = this.prisma.agent;
     if (agentDelegate?.findFirst) {
       const activeAgent = await agentDelegate.findFirst({
         where: { id: resolvedAgentId, status: "ACTIVE" },
@@ -526,7 +526,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
       Telemetry.end(txTracker, { success: true });
       Telemetry.end(submitTracker, { success: true });
-    } catch (error: any) {
+    } catch (error) {
       Telemetry.end(txTracker, { success: false });
       Telemetry.end(submitTracker, { success: false });
 
@@ -632,7 +632,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     const dueDateIso = toIsoDateOnly(invoice.dueDate);
     const issuedDateIso = toIsoDateOnly(invoice.issuedDate);
     
-    const relationalItems = (invoice as any).itemsRel?.map((item: any) => ({
+    const relationalItems = invoice.itemsRel?.map((item) => ({
       description: item.description,
       pax: item.pax,
       currency: item.currency,
@@ -671,9 +671,9 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
-      recipientName: (invoice as any).recipientName ?? undefined,
+      recipientName: invoice.recipientName ?? undefined,
       notes: invoice.notes ?? undefined,
-      description: (invoice as any).description ?? undefined,
+      description: invoice.description ?? undefined,
       items: resolvedItems.length > 0 ? resolvedItems : undefined,
       version: invoice.version,
     };

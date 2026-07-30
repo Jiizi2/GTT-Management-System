@@ -5,17 +5,21 @@ import { resolveClientIp } from "../http-origin";
 
 @Injectable()
 export class AppThrottlerGuard extends ThrottlerGuard {
-  protected async getTracker(req: Record<string, any>): Promise<string> {
+  protected async getTracker(req: Record<string, unknown>): Promise<string> {
+    const socket =
+      req.socket && typeof req.socket === "object"
+        ? (req.socket as { remoteAddress?: unknown })
+        : undefined;
+
     return resolveClientIp({
       headers: req.headers as Record<string, unknown> | undefined,
       ip: typeof req.ip === "string" ? req.ip : undefined,
-      socket:
-        req.socket && typeof req.socket === "object"
-          ? {
-              remoteAddress:
-                typeof req.socket.remoteAddress === "string" ? req.socket.remoteAddress : null,
-            }
-          : undefined,
+      socket: socket
+        ? {
+            remoteAddress:
+              typeof socket.remoteAddress === "string" ? socket.remoteAddress : null,
+          }
+        : undefined,
     }, {
       trustProxyHeaders: resolveConfiguredBoolean(undefined, "TRUST_PROXY") === true,
     });

@@ -11,7 +11,7 @@ export class InvoiceValidator {
     }
   }
 
-  validateItems(items: any): void {
+  validateItems(items: unknown): void {
     if (items === undefined) return;
     if (!Array.isArray(items)) {
       throw new BadRequestException("Format items invoice tidak valid.");
@@ -20,7 +20,7 @@ export class InvoiceValidator {
       if (!item || typeof item !== "object") {
         throw new BadRequestException("Item invoice tidak valid.");
       }
-      const { description, currency, pax, unitPrice } = item as any;
+      const { description, currency, pax, unitPrice } = item as Record<string, unknown>;
       if (!description || typeof description !== "string" || !description.trim()) {
         throw new BadRequestException("Uraian item invoice tidak boleh kosong.");
       }
@@ -60,7 +60,7 @@ export class InvoiceValidator {
     amount?: number;
     downPaymentIdr?: number;
     notes?: string;
-    items?: any;
+    items?: unknown;
   }): void {
     this.validateAmounts(payload);
     this.validateItems(payload.items);
