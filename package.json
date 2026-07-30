@@ -14,6 +14,8 @@
     "dev:backend": "npm run dev:local --workspace backend",
     "clean:test:coverage": "node apps/frontend/scripts/clean-output.mjs coverage/unit coverage/smoke/frontend .nyc_output/backend-unit",
     "lint:frontend": "npm run lint --workspace frontend",
+    "lint:backend": "npm run lint --workspace backend",
+    "lint": "npm run lint:backend && npm run lint:frontend",
     "format:frontend": "npm run format --workspace frontend",
     "format:check:frontend": "npm run format:check --workspace frontend",
     "format:write:frontend": "npm run format:write --workspace frontend",

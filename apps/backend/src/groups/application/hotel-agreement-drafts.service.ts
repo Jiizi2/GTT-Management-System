@@ -23,13 +23,6 @@ export class HotelAgreementDraftsService {
     private readonly agentsService?: AgentsService,
   ) {}
 
-  get memoryDrafts() {
-    if (this.agreementDraftRepo && "memoryDrafts" in this.agreementDraftRepo) {
-      return (this.agreementDraftRepo as any).memoryDrafts;
-    }
-    return undefined;
-  }
-
   async findAll(query?: string, rawStatus?: string, agentId?: string): Promise<unknown[]> {
     return this.agreementDraftRepo.findAll(query, rawStatus, agentId);
   }

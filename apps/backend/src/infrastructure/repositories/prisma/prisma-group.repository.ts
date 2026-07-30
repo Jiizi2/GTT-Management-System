@@ -26,6 +26,8 @@ import {
   MemoryAuditLog,
   ChecklistAssignmentSyncResult,
   PrismaGroupDetailRecord,
+  GroupAuditContext,
+  GroupAuditDetail,
 } from "../../../groups/groups.service-types";
 import {
   groupDetailSelection,
@@ -200,8 +202,8 @@ export class PrismaGroupRepository implements GroupRepository {
   async writeAuditLog(
     action: string,
     entity: string,
-    detail: any,
-    groupInfo?: any,
+    detail: GroupAuditDetail,
+    groupInfo?: GroupAuditContext,
   ): Promise<void> {
     const code = groupInfo?.code || groupInfo?.groupCode || "";
     await this.prisma.groupAuditLog.create({

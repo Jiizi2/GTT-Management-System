@@ -10,6 +10,8 @@ import { ConfirmChecklistDriverDto } from "../../groups/dto/confirm-checklist-dr
 import { ResetChecklistDriverDto } from "../../groups/dto/reset-checklist-driver.dto";
 import {
   FindAllOptions,
+  GroupAuditContext,
+  GroupAuditDetail,
   GroupDetailRecord,
   GroupListResult,
   MemoryAuditLog,
@@ -23,8 +25,8 @@ export interface GroupRepository {
   writeAuditLog(
     action: string,
     entity: string,
-    detail: any,
-    groupInfo?: any,
+    detail: GroupAuditDetail,
+    groupInfo?: GroupAuditContext,
   ): Promise<void>;
   create(payload: CreateGroupDto): Promise<GroupDetailRecord>;
   replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord>;
