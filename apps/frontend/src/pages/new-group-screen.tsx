@@ -1,16 +1,7 @@
-import { type ReactNode, Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import type { GroupIdentityDraftPayload } from "../hooks/use-app-controller-backend";
-import type {
-  GroupData,
-  ItineraryPrefill,
-  NewGroupItineraryDraft,
-} from "../shared/app-domain";
+import type { GroupData, NewGroupItineraryDraft } from "../shared/app-domain";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { NewGroupContext } from "./new-group/context/NewGroupContext";
-import { useNewGroupForm } from "./new-group/hooks/use-new-group-form";
-import { NewGroupIdentityForm } from "./new-group/components/NewGroupIdentityForm";
-import { NewGroupHotelsSection } from "./new-group/components/NewGroupHotelsSection";
-import { NewGroupRaudhahSection } from "./new-group/components/NewGroupRaudhahSection";
 
 const LazyInputItineraryScreen = lazy(async () => ({
   default: (await import("./add-group-workspace-page")).InputItineraryScreen,
@@ -30,104 +21,6 @@ function ItinerarySectionFallback({ label }: { label: string }) {
         <span>{label}</span>
       </div>
     </section>
-  );
-}
-
-export function NewGroupScreen({
-  onSaveGroup,
-  onCancel,
-  hideHeader = false,
-  itineraryDraft = null,
-  itinerarySectionTop,
-  itinerarySectionBottom,
-  hideGroupInformation = false,
-  requireItineraryBeforeSave = false,
-  onItineraryPrefillChange,
-  hideFooterActions = false,
-  onSetupDraftChange,
-}: {
-  onSaveGroup: (group: GroupData) => void;
-  onCancel: () => void;
-  hideHeader?: boolean;
-  itineraryDraft?: NewGroupItineraryDraft | null;
-  itinerarySectionTop?: ReactNode;
-  itinerarySectionBottom?: ReactNode;
-  hideGroupInformation?: boolean;
-  requireItineraryBeforeSave?: boolean;
-  onItineraryPrefillChange?: (prefill: ItineraryPrefill | null) => void;
-  hideFooterActions?: boolean;
-  onSetupDraftChange?: (draft: any) => void;
-}) {
-  const detailState = useNewGroupForm({
-    onSaveGroup,
-    itineraryDraft,
-    hideGroupInformation,
-    requireItineraryBeforeSave,
-    onItineraryPrefillChange,
-    onSetupDraftChange,
-  });
-
-  const {
-    form,
-    isSaveDisabled,
-    hasItineraryDraft,
-  } = detailState;
-
-  const containerClassName = hideHeader ? "space-y-6" : "mx-auto max-w-7xl space-y-6";
-
-  return (
-    <NewGroupContext.Provider value={{ ...detailState, hideGroupInformation }}>
-      <div className={containerClassName}>
-        {!hideHeader ? (
-          <header className="serene-section p-6">
-            <h1 className="font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl lg:text-4xl">
-              Add New Group
-            </h1>
-            <p className="mt-2 text-sm text-on-surface-variant sm:text-base">
-              <span className="sm:hidden">Create group and visa setup.</span>
-              <span className="hidden sm:inline">Create group and initialize visa tracking details.</span>
-            </p>
-          </header>
-        ) : null}
-
-        <form className="space-y-6" onSubmit={form.handleSubmit(detailState.handleSave)}>
-          {itinerarySectionTop ? <div className="space-y-4">{itinerarySectionTop}</div> : null}
-
-          <NewGroupIdentityForm />
-          <NewGroupHotelsSection />
-          <NewGroupRaudhahSection />
-
-          {itinerarySectionBottom ? <div className="space-y-4">{itinerarySectionBottom}</div> : null}
-
-          {!hideFooterActions ? (
-            <footer className="serene-form-actions">
-              {requireItineraryBeforeSave && !hasItineraryDraft ? (
-                <p className="w-full text-sm font-medium text-on-tertiary-fixed-variant" role="status" aria-live="polite">
-                  <span className="sm:hidden">Isi Add Schedule dulu untuk mengaktifkan Save.</span>
-                  <span className="hidden sm:inline">
-                    Isi itinerary di bagian Add Schedule terlebih dahulu untuk mengaktifkan Save Group.
-                  </span>
-                </p>
-              ) : null}
-              {!detailState.agreementSaveStatus || detailState.agreementSaveStatus.tone === "warning" ? (
-                <p className="w-full text-sm font-medium text-on-tertiary-fixed-variant" role="status" aria-live="polite">
-                  <span className="sm:hidden">Save agreement hotel dulu sebelum simpan group.</span>
-                  <span className="hidden sm:inline">
-                    Simpan agreement hotel terlebih dahulu. Saat save, sistem akan validasi tanggal dan sync ke itinerary.
-                  </span>
-                </p>
-              ) : null}
-              <button type="button" className="serene-btn-secondary min-h-11 w-full sm:w-auto" onClick={onCancel}>
-                Cancel
-              </button>
-              <button type="submit" className="serene-btn-primary min-h-11 w-full sm:w-auto" disabled={isSaveDisabled}>
-                Save Group
-              </button>
-            </footer>
-          ) : null}
-        </form>
-      </div>
-    </NewGroupContext.Provider>
   );
 }
 
