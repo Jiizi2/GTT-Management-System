@@ -27,8 +27,8 @@ import {
   buildAgreementItineraryPrefill,
   buildNewGroupPayload,
   getAgreementSaveValidationError,
-  validateConnectedAgreementDates,
 } from "../pages/new-group/helpers/new-group-screen-helpers.js";
+import { validateConnectedAgreementDates } from "../shared/agreement-date-validation.js";
 import { runCase } from "../test/run-case.js";
 
 function assertEqual<T>(actual: T, expected: T, message?: string): void {

@@ -13,8 +13,30 @@ import {
   normalizeAgreementMatchValue,
 } from "../visa-detail-helpers";
 import * as Domain from "../../../shared/app-domain";
+import { validateConnectedAgreementDates } from "../../../shared/agreement-date-validation";
 
 const { isIsoDateValue, formatVisaShortDate } = Domain;
+
+const agreementWarnClassName =
+  "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
+
+/**
+ * Soft warning for non-contiguous Makkah/Madinah stay dates.
+ *
+ * The backend deliberately accepts gaps (see groups.hotel-validation.ts), so
+ * this must stay advisory: it never blocks a save and never renders as an
+ * error. Overlaps are a different rule and are rejected server-side.
+ */
+function AgreementDateGapWarning({ message }: { message: string }) {
+  return (
+    <div className={agreementWarnClassName} role="status" aria-live="polite">
+      <span className="material-symbols-outlined" aria-hidden="true">
+        warning
+      </span>
+      <p>{message}</p>
+    </div>
+  );
+}
 
 export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreementHotel }) {
   const agreementNumber = agreement.agreementNumber?.trim() || "Agreement number pending";
@@ -371,9 +393,18 @@ export function HotelAgreementSection() {
 
   const makkahAgreementIdSet = useMemo(() => new Set(makkahAgreements.map((agreement) => agreement.id)), [makkahAgreements]);
   const madinahAgreementIdSet = useMemo(() => new Set(madinahAgreements.map((agreement) => agreement.id)), [madinahAgreements]);
+  const dateGapWarnings = useMemo(
+    () => validateConnectedAgreementDates(makkahAgreements, madinahAgreements),
+    [makkahAgreements, madinahAgreements],
+  );
 
   return (
     <section className="grid min-w-0 gap-4 xl:grid-cols-2">
+      {dateGapWarnings.crossCityWarning ? (
+        <div className="min-w-0 xl:col-span-2">
+          <AgreementDateGapWarning message={dateGapWarnings.crossCityWarning} />
+        </div>
+      ) : null}
       <article className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
@@ -394,6 +425,12 @@ export function HotelAgreementSection() {
             <span>Add Hotel</span>
           </button>
         </div>
+
+        {dateGapWarnings.cityWarnings.makkah ? (
+          <div className="mt-4">
+            <AgreementDateGapWarning message={dateGapWarnings.cityWarnings.makkah} />
+          </div>
+        ) : null}
 
         <div className="mt-4 min-w-0 space-y-3">
           {makkahAgreements.length === 0 ? (
@@ -553,6 +590,12 @@ export function HotelAgreementSection() {
             <span>Add Hotel</span>
           </button>
         </div>
+
+        {dateGapWarnings.cityWarnings.madinah ? (
+          <div className="mt-4">
+            <AgreementDateGapWarning message={dateGapWarnings.cityWarnings.madinah} />
+          </div>
+        ) : null}
 
         <div className="mt-4 min-w-0 space-y-3">
           {madinahAgreements.length === 0 ? (
