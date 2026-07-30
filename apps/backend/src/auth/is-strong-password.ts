@@ -2,14 +2,14 @@ import { registerDecorator, ValidationOptions, ValidationArguments } from "class
 import { validatePasswordStrength } from "./auth-password-validation";
 
 export function IsStrongPassword(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: "isStrongPassword",
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: unknown, _args: ValidationArguments) {
           if (typeof value !== "string") return false;
           return validatePasswordStrength(value).valid;
         },

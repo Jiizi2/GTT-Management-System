@@ -20,6 +20,7 @@ import {
 import type {
   ChecklistAssignmentSyncResult,
   FindAllOptions,
+  GroupAuditContext,
   GroupDetailRecord,
   GroupListResult,
   MemoryAuditLog,
@@ -506,7 +507,7 @@ export class GroupsService {
     const previous = await this.findOneByIdOrCode(idOrCode);
     const updated = await this.groupRepo.reassignAgent(idOrCode, agentId.trim());
     await this.writeAuditLog("group.agent.reassigned", "group", updated, {
-      previousAgentId: (previous as any).agentId,
+      previousAgentId: previous.agentId,
       nextAgentId: agentId.trim(),
       reason: reason.trim(),
     });
@@ -544,7 +545,7 @@ export class GroupsService {
   private async writeAuditLog(
     action: string,
     entity: string,
-    group: unknown,
+    group: GroupAuditContext,
     payload: Record<string, unknown>,
   ): Promise<void> {
     await this.groupRepo.writeAuditLog(action, entity, payload, group);

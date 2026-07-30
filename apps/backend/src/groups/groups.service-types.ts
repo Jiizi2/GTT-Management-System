@@ -122,6 +122,23 @@ export type MemoryAuditLog = {
   createdAt: string;
 };
 
+/**
+ * Body stored as the audit entry payload - a metadata bag describing what
+ * changed. Deliberately `unknown`: adapters guard the shape before persisting
+ * (memory wraps non-objects, Prisma runs it through sanitizeAuditPayloadValue).
+ */
+export type GroupAuditDetail = unknown;
+
+/**
+ * The group an audit entry belongs to. Callers pass the full group record;
+ * adapters only read `id`, `code`, and `groupCode` off it to resolve identity.
+ */
+export type GroupAuditContext = {
+  id?: string;
+  code?: string;
+  groupCode?: string;
+};
+
 export type GroupListFilter = "all" | "not-issued" | "missing-hotel" | "unpaid";
 export type GroupResponseProjection = "summary" | "detail";
 

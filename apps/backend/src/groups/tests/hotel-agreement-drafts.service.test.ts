@@ -17,15 +17,14 @@ import { MemoryHotelAgreementDraftRepository } from "../../infrastructure/reposi
 async function createMemoryServices(): Promise<{
   groupsService: GroupsService;
   draftsService: HotelAgreementDraftsService;
+  draftsRepository: MemoryHotelAgreementDraftRepository;
   restore: () => void;
 }> {
   const previous = process.env.DATA_SOURCE;
   process.env.DATA_SOURCE = "memory";
   const groupsService = new GroupsService(new MemoryGroupRepository(new GroupMemoryStore()));
-  const draftsService = new HotelAgreementDraftsService(
-    new MemoryHotelAgreementDraftRepository(groupsService),
-    groupsService,
-  );
+  const draftsRepository = new MemoryHotelAgreementDraftRepository(groupsService);
+  const draftsService = new HotelAgreementDraftsService(draftsRepository, groupsService);
 
   const existingGroups = await groupsService.findAll();
   if (Array.isArray(existingGroups)) {
@@ -40,6 +39,7 @@ async function createMemoryServices(): Promise<{
   return {
     groupsService,
     draftsService,
+    draftsRepository,
     restore: () => {
       if (previous === undefined) {
         delete process.env.DATA_SOURCE;
@@ -263,7 +263,7 @@ describe("HotelAgreementDrafts", () => {
   });
 
   runCase("hotel agreement draft auto-rejection after 24h", async () => {
-    const { draftsService, restore } = await createMemoryServices();
+    const { draftsService, draftsRepository, restore } = await createMemoryServices();
 
     try {
       const created = (await draftsService.create({
@@ -280,8 +280,7 @@ describe("HotelAgreementDrafts", () => {
 
       // Manipulate createdAt to be 25 hours ago
       const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-      const memoryDrafts = draftsService["memoryDrafts"];
-      const draftInMemory = memoryDrafts.find((d: any) => d.id === created.id);
+      const draftInMemory = draftsRepository.memoryDrafts.find((d) => d.id === created.id);
       if (draftInMemory) {
         draftInMemory.createdAt = twentyFiveHoursAgo;
         draftInMemory.updatedAt = twentyFiveHoursAgo;

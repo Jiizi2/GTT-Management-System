@@ -17,6 +17,8 @@ import {
   GroupListResult,
   MemoryAuditLog,
   ChecklistAssignmentSyncResult,
+  GroupAuditContext,
+  GroupAuditDetail,
 } from "../../../groups/groups.service-types";
 import {
   findAllFromMemory,
@@ -92,8 +94,8 @@ export class MemoryGroupRepository implements GroupRepository {
   async writeAuditLog(
     action: string,
     entity: string,
-    detail: any,
-    groupInfo?: any,
+    detail: GroupAuditDetail,
+    groupInfo?: GroupAuditContext,
   ): Promise<void> {
     const code = groupInfo?.code || groupInfo?.groupCode || "";
     const entry: MemoryAuditLog = {
@@ -101,7 +103,10 @@ export class MemoryGroupRepository implements GroupRepository {
       groupCode: code.trim().toUpperCase(),
       action,
       entity,
-      payload: typeof detail === "object" ? detail : { value: detail },
+      payload:
+        typeof detail === "object" && detail !== null
+          ? (detail as Record<string, unknown>)
+          : { value: detail },
       createdAt: new Date().toISOString(),
     };
     this.memoryStore.auditLogs.unshift(entry);
