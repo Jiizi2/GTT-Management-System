@@ -160,8 +160,8 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       version: 0,
     };
 
-    (createdInvoice as any).groupCode = groupCode;
-    (createdInvoice as any).groupName = groupName;
+    createdInvoice.groupCode = groupCode;
+    createdInvoice.groupName = groupName;
 
     this.memoryStore.invoices.push(createdInvoice);
     return this.mapMemoryInvoiceToListItem(createdInvoice, client);
@@ -220,8 +220,8 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       payload.downPaymentIdr !== undefined ? payload.downPaymentIdr : currentInvoice.downPaymentIdr,
     );
 
-    let groupCode = (currentInvoice as any).groupCode;
-    let groupName = (currentInvoice as any).groupName;
+    let groupCode = currentInvoice.groupCode;
+    let groupName = currentInvoice.groupName;
     if (payload.groupCode !== undefined) {
       const requestedGroupCode = getTrimmedString(payload.groupCode).toUpperCase();
       if (requestedGroupCode) {
@@ -253,8 +253,8 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       version: currentInvoice.version + 1,
     };
 
-    (updatedInvoice as any).groupCode = groupCode;
-    (updatedInvoice as any).groupName = groupName;
+    updatedInvoice.groupCode = groupCode;
+    updatedInvoice.groupName = groupName;
 
     this.memoryStore.invoices[invoiceIndex] = updatedInvoice;
     return this.mapMemoryInvoiceToListItem(updatedInvoice, client);
@@ -346,7 +346,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
     return currentClient;
   }
 
-  private mapMemoryInvoiceToListItem(invoice: any, client: any): InvoiceListItem {
+  private mapMemoryInvoiceToListItem(invoice: MemoryInvoice, client: MemoryInvoiceClient): InvoiceListItem {
     const baseAmount = resolveStoredInvoiceAmount(invoice.amount, invoice.items);
     const roundedAmount = Math.max(0, Math.round(baseAmount));
     const effectiveStatus = resolveEffectiveStatus(

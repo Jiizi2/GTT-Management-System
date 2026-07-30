@@ -84,6 +84,13 @@ export type MemoryInvoice = {
   recipientName?: string;
   items: MemoryInvoiceItem[];
   version: number;
+  /**
+   * Denormalised off the client (or the create/update payload) so list rows can
+   * render a group without a second lookup. The memory repository writes these
+   * on create and update; they were previously attached through an `any` cast.
+   */
+  groupCode?: string;
+  groupName?: string;
 };
 
 export type PrismaInvoiceSummaryRow = {
@@ -110,8 +117,24 @@ export type PrismaInvoiceSummaryRow = {
   agent: { name: string };
 };
 
+/** Line items, when the caller selected the `itemsRel` relation. */
+export type PrismaInvoiceItemRow = {
+  description: string;
+  pax: number;
+  currency: InvoiceLineItemCurrency;
+  unitPrice: Prisma.Decimal | number;
+  totalPrice: Prisma.Decimal | number;
+  totalPriceIdr: Prisma.Decimal | number;
+};
+
+/**
+ * Summary row plus the columns/relations that only some queries select. They are
+ * optional rather than required so a caller that skips them still type-checks.
+ */
 export type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & {
   downPaymentIdr?: Prisma.Decimal | number | null;
+  description?: string | null;
+  itemsRel?: PrismaInvoiceItemRow[];
 };
 
 export type PrismaInvoiceDownPaymentRow = {

@@ -47,10 +47,15 @@ export default tseslint.config(
     },
   },
   {
-    // Layer-boundary guard. These directories define the contracts every
-    // adapter implements, so an `any` here erases type safety everywhere
-    // downstream. Both are `any`-free as of this config landing - keep them so.
-    files: ["src/domain/**/*.ts", "src/groups/application/**/*.ts"],
+    // Production source is `any`-free and stays that way. The single remaining
+    // occurrence (invoice-number-generator's structural PrismaClient stand-in)
+    // carries an inline disable explaining why it cannot be typed.
+    //
+    // Test files are deliberately excluded: they still carry ~60 `any`, which
+    // are far lower risk than an `any` in an adapter or a contract. They remain
+    // "warn" so the count stays visible without blocking.
+    files: ["src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
     },

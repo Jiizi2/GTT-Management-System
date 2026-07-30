@@ -40,6 +40,13 @@ export class InvoiceNumberGenerator {
 
   async generateNextInvoiceNumberWithPrisma(
     year: string,
+    // The only `any` left in backend production source, and it is load-bearing.
+    // This is a structural stand-in for PrismaClient so the domain does not
+    // depend on it and tests can pass a stub. `unknown` in parameter position
+    // breaks contravariance - the real PrismaClient stops being assignable -
+    // and the alternatives are coupling this file to Prisma's generated arg
+    // types or adding generics that buy nothing.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prismaClient: { invoice: { findFirst: (args: any) => Promise<any>; findMany: (args: any) => Promise<any[]> } }
   ): Promise<string> {
     const latest = await prismaClient.invoice.findFirst({
