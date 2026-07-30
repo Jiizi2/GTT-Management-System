@@ -1,3 +1,22 @@
+/**
+ * RETAINED ON PURPOSE - the folder name is misleading.
+ *
+ * The `new-group` wizard this used to serve was deleted (PR #90); only these
+ * helpers survive. They are kept because `validateConnectedAgreementDates` and
+ * `getAgreementSaveValidationError` are the ONLY implementation of the
+ * Makkah/Madinah agreement date gap SOFT WARNING, which the backend explicitly
+ * delegates to the frontend (see the intentionally-empty branch in
+ * apps/backend/src/groups/domain/groups.hotel-validation.ts).
+ *
+ * Current state: no live UI calls them, so the warning renders nowhere. The
+ * accompanying smoke tests are the only surviving specification of the rule -
+ * roughly ten scenarios covering connected, gapped, and out-of-order stays.
+ * Deleting this file would erase that specification.
+ *
+ * Whoever wires the warning back into the live agreement UI
+ * (pages/visa-detail/components/HotelAgreementSection.tsx) should move this
+ * module somewhere honest, e.g. shared/agreement-date-validation.ts.
+ */
 import type {
   BusStatus,
   GroupAgreementHotel,

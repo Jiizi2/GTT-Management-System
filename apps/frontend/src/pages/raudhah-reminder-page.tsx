@@ -1,3 +1,15 @@
+/**
+ * RETAINED ON PURPOSE - do not delete, even though this screen is currently
+ * unreachable.
+ *
+ * The `raudhah-reminder` nav item was removed from `sidebarItems` and
+ * `/raudhah-reminder` now redirects to `/overview`, so by every static signal
+ * this module (and `pages/raudhah-reminder/`) looks like dead code. It is kept
+ * deliberately because the Raudhah Reminder workspace may be brought back.
+ *
+ * Decision recorded 2026-07-30. Do not "clean up" the `vi.mock` in
+ * components/__tests__/app-main-content.test.tsx that keeps it referenced.
+ */
 import { useState } from "react";
 import type { GroupData, VisaTrackingRow } from "../shared/app-domain";
 import { useThemeMode } from "../theme/theme-provider";
