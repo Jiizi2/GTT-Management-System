@@ -21,6 +21,8 @@ import {
   type InvoiceRow,
   type InvoiceStatus,
 } from "../helpers/invoice-page-shared";
+import { clampMoney } from "../../../shared/money";
+import { stripInvoiceMetadataTags } from "../../../shared/invoice-notes-tags";
 
 export const invoiceDraftItemSchema = z.object({
   id: z.string(),
@@ -217,18 +219,7 @@ export function useInvoiceWorkspaceForm({
         return bankDisbursementOptions[0]?.value ?? "";
       })(),
 
-      notes: resolvedInitialInvoice?.notes
-        ? resolvedInitialInvoice.notes
-            .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
-            .replace(/\[KeepValasTotal\]/g, "")
-            .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
-            .replace(/\[BankAccount:[^\]]+\]/g, "")
-            .replace(/\[IssuingOffice:[^\]]+\]/g, "")
-            .replace(/\[NoDueDate:true\]/g, "")
-            .replace(/\[Address:[^\]]*\]/g, "")
-            .replace(/\[Payments:[^\]]*\]/g, "")
-            .trim()
-        : "",
+      notes: resolvedInitialInvoice?.notes ? stripInvoiceMetadataTags(resolvedInitialInvoice.notes) : "",
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
       payments: (() => {
         if (!resolvedInitialInvoice) return [];
@@ -252,7 +243,7 @@ export function useInvoiceWorkspaceForm({
         if (initialKeepValasCurrency !== "IDR") {
           const rateVal = initialKeepValasCurrency === "USD" ? initialRates.usdToIdr : initialRates.sarToIdr;
           if (rateVal > 0) {
-            legacyAmount = Math.ceil(resolvedInitialInvoice.downPaymentIdr / rateVal);
+            legacyAmount = clampMoney(resolvedInitialInvoice.downPaymentIdr / rateVal);
           }
         }
 

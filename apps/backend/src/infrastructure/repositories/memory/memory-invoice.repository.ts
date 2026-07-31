@@ -27,6 +27,7 @@ import {
   resolveNextClientSortOrder,
 } from "../../../invoices/invoices-helpers";
 import { toIsoDateOnly } from "../../../utils/date-helpers";
+import { clampMoney } from "../../../utils/money";
 import { InvoiceNumberGenerator } from "../../../invoices/domain/invoice-number-generator";
 
 @Injectable()
@@ -110,7 +111,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
     );
     const normalizedItems = normalizeInvoiceLineItems(payload.items, payload.notes) as MemoryInvoiceItem[];
     const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
-    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const roundedAmount = clampMoney(baseAmount);
 
     let notes = getTrimmedString(payload.notes);
     if (isNoDueDate) {
@@ -196,7 +197,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
     const resolvedAmount = payload.items !== undefined
       ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems)
       : baseAmount;
-    const roundedAmount = Math.max(0, Math.round(resolvedAmount));
+    const roundedAmount = clampMoney(resolvedAmount);
 
     let notes = payload.notes === undefined ? (currentInvoice.notes ?? "") : getTrimmedString(payload.notes);
     if (isNoDueDate) {
@@ -348,7 +349,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
 
   private mapMemoryInvoiceToListItem(invoice: MemoryInvoice, client: MemoryInvoiceClient): InvoiceListItem {
     const baseAmount = resolveStoredInvoiceAmount(invoice.amount, invoice.items);
-    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const roundedAmount = clampMoney(baseAmount);
     const effectiveStatus = resolveEffectiveStatus(
       invoice.status,
       invoice.dueDateIso,

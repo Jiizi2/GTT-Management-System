@@ -64,21 +64,21 @@ export class CreateInvoiceDto {
   dueDate?: string;
 
   @ApiProperty({
-    description: "Nominal invoice. Akan dinormalisasi ke nilai non-negatif.",
-    example: 17500000,
+    description: "Nominal invoice dalam IDR. Akan dinormalisasi ke nilai non-negatif dengan 2 desimal.",
+    example: 1980468.75,
     minimum: 0,
   })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount!: number;
 
   @ApiPropertyOptional({
-    description: "Nominal DP invoice dalam rupiah.",
+    description: "Nominal DP invoice dalam rupiah, mendukung 2 desimal.",
     example: 50000000,
     minimum: 0,
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   downPaymentIdr?: number;
 

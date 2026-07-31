@@ -10,6 +10,7 @@ import { Telemetry } from "../../../logging/telemetry";
 import { InvoiceValidator } from "../../../invoices/domain/invoice-validator";
 import { InvoiceNumberGenerator } from "../../../invoices/domain/invoice-number-generator";
 import { toIsoDateOnly, toUtcMidnightDate as createUtcDateFromIso } from "../../../utils/date-helpers";
+import { clampMoney, roundMoney } from "../../../utils/money";
 import {
   formatClientLabel,
   getInitials,
@@ -216,7 +217,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     Telemetry.end(queryTracker, { action: "create_pre_queries_success" });
 
     const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
-    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const roundedAmount = clampMoney(baseAmount);
     let notes = getTrimmedString(payload.notes);
     if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
       notes = `${notes}\n[NoDueDate:true]`.trim();
@@ -261,7 +262,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
                     pax: item.pax,
                     currency: item.currency,
                     unitPrice: item.unitPrice,
-                    totalPrice: item.pax * item.unitPrice,
+                    totalPrice: roundMoney(item.pax * item.unitPrice),
                     totalPriceIdr: item.totalPriceIdr,
                   })),
                 },
@@ -420,7 +421,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     const baseAmount = normalizedItems === undefined
       ? (payload.amount ?? Number(existing.amount))
       : resolveInvoiceAmountFromItems(payload.amount ?? Number(existing.amount), normalizedItems);
-    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const roundedAmount = clampMoney(baseAmount);
     let notes = payload.notes === undefined ? (existing.notes ?? "") : getTrimmedString(payload.notes);
     if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
       notes = `${notes}\n[NoDueDate:true]`.trim();
@@ -501,7 +502,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
                     pax: item.pax,
                     currency: item.currency,
                     unitPrice: item.unitPrice,
-                    totalPrice: item.pax * item.unitPrice,
+                    totalPrice: roundMoney(item.pax * item.unitPrice),
                     totalPriceIdr: item.totalPriceIdr,
                   })),
                 },
@@ -643,7 +644,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
     const resolvedItems = relationalItems;
     const baseAmount = resolveStoredInvoiceAmount(Number(invoice.amount), resolvedItems);
-    const roundedAmount = Math.max(0, Math.round(baseAmount));
+    const roundedAmount = clampMoney(baseAmount);
     const effectiveStatus = resolveEffectiveStatus(
       invoice.status,
       dueDateIso,

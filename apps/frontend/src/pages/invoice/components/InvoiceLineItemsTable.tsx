@@ -4,9 +4,9 @@ import { SereneSelect } from "../../../components/serene-select";
 import {
   deriveItemTotals,
   formatIdr,
-  parseNumberInput,
   formatNumberInput,
 } from "../helpers/invoice-page-shared";
+import { MoneyInput } from "./MoneyInput";
 import type { GroupData } from "../../../shared/app-domain";
 
 export const InvoiceLineItemsTable = memo(function InvoiceLineItemsTable({
@@ -102,7 +102,7 @@ export const InvoiceLineItemsTable = memo(function InvoiceLineItemsTable({
             {itemFields.map((itemField, index) => {
               const item = items[index] ?? itemField;
               const currentTotals = itemsWithTotals[index] || { totalPrice: 0, totalPriceIdr: 0 };
-              const lineSubtotalLabel = `${item.currency} ${formatNumberInput(currentTotals.totalPrice)}`;
+              const lineSubtotalLabel = `${item.currency} ${formatNumberInput(currentTotals.totalPrice, item.currency)}`;
               return (
                 <tr key={itemField.id} className="transition hover:bg-surface-container-low/45">
                   <td className="px-5 py-3 text-xs font-bold text-on-surface">
@@ -172,13 +172,11 @@ export const InvoiceLineItemsTable = memo(function InvoiceLineItemsTable({
                         name={`items.${index}.unitPrice` as any}
                         control={control}
                         render={({ field }) => (
-                          <input
-                            type="text"
+                          <MoneyInput
                             className="w-full border-none bg-transparent p-0 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-0"
-                            value={formatNumberInput(field.value || 0)}
-                            onChange={(event) => {
-                              field.onChange(parseNumberInput(event.target.value));
-                            }}
+                            ariaLabel={`Item ${index + 1} unit price`}
+                            value={field.value || 0}
+                            onChange={field.onChange}
                           />
                         )}
                       />

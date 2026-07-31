@@ -18,18 +18,22 @@ export class InvoiceLineItemDto {
   @IsIn(INVOICE_LINE_ITEM_CURRENCIES)
   currency!: (typeof INVOICE_LINE_ITEM_CURRENCIES)[number];
 
-  @ApiProperty({ example: 22200000, minimum: 0.01 })
-  @IsNumber()
+  @ApiProperty({
+    description: "Harga per pax. Mendukung 2 desimal untuk mata uang SAR/USD, contoh 468.75.",
+    example: 468.75,
+    minimum: 0.01,
+  })
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   unitPrice!: number;
 
   @ApiProperty({ example: 22200000, minimum: 0 })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   totalPrice!: number;
 
   @ApiProperty({ example: 22200000, minimum: 0 })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   totalPriceIdr!: number;
 }

@@ -5,8 +5,9 @@ import { DatePickerInput } from "../../../components/date-time-pickers";
 import {
   calculateSubtotalInCurrency,
   formatNumberInput,
-  parseNumberInput,
 } from "../helpers/invoice-page-shared";
+import { clampMoney, sumMoney } from "../../../shared/money";
+import { MoneyInput } from "./MoneyInput";
 
 export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
   usdToIdr,
@@ -39,7 +40,7 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
   const taxAmount = 0;
   const totalPayable = subtotal + taxAmount;
   const totalPaid = useMemo(() => {
-    return payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+    return sumMoney(payments.map((p: any) => Number(p.amount) || 0));
   }, [payments]);
 
   const downPaymentCoveragePercent = totalPayable > 0 ? Math.min(100, Math.round((totalPaid / totalPayable) * 100)) : 0;
@@ -70,8 +71,8 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
 
       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
         {paymentFields.map((field, idx) => {
-          const runningPaid = payments.slice(0, idx + 1).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-          const remainingAfterThis = Math.max(0, totalPayable - runningPaid);
+          const runningPaid = sumMoney(payments.slice(0, idx + 1).map((p: any) => Number(p.amount) || 0));
+          const remainingAfterThis = clampMoney(totalPayable - runningPaid);
           return (
             <div key={field.id} className="relative bg-surface-container-low rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2 transition hover:shadow-md">
               <div className="flex items-center justify-between">
@@ -80,7 +81,7 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
                     Pembayaran #{idx + 1}
                   </span>
                   <span className="rounded-md bg-slate-100 dark:bg-surface-container-high px-1.5 py-0.5 text-[9px] font-bold text-slate-600 dark:text-slate-400">
-                    Sisa: {invoiceCurrency} {formatNumberInput(remainingAfterThis)}
+                    Sisa: {invoiceCurrency} {formatNumberInput(remainingAfterThis, invoiceCurrency)}
                   </span>
                 </div>
                 <button
@@ -100,17 +101,13 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
                   </label>
                   <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-surface-container-lowest px-2 py-1 h-9">
                     <span className="text-[9px] font-extrabold text-slate-500">{invoiceCurrency}</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
+                    <MoneyInput
                       className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-xs font-extrabold text-on-surface outline-none ring-0 focus:ring-0"
-                      value={formatNumberInput(watch(`payments.${idx}.amount`) ?? 0)}
-                      onChange={(event) =>
-                        setValue(`payments.${idx}.amount`, Math.max(0, parseNumberInput(event.target.value)), {
-                          shouldDirty: true,
-                        })
+                      value={watch(`payments.${idx}.amount`) ?? 0}
+                      onChange={(nextAmount) =>
+                        setValue(`payments.${idx}.amount`, nextAmount, { shouldDirty: true })
                       }
-                      aria-label={`Payment ${idx + 1} amount`}
+                      ariaLabel={`Payment ${idx + 1} amount`}
                     />
                   </div>
                 </div>

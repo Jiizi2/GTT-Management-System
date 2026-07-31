@@ -3,6 +3,7 @@ export type BackendDataSource = "memory" | "prisma";
 
 import { fetchBackendParsed } from "../shared/api-client";
 import { formatBackendRequestError } from "../shared/api-error";
+import { clampMoney } from "../shared/money";
 
 export type BackendInvoiceClient = {
   id: string;
@@ -212,10 +213,11 @@ function mapInvoiceStatusForBackend(value: BackendInvoiceStatus): "PAID" | "PEND
 function mapBackendInvoiceItem(record: BackendInvoiceItemRecord): BackendInvoiceItem | null {
   const description = readString(record.description);
   const currency = readString(record.currency).toUpperCase();
+  // pax is a head count, not money — it stays an integer.
   const pax = Math.max(0, Math.round(readNumber(record.pax, 0)));
-  const unitPrice = Math.max(0, Math.round(readNumber(record.unitPrice, 0)));
-  const totalPrice = Math.max(0, Math.round(readNumber(record.totalPrice, pax * unitPrice)));
-  const totalPriceIdr = Math.max(0, Math.round(readNumber(record.totalPriceIdr, totalPrice)));
+  const unitPrice = clampMoney(readNumber(record.unitPrice, 0));
+  const totalPrice = clampMoney(readNumber(record.totalPrice, pax * unitPrice));
+  const totalPriceIdr = clampMoney(readNumber(record.totalPriceIdr, totalPrice));
 
   if (!description || (currency !== "IDR" && currency !== "USD" && currency !== "SAR") || pax <= 0 || unitPrice <= 0) {
     return null;
@@ -254,8 +256,8 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
   const dueDateIso = readString(record.dueDateIso);
   const monthKeyFromDueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateIso) ? dueDateIso.slice(0, 7) : "unknown";
   const status = mapBackendInvoiceStatus(record.status);
-  const amount = Math.max(0, Math.round(readNumber(record.amount, 0)));
-  const rawDownPaymentIdr = Math.max(0, Math.round(readNumber(record.downPaymentIdr, 0)));
+  const amount = clampMoney(readNumber(record.amount, 0));
+  const rawDownPaymentIdr = clampMoney(readNumber(record.downPaymentIdr, 0));
   const downPaymentIdr = rawDownPaymentIdr > 0 ? Math.min(rawDownPaymentIdr, amount) : status === "Paid" ? amount : 0;
   const defaultClientInitials = clientName
     .split(/\s+/)
@@ -416,9 +418,8 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
       groupCode: payload.groupCode?.trim() || undefined,
       issuedDate: payload.issuedDateIso.trim(),
       dueDate: payload.dueDateIso.trim(),
-      amount: Math.max(0, Math.round(payload.amount)),
-      downPaymentIdr:
-        payload.downPaymentIdr !== undefined ? Math.max(0, Math.round(payload.downPaymentIdr)) : undefined,
+      amount: clampMoney(payload.amount),
+      downPaymentIdr: payload.downPaymentIdr !== undefined ? clampMoney(payload.downPaymentIdr) : undefined,
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
       description: payload.description?.trim() || undefined,
@@ -468,10 +469,10 @@ export async function updateInvoiceInBackend(
     requestBody.dueDate = payload.dueDateIso.trim();
   }
   if (payload.amount !== undefined) {
-    requestBody.amount = Math.max(0, Math.round(payload.amount));
+    requestBody.amount = clampMoney(payload.amount);
   }
   if (payload.downPaymentIdr !== undefined) {
-    requestBody.downPaymentIdr = Math.max(0, Math.round(payload.downPaymentIdr));
+    requestBody.downPaymentIdr = clampMoney(payload.downPaymentIdr);
   }
   if (payload.status !== undefined) {
     requestBody.status = mapInvoiceStatusForBackend(payload.status);

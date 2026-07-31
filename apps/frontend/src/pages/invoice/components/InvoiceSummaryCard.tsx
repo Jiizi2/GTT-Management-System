@@ -68,7 +68,7 @@ export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
             <span className="text-xs text-on-surface-variant">Subtotal</span>
             <div className="flex items-baseline gap-1">
               <span className="text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
-              <strong className="text-xs text-on-surface">{formatNumberInput(subtotal)}</strong>
+              <strong className="text-xs text-on-surface">{formatNumberInput(subtotal, invoiceCurrency)}</strong>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -114,7 +114,7 @@ export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
             <div className="mt-1 flex items-baseline gap-1">
               <span className="text-xs font-bold text-primary">{invoiceCurrency}</span>
               <span className="font-display text-xl font-extrabold tracking-tight text-primary">
-                {formatNumberInput(totalPayable)}
+                {formatNumberInput(totalPayable, invoiceCurrency)}
               </span>
             </div>
           </div>
@@ -133,7 +133,7 @@ export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
               className={`text-xs font-bold ${remainingBalance <= 0 ? "text-emerald-700" : "text-primary"}`}
             >
               <span className="mr-1 text-[10px] font-bold text-on-surface-variant/70">{invoiceCurrency}</span>
-              {formatNumberInput(remainingBalance)}
+              {formatNumberInput(remainingBalance, invoiceCurrency)}
             </strong>
           </div>
         </div>

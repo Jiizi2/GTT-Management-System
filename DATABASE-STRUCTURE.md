@@ -329,8 +329,8 @@ Tabel pusat yang menjadi referensi hampir semua tabel lain.
 | `groupId` | TEXT | Nullable, FK → `Group.id` (SET NULL) | Grup terkait |
 | `issuedDate` | TIMESTAMP | NOT NULL | Tanggal penerbitan |
 | `dueDate` | TIMESTAMP | NOT NULL | Jatuh tempo |
-| `amount` | DECIMAL(12,2) | NOT NULL, DEFAULT `0` | Total jumlah |
-| `downPaymentIdr` | DECIMAL(12,2) | NOT NULL, DEFAULT `0` | DP dalam IDR |
+| `amount` | DECIMAL(12,2) | NOT NULL, DEFAULT `0` | Total jumlah dalam IDR, 2 desimal |
+| `downPaymentIdr` | DECIMAL(12,2) | NOT NULL, DEFAULT `0` | DP dalam IDR, 2 desimal |
 | `status` | Enum | NOT NULL, DEFAULT `PENDING` | `PAID`, `PARTIALLY_PAID`, `PENDING`, `OVERDUE`, `CANCELLED` |
 | `notes` | TEXT | Nullable | Catatan |
 | `items` | JSONB | Nullable | Line items (legacy field) |
@@ -340,6 +340,17 @@ Tabel pusat yang menjadi referensi hampir semua tabel lain.
 | `updatedAt` | TIMESTAMP | NOT NULL | Waktu update terakhir |
 
 **Indexes:** `dueDate`, `(clientId, dueDate)`, `groupId`
+
+> **Presisi nominal.** Seluruh kolom uang invoice bertipe `DECIMAL(12,2)` dan
+> **wajib** diperlakukan sebagai 2 desimal di seluruh lapisan aplikasi — deposit
+> agent sering merupakan hasil konversi USD→SAR dan tiba sebagai nilai seperti
+> `468,75` atau `505,20`. Pembulatan ke bilangan bulat dilarang; gunakan
+> `roundMoney`/`clampMoney` (`apps/backend/src/utils/money.ts`,
+> `apps/frontend/src/shared/money.ts`) di setiap batas perhitungan. `pax` tetap
+> `INTEGER` karena merupakan jumlah jamaah, bukan nominal.
+>
+> Batas `DECIMAL(12,2)` adalah **9.999.999.999,99** — berlaku untuk `amount` dan
+> `totalPriceIdr`, jadi total IDR grup sangat besar dapat menabrak batas ini.
 
 ---
 

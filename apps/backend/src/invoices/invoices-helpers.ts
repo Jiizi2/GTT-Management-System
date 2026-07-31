@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { InvoiceStatus, Prisma } from "@prisma/client";
 import { isIsoDateOnly, toIsoDateOnly } from "../utils/date-helpers";
+import { clampMoney, isMoneyAtLeast, roundMoney, sumMoney } from "../utils/money";
 import { randomUUID } from "crypto";
 
 export { randomUUID };
@@ -208,10 +209,10 @@ export function resolveEffectiveStatus(
     return InvoiceStatus.CANCELLED;
   }
 
-  const sanitizedAmount = Math.max(0, Math.round(amount));
-  const sanitizedDownPayment = Math.max(0, Math.round(downPaymentIdr));
+  const sanitizedAmount = clampMoney(amount);
+  const sanitizedDownPayment = clampMoney(downPaymentIdr);
 
-  if (sanitizedAmount > 0 && sanitizedDownPayment >= sanitizedAmount) {
+  if (sanitizedAmount > 0 && isMoneyAtLeast(sanitizedDownPayment, sanitizedAmount)) {
     return InvoiceStatus.PAID;
   }
 
@@ -231,7 +232,7 @@ export function resolveEffectiveStatus(
     return isNoDueDate ? InvoiceStatus.PENDING : InvoiceStatus.OVERDUE;
   }
 
-  if (sanitizedDownPayment > 0 && sanitizedDownPayment < sanitizedAmount) {
+  if (sanitizedDownPayment > 0 && !isMoneyAtLeast(sanitizedDownPayment, sanitizedAmount)) {
     return InvoiceStatus.PARTIALLY_PAID;
   }
 
@@ -256,8 +257,8 @@ export function toNumberAmount(value: Prisma.Decimal | number | null | undefined
 }
 
 export function normalizeDownPaymentByAmount(amount: number, downPaymentIdr: number): number {
-  const sanitizedAmount = Math.max(0, Math.round(amount));
-  const sanitizedDownPayment = Math.max(0, Math.round(downPaymentIdr));
+  const sanitizedAmount = clampMoney(amount);
+  const sanitizedDownPayment = clampMoney(downPaymentIdr);
   return Math.min(sanitizedAmount, sanitizedDownPayment);
 }
 
@@ -266,7 +267,7 @@ export function resolveDisplayedDownPaymentByAmount(
   status: InvoiceStatus,
   downPaymentIdr: Prisma.Decimal | number | null | undefined,
 ): number {
-  const sanitizedAmount = Math.max(0, Math.round(amount));
+  const sanitizedAmount = clampMoney(amount);
   const normalizedDownPayment = normalizeDownPaymentByAmount(sanitizedAmount, toNumberAmount(downPaymentIdr));
   if (normalizedDownPayment > 0) {
     return normalizedDownPayment;
@@ -294,13 +295,23 @@ export function isInvoiceLineItemCurrency(value: string): value is InvoiceLineIt
   return value === "IDR" || value === "USD" || value === "SAR";
 }
 
+/**
+ * Rates are persisted as a `[Rates:USD=...,SAR=...]` tag inside `notes` because
+ * they have no column. The pattern must accept decimals: it is mirrored by the
+ * frontend strip patterns, and a rate that fails to parse here also fails to be
+ * stripped there, leaking the raw tag onto the printed invoice.
+ */
+const INVOICE_RATES_TAG_PATTERN = /\[(?:Rates|ExchangeRate):USD=(\d+(?:\.\d+)?),SAR=(\d+(?:\.\d+)?)\]/;
+
 export function extractExchangeRatesFromNotes(notes: string | undefined): { usdToIdr: number | null; sarToIdr: number | null } {
   const rates: { usdToIdr: number | null; sarToIdr: number | null } = { usdToIdr: null, sarToIdr: null };
   if (!notes) return rates;
-  const match = notes.match(/\[ExchangeRate:USD=(\d+),SAR=(\d+)\]/) || notes.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/);
+  const match = notes.match(INVOICE_RATES_TAG_PATTERN);
   if (match) {
-    rates.usdToIdr = Number.parseInt(match[1], 10);
-    rates.sarToIdr = Number.parseInt(match[2], 10);
+    const usdToIdr = Number.parseFloat(match[1]);
+    const sarToIdr = Number.parseFloat(match[2]);
+    rates.usdToIdr = Number.isFinite(usdToIdr) ? usdToIdr : null;
+    rates.sarToIdr = Number.isFinite(sarToIdr) ? sarToIdr : null;
   }
   return rates;
 }
@@ -317,20 +328,21 @@ export function normalizeInvoiceLineItem(
   const item = value as Record<string, unknown>;
   const description = getTrimmedString(item.description);
   const currency = getTrimmedString(item.currency).toUpperCase();
+  // pax is a head count, not money — it stays an integer.
   const pax = Math.max(0, Math.round(coerceNumber(item.pax, 0)));
-  const unitPrice = Math.max(0, Math.round(coerceNumber(item.unitPrice, 0)));
+  const unitPrice = clampMoney(coerceNumber(item.unitPrice, 0));
 
   // Authoritatively recalculate totalPrice to reinforce data integrity
-  const totalPrice = pax * unitPrice;
+  const totalPrice = roundMoney(pax * unitPrice);
 
   // Authoritatively recalculate totalPriceIdr using extracted exchange rates
   let totalPriceIdr = totalPrice;
   if (currency === "USD" && usdToIdr !== null) {
-    totalPriceIdr = totalPrice * usdToIdr;
+    totalPriceIdr = roundMoney(totalPrice * usdToIdr);
   } else if (currency === "SAR" && sarToIdr !== null) {
-    totalPriceIdr = totalPrice * sarToIdr;
+    totalPriceIdr = roundMoney(totalPrice * sarToIdr);
   } else if (currency !== "IDR") {
-    totalPriceIdr = Math.max(0, Math.round(coerceNumber(item.totalPriceIdr, totalPrice)));
+    totalPriceIdr = clampMoney(coerceNumber(item.totalPriceIdr, totalPrice));
   }
 
   if (!description || !isInvoiceLineItemCurrency(currency) || pax <= 0 || unitPrice <= 0) {
@@ -362,12 +374,12 @@ export function resolveInvoiceAmountFromItems(
   amount: number,
   items: ReadonlyArray<InvoiceLineItem> | undefined,
 ): number {
-  const normalizedAmount = Math.max(0, Math.round(amount));
+  const normalizedAmount = clampMoney(amount);
   if (!items || items.length === 0) {
     return normalizedAmount;
   }
 
-  const itemsTotalIdr = items.reduce((total, item) => total + Math.max(0, Math.round(item.totalPriceIdr)), 0);
+  const itemsTotalIdr = sumMoney(items.map((item) => clampMoney(item.totalPriceIdr)));
   return itemsTotalIdr > 0 ? itemsTotalIdr : normalizedAmount;
 }
 
@@ -375,12 +387,12 @@ export function resolveStoredInvoiceAmount(
   amount: number,
   items: ReadonlyArray<InvoiceLineItem> | undefined,
 ): number {
-  const normalizedAmount = Math.max(0, Math.round(amount));
+  const normalizedAmount = clampMoney(amount);
   if (normalizedAmount > 0 || !items || items.length === 0) {
     return normalizedAmount;
   }
 
-  const itemsTotalIdr = items.reduce((total, item) => total + Math.max(0, Math.round(item.totalPriceIdr)), 0);
+  const itemsTotalIdr = sumMoney(items.map((item) => clampMoney(item.totalPriceIdr)));
   return itemsTotalIdr > 0 ? itemsTotalIdr : normalizedAmount;
 }
 
