@@ -139,3 +139,37 @@ npm run build
 # Run E2E tests
 npm run test:e2e:frontend
 ```
+
+## Frontend: di mana kode baru ditaruh
+
+Jawaban singkat: **`src/<domain>/`**.
+
+`src/pages/` saat ini punya dua bentuk untuk hal yang sama — 18 file datar
+(`profile-page.tsx`) dan 11 folder modul (`group-detail/{components,hooks}`).
+Tanpa aturan, kontributor menebak, dan bentuk ketiga muncul.
+
+Aturannya:
+
+- **Domain fitur baru** → `src/<domain>/`, dengan struktur internal secukupnya
+  (`components/`, `hooks/`, `helpers/`). Contoh yang sudah ada: `agent/`.
+- **Logika yang dipakai 2+ domain** → `src/shared/`. Kalau dua domain
+  membutuhkan hal yang sama, itu milik `shared/`, bukan disalin atau dijangkau
+  lintas folder.
+- **`src/pages/` dibekukan** — tidak menerima file baru. Yang sudah ada
+  dibiarkan sampai tersentuh karena alasan lain; jangan migrasi massal.
+
+Kenapa ini penting, dengan contoh nyata dari repo ini:
+
+- `pages/new-group/helpers/new-group-screen-helpers.ts` sempat menjadi
+  satu-satunya implementasi aturan bisnis (soft warning tanggal agreement),
+  tersembunyi di folder yang layarnya sudah dihapus. Tidak ada UI yang
+  memanggilnya selama berbulan-bulan. Sekarang ada di
+  `shared/agreement-date-validation.ts`.
+- Di branch `feature/finance-module`, modul `finance/` menjangkau ke dalam
+  `pages/invoice/helpers/`. Begitu batas kepemilikan kabur, rumus profit
+  ditulis ulang di frontend alih-alih dipakai bersama — dan hasilnya berbeda
+  dari perhitungan backend.
+
+Catatan: `agent/` mengimpor layar dari `pages/` secara sengaja — Portal Agent
+merender layar Ops yang sama dengan data ber-scope agent. Itu reuse yang
+direncanakan, bukan pelanggaran batas.
