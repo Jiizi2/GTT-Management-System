@@ -148,15 +148,22 @@ export function useVisaMutations({
   );
 
   const handleUpdateVisaStatus = useCallback(
-    (groupCode: string, visaStatus: VisaStatus) => {
+    (groupCode: string, visaStatus: VisaStatus, issuedDateIso?: string) => {
       updateVisaSetupForGroupAndSync(groupCode, ({ visaSetup }) => {
+        const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+        const requestedIssuedDate = issuedDateIso?.trim() ?? "";
         const normalizedExistingIssuedDate = visaSetup.issuedDate?.trim() ?? "";
         const todayIso = formatLocalIsoDate(new Date());
+
+        // A caller that picked a date wins. Callers that do not pass one keep
+        // the previous behaviour: reuse the stored date, else default to today.
         const nextIssuedDate =
           visaStatus === "Issued"
-            ? /^\d{4}-\d{2}-\d{2}$/.test(normalizedExistingIssuedDate)
-              ? normalizedExistingIssuedDate
-              : todayIso
+            ? isIsoDate(requestedIssuedDate)
+              ? requestedIssuedDate
+              : isIsoDate(normalizedExistingIssuedDate)
+                ? normalizedExistingIssuedDate
+                : todayIso
             : "";
 
         return {

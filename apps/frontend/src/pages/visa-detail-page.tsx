@@ -34,7 +34,7 @@ export function VisaTrackingDetailScreen({
   onBack: () => void;
   onDeleteGroup: (groupCode: string) => void;
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
-  onUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus) => void;
+  onUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus, issuedDateIso?: string) => void;
   onUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   onUpdateSyarikah: (groupCode: string, syarikah: string) => void;
   onUpdateVisaHotel: (
