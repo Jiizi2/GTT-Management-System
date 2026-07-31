@@ -41,7 +41,24 @@ Dokumen ini mendefinisikan aturan dan guardrail teknis untuk pengembangan dan mo
 
 ---
 
-## 4. Schema Evolution
+## 4. Presisi Nominal (Decimal)
+
+* **Nominal Uang Selalu 2 Desimal**:
+  * Semua kolom nominal invoice bertipe `DECIMAL(12,2)`. Nominal **dilarang keras** dibulatkan ke bilangan bulat di lapisan mana pun (helper, repository, API client, formatter, maupun export). Deposit agent kerap merupakan hasil konversi USD→SAR dan bernilai seperti `468,75` atau `505,20`.
+  * Gunakan `roundMoney`/`clampMoney`/`sumMoney` dari `apps/backend/src/utils/money.ts` dan `apps/frontend/src/shared/money.ts`. Pembulatan dilakukan di **setiap batas** perhitungan (per item, per subtotal, per payload), bukan hanya di akhir, agar invoice yang dibuka lalu disimpan ulang tidak berubah nilainya.
+  * `Math.round` hanya boleh dipakai untuk kuantitas non-uang: `pax`, `sortOrder`, `totalPages`, dan persentase.
+  * Konversi valas **dilarang menggunakan `Math.ceil`**. Membulatkan ke atas menaikkan tagihan pelanggan secara sistematis.
+
+* **Perbandingan Nominal Wajib Bertoleransi**:
+  * Penentuan status (`PAID` / `PARTIALLY_PAID`) dan sisa tagihan wajib memakai `isMoneyAtLeast`, bukan `>=` pada float mentah. Tanpa toleransi ini, invoice yang dibayar persis dapat tersangkut di `PARTIALLY_PAID` dengan sisa Rp 0,004.
+
+* **Tag Metadata di `notes` Harus Konsisten**:
+  * Exchange rate dan histori pembayaran disimpan sebagai tag di dalam kolom `notes`. Pola baca dan pola strip **wajib menerima bentuk yang sama persis** — bila keduanya berbeda, tag yang gagal diparse juga gagal disembunyikan dan akan bocor ke PDF invoice pelanggan.
+  * Semua pola ini terpusat di `apps/frontend/src/shared/invoice-notes-tags.ts` (dan cerminannya di `extractExchangeRatesFromNotes` pada backend). Jangan mendeklarasikan ulang regex tag di call site.
+
+---
+
+## 5. Schema Evolution
 
 * **Mengikuti Pola Expand-Contract**:
   * Setiap perubahan struktur database (seperti transisi dari JSON items ke tabel relasional) wajib menggunakan skema migrasi bertahap:

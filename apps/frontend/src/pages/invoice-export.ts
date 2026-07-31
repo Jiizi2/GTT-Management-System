@@ -1,5 +1,7 @@
 import { escapeHtml } from "../shared/app-domain";
 import { fetchBackend } from "../shared/api-client";
+import { clampMoney, formatMoney } from "../shared/money";
+import { stripInvoiceMetadataTags } from "../shared/invoice-notes-tags";
 
 export type InvoiceExportCurrency = "IDR" | "USD" | "SAR";
 
@@ -99,7 +101,8 @@ const companyProfile = {
   alamat: "Graha Al Badegel Jl. Hajjah Tutty Alawiyah No.7, RT.2/RW.5, Kalibata, Kec. Pancoran, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta",
 };
 
-function formatNumber(value: number): string {
+/** Whole-number quantities (pax counts), never money. */
+function formatCount(value: number): string {
   return new Intl.NumberFormat("id-ID").format(Math.max(0, Math.round(value)));
 }
 
@@ -111,7 +114,7 @@ function formatRate(value: number): string {
 }
 
 function formatCurrency(value: number, currency: InvoiceExportCurrency): string {
-  return `${currency} ${formatNumber(value)}`;
+  return formatMoney(value, currency);
 }
 
 function isIdrCurrency(currency: string): boolean {
@@ -461,11 +464,11 @@ export async function exportInvoicePdf(
           const itemRate = item.currency === "USD" ? payload.usdToIdr : item.currency === "SAR" ? payload.sarToIdr : 1;
           const itemPriceIdr = item.totalPriceIdr;
           if (valasCurrency === "IDR") {
-            unitPriceValas = item.unitPrice * itemRate;
+            unitPriceValas = clampMoney(item.unitPrice * itemRate);
             totalPriceValas = itemPriceIdr;
           } else {
-            totalPriceValas = rate > 0 ? Math.ceil(itemPriceIdr / rate) : 0;
-            unitPriceValas = item.pax > 0 ? Math.ceil(totalPriceValas / item.pax) : 0;
+            totalPriceValas = rate > 0 ? clampMoney(itemPriceIdr / rate) : 0;
+            unitPriceValas = item.pax > 0 ? clampMoney(totalPriceValas / item.pax) : 0;
           }
         }
 
@@ -475,7 +478,7 @@ export async function exportInvoicePdf(
 <td class="invoice-cell-desc">
 <div class="invoice-row-description">${escapeHtml(item.description)}</div>
 </td>
-<td class="invoice-cell-pax">${escapeHtml(formatNumber(item.pax))}</td>
+<td class="invoice-cell-pax">${escapeHtml(formatCount(item.pax))}</td>
 <td class="invoice-cell-price">${escapeHtml(formatCurrency(unitPriceValas, valasCurrency))}</td>
 <td class="invoice-cell-total">${escapeHtml(formatCurrency(totalPriceValas, valasCurrency))}</td>
 </tr>`;
@@ -487,7 +490,7 @@ export async function exportInvoicePdf(
 <td class="invoice-cell-desc">
 <div class="invoice-row-description">${escapeHtml(item.description)}</div>
 </td>
-<td class="invoice-cell-pax">${escapeHtml(formatNumber(item.pax))}</td>
+<td class="invoice-cell-pax">${escapeHtml(formatCount(item.pax))}</td>
 <td class="invoice-cell-price">${escapeHtml(formatCurrency(item.unitPrice, item.currency))}</td>
 <td class="invoice-cell-total">${escapeHtml(totalPriceLabel)}</td>
 <td class="invoice-cell-total-idr">${escapeHtml(formatIdr(item.totalPriceIdr))}</td>
@@ -496,11 +499,9 @@ export async function exportInvoicePdf(
     })
     .join("");
 
-  const cleanNotes = payload.notes
-    .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
-    .replace(/\[KeepValasTotal\]/g, "")
-    .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
-    .trim();
+  // Callers normally pre-strip these, but stripping again is a no-op and keeps a
+  // stray metadata tag from ever reaching the customer-facing document.
+  const cleanNotes = stripInvoiceMetadataTags(payload.notes);
 
   const notesHtml = cleanNotes
     ? escapeHtml(cleanNotes).replace(/\n/g, "<br/>")

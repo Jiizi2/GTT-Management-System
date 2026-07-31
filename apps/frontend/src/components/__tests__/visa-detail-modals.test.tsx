@@ -16,6 +16,7 @@ vi.mock('../use-modal-focus-trap', () => ({
 describe('VisaStatusModal', () => {
   const defaultProps = {
     initialValue: 'Draft' as const,
+    todayIso: '2026-07-31',
     onClose: vi.fn(),
     onSave: vi.fn(),
   };
@@ -55,6 +56,57 @@ describe('VisaStatusModal', () => {
     render(<VisaStatusModal {...defaultProps} />);
     expect(screen.getByText('Save Changes')).toBeInTheDocument();
     expect(screen.getByText('Cancel')).toBeInTheDocument();
+  });
+
+  it('hides the issued date field for statuses that have no issued date', () => {
+    render(<VisaStatusModal {...defaultProps} initialValue="Pending" />);
+    expect(screen.queryByText('Issued Date')).not.toBeInTheDocument();
+  });
+
+  it('shows the issued date field once Issued is selected', async () => {
+    render(<VisaStatusModal {...defaultProps} />);
+    expect(screen.queryByText('Issued Date')).not.toBeInTheDocument();
+
+    fireEvent.click(document.querySelector('[aria-haspopup="listbox"]') as HTMLElement);
+    fireEvent.click(await screen.findByRole('option', { name: 'Issued' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Issued Date')).toBeInTheDocument();
+    });
+  });
+
+  it('prefills the stored issued date so an existing date is not overwritten', () => {
+    render(
+      <VisaStatusModal {...defaultProps} initialValue="Issued" initialIssuedDateIso="2026-03-14" />,
+    );
+    expect(document.querySelector('#visa-status-issued-date')).toHaveValue('14/03/2026');
+  });
+
+  it("defaults to today when the visa has no issued date yet", () => {
+    render(<VisaStatusModal {...defaultProps} initialValue="Issued" />);
+    expect(document.querySelector('#visa-status-issued-date')).toHaveValue('31/07/2026');
+  });
+
+  it('saves the selected issued date alongside the status', async () => {
+    render(
+      <VisaStatusModal {...defaultProps} initialValue="Issued" initialIssuedDateIso="2026-03-14" />,
+    );
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(defaultProps.onSave).toHaveBeenCalledWith('Issued', '2026-03-14');
+    });
+  });
+
+  it('clears the issued date when the status is not Issued', async () => {
+    render(
+      <VisaStatusModal {...defaultProps} initialValue="Pending" initialIssuedDateIso="2026-03-14" />,
+    );
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(defaultProps.onSave).toHaveBeenCalledWith('Pending', '');
+    });
   });
 });
 

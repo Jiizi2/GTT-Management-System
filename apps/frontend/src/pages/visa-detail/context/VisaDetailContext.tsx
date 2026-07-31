@@ -140,7 +140,7 @@ export interface VisaDetailContextType {
   closeDeleteGroupModal: () => void;
   confirmDeleteGroup: () => void;
   saveGroupEdit: (val: any) => { ok: true } | { ok: false; message: string };
-  saveVisaStatus: (nextStatus: VisaStatus) => void;
+  saveVisaStatus: (nextStatus: VisaStatus, issuedDateIso: string) => void;
   saveVisaType: (nextType: "Visa Only" | "Visa+") => void;
   savePaymentStatus: (nextValue: VisaPaymentStatus) => void;
   saveAgentAssignment: (agentId: string) => Promise<void>;

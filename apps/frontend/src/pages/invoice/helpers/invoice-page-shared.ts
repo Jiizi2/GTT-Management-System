@@ -1,5 +1,11 @@
 import { formatLocalIsoDate, type GroupData } from "../../../shared/app-domain";
 import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from "../../../hooks/use-invoice-backend";
+import { clampMoney, formatMoney, isMoneyAtLeast, roundMoney, sumMoney } from "../../../shared/money";
+import {
+  buildInvoiceRatesTag,
+  parseInvoiceRatesTag,
+  stripInvoiceMetadataTags,
+} from "../../../shared/invoice-notes-tags";
 
 export type InvoiceStatus = BackendInvoiceRow["status"];
 export type InvoiceRow = BackendInvoiceRow;
@@ -63,8 +69,7 @@ export const defaultInvoiceStatusOptions: InvoiceStatusOption[] = [
 ];
 
 export function formatIdr(value: number): string {
-  const normalized = Math.max(0, Math.round(value));
-  return `IDR ${new Intl.NumberFormat("id-ID").format(normalized)}`;
+  return formatMoney(value, "IDR");
 }
 
 export function formatDateLabel(isoDate: string): string {
@@ -310,8 +315,8 @@ export function resolveBankAccountLabel(
 }
 
 export function resolveInvoiceDownPaymentIdr(row: Pick<InvoiceRow, "amount" | "status" | "downPaymentIdr">): number {
-  const normalizedAmount = Math.max(0, Math.round(row.amount));
-  const normalizedDownPayment = Math.min(normalizedAmount, Math.max(0, Math.round(row.downPaymentIdr ?? 0)));
+  const normalizedAmount = clampMoney(row.amount);
+  const normalizedDownPayment = Math.min(normalizedAmount, clampMoney(row.downPaymentIdr ?? 0));
 
   if (normalizedDownPayment > 0) {
     return normalizedDownPayment;
@@ -321,15 +326,15 @@ export function resolveInvoiceDownPaymentIdr(row: Pick<InvoiceRow, "amount" | "s
 }
 
 export function resolveInvoiceRemainingBalanceIdr(amount: number, downPaymentIdr: number): number {
-  return Math.max(0, Math.round(amount) - Math.max(0, Math.round(downPaymentIdr)));
+  return clampMoney(clampMoney(amount) - clampMoney(downPaymentIdr));
 }
 
 export function resolveInvoiceOutstandingBalanceLabel(downPaymentIdr: number, remainingBalanceIdr?: number): string {
-  if (remainingBalanceIdr !== undefined && Math.max(0, Math.round(remainingBalanceIdr)) <= 0) {
+  if (remainingBalanceIdr !== undefined && clampMoney(remainingBalanceIdr) <= 0) {
     return "Lunas";
   }
 
-  return Math.max(0, Math.round(downPaymentIdr)) > 0 ? "Sisa Tagihan" : "Tagihan";
+  return clampMoney(downPaymentIdr) > 0 ? "Sisa Tagihan" : "Tagihan";
 }
 
 // openInvoiceExportWindow removed because popups are no longer used for printing
@@ -341,7 +346,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
         description: item.description.trim(),
         pax: Math.max(0, Math.round(item.pax)),
         currency: item.currency,
-        unitPrice: Math.max(0, Math.round(item.unitPrice)),
+        unitPrice: clampMoney(item.unitPrice),
       }))
     : [];
 
@@ -355,7 +360,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     groupCode: row.groupCode ?? "",
     issuedDateIso: row.issuedDateIso,
     dueDateIso: row.dueDateIso,
-    amount: Math.max(0, Math.round(row.amount)),
+    amount: clampMoney(row.amount),
     downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
     status: row.status,
     recipientName: row.recipientName ?? "",
@@ -394,19 +399,15 @@ export function resolveExchangeRatesFromItems(
   if (sarToIdr === 0) sarToIdr = fallbackSar;
 
   return {
-    usdToIdr: Math.round(usdToIdr),
-    sarToIdr: Math.round(sarToIdr),
+    usdToIdr: roundMoney(usdToIdr),
+    sarToIdr: roundMoney(sarToIdr),
   };
 }
 
 export function resolveExchangeRatesFromRow(row: { notes?: string; items?: any[] }): { usdToIdr: number; sarToIdr: number } {
-  const notesRaw = row.notes ?? "";
-  const ratesMatch = notesRaw.match(/\[Rates:USD=(\d+),SAR=(\d+)\]/) || notesRaw.match(/\[ExchangeRate:USD=(\d+),SAR=(\d+)\]/);
-  if (ratesMatch) {
-    return {
-      usdToIdr: Number.parseInt(ratesMatch[1], 10),
-      sarToIdr: Number.parseInt(ratesMatch[2], 10),
-    };
+  const taggedRates = parseInvoiceRatesTag(row.notes);
+  if (taggedRates) {
+    return taggedRates;
   }
 
   const items = row.items || [];
@@ -417,8 +418,8 @@ export function formatCurrencyLabel(value: number, currency: string): string {
   if (currency === "IDR") {
     return formatIdr(value);
   }
-  const rounded = Math.max(0, Math.round(value));
-  return `${currency} ${new Intl.NumberFormat("en-US").format(rounded)}`;
+
+  return formatMoney(value, currency, "en-US");
 }
 
 export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
@@ -439,7 +440,7 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   }
 
   const rates = resolveExchangeRatesFromRow(row);
-  const amountIdr = Math.max(0, Math.round(row.amount));
+  const amountIdr = clampMoney(row.amount);
   const dpIdr = resolveInvoiceDownPaymentIdr(row);
 
   if (keepValasCurrency === "IDR") {
@@ -468,18 +469,19 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   const items = row.items || [];
   let targetSubtotal = 0;
   if (items.length > 0) {
-    targetSubtotal = items.reduce((sum: number, item: BackendInvoiceItem) => {
-      if (item.currency === keepValasCurrency) {
-        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
-      }
-      return sum + Math.max(0, Math.ceil(item.totalPriceIdr / rate));
-    }, 0);
+    targetSubtotal = sumMoney(
+      items.map((item: BackendInvoiceItem) =>
+        item.currency === keepValasCurrency
+          ? clampMoney(item.pax * item.unitPrice)
+          : clampMoney(item.totalPriceIdr / rate),
+      ),
+    );
   } else {
-    targetSubtotal = Math.ceil(amountIdr / rate);
+    targetSubtotal = clampMoney(amountIdr / rate);
   }
 
-  const targetDp = Math.ceil(dpIdr / rate);
-  const targetRemaining = Math.max(0, targetSubtotal - targetDp);
+  const targetDp = clampMoney(dpIdr / rate);
+  const targetRemaining = clampMoney(targetSubtotal - targetDp);
 
   return {
     currency: keepValasCurrency,
@@ -556,16 +558,7 @@ export async function viewInvoicePdfFromRow({
   }
 
   // Strip metadata tags from notes for final printing
-  const cleanNotes = notesRaw
-    .replace(/\[KeepValasTotal:[A-Z]+\]/g, "")
-    .replace(/\[KeepValasTotal\]/g, "")
-    .replace(/\[Rates:USD=\d+,SAR=\d+\]/g, "")
-    .replace(/\[BankAccount:[^\]]+\]/g, "")
-    .replace(/\[IssuingOffice:[^\]]+\]/g, "")
-    .replace(/\[NoDueDate:true\]/g, "")
-    .replace(/\[Address:[^\]]*\]/g, "")
-    .replace(/\[Payments:[^\]]*\]/g, "")
-    .trim();
+  const cleanNotes = stripInvoiceMetadataTags(notesRaw);
 
   return await exportInvoicePdf(
     {
@@ -646,13 +639,15 @@ export function resolveDraftItemTotals(
   usdToIdr: number,
   sarToIdr: number,
 ): { totalPrice: number; totalPriceIdr: number } {
-  const totalPrice = Math.max(0, Math.round(item.pax)) * Math.max(0, Math.round(item.unitPrice));
-  const totalPriceIdr = convertToIdr({
-    amount: totalPrice,
-    currency: item.currency,
-    usdToIdr,
-    sarToIdr,
-  });
+  const totalPrice = roundMoney(Math.max(0, Math.round(item.pax)) * clampMoney(item.unitPrice));
+  const totalPriceIdr = roundMoney(
+    convertToIdr({
+      amount: totalPrice,
+      currency: item.currency,
+      usdToIdr,
+      sarToIdr,
+    }),
+  );
 
   return {
     totalPrice,
@@ -667,21 +662,21 @@ export function calculateSubtotalInCurrency(
   sarToIdr: number,
 ): number {
   if (targetCurrency === "IDR") {
-    return items.reduce((sum, item) => {
-      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
-      return sum + Math.max(0, Math.round(nextTotals.totalPriceIdr));
-    }, 0);
-  } else {
-    const rate = targetCurrency === "USD" ? usdToIdr : sarToIdr;
-    if (rate <= 0) return 0;
-    return items.reduce((sum, item) => {
-      if (item.currency === targetCurrency) {
-        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
-      }
-      const nextTotals = resolveDraftItemTotals(item, usdToIdr, sarToIdr);
-      return sum + Math.max(0, Math.ceil(nextTotals.totalPriceIdr / rate));
-    }, 0);
+    return sumMoney(
+      items.map((item) => clampMoney(resolveDraftItemTotals(item, usdToIdr, sarToIdr).totalPriceIdr)),
+    );
   }
+
+  const rate = targetCurrency === "USD" ? usdToIdr : sarToIdr;
+  if (rate <= 0) return 0;
+  return sumMoney(
+    items.map((item) => {
+      if (item.currency === targetCurrency) {
+        return clampMoney(item.pax * item.unitPrice);
+      }
+      return clampMoney(resolveDraftItemTotals(item, usdToIdr, sarToIdr).totalPriceIdr / rate);
+    }),
+  );
 }
 
 export function normalizeInvoiceDraftItems(items: InvoiceDraftItem[]): InvoiceDraftItem[] {
@@ -690,7 +685,7 @@ export function normalizeInvoiceDraftItems(items: InvoiceDraftItem[]): InvoiceDr
       ...item,
       description: item.description.trim(),
       pax: Math.max(0, Math.round(item.pax)),
-      unitPrice: Math.max(0, Math.round(item.unitPrice)),
+      unitPrice: clampMoney(item.unitPrice),
     }))
     .filter((item) => item.description.length > 0 && item.pax > 0 && item.unitPrice > 0);
 }
@@ -701,13 +696,15 @@ export function buildPrintableInvoiceItems(
   sarToIdr: number,
 ): BackendInvoiceItem[] {
   return items.map((item) => {
-    const totalPrice = item.pax * item.unitPrice;
-    const totalPriceIdr = convertToIdr({
-      amount: totalPrice,
-      currency: item.currency,
-      usdToIdr,
-      sarToIdr,
-    });
+    const totalPrice = roundMoney(item.pax * item.unitPrice);
+    const totalPriceIdr = roundMoney(
+      convertToIdr({
+        amount: totalPrice,
+        currency: item.currency,
+        usdToIdr,
+        sarToIdr,
+      }),
+    );
 
     return {
       description: item.description,
@@ -745,13 +742,15 @@ export function deriveItemTotals(
   sarToIdr: number,
 ): Array<InvoiceDraftItem & { totalPrice: number; totalPriceIdr: number }> {
   return items.map((item) => {
-    const totalPrice = Math.max(0, Math.round(item.pax)) * Math.max(0, Math.round(item.unitPrice));
-    const totalPriceIdr = convertToIdr({
-      amount: totalPrice,
-      currency: item.currency,
-      usdToIdr,
-      sarToIdr,
-    });
+    const totalPrice = roundMoney(Math.max(0, Math.round(item.pax)) * clampMoney(item.unitPrice));
+    const totalPriceIdr = roundMoney(
+      convertToIdr({
+        amount: totalPrice,
+        currency: item.currency,
+        usdToIdr,
+        sarToIdr,
+      }),
+    );
     return {
       ...item,
       totalPrice,
@@ -767,25 +766,26 @@ export function deriveSubtotal(
   sarToIdr: number,
 ): number {
   if (keepValasCurrency === "IDR") {
-    return itemsWithTotals.reduce((sum, item) => sum + Math.max(0, Math.round(item.totalPriceIdr)), 0);
-  } else {
-    const rate = keepValasCurrency === "USD" ? usdToIdr : sarToIdr;
-    if (rate <= 0) return 0;
-    return itemsWithTotals.reduce((sum, item) => {
-      if (item.currency === keepValasCurrency) {
-        return sum + Math.max(0, Math.round(item.pax * item.unitPrice));
-      }
-      return sum + Math.max(0, Math.ceil(item.totalPriceIdr / rate));
-    }, 0);
+    return sumMoney(itemsWithTotals.map((item) => clampMoney(item.totalPriceIdr)));
   }
+
+  const rate = keepValasCurrency === "USD" ? usdToIdr : sarToIdr;
+  if (rate <= 0) return 0;
+  return sumMoney(
+    itemsWithTotals.map((item) =>
+      item.currency === keepValasCurrency
+        ? clampMoney(item.pax * item.unitPrice)
+        : clampMoney(item.totalPriceIdr / rate),
+    ),
+  );
 }
 
 export function derivePayments(
   payments: Array<{ amount: number; dateIso: string }>,
   totalPayable: number,
 ) {
-  const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-  const remainingBalance = Math.max(0, totalPayable - totalPaid);
+  const totalPaid = sumMoney(payments.map((p) => Number(p.amount) || 0));
+  const remainingBalance = clampMoney(totalPayable - totalPaid);
   const downPaymentCoveragePercent =
     totalPayable > 0 ? Math.min(100, Math.round((totalPaid / totalPayable) * 100)) : 0;
 
@@ -802,7 +802,7 @@ export function derivePreviewStatus(
   dueDateIso?: string,
 ): string {
   let previewStatus = "Pending";
-  if (totalPayable > 0 && paymentSummary.totalPaid >= totalPayable) {
+  if (totalPayable > 0 && isMoneyAtLeast(paymentSummary.totalPaid, totalPayable)) {
     previewStatus = "Paid";
   } else if (paymentSummary.totalPaid > 0) {
     previewStatus = "Partially Paid";
@@ -836,7 +836,7 @@ export function deriveInvoiceState({
   const subtotal = deriveSubtotal(itemsWithTotals, keepValasCurrency, usdToIdr, sarToIdr);
 
   const taxAmount = 0;
-  const totalPayable = subtotal + taxAmount;
+  const totalPayable = roundMoney(subtotal + taxAmount);
   const paymentsResult = derivePayments(payments, totalPayable);
   const previewStatus = derivePreviewStatus(paymentsResult, totalPayable, dueDateIso);
 
@@ -874,19 +874,20 @@ export function buildInvoicePayload({
 
   const linkedGroupCode = values.selectedGroupCode.trim() || (clientSelection.selectedClient?.groupCode ?? "");
   
+  const keepValasRate = keepValasCurrency === "USD" ? usdToIdr : sarToIdr;
   const totalPaidIdr = keepValasCurrency !== "IDR"
-    ? Math.max(0, Math.round(derived.paymentSummary.totalPaid * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
-    : derived.paymentSummary.totalPaid;
-  
+    ? clampMoney(derived.paymentSummary.totalPaid * keepValasRate)
+    : clampMoney(derived.paymentSummary.totalPaid);
+
   const payloadAmountIdr = keepValasCurrency !== "IDR"
-    ? Math.max(0, Math.round(derived.paymentSummary.totalPayable * (keepValasCurrency === "USD" ? usdToIdr : sarToIdr)))
-    : derived.paymentSummary.totalPayable;
+    ? clampMoney(derived.paymentSummary.totalPayable * keepValasRate)
+    : clampMoney(derived.paymentSummary.totalPayable);
 
   let payloadNotes = values.notes.trim();
   if (keepValasCurrency !== "IDR") {
     payloadNotes += `\n[KeepValasTotal:${keepValasCurrency}]`;
   }
-  payloadNotes += `\n[Rates:USD=${usdToIdr},SAR=${sarToIdr}]`;
+  payloadNotes += `\n${buildInvoiceRatesTag(usdToIdr, sarToIdr)}`;
   if (values.bankAccount) {
     payloadNotes += `\n[BankAccount:${values.bankAccount}]`;
   }
@@ -929,8 +930,23 @@ export function parseNumberInput(value: string): number {
   return Number.isFinite(val) ? val : 0;
 }
 
-export function formatNumberInput(value: number): string {
-  return new Intl.NumberFormat("id-ID").format(value);
+/**
+ * Display format for the money inputs and the summary card.
+ *
+ * `maximumFractionDigits` is pinned to 2 — the default for a decimal-style
+ * `Intl.NumberFormat` is 3, which would render a stored `468.75` fine but show
+ * a computed value like `505.204` with a third digit the database cannot keep.
+ *
+ * Pass `currency` where the value is a finished total, so IDR renders without a
+ * subunit. Leave it off for editable inputs: an IDR-truncated display would hide
+ * decimals that are still present in the underlying value.
+ */
+export function formatNumberInput(value: number, currency?: string): string {
+  const fractionDigits = currency && currency.trim().toUpperCase() === "IDR" ? 0 : 2;
+  return new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
 }
 
 export function createEmptyDraftItems(): InvoiceDraftItem[] {

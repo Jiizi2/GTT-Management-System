@@ -35,9 +35,21 @@ const syarikahModalSchema = z.object({
   value: z.string().trim().min(1, "Syarikah wajib diisi."),
 });
 
-const visaStatusModalSchema = z.object({
-  value: z.enum(["Draft", "Pending", "Issued"]),
-});
+const visaStatusModalSchema = z
+  .object({
+    value: z.enum(["Draft", "Pending", "Issued"]),
+    issuedDateIso: z.string(),
+  })
+  .superRefine((values, context) => {
+    // Only Issued carries a date; the other statuses clear it on save.
+    if (values.value === "Issued" && values.issuedDateIso.trim().length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["issuedDateIso"],
+        message: "Issued date wajib diisi.",
+      });
+    }
+  });
 
 const paymentStatusModalSchema = z.object({
   value: z.enum(["Paid", "Unpaid", "Partial"]),
@@ -200,23 +212,34 @@ function SaveFooter({
 
 export function VisaStatusModal({
   initialValue,
+  initialIssuedDateIso = "",
+  todayIso,
   onClose,
   onSave,
 }: {
   initialValue: VisaStatus;
+  initialIssuedDateIso?: string;
+  todayIso: string;
   onClose: () => void;
-  onSave: (nextValue: VisaStatus) => void | Promise<void>;
+  onSave: (nextValue: VisaStatus, issuedDateIso: string) => void | Promise<void>;
 }) {
   const {
     control,
     handleSubmit,
-    formState: { isSubmitting },
-  } = useForm<{ value: VisaStatus }>({
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<{ value: VisaStatus; issuedDateIso: string }>({
     resolver: zodResolver(visaStatusModalSchema),
     defaultValues: {
       value: initialValue,
+      // Prefill today so marking a visa Issued stays a single click, while still
+      // letting the user backdate a visa that was issued earlier.
+      issuedDateIso: initialIssuedDateIso.trim() || todayIso,
     },
   });
+
+  const selectedStatus = watch("value");
+  const issuedDateErrorMessage = errors.issuedDateIso?.message;
 
   return (
     <ModalShell
@@ -227,7 +250,12 @@ export function VisaStatusModal({
       footer={
         <SaveFooter
           onClose={onClose}
-          onSave={() => void handleSubmit(({ value }) => void onSave(value))()}
+          onSave={() =>
+            void handleSubmit(({ value, issuedDateIso }) =>
+              // Non-issued statuses have no issued date to carry.
+              void onSave(value, value === "Issued" ? issuedDateIso : ""),
+            )()
+          }
           saveLabel="Save Changes"
           isSaving={isSubmitting}
         />
@@ -253,6 +281,35 @@ export function VisaStatusModal({
           />
         </div>
       </label>
+
+      {selectedStatus === "Issued" ? (
+        <>
+          <label className={modalFieldClassName}>
+            <span>Issued Date</span>
+            <Controller
+              control={control}
+              name="issuedDateIso"
+              render={({ field }) => (
+                <DatePickerInput
+                  id="visa-status-issued-date"
+                  inputClassName={modalInputClassName}
+                  value={field.value}
+                  onChange={field.onChange}
+                  ariaInvalid={getFieldAriaInvalid(issuedDateErrorMessage)}
+                  ariaDescribedBy={getFieldDescribedBy("visa-status-issued-date", {
+                    errorMessage: issuedDateErrorMessage,
+                  })}
+                />
+              )}
+            />
+          </label>
+          <FieldErrorMessage
+            fieldId="visa-status-issued-date"
+            message={issuedDateErrorMessage}
+            className={modalErrorClassName}
+          />
+        </>
+      ) : null}
     </ModalShell>
   );
 }

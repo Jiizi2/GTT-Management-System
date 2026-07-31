@@ -191,7 +191,9 @@ async function testCreateUsesExistingClientAndGeneratesSequentialNumbers(): Prom
     expect(createdOne.clientName).toBe("Yassir");
     expect(createdOne.clientInitials).toBe("Y");
     expect(createdOne.status).toBe("Pending");
-    expect(createdOne.amount).toBe(1_500_000);
+    // Decimals are preserved to the DECIMAL(12,2) precision of the column, not
+    // rounded away — SAR/USD deposits arrive as amounts like 468.75.
+    expect(createdOne.amount).toBe(1_500_000.4);
     expect(createdOne.downPaymentIdr).toBe(0);
     expect(createdOne.groupCode).toBe("9017000001");
     expect(createdOne.monthKey).toBe("2099-02");
@@ -1586,8 +1588,99 @@ async function testPaginationSupport() {
 }
 
 
+async function testDecimalValasAmountsSurviveCreateAndRead(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    const clients = await service.listClients();
+    const yassir = findClientByName(clients, "Yassir");
+
+    // 125 USD converted to SAR: the deposit the agent actually transfers.
+    const created = await service.create({
+      clientId: yassir.id,
+      issuedDate: "2099-01-01",
+      dueDate: "2099-02-01",
+      amount: 0,
+      notes: "[KeepValasTotal:SAR]\n[Rates:USD=15845,SAR=4225]",
+      items: [
+        {
+          description: "Deposit Umrah",
+          pax: 1,
+          currency: "SAR",
+          unitPrice: 468.75,
+          totalPrice: 468.75,
+          totalPriceIdr: 1_980_468.75,
+        },
+      ],
+    });
+
+    // The backend recalculates totals authoritatively — it must recalculate them
+    // at DECIMAL(12,2) precision rather than rounding the cents away.
+    expect(created.items?.[0].unitPrice).toBe(468.75);
+    expect(created.items?.[0].totalPrice).toBe(468.75);
+    expect(created.items?.[0].totalPriceIdr).toBe(1_980_468.75);
+    expect(created.amount).toBe(1_980_468.75);
+
+    const [listed] = await service.findAll();
+    expect(listed.amount).toBe(1_980_468.75);
+    expect(listed.items?.[0].unitPrice).toBe(468.75);
+  } finally {
+    restore();
+  }
+}
+
+async function testDecimalPaymentSettlesInvoiceExactly(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    const clients = await service.listClients();
+    const yassir = findClientByName(clients, "Yassir");
+
+    const created = await service.create({
+      clientId: yassir.id,
+      issuedDate: "2099-01-01",
+      dueDate: "2099-02-01",
+      amount: 2_134_230.6,
+      downPaymentIdr: 2_134_230.6,
+    });
+
+    // Paying the exact decimal amount must read as fully paid, with no residue
+    // left behind by rounding the two sides independently.
+    expect(created.amount).toBe(2_134_230.6);
+    expect(created.downPaymentIdr).toBe(2_134_230.6);
+    expect(created.status).toBe("Paid");
+
+    const partial = await service.create({
+      clientId: yassir.id,
+      issuedDate: "2099-01-01",
+      dueDate: "2099-02-01",
+      amount: 2_134_230.6,
+      downPaymentIdr: 1_000_000.25,
+    });
+    expect(partial.downPaymentIdr).toBe(1_000_000.25);
+    expect(partial.status).toBe("Partially Paid");
+  } finally {
+    restore();
+  }
+}
+
+async function testRejectsAmountsBeyondStoredPrecision(): Promise<void> {
+  const validator = new InvoiceValidator();
+
+  expect(() =>
+    validator.validatePayments(`[Payments:${encodeURIComponent(JSON.stringify([{ amount: 468.75 }]))}]`),
+  ).not.toThrow();
+
+  expect(() =>
+    validator.validatePayments(`[Payments:${encodeURIComponent(JSON.stringify([{ amount: 468.755 }]))}]`),
+  ).toThrow(BadRequestException);
+}
+
 describe("InvoicesService", () => {
   it("invoice list clients seeded labels", async () => testListClientsReturnsSeededSortedLabels());
+  it("invoice keeps decimal valas amounts through create and read", async () =>
+    testDecimalValasAmountsSurviveCreateAndRead());
+  it("invoice decimal payment settles the invoice exactly", async () => testDecimalPaymentSettlesInvoiceExactly());
+  it("invoice rejects payment amounts beyond stored precision", async () =>
+    testRejectsAmountsBeyondStoredPrecision());
   it("invoice create existing client sequential numbering", async () => testCreateUsesExistingClientAndGeneratesSequentialNumbers());
   it("invoice create new clients and status rules", async () => testCreateCanCreateNewClientAndResolvesStatusRules());
   it("invoice create reuses existing client case-insensitively", async () => testCreateReusesExistingClientCaseInsensitively());

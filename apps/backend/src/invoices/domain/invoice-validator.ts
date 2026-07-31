@@ -45,8 +45,14 @@ export class InvoiceValidator {
         const paymentsList = JSON.parse(decodeURIComponent(match[1]));
         if (Array.isArray(paymentsList)) {
           for (const p of paymentsList) {
-            if ((Number(p.amount) || 0) < 0) {
+            const amount = Number(p.amount) || 0;
+            if (amount < 0) {
               throw new BadRequestException("Nominal pembayaran tidak boleh kurang dari 0.");
+            }
+            // Amounts land in DECIMAL(12,2); reject extra precision instead of
+            // letting the database truncate it silently.
+            if (Math.round(amount * 100) !== Number((amount * 100).toFixed(6))) {
+              throw new BadRequestException("Nominal pembayaran maksimal 2 angka desimal.");
             }
           }
         }

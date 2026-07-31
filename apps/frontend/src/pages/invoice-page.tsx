@@ -11,9 +11,8 @@ import { InvoiceLineItemsTable } from "./invoice/components/InvoiceLineItemsTabl
 import { InvoiceSummaryCard } from "./invoice/components/InvoiceSummaryCard";
 import { InvoiceNotesSection } from "./invoice/components/InvoiceNotesSection";
 import { InvoicePaymentsSection } from "./invoice/components/InvoicePaymentsSection";
+import { MoneyInput } from "./invoice/components/MoneyInput";
 import {
-  formatNumberInput,
-  parseNumberInput,
   type InvoiceWorkspaceInitialData,
   type InvoiceClientOption,
   type SelectOption,
@@ -389,28 +388,22 @@ export function CreateInvoiceWorkspace({
                       <span className="block text-[9px] font-bold uppercase tracking-[0.11em] text-on-surface-variant/65">
                         USD/IDR
                       </span>
-                      <input
-                        type="text"
+                      <MoneyInput
                         className="h-10 w-full rounded-lg border border-outline-variant/35 bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                        value={formatNumberInput(usdToIdr)}
-                        onChange={(event) => {
-                          const val = Math.max(0, parseNumberInput(event.target.value));
-                          setUsdToIdr(val);
-                        }}
+                        ariaLabel="USD to IDR exchange rate"
+                        value={usdToIdr}
+                        onChange={setUsdToIdr}
                       />
                     </label>
                     <label className="space-y-1">
                       <span className="block text-[9px] font-bold uppercase tracking-[0.11em] text-on-surface-variant/65">
                         SAR/IDR
                       </span>
-                      <input
-                        type="text"
+                      <MoneyInput
                         className="h-10 w-full rounded-lg border border-outline-variant/35 bg-surface-container-low px-3 text-xs font-bold text-on-surface outline-none ring-0 focus:ring-2 focus:ring-primary/20"
-                        value={formatNumberInput(sarToIdr)}
-                        onChange={(event) => {
-                          const val = Math.max(0, parseNumberInput(event.target.value));
-                          setSarToIdr(val);
-                        }}
+                        ariaLabel="SAR to IDR exchange rate"
+                        value={sarToIdr}
+                        onChange={setSarToIdr}
                       />
                     </label>
                   </div>

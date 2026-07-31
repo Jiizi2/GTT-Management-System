@@ -63,22 +63,22 @@ export class UpdateInvoiceDto {
   dueDate?: string;
 
   @ApiPropertyOptional({
-    description: "Nominal invoice terbaru.",
+    description: "Nominal invoice terbaru dalam IDR, mendukung 2 desimal.",
     example: 9800000,
     minimum: 0,
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount?: number;
 
   @ApiPropertyOptional({
-    description: "Nominal DP invoice terbaru dalam rupiah.",
+    description: "Nominal DP invoice terbaru dalam rupiah, mendukung 2 desimal.",
     example: 25000000,
     minimum: 0,
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   downPaymentIdr?: number;
 

@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useAgentsQuery } from "../../../hooks/use-agents-backend";
+import { formatLocalIsoDate } from "../../../shared/app-domain";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
 
 const LazyDeleteGroupModal = lazy(async () => ({
@@ -142,7 +143,13 @@ export function VisaDetailModals() {
       {activeModal ? (
         <Suspense fallback={<VisaDetailModalFallback />}>
           {activeModal === "visa-status" ? (
-            <LazyVisaStatusModal initialValue={row.visaStatus} onClose={closeModal} onSave={saveVisaStatus} />
+            <LazyVisaStatusModal
+              initialValue={row.visaStatus}
+              initialIssuedDateIso={row.issuedDateIso}
+              todayIso={formatLocalIsoDate(new Date())}
+              onClose={closeModal}
+              onSave={saveVisaStatus}
+            />
           ) : null}
 
           {activeModal === "visa-type" ? (
