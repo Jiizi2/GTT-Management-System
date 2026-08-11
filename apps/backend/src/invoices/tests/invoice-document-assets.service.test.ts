@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigService } from "@nestjs/config";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { InvoiceDocumentAssetsService } from "../invoice-document-assets.service";
@@ -61,6 +61,51 @@ describe("InvoiceDocumentAssetsService", () => {
     );
     await expect(cancelledService.readForInvoice({ invoiceId: "inv-1", kind: "stamp", actor: createActor() }))
       .rejects.toThrow(/cancelled/i);
+  });
+
+  it("reads a non-default brand's assets from its subdirectory", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gtt-invoice-assets-"));
+    temporaryDirectories.push(directory);
+    const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    // Root (Ghaniya) stamp differs from the Yahya subdirectory stamp.
+    await writeFile(path.join(directory, "stamp.png"), Buffer.concat([pngMagic, Buffer.from("ghaniya")]));
+    const yahyaDirectory = path.join(directory, "yahya");
+    await mkdir(yahyaDirectory, { recursive: true });
+    const yahyaPng = Buffer.concat([pngMagic, Buffer.from("yahya")]);
+    await writeFile(path.join(yahyaDirectory, "stamp.png"), yahyaPng);
+
+    const service = new InvoiceDocumentAssetsService(
+      {
+        findAll: vi.fn().mockResolvedValue([
+          { id: "inv-1", invoiceNumber: "GTT/INV/2026/1", status: "Pending", notes: "Hi\n[Brand:yahya]" },
+        ]),
+      } as unknown as InvoicesService,
+      { get: vi.fn().mockReturnValue(directory) } as unknown as ConfigService,
+    );
+
+    await expect(service.readForInvoice({ invoiceId: "inv-1", kind: "stamp", actor: createActor() }))
+      .resolves.toEqual(yahyaPng);
+  });
+
+  it("reads from the root for the default brand and unknown brands", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gtt-invoice-assets-"));
+    temporaryDirectories.push(directory);
+    const rootPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from("root"),
+    ]);
+    await writeFile(path.join(directory, "signature.png"), rootPng);
+    const service = new InvoiceDocumentAssetsService(
+      {
+        findAll: vi.fn().mockResolvedValue([
+          { id: "inv-1", invoiceNumber: "GTT/INV/2026/2", status: "Paid", notes: "No brand tag here" },
+        ]),
+      } as unknown as InvoicesService,
+      { get: vi.fn().mockReturnValue(directory) } as unknown as ConfigService,
+    );
+
+    await expect(service.readForInvoice({ invoiceId: "inv-1", kind: "signature", actor: createActor() }))
+      .resolves.toEqual(rootPng);
   });
 
   it("rejects invalid PNG content", async () => {

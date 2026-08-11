@@ -122,6 +122,17 @@ export const DEFAULT_MASTER_DATA_OPTIONS: MasterDataSeedOption[] = [
     },
   },
   {
+    categoryKey: "bank-disbursement",
+    value: "yahya_tour",
+    label: "BSI - 7359108286",
+    sortOrder: 4,
+    metadata: {
+      bankName: "BSI",
+      penerima: "PT YAHYA TOUR INDONESIA",
+      accountNumber: "7359108286",
+    },
+  },
+  {
     categoryKey: "invoice-client-name",
     value: "YASSIR",
     label: "Yassir",

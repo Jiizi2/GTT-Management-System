@@ -22,10 +22,14 @@ const INVOICE_METADATA_TAG_PATTERNS: RegExp[] = [
   new RegExp(String.raw`\[(?:Rates|ExchangeRate):USD=${RATE_NUMBER},SAR=${RATE_NUMBER}\]`, "g"),
   /\[BankAccount:[^\]]+\]/g,
   /\[IssuingOffice:[^\]]+\]/g,
+  /\[Brand:[^\]]+\]/g,
   /\[NoDueDate:true\]/g,
   /\[Address:[^\]]*\]/g,
   /\[Payments:[^\]]*\]/g,
 ];
+
+/** Single read pattern for the brand tag, shared by parse below. */
+const INVOICE_BRAND_TAG_PATTERN = /\[Brand:([^\]]+)\]/;
 
 /** Strip every metadata tag, leaving only the human-written note text. */
 export function stripInvoiceMetadataTags(notes: string): string {
@@ -48,6 +52,25 @@ function formatRateForTag(rate: number): string {
 
 export function buildInvoiceRatesTag(usdToIdr: number, sarToIdr: number): string {
   return `[Rates:USD=${formatRateForTag(usdToIdr)},SAR=${formatRateForTag(sarToIdr)}]`;
+}
+
+/** Serialise the invoice issuer brand as a `[Brand:...]` tag. */
+export function buildInvoiceBrandTag(brandId: string): string {
+  return `[Brand:${brandId.trim().toLowerCase()}]`;
+}
+
+/** Read the brand id back, or `null` when the invoice carries no brand tag (= default). */
+export function parseInvoiceBrandTag(notes: string | undefined): string | null {
+  if (!notes) {
+    return null;
+  }
+
+  const matched = notes.match(INVOICE_BRAND_TAG_PATTERN);
+  if (!matched || !matched[1]) {
+    return null;
+  }
+
+  return matched[1].trim().toLowerCase();
 }
 
 /** Read the rates back, or `null` when the invoice carries no rate tag. */

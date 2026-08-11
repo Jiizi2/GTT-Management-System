@@ -316,6 +316,21 @@ export function extractExchangeRatesFromNotes(notes: string | undefined): { usdT
   return rates;
 }
 
+/**
+ * The issuer brand is persisted as a `[Brand:...]` tag inside `notes` (mirrored
+ * by the frontend `parseInvoiceBrandTag`). It selects which company identity —
+ * and which stamp/signature directory — the printed invoice uses. Missing tag
+ * means the default brand (Ghaniya).
+ */
+const INVOICE_BRAND_TAG_PATTERN = /\[Brand:([^\]]+)\]/;
+
+export function extractInvoiceBrandFromNotes(notes: string | undefined): string | null {
+  if (!notes) return null;
+  const match = notes.match(INVOICE_BRAND_TAG_PATTERN);
+  if (!match || !match[1]) return null;
+  return match[1].trim().toLowerCase();
+}
+
 export function normalizeInvoiceLineItem(
   value: unknown,
   usdToIdr: number | null,

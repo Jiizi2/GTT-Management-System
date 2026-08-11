@@ -22,7 +22,8 @@ import {
   type InvoiceStatus,
 } from "../helpers/invoice-page-shared";
 import { clampMoney } from "../../../shared/money";
-import { stripInvoiceMetadataTags } from "../../../shared/invoice-notes-tags";
+import { parseInvoiceBrandTag, stripInvoiceMetadataTags } from "../../../shared/invoice-notes-tags";
+import { DEFAULT_INVOICE_BRAND } from "../../../shared/invoice-brands";
 
 export const invoiceDraftItemSchema = z.object({
   id: z.string(),
@@ -41,6 +42,7 @@ export const invoiceWorkspaceFormSchema = z
     dueDateIso: z.string().optional(),
     invoiceStatus: z.string(),
     issuingOffice: z.string(),
+    brand: z.string(),
     selectedClientId: z.string().trim().min(1, "Select a client before saving invoice."),
     manualClientName: z.string(),
     selectedGroupCode: z.string(),
@@ -178,6 +180,7 @@ export function useInvoiceWorkspaceForm({
       issueDateIso: resolvedInitialInvoice?.issuedDateIso ?? "",
       dueDateIso: resolvedInitialInvoice?.dueDateIso ?? "",
       invoiceStatus: resolvedInitialInvoice?.status ?? "Pending",
+      brand: parseInvoiceBrandTag(resolvedInitialInvoice?.notes) ?? DEFAULT_INVOICE_BRAND,
       issuingOffice: (() => {
         const notesRaw = resolvedInitialInvoice?.notes ?? "";
         const match = notesRaw.match(/\[IssuingOffice:([^\]]+)\]/);
@@ -272,6 +275,7 @@ export function useInvoiceWorkspaceForm({
   const dueDateIso = watch("dueDateIso");
   const invoiceStatus = watch("invoiceStatus") as InvoiceStatus | "";
   const issuingOffice = watch("issuingOffice");
+  const brand = watch("brand");
   const selectedClientId = watch("selectedClientId");
   const selectedGroupCode = watch("selectedGroupCode");
   const bankAccount = watch("bankAccount");
@@ -600,6 +604,7 @@ export function useInvoiceWorkspaceForm({
     dueDateIso,
     invoiceStatus,
     issuingOffice,
+    brand,
     selectedClientId,
     selectedGroupCode,
     bankAccount,

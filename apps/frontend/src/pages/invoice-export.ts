@@ -2,6 +2,7 @@ import { escapeHtml } from "../shared/app-domain";
 import { fetchBackend } from "../shared/api-client";
 import { clampMoney, formatMoney } from "../shared/money";
 import { stripInvoiceMetadataTags } from "../shared/invoice-notes-tags";
+import { resolveInvoiceBrand, type InvoiceBrandProfile } from "../shared/invoice-brands";
 
 export type InvoiceExportCurrency = "IDR" | "USD" | "SAR";
 
@@ -21,6 +22,8 @@ export type InvoiceExportPaymentItem = {
 
 export type InvoiceExportPayload = {
   invoiceId?: string;
+  /** Issuer brand id (`"ghaniya"` | `"yahya"`); missing/unknown falls back to Ghaniya. */
+  brand?: string;
   invoiceNumber: string;
   issueDateIso: string;
   dueDateIso: string;
@@ -92,14 +95,6 @@ async function fetchProtectedApprovalAssets(invoiceId?: string): Promise<Protect
   const [stampDataUrl, signatureDataUrl] = await Promise.all([read("stamp"), read("signature")]);
   return { stampDataUrl, signatureDataUrl };
 }
-
-const companyProfile = {
-  brandName: "PT. Ghaniya Zilia Rahman",
-  directorName: "Husein Ghanim",
-  directorTitle: "Director",
-  izinPpiu: "SK NO U.419 TAHUN 2021",
-  alamat: "Graha Al Badegel Jl. Hajjah Tutty Alawiyah No.7, RT.2/RW.5, Kalibata, Kec. Pancoran, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta",
-};
 
 /** Whole-number quantities (pax counts), never money. */
 function formatCount(value: number): string {
@@ -401,6 +396,355 @@ async function finalizePrintWindow(printableWindow: Window, iframe: HTMLIFrameEl
   }, PRINT_TRIGGER_DELAY_MS);
 }
 
+type SultanRenderContext = {
+  payload: InvoiceExportPayload;
+  brandProfile: InvoiceBrandProfile;
+  logoUrl: string;
+  appCssUrl: string;
+  fontsCssUrl: string;
+  billToName: string;
+  beneficiaryName: string;
+  bankMeta: { bankName: string; accountNumber: string };
+  valasCurrency: InvoiceExportCurrency;
+  isSingleCurrencyBilling: boolean;
+  hasUsdItems: boolean;
+  hasSarItems: boolean;
+  isPaidInvoice: boolean;
+  notesHtml: string;
+  approvalAssets: ProtectedApprovalAssets;
+};
+
+/**
+ * Mirrors the classic single-currency conversion so the `sultan` layout shows
+ * the same per-item amounts. Kept separate from the classic inline builder so
+ * the Ghaniya template stays byte-for-byte unchanged.
+ */
+function resolveSultanItemAmounts(
+  item: InvoiceExportLineItem,
+  payload: InvoiceExportPayload,
+  valasCurrency: InvoiceExportCurrency,
+  rate: number,
+): { unitPriceValas: number; totalPriceValas: number } {
+  let unitPriceValas = item.unitPrice;
+  let totalPriceValas = item.totalPrice;
+  if (item.currency !== valasCurrency) {
+    const itemRate = item.currency === "USD" ? payload.usdToIdr : item.currency === "SAR" ? payload.sarToIdr : 1;
+    const itemPriceIdr = item.totalPriceIdr;
+    if (valasCurrency === "IDR") {
+      unitPriceValas = clampMoney(item.unitPrice * itemRate);
+      totalPriceValas = itemPriceIdr;
+    } else {
+      totalPriceValas = rate > 0 ? clampMoney(itemPriceIdr / rate) : 0;
+      unitPriceValas = item.pax > 0 ? clampMoney(totalPriceValas / item.pax) : 0;
+    }
+  }
+  return { unitPriceValas, totalPriceValas };
+}
+
+/**
+ * Purple, payment-in-table invoice modelled on the Sultan Fatih page-1 layout.
+ * Reuses every existing feature (exchange rates, USD/SAR billing, multi-currency
+ * table with a Total (IDR) column, Lunas/Belum-Lunas status). Used by brands
+ * whose profile `layout === "sultan"` (currently Yahya Tours).
+ */
+function renderSultanInvoiceHtml(ctx: SultanRenderContext): string {
+  const {
+    payload,
+    brandProfile,
+    logoUrl,
+    appCssUrl,
+    fontsCssUrl,
+    billToName,
+    beneficiaryName,
+    bankMeta,
+    valasCurrency,
+    isSingleCurrencyBilling,
+    hasUsdItems,
+    hasSarItems,
+    isPaidInvoice,
+    notesHtml,
+    approvalAssets,
+  } = ctx;
+
+  const rate = valasCurrency === "USD" ? payload.usdToIdr : payload.sarToIdr;
+  const showTotalIdrColumn = !isSingleCurrencyBilling;
+  const itemColumnCount = showTotalIdrColumn ? 5 : 4;
+
+  const itemRowsHtml = payload.items.length
+    ? payload.items
+        .map((item) => {
+          if (isSingleCurrencyBilling) {
+            const { unitPriceValas, totalPriceValas } = resolveSultanItemAmounts(
+              item,
+              payload,
+              valasCurrency,
+              rate,
+            );
+            return `<tr>
+<td class="sf-desc">${escapeHtml(item.description)}</td>
+<td class="sf-c">${escapeHtml(formatCount(item.pax))}</td>
+<td class="sf-r">${escapeHtml(formatCurrency(unitPriceValas, valasCurrency))}</td>
+<td class="sf-r">${escapeHtml(formatCurrency(totalPriceValas, valasCurrency))}</td>
+</tr>`;
+          }
+          return `<tr>
+<td class="sf-desc">${escapeHtml(item.description)}</td>
+<td class="sf-c">${escapeHtml(formatCount(item.pax))}</td>
+<td class="sf-r">${escapeHtml(formatCurrency(item.unitPrice, item.currency))}</td>
+<td class="sf-r">${escapeHtml(formatCurrency(item.totalPrice, item.currency))}</td>
+<td class="sf-r">${escapeHtml(formatIdr(item.totalPriceIdr))}</td>
+</tr>`;
+        })
+        .join("")
+    : `<tr><td class="sf-c" colspan="${itemColumnCount}" style="color:#9aa0aa;">No invoice items</td></tr>`;
+
+  const payments = payload.payments ?? [];
+  const paymentLinesHtml = payments.length
+    ? payments
+        .map(
+          (p) =>
+            `<div class="row pay"><span>${escapeHtml(formatDateLabel(p.dateIso))}</span><strong>${escapeHtml(formatCurrency(p.amount, valasCurrency))}</strong></div>`,
+        )
+        .join("")
+    : `<div class="row pay"><span>Belum ada pembayaran</span><strong>—</strong></div>`;
+
+  const showRates = hasUsdItems || hasSarItems;
+  const ratesHtml = showRates
+    ? [
+        hasSarItems ? `SAR/IDR ${escapeHtml(formatRate(payload.sarToIdr))}` : "",
+        hasUsdItems ? `USD/IDR ${escapeHtml(formatRate(payload.usdToIdr))}` : "",
+      ]
+        .filter(Boolean)
+        .join("&nbsp;&nbsp;·&nbsp;&nbsp;")
+    : "";
+
+  const totalHargaLabel = formatCurrency(payload.totalPayable, valasCurrency);
+  const sisaLabel = isPaidInvoice ? "LUNAS" : formatCurrency(payload.remainingBalance, valasCurrency);
+
+  const contactLine = [brandProfile.phone, brandProfile.socialHandle]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join("  ·  ");
+
+  const signatureInner =
+    approvalAssets.signatureDataUrl || approvalAssets.stampDataUrl
+      ? `${approvalAssets.signatureDataUrl ? `<img alt="Tanda tangan terotorisasi" class="sf-sign-img" decoding="sync" src="${escapeHtml(approvalAssets.signatureDataUrl)}"/>` : ""}${approvalAssets.stampDataUrl ? `<img alt="Cap terotorisasi" class="sf-stamp-img" decoding="sync" src="${escapeHtml(approvalAssets.stampDataUrl)}"/>` : ""}`
+      : "";
+
+  return `<!DOCTYPE html>
+<html lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="light only" name="color-scheme"/>
+<title>${escapeHtml(brandProfile.documentTitle)}</title>
+<link as="style" href="${escapeHtml(fontsCssUrl)}" rel="preload"/>
+<link as="style" href="${escapeHtml(appCssUrl)}" rel="preload"/>
+<link as="image" href="${escapeHtml(logoUrl)}" rel="preload"/>
+${approvalAssets.stampDataUrl ? `<link as="image" href="${escapeHtml(approvalAssets.stampDataUrl)}" rel="preload"/>` : ""}
+${approvalAssets.signatureDataUrl ? `<link as="image" href="${escapeHtml(approvalAssets.signatureDataUrl)}" rel="preload"/>` : ""}
+<link href="${escapeHtml(fontsCssUrl)}" rel="stylesheet"/>
+<link href="${escapeHtml(appCssUrl)}" rel="stylesheet"/>
+<style>
+:root {
+  /* Yahya Tours — green + gold as restrained accents on a white sheet. */
+  --sf-green: #007d00;
+  --sf-green-deep: #026a02;
+  --sf-gold: #b8860b;
+  --sf-ink: #1b2230;
+  --sf-sub: #5c6470;
+  --sf-muted: #8a919c;
+  --sf-line: #e7e9ec;
+  --sf-line-strong: #cfd4da;
+}
+* { box-sizing: border-box; }
+@page { size: A4 portrait; margin: 0; }
+html, body {
+  width: 100%; height: 100%; margin: 0; padding: 0;
+  background: #ffffff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+body {
+  color: var(--sf-ink);
+  font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 11.5px; line-height: 1.6;
+}
+img { image-rendering: -webkit-optimize-contrast; }
+.sf-r { font-variant-numeric: tabular-nums; }
+.sf-page { position: relative; width: 100%; max-width: 210mm; min-height: 297mm; margin: 0 auto; background: #ffffff; display: flex; flex-direction: column; }
+.sf-eyebrow { font-family: 'Outfit', 'Inter', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--sf-muted); }
+/* Thin brand accent at the very top */
+.sf-topbar { height: 4px; background: var(--sf-green); }
+.sf-topbar span { display: block; height: 100%; width: 24%; background: var(--sf-gold); }
+/* Header — letterhead: full company identity left, logo right */
+.sf-header { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 44px 56px 22px 56px; }
+.sf-company { flex: 1; min-width: 0; }
+.sf-company-name { font-family: 'Outfit', 'Inter', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 0.01em; color: var(--sf-green); text-transform: uppercase; line-height: 1.15; }
+.sf-company-line { font-size: 10.5px; color: var(--sf-sub); margin-top: 4px; line-height: 1.55; max-width: 470px; }
+.sf-company-line.izin { color: var(--sf-gold); font-weight: 700; letter-spacing: 0.02em; }
+.sf-logo { height: 74px; width: auto; object-fit: contain; flex: 0 0 auto; }
+/* Divider */
+.sf-div { height: 1px; background: var(--sf-line); margin: 0 56px; }
+/* Bill row: client (left) + compact invoice meta (right) */
+.sf-billrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; padding: 24px 56px 6px 56px; }
+.sf-party { max-width: 58%; }
+.sf-party .sf-eyebrow { display: block; margin-bottom: 7px; }
+.sf-party .name { font-family: 'Outfit', 'Inter', sans-serif; font-size: 15px; font-weight: 700; color: var(--sf-ink); line-height: 1.3; }
+.sf-party .line { font-size: 11px; color: var(--sf-sub); margin-top: 4px; line-height: 1.6; }
+.sf-docmeta { flex: 0 0 auto; min-width: 200px; text-align: right; }
+.sf-docmeta-no { font-family: 'Outfit', 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: var(--sf-ink); letter-spacing: 0.01em; }
+.sf-docmeta-no span { color: var(--sf-muted); font-weight: 700; letter-spacing: 0.16em; font-size: 9.5px; }
+.sf-docmeta-rows { margin-top: 9px; }
+.sf-docmeta-rows .r { display: flex; justify-content: flex-end; gap: 12px; font-size: 11px; padding: 2px 0; }
+.sf-docmeta-rows .r span { color: var(--sf-muted); }
+.sf-docmeta-rows .r b { color: var(--sf-ink); font-weight: 700; min-width: 92px; text-align: right; }
+.sf-docmeta-rows .r b.paid { color: var(--sf-green); }
+.sf-docmeta-rows .r b.unpaid { color: #b45309; }
+/* Items table */
+.sf-items { padding: 30px 56px 0 56px; }
+.sf-tbl { width: 100%; border-collapse: collapse; }
+.sf-tbl thead th { font-family: 'Outfit', 'Inter', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sf-muted); padding: 0 0 11px 0; border-bottom: 1.5px solid var(--sf-ink); text-align: left; }
+.sf-tbl tbody td { font-size: 11.5px; padding: 13px 0; border-bottom: 1px solid var(--sf-line); vertical-align: top; color: var(--sf-sub); }
+.sf-tbl th + th, .sf-tbl td + td { padding-left: 18px; }
+.sf-tbl .sf-desc { font-weight: 700; color: var(--sf-ink); word-break: break-word; }
+.sf-tbl .sf-c { text-align: center; white-space: nowrap; }
+.sf-tbl .sf-r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Summary — payment instructions + notes (left) beside totals (right) */
+.sf-summary { display: flex; justify-content: space-between; gap: 52px; align-items: flex-start; padding: 32px 56px 0 56px; }
+.sf-payinfo { flex: 1; min-width: 0; max-width: 54%; }
+.sf-payinfo .block + .block { margin-top: 22px; }
+.sf-payinfo .sf-eyebrow { display: block; margin-bottom: 9px; }
+.sf-payinfo .bank { font-size: 12px; color: var(--sf-ink); line-height: 1.75; }
+.sf-payinfo .bank .acct { font-family: 'Outfit', 'Inter', sans-serif; font-size: 15px; font-weight: 700; color: var(--sf-green); letter-spacing: 0.02em; }
+.sf-payinfo .bank .an { color: var(--sf-sub); }
+.sf-payinfo .rates { margin-top: 9px; font-size: 11px; color: var(--sf-muted); }
+.sf-payinfo .notes { font-size: 11.5px; line-height: 1.8; color: var(--sf-ink); font-weight: 500; }
+.sf-sumbox { width: 320px; flex: 0 0 auto; }
+.sf-sumbox .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; padding: 7px 0; color: var(--sf-sub); }
+.sf-sumbox .row strong { color: var(--sf-ink); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sf-payhead { margin: 10px 0 4px; padding-top: 12px; border-top: 1px solid var(--sf-line); }
+.sf-payhead .sf-eyebrow { display: block; }
+.sf-sumbox .row.pay { font-size: 11px; padding: 4px 0; color: var(--sf-muted); }
+.sf-sumbox .row.pay strong { color: var(--sf-sub); font-weight: 600; }
+.sf-sumbox .grand { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; padding-top: 13px; border-top: 2px solid var(--sf-ink); }
+.sf-sumbox .grand .l { font-family: 'Outfit', 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sf-muted); }
+.sf-sumbox .grand .v { font-family: 'Outfit', 'Inter', sans-serif; font-size: 21px; font-weight: 700; color: var(--sf-green); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Payment instructions */
+.sf-bankblock { padding: 30px 56px 0 56px; }
+.sf-bankblock .sf-eyebrow { display: block; margin-bottom: 9px; }
+.sf-bankblock .bank { font-size: 12px; color: var(--sf-ink); line-height: 1.6; }
+.sf-bankblock .bank .acct { font-family: 'Outfit', 'Inter', sans-serif; font-weight: 700; letter-spacing: 0.02em; color: var(--sf-green); }
+.sf-bankblock .rates { margin-top: 7px; font-size: 11px; color: var(--sf-muted); }
+/* Notes */
+.sf-notes { padding: 24px 56px 0 56px; }
+.sf-notes .sf-eyebrow { display: block; margin-bottom: 7px; }
+.sf-notes p { margin: 0; font-size: 11px; line-height: 1.75; color: var(--sf-sub); }
+/* Signature */
+.sf-sign { display: flex; justify-content: flex-end; padding: 34px 56px 22px 56px; }
+.sf-sign-col { width: 240px; text-align: center; }
+.sf-sign-role { font-size: 11px; color: var(--sf-muted); margin-bottom: 4px; }
+.sf-sign-space { position: relative; height: 88px; display: flex; align-items: center; justify-content: center; }
+.sf-sign-img { height: 64px; width: auto; object-fit: contain; position: relative; z-index: 2; }
+.sf-stamp-img { height: 92px; width: auto; object-fit: contain; position: absolute; top: -2px; left: 44px; opacity: 0.9; transform: rotate(-7deg); z-index: 3; }
+.sf-sign-name { display: inline-block; min-width: 190px; font-family: 'Outfit', 'Inter', sans-serif; font-size: 12.5px; font-weight: 700; color: var(--sf-ink); border-top: 1px solid var(--sf-line-strong); padding-top: 6px; }
+.sf-sign-title { font-size: 10px; color: var(--sf-muted); margin-top: 3px; }
+/* Footer */
+.sf-footer { border-top: 1px solid var(--sf-line); margin: auto 56px 0; padding: 15px 0 26px 0; text-align: center; font-size: 10px; color: var(--sf-muted); letter-spacing: 0.06em; }
+.sf-footer .sf-foot-tag { color: var(--sf-green); font-weight: 700; }
+@media screen {
+  html, body { height: auto; min-height: 100%; background: #eef1f4; }
+  body { padding: 24px; display: flex; justify-content: center; align-items: flex-start; }
+  .sf-page { min-height: 297mm; box-shadow: 0 18px 44px rgba(0,0,0,0.14); }
+}
+@media print {
+  html, body { width: 210mm; background: #fff; }
+  .sf-page { width: 210mm !important; min-height: 297mm !important; box-shadow: none !important; }
+  .sf-billrow, .sf-summary, .sf-payinfo .block, .sf-sign-col, .sf-tbl tr { break-inside: avoid; page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="sf-page">
+<div class="sf-topbar"><span></span></div>
+
+<header class="sf-header">
+<div class="sf-company">
+<div class="sf-company-name">${escapeHtml(brandProfile.brandName)}</div>
+<div class="sf-company-line izin">No Izin. ${escapeHtml(brandProfile.izinPpiu)}</div>
+<div class="sf-company-line">${escapeHtml(brandProfile.alamat)}</div>
+${contactLine ? `<div class="sf-company-line">${escapeHtml(contactLine)}</div>` : ""}
+</div>
+<img alt="Logo" class="sf-logo" decoding="sync" fetchpriority="high" src="${escapeHtml(logoUrl)}"/>
+</header>
+<div class="sf-div"></div>
+
+<section class="sf-billrow">
+<div class="sf-party to">
+<span class="sf-eyebrow">Ditagihkan Kepada</span>
+<div class="name">${escapeHtml(billToName)}</div>
+${payload.recipientName?.trim() ? `<div class="line">U.p. ${escapeHtml(payload.recipientName)}</div>` : ""}
+${payload.address?.trim() ? `<div class="line">${escapeHtml(payload.address).replace(/\n/g, "<br/>")}</div>` : ""}
+</div>
+<div class="sf-docmeta">
+<div class="sf-docmeta-no"><span>INVOICE</span>&nbsp;&nbsp;${escapeHtml(payload.invoiceNumber)}</div>
+<div class="sf-docmeta-rows">
+<div class="r"><span>Tanggal</span><b>${escapeHtml(formatDateLabel(payload.issueDateIso))}</b></div>
+${payload.dueDateIso ? `<div class="r"><span>Periode</span><b>${escapeHtml(formatDateLabel(payload.dueDateIso))}</b></div>` : ""}
+<div class="r"><span>Status</span><b class="${isPaidInvoice ? "paid" : "unpaid"}">${isPaidInvoice ? "Lunas" : "Belum Lunas"}</b></div>
+</div>
+</div>
+</section>
+
+<section class="sf-items">
+<table class="sf-tbl">
+<thead>
+<tr>
+<th>Deskripsi</th>
+<th class="sf-c">Pax</th>
+<th class="sf-r">Harga</th>
+<th class="sf-r">Total</th>
+${showTotalIdrColumn ? `<th class="sf-r">Total (IDR)</th>` : ""}
+</tr>
+</thead>
+<tbody>${itemRowsHtml}</tbody>
+</table>
+</section>
+
+<section class="sf-summary">
+<div class="sf-payinfo">
+<div class="block">
+<span class="sf-eyebrow">Instruksi Pembayaran</span>
+<div class="bank">
+<div class="acct">${escapeHtml(bankMeta.accountNumber)}</div>
+${escapeHtml(bankMeta.bankName)}<br/>
+<span class="an">a.n ${escapeHtml(beneficiaryName)}</span>
+</div>
+${ratesHtml ? `<div class="rates">Kurs&nbsp;&nbsp;${ratesHtml}</div>` : ""}
+</div>
+${notesHtml ? `<div class="block"><span class="sf-eyebrow">Catatan</span><div class="notes">${notesHtml}</div></div>` : ""}
+</div>
+<div class="sf-sumbox">
+<div class="row"><span>Total Tagihan</span><strong>${escapeHtml(totalHargaLabel)}</strong></div>
+<div class="sf-payhead"><span class="sf-eyebrow">Riwayat Pembayaran</span></div>
+${paymentLinesHtml}
+<div class="row grand"><span class="l">Sisa Pembayaran</span><span class="v">${escapeHtml(sisaLabel)}</span></div>
+</div>
+</section>
+
+<section class="sf-sign">
+<div class="sf-sign-col">
+<div class="sf-sign-role">Hormat kami,</div>
+<div class="sf-sign-space">${signatureInner}</div>
+<div class="sf-sign-name">${escapeHtml(brandProfile.directorName)}</div>
+<div class="sf-sign-title">${escapeHtml(brandProfile.directorTitle)}</div>
+</div>
+</section>
+
+<footer class="sf-footer">${escapeHtml(brandProfile.footerText)}${brandProfile.tagline?.trim() ? ` · <span class="sf-foot-tag">${escapeHtml(brandProfile.tagline)}</span>` : ""}</footer>
+</div>
+</body></html>`;
+}
+
 
 export async function exportInvoicePdf(
   payload: InvoiceExportPayload,
@@ -421,7 +765,8 @@ export async function exportInvoicePdf(
     return false;
   }
 
-  const logoUrl = new URL("/logo-ghaniya-travel-polos.png", window.location.origin).toString();
+  const brandProfile = resolveInvoiceBrand(payload.brand);
+  const logoUrl = new URL(brandProfile.logoFileName, window.location.origin).toString();
   const appCssUrl = new URL("/index.css", window.location.origin).toString();
   const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
   const statusLabel = resolvePaymentStatusLabel(payload);
@@ -430,7 +775,7 @@ export async function exportInvoicePdf(
   const taxPercentage = resolveTaxPercentage(payload);
   const bankMeta = resolveBankMeta(payload.bankAccountLabel);
   const billToName = resolveBillToName(payload);
-  const beneficiaryName = payload.bankAccountRecipient?.trim() || companyProfile.brandName;
+  const beneficiaryName = payload.bankAccountRecipient?.trim() || brandProfile.brandName;
 
   const valasCurrency = payload.currency || "IDR";
   const isRupiahOnly = payload.items.every((item) => isIdrCurrency(item.currency));
@@ -505,7 +850,7 @@ export async function exportInvoicePdf(
 
   const notesHtml = cleanNotes
     ? escapeHtml(cleanNotes).replace(/\n/g, "<br/>")
-    : "Thank you for choosing Ghaniya Tour & Travel for your spiritual pilgrimage. We look forward to serving your group.";
+    : escapeHtml(brandProfile.thankYouNote);
 
   const displaySubtotal = formatCurrency(payload.subtotal, valasCurrency);
   const displayTotalPayable = formatCurrency(payload.totalPayable, valasCurrency);
@@ -527,12 +872,30 @@ export async function exportInvoicePdf(
             .invoice-table th:nth-child(6), .invoice-table td:nth-child(6) { width: 16%; }
   `;
 
-  const printableHtml = `<!DOCTYPE html>
+  const printableHtml = brandProfile.layout === "sultan"
+    ? renderSultanInvoiceHtml({
+        payload,
+        brandProfile,
+        logoUrl,
+        appCssUrl,
+        fontsCssUrl,
+        billToName,
+        beneficiaryName,
+        bankMeta,
+        valasCurrency,
+        isSingleCurrencyBilling,
+        hasUsdItems,
+        hasSarItems,
+        isPaidInvoice,
+        notesHtml,
+        approvalAssets,
+      })
+    : `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <meta content="light only" name="color-scheme"/>
-<title>Invoice - Ghaniya Tour & Travel</title>
+<title>${escapeHtml(brandProfile.documentTitle)}</title>
 <link as="style" href="${escapeHtml(fontsCssUrl)}" rel="preload"/>
 <link as="style" href="${escapeHtml(appCssUrl)}" rel="preload"/>
 <link as="image" href="${escapeHtml(logoUrl)}" rel="preload"/>
@@ -1201,10 +1564,10 @@ ${approvalAssets.signatureDataUrl ? `<link as="image" href="${escapeHtml(approva
 <div class="invoice-header-left">
 <img alt="Logo" class="invoice-header-logo" decoding="sync" fetchpriority="high" src="${escapeHtml(logoUrl)}"/>
 <div class="invoice-header-info">
-<h1 class="invoice-header-title">PT. Ghaniya Zilia Rahman</h1>
-<span class="invoice-header-sub">IZIN PPIU: SK NO U.419 TAHUN 2021</span>
+<h1 class="invoice-header-title">${escapeHtml(brandProfile.brandName)}</h1>
+<span class="invoice-header-sub">IZIN PPIU: ${escapeHtml(brandProfile.izinPpiu)}</span>
 <p class="invoice-header-address">
-Graha Al Badegel Jl. Hajjah Tutty Alawiyah No.7, RT.2/RW.5, Kalibata, Kec. Pancoran, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta
+${escapeHtml(brandProfile.alamat)}
 </p>
 </div>
 </div>
@@ -1357,12 +1720,12 @@ ${approvalAssets.signatureDataUrl ? `<img alt="Tanda tangan terotorisasi" class=
 ${approvalAssets.stampDataUrl ? `<img alt="Cap terotorisasi" class="stamp-img" decoding="sync" src="${escapeHtml(approvalAssets.stampDataUrl)}"/>` : ""}
 ${!approvalAssets.signatureDataUrl && !approvalAssets.stampDataUrl ? `<span class="text-xs">Dokumen dibuat oleh sistem. Aset persetujuan belum tersedia.</span>` : ""}
 </div>
-<p class="signature-name">${escapeHtml(companyProfile.directorName)}</p>
-<p class="signature-title">${escapeHtml(companyProfile.directorTitle)}</p>
+<p class="signature-name">${escapeHtml(brandProfile.directorName)}</p>
+<p class="signature-title">${escapeHtml(brandProfile.directorTitle)}</p>
 </div>
 </section>
 <footer class="invoice-footer">
-<span class="invoice-footer-text">© 2026 PT. Ghaniya Zilia Rahman</span>
+<span class="invoice-footer-text">${escapeHtml(brandProfile.footerText)}</span>
 </footer>
 </div>
 </body></html>`;
