@@ -10,12 +10,23 @@ import path from "node:path";
 import { createStructuredLogger } from "../logging/create-structured-logger";
 import type { AuthTokenPayload } from "../auth/auth.types";
 import { InvoicesService } from "./invoices.service";
+import { extractInvoiceBrandFromNotes } from "./invoices-helpers";
 
 export type InvoiceDocumentAssetKind = "stamp" | "signature";
 
 const ASSET_FILE_NAMES: Record<InvoiceDocumentAssetKind, string> = {
   stamp: "stamp.png",
   signature: "signature.png",
+};
+
+/**
+ * Non-default brands keep their approval assets in a dedicated subdirectory.
+ * This is a fixed whitelist — the brand tag from `notes` never becomes a raw
+ * path segment, so it cannot be used to traverse outside the asset directory.
+ * The default brand (Ghaniya) and any unknown brand read from the root.
+ */
+const BRAND_ASSET_SUBDIRS: Record<string, string> = {
+  yahya: "yahya",
 };
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const MAX_ASSET_BYTES = 2 * 1024 * 1024;
@@ -58,8 +69,21 @@ export class InvoiceDocumentAssetsService {
     }
 
     const assetDirectory = path.resolve(configuredDirectory);
-    const assetPath = path.resolve(assetDirectory, ASSET_FILE_NAMES[args.kind]);
-    if (path.dirname(assetPath) !== assetDirectory) {
+    const brand = extractInvoiceBrandFromNotes(invoice.notes);
+    const brandSubdir = brand ? (BRAND_ASSET_SUBDIRS[brand] ?? "") : "";
+    const resolvedAssetDirectory = brandSubdir
+      ? path.resolve(assetDirectory, brandSubdir)
+      : assetDirectory;
+    // Whitelisted subdir only, but re-verify containment before touching the disk.
+    if (
+      resolvedAssetDirectory !== assetDirectory &&
+      !resolvedAssetDirectory.startsWith(assetDirectory + path.sep)
+    ) {
+      throw new ServiceUnavailableException("Invalid invoice document asset path.");
+    }
+
+    const assetPath = path.resolve(resolvedAssetDirectory, ASSET_FILE_NAMES[args.kind]);
+    if (path.dirname(assetPath) !== resolvedAssetDirectory) {
       throw new ServiceUnavailableException("Invalid invoice document asset path.");
     }
 

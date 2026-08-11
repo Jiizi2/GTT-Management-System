@@ -19,6 +19,7 @@ import {
   type InvoiceStatusOption,
   type InvoiceRow,
 } from "./invoice/helpers/invoice-page-shared";
+import { invoiceBrandOptions, resolveInvoiceBrand } from "../shared/invoice-brands";
 import type { GroupData } from "../shared/app-domain";
 
 export function CreateInvoiceWorkspace({
@@ -83,6 +84,7 @@ export function CreateInvoiceWorkspace({
     isWorkspaceBusy,
     formErrors,
     bankAccount,
+    brand,
     selectedClient,
     selectedGroup,
     nextInvoiceNumberPreview,
@@ -244,6 +246,30 @@ export function CreateInvoiceWorkspace({
 
                   <label className="space-y-1">
                     <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
+                      Brand / Penerbit
+                    </span>
+                    <Controller
+                      name="brand"
+                      control={methods.control}
+                      render={({ field }) => (
+                        <SereneSelect
+                          id="invoice-brand"
+                          className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
+                          value={field.value}
+                          onChange={(event) => field.onChange(event.target.value)}
+                        >
+                          {invoiceBrandOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </SereneSelect>
+                      )}
+                    />
+                  </label>
+
+                  <label className="space-y-1">
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">
                       Issuing Office
                     </span>
                     <Controller
@@ -363,7 +389,7 @@ export function CreateInvoiceWorkspace({
                         <strong className="text-primary font-extrabold uppercase">
                           {(() => {
                             const matchedBank = bankDisbursementOptions.find((o) => o.value === bankAccount);
-                            return matchedBank?.metadata?.penerima || matchedBank?.metadata?.beneficiary || matchedBank?.metadata?.recipient || matchedBank?.metadata?.recipientName || "PT. Ghaniya Zilia Rahman";
+                            return matchedBank?.metadata?.penerima || matchedBank?.metadata?.beneficiary || matchedBank?.metadata?.recipient || matchedBank?.metadata?.recipientName || resolveInvoiceBrand(brand).brandName;
                           })()}
                         </strong>
                       </div>

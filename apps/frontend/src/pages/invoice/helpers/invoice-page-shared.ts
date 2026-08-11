@@ -2,10 +2,13 @@ import { formatLocalIsoDate, type GroupData } from "../../../shared/app-domain";
 import type { BackendInvoiceClient, BackendInvoiceItem, BackendInvoiceRow } from "../../../hooks/use-invoice-backend";
 import { clampMoney, formatMoney, isMoneyAtLeast, roundMoney, sumMoney } from "../../../shared/money";
 import {
+  buildInvoiceBrandTag,
   buildInvoiceRatesTag,
+  parseInvoiceBrandTag,
   parseInvoiceRatesTag,
   stripInvoiceMetadataTags,
 } from "../../../shared/invoice-notes-tags";
+import { DEFAULT_INVOICE_BRAND } from "../../../shared/invoice-brands";
 
 export type InvoiceStatus = BackendInvoiceRow["status"];
 export type InvoiceRow = BackendInvoiceRow;
@@ -50,9 +53,11 @@ export type InvoiceWorkspaceInitialData = {
 };
 
 export const defaultBankDisbursementOptions: SelectOption[] = [
-  { value: "bsi", label: "Mandiri Syariah (BSI) - 7088 1234 5678" },
-  { value: "bca", label: "BCA (IDR) - 035 123 4455" },
-  { value: "bca_usd", label: "BCA (USD) - 035 998 7766" },
+  { value: "bsi", label: "Mandiri Syariah (BSI) - 7088 1234 5678", metadata: { penerima: "PT. Ghaniya Zilia Rahman" } },
+  { value: "bca", label: "BCA (IDR) - 035 123 4455", metadata: { penerima: "PT. Ghaniya Zilia Rahman" } },
+  { value: "bca_usd", label: "BCA (USD) - 035 998 7766", metadata: { penerima: "PT. Ghaniya Zilia Rahman" } },
+  { value: "yahya_main", label: "BSI - 7359108286", metadata: { penerima: "PT YAHYA TOUR INDONESIA" } },
+  { value: "yahya_tour", label: "BSI - 7359108286", metadata: { penerima: "PT YAHYA TOUR INDONESIA" } },
 ];
 
 export const defaultIssuingOfficeOptions: SelectOption[] = [
@@ -529,7 +534,9 @@ export async function viewInvoicePdfFromRow({
   const notesRaw = row.notes ?? "";
   const bankMatch = notesRaw.match(/\[BankAccount:([^\]]+)\]/);
   const bankKey = bankMatch && bankMatch[1] ? bankMatch[1].trim() : "bsi";
-  const matchedBank = bankDisbursementOptions?.find((option) => option.value === bankKey);
+  const matchedBank =
+    bankDisbursementOptions?.find((option) => option.value === bankKey) ??
+    defaultBankDisbursementOptions.find((option) => option.value === bankKey);
   const bankAccountLabel = matchedBank?.label ?? resolveBankAccountLabel(bankKey, bankDisbursementOptions);
   const bankAccountRecipient = matchedBank?.metadata?.penerima || matchedBank?.metadata?.beneficiary || matchedBank?.metadata?.recipient || matchedBank?.metadata?.recipientName;
 
@@ -557,12 +564,15 @@ export async function viewInvoicePdfFromRow({
     }
   }
 
+  const brand = parseInvoiceBrandTag(notesRaw) ?? DEFAULT_INVOICE_BRAND;
+
   // Strip metadata tags from notes for final printing
   const cleanNotes = stripInvoiceMetadataTags(notesRaw);
 
   return await exportInvoicePdf(
     {
       invoiceId: row.id,
+      brand,
       invoiceNumber: row.invoiceNumber,
       issueDateIso: row.issuedDateIso,
       dueDateIso: row.dueDateIso,
@@ -886,6 +896,11 @@ export function buildInvoicePayload({
   let payloadNotes = values.notes.trim();
   if (keepValasCurrency !== "IDR") {
     payloadNotes += `\n[KeepValasTotal:${keepValasCurrency}]`;
+  }
+  // Ghaniya is the implicit default, so only non-default brands write a tag —
+  // this keeps existing Ghaniya invoices' notes byte-for-byte unchanged.
+  if (values.brand && values.brand !== DEFAULT_INVOICE_BRAND) {
+    payloadNotes += `\n${buildInvoiceBrandTag(values.brand)}`;
   }
   payloadNotes += `\n${buildInvoiceRatesTag(usdToIdr, sarToIdr)}`;
   if (values.bankAccount) {
