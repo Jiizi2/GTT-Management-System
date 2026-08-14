@@ -21,6 +21,7 @@ function invoice(id: string, agentId: string, overrides: Partial<MemoryInvoice> 
     dueDateIso: "2026-07-10",
     amount: 99_000_000,
     downPaymentIdr: 50_000_000,
+    discountIdr: 0,
     status: InvoiceStatus.PENDING,
     notes: "PRIVATE INVOICE NOTE",
     description: "PRIVATE DESCRIPTION",

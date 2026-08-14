@@ -2,12 +2,15 @@ import { Injectable, BadRequestException } from "@nestjs/common";
 
 @Injectable()
 export class InvoiceValidator {
-  validateAmounts(payload: { amount?: number; downPaymentIdr?: number }): void {
+  validateAmounts(payload: { amount?: number; downPaymentIdr?: number; discountIdr?: number }): void {
     if (payload.downPaymentIdr !== undefined && payload.downPaymentIdr < 0) {
       throw new BadRequestException("Nominal downpayment tidak boleh kurang dari 0.");
     }
     if (payload.amount !== undefined && payload.amount < 0) {
       throw new BadRequestException("Nominal amount invoice tidak boleh kurang dari 0.");
+    }
+    if (payload.discountIdr !== undefined && payload.discountIdr < 0) {
+      throw new BadRequestException("Nominal diskon tidak boleh kurang dari 0.");
     }
   }
 
@@ -65,6 +68,7 @@ export class InvoiceValidator {
   validateInvoicePayloadInvariants(payload: {
     amount?: number;
     downPaymentIdr?: number;
+    discountIdr?: number;
     notes?: string;
     items?: unknown;
   }): void {

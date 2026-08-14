@@ -44,6 +44,7 @@ export type InvoiceWorkspaceInitialData = {
   dueDateIso: string;
   amount: number;
   downPaymentIdr: number;
+  discountIdr: number;
   status: InvoiceStatus;
   recipientName?: string;
   notes?: string;
@@ -367,6 +368,7 @@ export function createInvoiceWorkspaceInitialData(row: InvoiceRow): InvoiceWorks
     dueDateIso: row.dueDateIso,
     amount: clampMoney(row.amount),
     downPaymentIdr: resolveInvoiceDownPaymentIdr(row),
+    discountIdr: clampMoney(row.discountIdr ?? 0),
     status: row.status,
     recipientName: row.recipientName ?? "",
     notes: row.notes ?? "",
@@ -429,6 +431,11 @@ export function formatCurrencyLabel(value: number, currency: string): string {
 
 export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   currency: string;
+  /** Gross subtotal (before discount), in the display currency. */
+  grossSubtotal: number;
+  /** Discount, in the display currency (stored IDR-native, converted for valas). */
+  discount: number;
+  /** Net total payable (gross minus discount), in the display currency. */
   subtotal: number;
   downPayment: number;
   remainingBalance: number;
@@ -445,24 +452,20 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   }
 
   const rates = resolveExchangeRatesFromRow(row);
+  // `row.amount` is the stored NET total; the gross subtotal is reconstructed by
+  // adding the discount back so the PDF can show both lines.
   const amountIdr = clampMoney(row.amount);
+  const discountIdr = clampMoney(row.discountIdr ?? 0);
+  const grossIdr = clampMoney(amountIdr + discountIdr);
   const dpIdr = resolveInvoiceDownPaymentIdr(row);
 
-  if (keepValasCurrency === "IDR") {
-    return {
-      currency: "IDR",
-      subtotal: amountIdr,
-      downPayment: dpIdr,
-      remainingBalance: resolveInvoiceRemainingBalanceIdr(amountIdr, dpIdr),
-      usdToIdr: rates.usdToIdr,
-      sarToIdr: rates.sarToIdr,
-    };
-  }
+  const rate = keepValasCurrency === "USD" ? rates.usdToIdr : keepValasCurrency === "SAR" ? rates.sarToIdr : 0;
 
-  const rate = keepValasCurrency === "USD" ? rates.usdToIdr : rates.sarToIdr;
-  if (rate <= 0) {
+  if (keepValasCurrency === "IDR" || rate <= 0) {
     return {
       currency: "IDR",
+      grossSubtotal: grossIdr,
+      discount: discountIdr,
       subtotal: amountIdr,
       downPayment: dpIdr,
       remainingBalance: resolveInvoiceRemainingBalanceIdr(amountIdr, dpIdr),
@@ -472,9 +475,10 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
   }
 
   const items = row.items || [];
-  let targetSubtotal = 0;
+  let grossValas = 0;
   if (items.length > 0) {
-    targetSubtotal = sumMoney(
+    // Line items carry no discount, so their sum is the gross subtotal.
+    grossValas = sumMoney(
       items.map((item: BackendInvoiceItem) =>
         item.currency === keepValasCurrency
           ? clampMoney(item.pax * item.unitPrice)
@@ -482,15 +486,19 @@ export function resolveInvoiceDisplayTotals(row: InvoiceRow): {
       ),
     );
   } else {
-    targetSubtotal = clampMoney(amountIdr / rate);
+    grossValas = clampMoney(grossIdr / rate);
   }
 
+  const discountValas = clampMoney(discountIdr / rate);
+  const netValas = clampMoney(grossValas - discountValas);
   const targetDp = clampMoney(dpIdr / rate);
-  const targetRemaining = clampMoney(targetSubtotal - targetDp);
+  const targetRemaining = clampMoney(netValas - targetDp);
 
   return {
     currency: keepValasCurrency,
-    subtotal: targetSubtotal,
+    grossSubtotal: grossValas,
+    discount: discountValas,
+    subtotal: netValas,
     downPayment: targetDp,
     remainingBalance: targetRemaining,
     usdToIdr: rates.usdToIdr,
@@ -515,6 +523,9 @@ export async function viewInvoicePdfFromRow({
   const description = linkedGroup
     ? `${linkedGroup.packageName} Package - ${linkedGroup.durationDays} Days`
     : `Invoice ${row.invoiceNumber}`;
+  // The single fallback line shows the gross subtotal (net amount + discount) so
+  // the discount row below it subtracts down to the stored net total.
+  const grossFallbackAmount = clampMoney(row.amount + (row.discountIdr ?? 0));
   const printableItems =
     row.items && row.items.length > 0
       ? row.items
@@ -523,9 +534,9 @@ export async function viewInvoicePdfFromRow({
             description,
             pax: 1,
             currency: "IDR" as const,
-            unitPrice: row.amount,
-            totalPrice: row.amount,
-            totalPriceIdr: row.amount,
+            unitPrice: grossFallbackAmount,
+            totalPrice: grossFallbackAmount,
+            totalPriceIdr: grossFallbackAmount,
           },
         ];
   const totals = resolveInvoiceDisplayTotals(row);
@@ -588,8 +599,9 @@ export async function viewInvoicePdfFromRow({
       usdToIdr: totals.usdToIdr,
       sarToIdr: totals.sarToIdr,
       currency: totals.currency as any,
-      subtotal: totals.subtotal,
+      subtotal: totals.grossSubtotal,
       tax: 0,
+      discount: totals.discount,
       totalPayable: totals.subtotal,
       downPayment: totals.downPayment,
       remainingBalance: totals.remainingBalance,
@@ -616,6 +628,7 @@ export interface DerivedInvoiceState {
   >;
   paymentSummary: {
     subtotal: number;
+    discount: number;
     totalPayable: number;
     totalPaid: number;
     remainingBalance: number;
@@ -827,6 +840,25 @@ export function derivePreviewStatus(
   return previewStatus;
 }
 
+/** Convert an IDR-native discount into the display currency, clamped to `subtotal`. */
+export function resolveDiscountInCurrency(
+  discountIdr: number,
+  keepValasCurrency: "IDR" | "USD" | "SAR",
+  usdToIdr: number,
+  sarToIdr: number,
+  subtotalInCurrency: number,
+): number {
+  const sanitizedDiscount = clampMoney(discountIdr);
+  if (sanitizedDiscount <= 0) {
+    return 0;
+  }
+  const rate = keepValasCurrency === "USD" ? usdToIdr : keepValasCurrency === "SAR" ? sarToIdr : 0;
+  const discountInCurrency = keepValasCurrency === "IDR" || rate <= 0
+    ? sanitizedDiscount
+    : clampMoney(sanitizedDiscount / rate);
+  return Math.min(clampMoney(subtotalInCurrency), discountInCurrency);
+}
+
 export function deriveInvoiceState({
   items,
   payments,
@@ -834,6 +866,7 @@ export function deriveInvoiceState({
   sarToIdr,
   dueDateIso,
   keepValasCurrency,
+  discountIdr = 0,
 }: {
   items: InvoiceDraftItem[];
   payments: Array<{ amount: number; dateIso: string }>;
@@ -841,12 +874,13 @@ export function deriveInvoiceState({
   sarToIdr: number;
   dueDateIso?: string;
   keepValasCurrency: "IDR" | "USD" | "SAR";
+  discountIdr?: number;
 }): DerivedInvoiceState {
   const itemsWithTotals = deriveItemTotals(items, usdToIdr, sarToIdr);
   const subtotal = deriveSubtotal(itemsWithTotals, keepValasCurrency, usdToIdr, sarToIdr);
 
-  const taxAmount = 0;
-  const totalPayable = roundMoney(subtotal + taxAmount);
+  const discount = resolveDiscountInCurrency(discountIdr, keepValasCurrency, usdToIdr, sarToIdr, subtotal);
+  const totalPayable = clampMoney(subtotal - discount);
   const paymentsResult = derivePayments(payments, totalPayable);
   const previewStatus = derivePreviewStatus(paymentsResult, totalPayable, dueDateIso);
 
@@ -854,6 +888,7 @@ export function deriveInvoiceState({
     items: itemsWithTotals,
     paymentSummary: {
       subtotal,
+      discount,
       totalPayable,
       totalPaid: paymentsResult.totalPaid,
       remainingBalance: paymentsResult.remainingBalance,
@@ -928,6 +963,7 @@ export function buildInvoicePayload({
     dueDateIso: values.dueDateIso || "",
     amount: payloadAmountIdr,
     downPaymentIdr: totalPaidIdr,
+    discountIdr: clampMoney(values.discountIdr ?? 0),
     notes: payloadNotes,
     description: values.description || "",
     recipientName: values.recipientName?.trim() ?? "",

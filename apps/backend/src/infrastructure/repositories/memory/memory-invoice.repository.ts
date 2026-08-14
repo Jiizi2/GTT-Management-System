@@ -21,8 +21,12 @@ import {
   normalizeIsoDate,
   normalizeInvoiceLineItems,
   resolveInvoiceAmountFromItems,
+  extractInvoiceBrandFromNotes,
+  resolveInvoiceNumberPrefix,
   getTrimmedString,
   normalizeDownPaymentByAmount,
+  normalizeDiscountByGrossAmount,
+  resolveNetInvoiceAmount,
   normalizeInvoiceClientName,
   resolveNextClientSortOrder,
 } from "../../../invoices/invoices-helpers";
@@ -103,15 +107,22 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       : normalizeIsoDate(payload.dueDate!, "dueDate");
     const invoiceYear = this.generator.extractYearFromIsoDate(dueDateIso);
 
-    const existingInvoiceNumbers = this.memoryStore.invoices.map((inv) => inv.invoiceNumber);
+    // Serial counters are per-brand: only numbers sharing this brand's prefix
+    // advance its sequence, so Yahya (YHY) and Ghaniya (GTT) never share a serial.
+    const invoicePrefix = resolveInvoiceNumberPrefix(extractInvoiceBrandFromNotes(payload.notes));
+    const existingInvoiceNumbers = this.memoryStore.invoices
+      .map((inv) => inv.invoiceNumber)
+      .filter((invoiceNumber) => invoiceNumber.startsWith(`${invoicePrefix}/INV/`));
 
     const invoiceNumber = this.generator.buildInvoiceNumber(
       invoiceYear,
       this.generator.resolveNextSerial(existingInvoiceNumbers),
+      invoicePrefix,
     );
     const normalizedItems = normalizeInvoiceLineItems(payload.items, payload.notes) as MemoryInvoiceItem[];
-    const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
-    const roundedAmount = clampMoney(baseAmount);
+    const grossAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
+    const discountIdr = normalizeDiscountByGrossAmount(grossAmount, payload.discountIdr ?? 0);
+    const roundedAmount = resolveNetInvoiceAmount(grossAmount, discountIdr);
 
     let notes = getTrimmedString(payload.notes);
     if (isNoDueDate) {
@@ -153,6 +164,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: normalizedDownPaymentIdr,
+      discountIdr,
       status: effectiveStatus,
       notes: notes || undefined,
       description: getTrimmedString(payload.description) || undefined,
@@ -189,15 +201,20 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
           ? issuedDateIso
           : normalizeIsoDate(payload.dueDate!, "dueDate"));
 
-    const baseAmount = payload.amount !== undefined ? payload.amount : currentInvoice.amount;
+    const existingDiscount = clampMoney(currentInvoice.discountIdr ?? 0);
+    const existingGross = clampMoney(currentInvoice.amount + existingDiscount);
     const resolvedNotesForItems = payload.notes !== undefined ? payload.notes : (currentInvoice.notes ?? "");
     const normalizedItems = payload.items !== undefined
       ? (normalizeInvoiceLineItems(payload.items, resolvedNotesForItems) as MemoryInvoiceItem[])
       : (currentInvoice.items ?? []);
-    const resolvedAmount = payload.items !== undefined
-      ? resolveInvoiceAmountFromItems(baseAmount, normalizedItems)
-      : baseAmount;
-    const roundedAmount = clampMoney(resolvedAmount);
+    const grossAmount = payload.items !== undefined
+      ? resolveInvoiceAmountFromItems(payload.amount ?? existingGross, normalizedItems)
+      : clampMoney(payload.amount ?? existingGross);
+    const discountIdr = normalizeDiscountByGrossAmount(
+      grossAmount,
+      payload.discountIdr ?? existingDiscount,
+    );
+    const roundedAmount = resolveNetInvoiceAmount(grossAmount, discountIdr);
 
     let notes = payload.notes === undefined ? (currentInvoice.notes ?? "") : getTrimmedString(payload.notes);
     if (isNoDueDate) {
@@ -242,6 +259,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: normalizedDownPaymentIdr,
+      discountIdr,
       status: effectiveStatus,
       notes: notes || undefined,
       description: payload.description === undefined
@@ -274,6 +292,10 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
   }
 
   async ensureInvoiceRecipientNameColumn(): Promise<boolean> {
+    return true;
+  }
+
+  async ensureInvoiceDiscountColumn(): Promise<boolean> {
     return true;
   }
 
@@ -348,7 +370,8 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
   }
 
   private mapMemoryInvoiceToListItem(invoice: MemoryInvoice, client: MemoryInvoiceClient): InvoiceListItem {
-    const baseAmount = resolveStoredInvoiceAmount(invoice.amount, invoice.items);
+    const discountIdr = clampMoney(invoice.discountIdr ?? 0);
+    const baseAmount = resolveStoredInvoiceAmount(invoice.amount, invoice.items, discountIdr);
     const roundedAmount = clampMoney(baseAmount);
     const effectiveStatus = resolveEffectiveStatus(
       invoice.status,
@@ -373,6 +396,7 @@ export class MemoryInvoiceRepository implements InvoiceRepository {
       dueDateIso: isNoDueDate ? "" : invoice.dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, invoice.downPaymentIdr),
+      discountIdr,
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(invoice.dueDateIso),
       recipientName: invoice.recipientName,

@@ -34,6 +34,7 @@ export type InvoiceListItem = {
   dueDateIso: string;
   amount: number;
   downPaymentIdr: number;
+  discountIdr: number;
   status: InvoiceStatusLabel;
   monthKey: string;
   recipientName?: string;
@@ -79,6 +80,7 @@ export type MemoryInvoice = {
   dueDateIso: string;
   amount: number;
   downPaymentIdr: number;
+  discountIdr: number;
   status: InvoiceStatus;
   notes?: string;
   description?: string;
@@ -134,6 +136,7 @@ export type PrismaInvoiceItemRow = {
  */
 export type PrismaInvoiceSummaryRowWithOptionalDownPayment = PrismaInvoiceSummaryRow & {
   downPaymentIdr?: Prisma.Decimal | number | null;
+  discountIdr?: Prisma.Decimal | number | null;
   description?: string | null;
   itemsRel?: PrismaInvoiceItemRow[];
 };
@@ -262,6 +265,31 @@ export function normalizeDownPaymentByAmount(amount: number, downPaymentIdr: num
   return Math.min(sanitizedAmount, sanitizedDownPayment);
 }
 
+/**
+ * A discount can never exceed the gross subtotal — clamping it there keeps the
+ * net `amount` from going negative. Discount is IDR-native, matching `amount`.
+ */
+export function normalizeDiscountByGrossAmount(grossAmount: number, discountIdr: number): number {
+  const sanitizedGross = clampMoney(grossAmount);
+  const sanitizedDiscount = clampMoney(discountIdr);
+  return Math.min(sanitizedGross, sanitizedDiscount);
+}
+
+/**
+ * The stored `amount` is the NET total (gross subtotal minus discount). Every
+ * downstream derivation — status, down payment, remaining balance — runs against
+ * this net value, so the discount is applied once here and nowhere else.
+ */
+export function resolveNetInvoiceAmount(grossAmount: number, discountIdr: number): number {
+  const sanitizedGross = clampMoney(grossAmount);
+  const discount = normalizeDiscountByGrossAmount(sanitizedGross, discountIdr);
+  return clampMoney(sanitizedGross - discount);
+}
+
+export function toNumberDiscount(value: Prisma.Decimal | number | null | undefined): number {
+  return clampMoney(toNumberAmount(value));
+}
+
 export function resolveDisplayedDownPaymentByAmount(
   amount: number,
   status: InvoiceStatus,
@@ -329,6 +357,16 @@ export function extractInvoiceBrandFromNotes(notes: string | undefined): string 
   const match = notes.match(INVOICE_BRAND_TAG_PATTERN);
   if (!match || !match[1]) return null;
   return match[1].trim().toLowerCase();
+}
+
+/**
+ * Invoice-number prefix per issuer brand. Ghaniya keeps `GTT` so every existing
+ * invoice stays valid and its serial sequence is untouched; other brands get
+ * their own prefix, which — because the serial query filters by prefix — gives
+ * each brand an independent per-year counter (Yahya starts back at 0001).
+ */
+export function resolveInvoiceNumberPrefix(brand: string | null | undefined): string {
+  return brand === "yahya" ? "YHY" : "GTT";
 }
 
 export function normalizeInvoiceLineItem(
@@ -401,9 +439,13 @@ export function resolveInvoiceAmountFromItems(
 export function resolveStoredInvoiceAmount(
   amount: number,
   items: ReadonlyArray<InvoiceLineItem> | undefined,
+  discountIdr = 0,
 ): number {
   const normalizedAmount = clampMoney(amount);
-  if (normalizedAmount > 0 || !items || items.length === 0) {
+  // A discounted invoice already carries an authoritative net `amount` (which may
+  // legitimately be 0 for a full discount). Trust it instead of re-deriving the
+  // gross items total, which would silently discard the discount on read.
+  if (normalizedAmount > 0 || clampMoney(discountIdr) > 0 || !items || items.length === 0) {
     return normalizedAmount;
   }
 

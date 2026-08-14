@@ -37,6 +37,7 @@ export class InvoicesService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.queryService.ensurePrismaInvoiceDownPaymentColumn();
     await this.queryService.ensurePrismaInvoiceRecipientNameColumn();
+    await this.queryService.ensurePrismaInvoiceDiscountColumn();
   }
 
   async listClients(): Promise<InvoiceClientListItem[]> {

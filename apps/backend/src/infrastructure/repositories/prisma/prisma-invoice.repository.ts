@@ -23,7 +23,12 @@ import {
   normalizeIsoDate,
   normalizeInvoiceLineItems,
   resolveInvoiceAmountFromItems,
+  extractInvoiceBrandFromNotes,
+  resolveInvoiceNumberPrefix,
   normalizeDownPaymentByAmount,
+  normalizeDiscountByGrossAmount,
+  resolveNetInvoiceAmount,
+  toNumberDiscount,
   normalizeInvoiceClientName,
   resolveNextClientSortOrder,
   PrismaInvoiceSummaryRowWithOptionalDownPayment,
@@ -46,6 +51,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   private prismaInvoiceDownPaymentColumnInitPromise: Promise<boolean> | null = null;
   public prismaInvoiceRecipientNameColumnState: boolean | null = null;
   private prismaInvoiceRecipientNameColumnInitPromise: Promise<boolean> | null = null;
+  public prismaInvoiceDiscountColumnState: boolean | null = null;
+  private prismaInvoiceDiscountColumnInitPromise: Promise<boolean> | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -73,7 +80,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   }
 
   async findAll(agentId?: string): Promise<InvoiceListItem[]> {
-    const canReadInlineDownPayment = await this.ensureInvoiceDownPaymentColumn();
+    const readSelect = await this.buildInvoiceReadSelect();
 
     // Lazy sync overdue invoices in the database
     const todayUtc = createUtcDateFromIso(toIsoDateOnly(new Date()));
@@ -97,7 +104,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
     const invoices = (await this.prisma.invoice.findMany({
       where: agentId ? { agentId } : undefined,
-      select: canReadInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
+      select: readSelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
     })) as PrismaInvoiceSummaryRowWithOptionalDownPayment[];
 
@@ -111,7 +118,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
 
-    const canReadInlineDownPayment = await this.ensureInvoiceDownPaymentColumn();
+    const readSelect = await this.buildInvoiceReadSelect();
 
     const todayUtc = createUtcDateFromIso(toIsoDateOnly(new Date()));
     await this.prisma.invoice.updateMany({
@@ -134,7 +141,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
     const invoices = (await this.prisma.invoice.findMany({
       where: agentId ? { agentId } : undefined,
-      select: canReadInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
+      select: readSelect,
       orderBy: [{ dueDate: "desc" }, { invoiceNumber: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
@@ -216,8 +223,9 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     }
     Telemetry.end(queryTracker, { action: "create_pre_queries_success" });
 
-    const baseAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
-    const roundedAmount = clampMoney(baseAmount);
+    const grossAmount = resolveInvoiceAmountFromItems(payload.amount, normalizedItems);
+    const discountIdr = normalizeDiscountByGrossAmount(grossAmount, payload.discountIdr ?? 0);
+    const roundedAmount = resolveNetInvoiceAmount(grossAmount, discountIdr);
     let notes = getTrimmedString(payload.notes);
     if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
       notes = `${notes}\n[NoDueDate:true]`.trim();
@@ -234,14 +242,19 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       payload.downPaymentIdr ?? 0,
     );
     const canWriteInlineDownPayment = await this.ensureInvoiceDownPaymentColumn();
+    const canWriteInlineDiscount = await this.ensureInvoiceDiscountColumn();
+    const readSelect = await this.buildInvoiceReadSelect();
+    // Each brand owns an independent per-year serial; the lock is scoped to the
+    // brand prefix so two brands can mint numbers in parallel without collision.
+    const invoicePrefix = resolveInvoiceNumberPrefix(extractInvoiceBrandFromNotes(notes));
 
     const txTracker = Telemetry.start("invoice_transaction_ms");
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const created = await this.prisma.$transaction(async (tx) => {
-          await this.acquirePrismaTransactionLock(tx, "invoice-number-year", invoiceYear);
+          await this.acquirePrismaTransactionLock(tx, "invoice-number-year", `${invoicePrefix}-${invoiceYear}`);
 
-          const nextInvoiceNumber = await this.generator.generateNextInvoiceNumberWithPrisma(invoiceYear, tx);
+          const nextInvoiceNumber = await this.generator.generateNextInvoiceNumberWithPrisma(invoiceYear, tx, invoicePrefix);
           const createdInvoice = await tx.invoice.create({
             data: {
               invoiceNumber: nextInvoiceNumber,
@@ -268,12 +281,16 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
                 },
               },
               ...(canWriteInlineDownPayment ? { downPaymentIdr: normalizedDownPaymentIdr } : {}),
+              ...(canWriteInlineDiscount ? { discountIdr } : {}),
             },
-            select: canWriteInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
+            select: readSelect,
           });
 
           if (!canWriteInlineDownPayment) {
             await this.writePrismaInvoiceDownPaymentWithExecutor(tx, createdInvoice.id, normalizedDownPaymentIdr);
+          }
+          if (!canWriteInlineDiscount) {
+            await this.writePrismaInvoiceDiscountWithExecutor(tx, createdInvoice.id, discountIdr);
           }
 
           return createdInvoice;
@@ -281,7 +298,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
 
         Telemetry.end(txTracker, { attempt: attempt + 1, success: true });
         Telemetry.end(submitTracker, { success: true });
-        return this.mapPrismaInvoiceToListItem(created as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr);
+        return this.mapPrismaInvoiceToListItem(created as PrismaInvoiceSummaryRowWithOptionalDownPayment, normalizedDownPaymentIdr, discountIdr);
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -310,7 +327,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     this.validator.validateInvoicePayloadInvariants(payload);
 
     const queryTracker = Telemetry.start("invoice_db_query_ms");
-    const existing = await this.prisma.invoice.findUnique({
+    const canWriteInlineDiscount = await this.ensureInvoiceDiscountColumn();
+    const existing = (await this.prisma.invoice.findUnique({
       where: { id },
       select: {
         id: true,
@@ -327,13 +345,34 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         recipientName: true,
         status: true,
         version: true,
+        ...(canWriteInlineDiscount ? { discountIdr: true } : {}),
         itemsRel: {
           select: {
             id: true,
           },
         },
       },
-    });
+    })) as
+      | (Prisma.InvoiceGetPayload<{
+          select: {
+            id: true;
+            clientId: true;
+            agentId: true;
+            groupId: true;
+            invoiceNumber: true;
+            dueDate: true;
+            issuedDate: true;
+            amount: true;
+            downPaymentIdr: true;
+            notes: true;
+            description: true;
+            recipientName: true;
+            status: true;
+            version: true;
+            itemsRel: { select: { id: true } };
+          };
+        }> & { discountIdr?: Prisma.Decimal | number | null })
+      | null;
 
     if (!existing) {
       Telemetry.end(queryTracker, { action: "update_queries_failed" });
@@ -418,10 +457,20 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     }
     Telemetry.end(queryTracker, { action: "update_queries_success" });
 
-    const baseAmount = normalizedItems === undefined
-      ? (payload.amount ?? Number(existing.amount))
-      : resolveInvoiceAmountFromItems(payload.amount ?? Number(existing.amount), normalizedItems);
-    const roundedAmount = clampMoney(baseAmount);
+    // `existing.amount` is the stored NET total; reconstruct the gross subtotal so
+    // a discount change (or an unchanged discount alongside an item change) is
+    // applied exactly once. When the form submits items, gross comes from them and
+    // any `payload.amount` is ignored — matching create().
+    const existingDiscount = toNumberDiscount(existing.discountIdr);
+    const existingGross = clampMoney(Number(existing.amount) + existingDiscount);
+    const grossAmount = normalizedItems === undefined
+      ? clampMoney(payload.amount ?? existingGross)
+      : resolveInvoiceAmountFromItems(payload.amount ?? existingGross, normalizedItems);
+    const nextDiscountIdr = normalizeDiscountByGrossAmount(
+      grossAmount,
+      payload.discountIdr ?? existingDiscount,
+    );
+    const roundedAmount = resolveNetInvoiceAmount(grossAmount, nextDiscountIdr);
     let notes = payload.notes === undefined ? (existing.notes ?? "") : getTrimmedString(payload.notes);
     if (isNoDueDate && !notes.includes("[NoDueDate:true]")) {
       notes = `${notes}\n[NoDueDate:true]`.trim();
@@ -440,6 +489,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       payload.downPaymentIdr ?? Number(existing.downPaymentIdr),
     );
     const canWriteInlineDownPayment = await this.ensureInvoiceDownPaymentColumn();
+    const readSelect = await this.buildInvoiceReadSelect();
 
     const txTracker = Telemetry.start("invoice_transaction_ms");
     let updated: unknown = null;
@@ -462,6 +512,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
             : (getTrimmedString(payload.recipientName) || null),
           version: { increment: 1 },
           ...(canWriteInlineDownPayment ? { downPaymentIdr: nextDownPaymentIdr } : {}),
+          ...(canWriteInlineDiscount ? { discountIdr: nextDiscountIdr } : {}),
         };
 
 
@@ -511,11 +562,15 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
           });
         }
 
+        if (!canWriteInlineDiscount) {
+          await this.writePrismaInvoiceDiscountWithExecutor(tx, existing.id, nextDiscountIdr);
+        }
+
         const nextInvoice = await tx.invoice.findUnique({
           where: {
             id: existing.id,
           },
-          select: canWriteInlineDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect,
+          select: readSelect,
         });
 
         if (!canWriteInlineDownPayment) {
@@ -550,7 +605,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       throw error;
     }
 
-    return this.mapPrismaInvoiceToListItem(updated as PrismaInvoiceSummaryRowWithOptionalDownPayment, nextDownPaymentIdr);
+    return this.mapPrismaInvoiceToListItem(updated as PrismaInvoiceSummaryRowWithOptionalDownPayment, nextDownPaymentIdr, nextDiscountIdr);
   }
 
 
@@ -619,6 +674,44 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     return this.prismaInvoiceRecipientNameColumnInitPromise;
   }
 
+  async ensureInvoiceDiscountColumn(): Promise<boolean> {
+    if (this.prismaInvoiceDiscountColumnState !== null) {
+      return this.prismaInvoiceDiscountColumnState;
+    }
+
+    if (this.prismaInvoiceDiscountColumnInitPromise) {
+      return this.prismaInvoiceDiscountColumnInitPromise;
+    }
+
+    this.prismaInvoiceDiscountColumnInitPromise = (async () => {
+      try {
+        await this.prisma.$queryRawUnsafe(`SELECT "discountIdr" FROM "Invoice" LIMIT 1`);
+        this.prismaInvoiceDiscountColumnState = true;
+        return true;
+      } catch {
+        this.prismaInvoiceDiscountColumnState = false;
+        return false;
+      } finally {
+        this.prismaInvoiceDiscountColumnInitPromise = null;
+      }
+    })();
+
+    return this.prismaInvoiceDiscountColumnInitPromise;
+  }
+
+  /**
+   * The read select is assembled at runtime because `downPaymentIdr` and
+   * `discountIdr` are each probed lazily: an environment that has not run the
+   * matching migration must still read the rest of the invoice. A missing column
+   * simply means that field is absent from the row (and treated as 0).
+   */
+  private async buildInvoiceReadSelect(): Promise<Prisma.InvoiceSelect> {
+    const canReadDownPayment = await this.ensureInvoiceDownPaymentColumn();
+    const canReadDiscount = await this.ensureInvoiceDiscountColumn();
+    const base = canReadDownPayment ? invoiceSummarySelectWithDownPayment : invoiceSummarySelect;
+    return canReadDiscount ? { ...base, discountIdr: true } : { ...base };
+  }
+
   private resolvePrismaInvoiceInlineDownPayment(invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment): number | null {
     if ("downPaymentIdr" in invoice && invoice.downPaymentIdr !== null && invoice.downPaymentIdr !== undefined) {
       return Number(invoice.downPaymentIdr);
@@ -626,13 +719,23 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     return null;
   }
 
+  private resolvePrismaInvoiceInlineDiscount(invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment): number {
+    if ("discountIdr" in invoice && invoice.discountIdr !== null && invoice.discountIdr !== undefined) {
+      return toNumberDiscount(invoice.discountIdr);
+    }
+    return 0;
+  }
+
   private mapPrismaInvoiceToListItem(
     invoice: PrismaInvoiceSummaryRowWithOptionalDownPayment,
     downPaymentIdr = 0,
+    discountOverride?: number,
   ): InvoiceListItem {
     const dueDateIso = toIsoDateOnly(invoice.dueDate);
     const issuedDateIso = toIsoDateOnly(invoice.issuedDate);
-    
+
+    const discountIdr = discountOverride ?? this.resolvePrismaInvoiceInlineDiscount(invoice);
+
     const relationalItems = invoice.itemsRel?.map((item) => ({
       description: item.description,
       pax: item.pax,
@@ -643,7 +746,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     })) ?? [];
 
     const resolvedItems = relationalItems;
-    const baseAmount = resolveStoredInvoiceAmount(Number(invoice.amount), resolvedItems);
+    const baseAmount = resolveStoredInvoiceAmount(Number(invoice.amount), resolvedItems, discountIdr);
     const roundedAmount = clampMoney(baseAmount);
     const effectiveStatus = resolveEffectiveStatus(
       invoice.status,
@@ -670,6 +773,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       dueDateIso: isNoDueDate ? "" : dueDateIso,
       amount: roundedAmount,
       downPaymentIdr: resolveDisplayedDownPaymentByAmount(roundedAmount, effectiveStatus, downPaymentIdr),
+      discountIdr: clampMoney(discountIdr),
       status: toStatusLabel(effectiveStatus),
       monthKey: resolveMonthKey(dueDateIso),
       recipientName: invoice.recipientName ?? undefined,
@@ -866,6 +970,22 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
       );
     } catch {
       // Ignored for databases with missing downPaymentIdr column
+    }
+  }
+
+  private async writePrismaInvoiceDiscountWithExecutor(
+    executor: Prisma.TransactionClient,
+    invoiceId: string,
+    discountIdr: number,
+  ): Promise<void> {
+    try {
+      await executor.$executeRawUnsafe(
+        `UPDATE "Invoice" SET "discountIdr" = $1 WHERE "id" = $2`,
+        discountIdr,
+        invoiceId,
+      );
+    } catch {
+      // Ignored for databases with missing discountIdr column
     }
   }
 

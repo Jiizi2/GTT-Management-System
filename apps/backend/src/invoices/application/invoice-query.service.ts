@@ -70,4 +70,8 @@ export class InvoiceQueryService {
   async ensurePrismaInvoiceRecipientNameColumn(): Promise<boolean> {
     return this.invoiceRepo.ensureInvoiceRecipientNameColumn();
   }
+
+  async ensurePrismaInvoiceDiscountColumn(): Promise<boolean> {
+    return this.invoiceRepo.ensureInvoiceDiscountColumn();
+  }
 }

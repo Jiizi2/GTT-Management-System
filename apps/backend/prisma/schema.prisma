@@ -421,6 +421,7 @@ model Invoice {
   dueDate        DateTime
   amount         Decimal       @default(0) @db.Decimal(12, 2)
   downPaymentIdr Decimal       @default(0) @db.Decimal(12, 2)
+  discountIdr    Decimal       @default(0) @db.Decimal(12, 2)
   status         InvoiceStatus @default(PENDING)
   notes          String?
   description    String?

@@ -23,7 +23,7 @@ import {
 } from "../helpers/invoice-page-shared";
 import { clampMoney } from "../../../shared/money";
 import { parseInvoiceBrandTag, stripInvoiceMetadataTags } from "../../../shared/invoice-notes-tags";
-import { DEFAULT_INVOICE_BRAND } from "../../../shared/invoice-brands";
+import { DEFAULT_INVOICE_BRAND, resolveInvoiceNumberPrefix } from "../../../shared/invoice-brands";
 
 export const invoiceDraftItemSchema = z.object({
   id: z.string(),
@@ -51,6 +51,7 @@ export const invoiceWorkspaceFormSchema = z
     recipientName: z.string().optional(),
     bankAccount: z.string(),
     notes: z.string(),
+    discountIdr: z.number().optional(),
     items: z.array(invoiceDraftItemSchema),
     payments: z.array(z.object({
       amount: z.number(),
@@ -104,8 +105,8 @@ export function extractYearFromIsoDate(isoDate: string): string {
   return matched[1];
 }
 
-export function buildNextInvoiceNumber(existingInvoiceNumbers: string[], year: string): string {
-  const invoicePrefix = `GTT/INV/${year}/`;
+export function buildNextInvoiceNumber(existingInvoiceNumbers: string[], year: string, prefixCode = "GTT"): string {
+  const invoicePrefix = `${prefixCode}/INV/${year}/`;
   const matchingInvoiceNumbers = existingInvoiceNumbers
     .filter((num) => num.startsWith(invoicePrefix))
     .map((num) => {
@@ -223,6 +224,7 @@ export function useInvoiceWorkspaceForm({
       })(),
 
       notes: resolvedInitialInvoice?.notes ? stripInvoiceMetadataTags(resolvedInitialInvoice.notes) : "",
+      discountIdr: resolvedInitialInvoice?.discountIdr ?? 0,
       items: createInitialInvoiceDraftItems(resolvedInitialInvoice),
       payments: (() => {
         if (!resolvedInitialInvoice) return [];
@@ -290,8 +292,13 @@ export function useInvoiceWorkspaceForm({
   );
   const isManualClientSelected = selectedClientId === MANUAL_CLIENT_OPTION_ID;
   const nextInvoiceNumberPreview = useMemo(
-    () => buildNextInvoiceNumber(existingInvoiceNumbers, extractYearFromIsoDate(dueDateIso || issueDateIso || "")),
-    [existingInvoiceNumbers, dueDateIso, issueDateIso],
+    () =>
+      buildNextInvoiceNumber(
+        existingInvoiceNumbers,
+        extractYearFromIsoDate(dueDateIso || issueDateIso || ""),
+        resolveInvoiceNumberPrefix(brand),
+      ),
+    [existingInvoiceNumbers, dueDateIso, issueDateIso, brand],
   );
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -454,6 +461,7 @@ export function useInvoiceWorkspaceForm({
       usdToIdr,
       sarToIdr,
       keepValasCurrency,
+      discountIdr: values.discountIdr ?? 0,
     });
 
     const payload = buildInvoicePayload({
@@ -519,6 +527,7 @@ export function useInvoiceWorkspaceForm({
       usdToIdr,
       sarToIdr,
       keepValasCurrency,
+      discountIdr: values.discountIdr ?? 0,
     });
 
     const payload = buildInvoicePayload({

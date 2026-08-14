@@ -41,6 +41,8 @@ export type InvoiceExportPayload = {
   currency: InvoiceExportCurrency;
   subtotal: number;
   tax: number;
+  /** Discount subtracted from the gross subtotal, in the display currency. Optional for back-compat. */
+  discount?: number;
   totalPayable: number;
   downPayment: number;
   remainingBalance: number;
@@ -519,6 +521,13 @@ function renderSultanInvoiceHtml(ctx: SultanRenderContext): string {
     : "";
 
   const totalHargaLabel = formatCurrency(payload.totalPayable, valasCurrency);
+  const discountValue = clampMoney(payload.discount ?? 0);
+  const hasDiscount = discountValue > 0;
+  const grossSubtotalLabel = formatCurrency(payload.subtotal, valasCurrency);
+  const discountLabel = formatCurrency(discountValue, valasCurrency);
+  const discountColor = hasDiscount ? "color:#b91c1c;" : "";
+  const discountRowsHtml = `<div class="row"><span>Subtotal</span><strong>${escapeHtml(grossSubtotalLabel)}</strong></div>
+<div class="row"><span style="${discountColor}">Diskon</span><strong style="${discountColor}">${hasDiscount ? "- " : ""}${escapeHtml(discountLabel)}</strong></div>`;
   const sisaLabel = isPaidInvoice ? "LUNAS" : formatCurrency(payload.remainingBalance, valasCurrency);
 
   const contactLine = [brandProfile.phone, brandProfile.socialHandle]
@@ -551,8 +560,8 @@ ${approvalAssets.signatureDataUrl ? `<link as="image" href="${escapeHtml(approva
   --sf-green-deep: #026a02;
   --sf-gold: #b8860b;
   --sf-ink: #1b2230;
-  --sf-sub: #5c6470;
-  --sf-muted: #8a919c;
+  --sf-sub: #3f4653;
+  --sf-muted: #5c6470;
   --sf-line: #e7e9ec;
   --sf-line-strong: #cfd4da;
 }
@@ -567,12 +576,12 @@ body {
   color: var(--sf-ink);
   font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
-  font-size: 11.5px; line-height: 1.6;
+  font-size: 11.5px; line-height: 1.6; font-weight: 500;
 }
 img { image-rendering: -webkit-optimize-contrast; }
 .sf-r { font-variant-numeric: tabular-nums; }
 .sf-page { position: relative; width: 100%; max-width: 210mm; min-height: 297mm; margin: 0 auto; background: #ffffff; display: flex; flex-direction: column; }
-.sf-eyebrow { font-family: 'Outfit', 'Inter', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--sf-muted); }
+.sf-eyebrow { font-family: 'Outfit', 'Inter', sans-serif; font-size: 9.5px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sf-ink); }
 /* Thin brand accent at the very top */
 .sf-topbar { height: 4px; background: var(--sf-green); }
 .sf-topbar span { display: block; height: 100%; width: 24%; background: var(--sf-gold); }
@@ -591,35 +600,38 @@ img { image-rendering: -webkit-optimize-contrast; }
 .sf-party .sf-eyebrow { display: block; margin-bottom: 7px; }
 .sf-party .name { font-family: 'Outfit', 'Inter', sans-serif; font-size: 15px; font-weight: 700; color: var(--sf-ink); line-height: 1.3; }
 .sf-party .line { font-size: 11px; color: var(--sf-sub); margin-top: 4px; line-height: 1.6; }
-.sf-docmeta { flex: 0 0 auto; min-width: 200px; text-align: right; }
+.sf-docmeta { flex: 0 0 auto; min-width: 220px; text-align: right; border: 1px solid var(--sf-line-strong); border-radius: 9px; padding: 14px 16px; background: #fbfcfd; }
 .sf-docmeta-no { font-family: 'Outfit', 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: var(--sf-ink); letter-spacing: 0.01em; }
-.sf-docmeta-no span { color: var(--sf-muted); font-weight: 700; letter-spacing: 0.16em; font-size: 9.5px; }
+.sf-docmeta-no span { color: var(--sf-ink); font-weight: 800; letter-spacing: 0.16em; font-size: 9.5px; }
 .sf-docmeta-rows { margin-top: 9px; }
 .sf-docmeta-rows .r { display: flex; justify-content: flex-end; gap: 12px; font-size: 11px; padding: 2px 0; }
-.sf-docmeta-rows .r span { color: var(--sf-muted); }
+.sf-docmeta-rows .r span { color: var(--sf-sub); font-weight: 700; }
 .sf-docmeta-rows .r b { color: var(--sf-ink); font-weight: 700; min-width: 92px; text-align: right; }
 .sf-docmeta-rows .r b.paid { color: var(--sf-green); }
 .sf-docmeta-rows .r b.unpaid { color: #b45309; }
 /* Items table */
 .sf-items { padding: 30px 56px 0 56px; }
 .sf-tbl { width: 100%; border-collapse: collapse; }
-.sf-tbl thead th { font-family: 'Outfit', 'Inter', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sf-muted); padding: 0 0 11px 0; border-bottom: 1.5px solid var(--sf-ink); text-align: left; }
+.sf-tbl thead th { font-family: 'Outfit', 'Inter', sans-serif; font-size: 9.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sf-ink); padding: 0 0 11px 0; border-bottom: 1.5px solid var(--sf-ink); text-align: left; }
 .sf-tbl tbody td { font-size: 11.5px; padding: 13px 0; border-bottom: 1px solid var(--sf-line); vertical-align: top; color: var(--sf-sub); }
 .sf-tbl th + th, .sf-tbl td + td { padding-left: 18px; }
 .sf-tbl .sf-desc { font-weight: 700; color: var(--sf-ink); word-break: break-word; }
 .sf-tbl .sf-c { text-align: center; white-space: nowrap; }
 .sf-tbl .sf-r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Summary — payment instructions + notes (left) beside totals (right) */
-.sf-summary { display: flex; justify-content: space-between; gap: 52px; align-items: flex-start; padding: 32px 56px 0 56px; }
-.sf-payinfo { flex: 1; min-width: 0; max-width: 54%; }
-.sf-payinfo .block + .block { margin-top: 22px; }
+.sf-summary { display: flex; justify-content: space-between; gap: 52px; align-items: stretch; padding: 32px 56px 0 56px; }
+.sf-payinfo { flex: 1; min-width: 0; max-width: 54%; display: flex; flex-direction: column; }
+.sf-payinfo .block { border: 1px solid var(--sf-line-strong); border-radius: 9px; padding: 14px 16px; background: #fbfcfd; }
+.sf-payinfo .block + .block { margin-top: 16px; }
+/* Last block (Catatan) grows so its bottom edge lines up with the totals box. */
+.sf-payinfo .block:last-child { flex: 1 1 auto; }
 .sf-payinfo .sf-eyebrow { display: block; margin-bottom: 9px; }
 .sf-payinfo .bank { font-size: 12px; color: var(--sf-ink); line-height: 1.75; }
 .sf-payinfo .bank .acct { font-family: 'Outfit', 'Inter', sans-serif; font-size: 15px; font-weight: 700; color: var(--sf-green); letter-spacing: 0.02em; }
 .sf-payinfo .bank .an { color: var(--sf-sub); }
 .sf-payinfo .rates { margin-top: 9px; font-size: 11px; color: var(--sf-muted); }
 .sf-payinfo .notes { font-size: 11.5px; line-height: 1.8; color: var(--sf-ink); font-weight: 500; }
-.sf-sumbox { width: 320px; flex: 0 0 auto; }
+.sf-sumbox { width: 320px; flex: 0 0 auto; border: 1px solid var(--sf-line-strong); border-radius: 9px; padding: 16px 18px; background: #fbfcfd; }
 .sf-sumbox .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; padding: 7px 0; color: var(--sf-sub); }
 .sf-sumbox .row strong { color: var(--sf-ink); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sf-payhead { margin: 10px 0 4px; padding-top: 12px; border-top: 1px solid var(--sf-line); }
@@ -627,7 +639,7 @@ img { image-rendering: -webkit-optimize-contrast; }
 .sf-sumbox .row.pay { font-size: 11px; padding: 4px 0; color: var(--sf-muted); }
 .sf-sumbox .row.pay strong { color: var(--sf-sub); font-weight: 600; }
 .sf-sumbox .grand { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; padding-top: 13px; border-top: 2px solid var(--sf-ink); }
-.sf-sumbox .grand .l { font-family: 'Outfit', 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sf-muted); }
+.sf-sumbox .grand .l { font-family: 'Outfit', 'Inter', sans-serif; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sf-ink); }
 .sf-sumbox .grand .v { font-family: 'Outfit', 'Inter', sans-serif; font-size: 21px; font-weight: 700; color: var(--sf-green); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Payment instructions */
 .sf-bankblock { padding: 30px 56px 0 56px; }
@@ -724,6 +736,7 @@ ${ratesHtml ? `<div class="rates">Kurs&nbsp;&nbsp;${ratesHtml}</div>` : ""}
 ${notesHtml ? `<div class="block"><span class="sf-eyebrow">Catatan</span><div class="notes">${notesHtml}</div></div>` : ""}
 </div>
 <div class="sf-sumbox">
+${discountRowsHtml}
 <div class="row"><span>Total Tagihan</span><strong>${escapeHtml(totalHargaLabel)}</strong></div>
 <div class="sf-payhead"><span class="sf-eyebrow">Riwayat Pembayaran</span></div>
 ${paymentLinesHtml}
@@ -852,7 +865,10 @@ export async function exportInvoicePdf(
     ? escapeHtml(cleanNotes).replace(/\n/g, "<br/>")
     : escapeHtml(brandProfile.thankYouNote);
 
+  const discountValue = clampMoney(payload.discount ?? 0);
+  const hasDiscount = discountValue > 0;
   const displaySubtotal = formatCurrency(payload.subtotal, valasCurrency);
+  const displayDiscount = formatCurrency(discountValue, valasCurrency);
   const displayTotalPayable = formatCurrency(payload.totalPayable, valasCurrency);
   const displayDownPayment = formatCurrency(payload.downPayment, valasCurrency);
   const displayRemainingBalance = formatCurrency(payload.remainingBalance, valasCurrency);
@@ -1676,6 +1692,15 @@ ${hasUsdItems ? `
 <div class="invoice-subtotal-card">
   <div class="invoice-section-title" style="margin-bottom: 4px;">Total Pembayaran</div>
   <div style="border-top: 1px solid var(--invoice-gold); margin-bottom: 12px;"></div>
+
+  <div class="subtotal-row" style="font-size: 12.5px; color: #4a5568; margin-bottom: 6px;">
+    <span>Subtotal :</span>
+    <strong>${escapeHtml(displaySubtotal)}</strong>
+  </div>
+  <div class="subtotal-row" style="font-size: 12.5px; color: ${hasDiscount ? "#dc2626" : "#4a5568"}; font-weight: 700; margin-bottom: 8px;">
+    <span>Diskon :</span>
+    <strong>${hasDiscount ? "- " : ""}${escapeHtml(displayDiscount)}</strong>
+  </div>
 
   <div class="subtotal-row" style="font-size: 13.5px; font-weight: 700; color: #111111; margin-bottom: 8px;">
     <span>Total Tagihan :</span>

@@ -92,6 +92,15 @@ function isInvoiceBrandId(value: string): value is InvoiceBrandId {
   return value === "ghaniya" || value === "yahya";
 }
 
+/**
+ * Invoice-number prefix per brand. Ghaniya keeps `GTT` (existing invoices and
+ * its serial sequence are untouched); other brands get their own prefix so each
+ * has an independent per-year counter. Mirrors the backend `resolveInvoiceNumberPrefix`.
+ */
+export function resolveInvoiceNumberPrefix(brandId?: string): string {
+  return brandId?.trim().toLowerCase() === "yahya" ? "YHY" : "GTT";
+}
+
 /** Resolve a brand id (from a tag or form field) to its profile; falls back to Ghaniya. */
 export function resolveInvoiceBrand(id?: string): InvoiceBrandProfile {
   const normalized = id?.trim().toLowerCase() ?? "";

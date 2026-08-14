@@ -341,6 +341,101 @@ async function testCreateAndUpdatePersistInvoiceItems(): Promise<void> {
   }
 }
 
+async function testDiscountReducesNetAmountAndClampsToSubtotal(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    // Gross items total = 10,000,000; discount 1,500,000 → net 8,500,000.
+    const created = await service.create({
+      clientName: "Discount Client",
+      issuedDate: "2099-05-01",
+      dueDate: "2099-05-10",
+      amount: 0,
+      discountIdr: 1_500_000,
+      items: [
+        {
+          description: "Paket Umrah",
+          pax: 4,
+          currency: "IDR",
+          unitPrice: 2_500_000,
+          totalPrice: 10_000_000,
+          totalPriceIdr: 10_000_000,
+        },
+      ],
+    });
+    expect(created.discountIdr).toBe(1_500_000);
+    expect(created.amount).toBe(8_500_000);
+
+    // Net amount and discount survive a read.
+    const listed = await service.findAll();
+    expect(listed[0].amount).toBe(8_500_000);
+    expect(listed[0].discountIdr).toBe(1_500_000);
+
+    // A discount larger than the subtotal is clamped so the net never goes negative.
+    const overClamped = await service.update(created.id, {
+      version: created.version,
+      discountIdr: 999_000_000,
+    });
+    expect(overClamped.discountIdr).toBe(10_000_000);
+    expect(overClamped.amount).toBe(0);
+
+    // Paying the discounted net settles the invoice.
+    const settled = await service.update(created.id, {
+      version: overClamped.version,
+      discountIdr: 1_500_000,
+      downPaymentIdr: 8_500_000,
+    });
+    expect(settled.amount).toBe(8_500_000);
+    expect(settled.downPaymentIdr).toBe(8_500_000);
+    expect(settled.status).toBe("Paid");
+  } finally {
+    restore();
+  }
+}
+
+async function testInvoiceNumberPrefixDiffersByBrand(): Promise<void> {
+  const { service, restore } = await createMemoryInvoicesService();
+  try {
+    const ghaniyaOne = await service.create({
+      clientName: "Ghaniya Client",
+      issuedDate: "2099-01-01",
+      dueDate: "2099-01-10",
+      amount: 1_000_000,
+    });
+    expect(ghaniyaOne.invoiceNumber).toBe("GTT/INV/2099/0001");
+
+    // The brand rides in the notes tag; Yahya gets its own prefix and a serial
+    // that starts fresh at 0001 instead of continuing the Ghaniya counter.
+    const yahyaOne = await service.create({
+      clientName: "Yahya Client",
+      issuedDate: "2099-01-01",
+      dueDate: "2099-01-10",
+      amount: 2_000_000,
+      notes: "[Brand:yahya]",
+    });
+    expect(yahyaOne.invoiceNumber).toBe("YHY/INV/2099/0001");
+
+    const yahyaTwo = await service.create({
+      clientName: "Yahya Client 2",
+      issuedDate: "2099-01-02",
+      dueDate: "2099-01-12",
+      amount: 3_000_000,
+      notes: "[Brand:yahya]",
+    });
+    expect(yahyaTwo.invoiceNumber).toBe("YHY/INV/2099/0002");
+
+    // Ghaniya's counter is untouched by the Yahya invoices in between.
+    const ghaniyaTwo = await service.create({
+      clientName: "Ghaniya Client 2",
+      issuedDate: "2099-01-03",
+      dueDate: "2099-01-13",
+      amount: 4_000_000,
+    });
+    expect(ghaniyaTwo.invoiceNumber).toBe("GTT/INV/2099/0002");
+  } finally {
+    restore();
+  }
+}
+
 async function testCreateValidationErrors(): Promise<void> {
   const { service, restore } = await createMemoryInvoicesService();
   try {
@@ -1685,6 +1780,10 @@ describe("InvoicesService", () => {
   it("invoice create new clients and status rules", async () => testCreateCanCreateNewClientAndResolvesStatusRules());
   it("invoice create reuses existing client case-insensitively", async () => testCreateReusesExistingClientCaseInsensitively());
   it("invoice create and update persist items", async () => testCreateAndUpdatePersistInvoiceItems());
+  it("invoice discount reduces net amount and clamps to subtotal", async () =>
+    testDiscountReducesNetAmountAndClampsToSubtotal());
+  it("invoice number prefix differs by brand with independent serials", async () =>
+    testInvoiceNumberPrefixDiffersByBrand());
   it("invoice create validation errors", async () => testCreateValidationErrors());
   it("invoice update status client and group rules", async () => testUpdateSupportsClientSwitchStatusAndGroupRules());
   it("invoice update validation errors", async () => testUpdateValidationErrors());
