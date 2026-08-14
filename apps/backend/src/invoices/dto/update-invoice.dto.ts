@@ -83,6 +83,16 @@ export class UpdateInvoiceDto {
   downPaymentIdr?: number;
 
   @ApiPropertyOptional({
+    description: "Nominal diskon invoice terbaru dalam IDR (dipotong dari subtotal).",
+    example: 500000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  discountIdr?: number;
+
+  @ApiPropertyOptional({
     description: "Status invoice terbaru.",
     enum: InvoiceStatus,
     example: InvoiceStatus.PAID,

@@ -135,4 +135,70 @@ describe("invoice decimal amounts", () => {
     assert.equal(totals.subtotal, 505.2);
     assert.equal(totals.remainingBalance, 505.2);
   });
+
+  runCase("applies a Rupiah discount to the derived total payable", () => {
+    const derived = deriveInvoiceState({
+      items: [{ id: "line-1", description: "Paket", pax: 4, currency: "IDR", unitPrice: 2_500_000 }],
+      payments: [],
+      usdToIdr: 15845,
+      sarToIdr: 4225,
+      keepValasCurrency: "IDR",
+      discountIdr: 1_500_000,
+    });
+
+    assert.equal(derived.paymentSummary.subtotal, 10_000_000);
+    assert.equal(derived.paymentSummary.discount, 1_500_000);
+    assert.equal(derived.paymentSummary.totalPayable, 8_500_000);
+  });
+
+  runCase("clamps a discount larger than the subtotal so the total never goes negative", () => {
+    const derived = deriveInvoiceState({
+      items: [{ id: "line-1", description: "Paket", pax: 1, currency: "IDR", unitPrice: 2_000_000 }],
+      payments: [],
+      usdToIdr: 15845,
+      sarToIdr: 4225,
+      keepValasCurrency: "IDR",
+      discountIdr: 9_999_999,
+    });
+
+    assert.equal(derived.paymentSummary.discount, 2_000_000);
+    assert.equal(derived.paymentSummary.totalPayable, 0);
+  });
+
+  runCase("reconstructs the gross subtotal and discount for a stored discounted invoice", () => {
+    const totals = resolveInvoiceDisplayTotals({
+      id: "inv-2",
+      invoiceNumber: "GTT/INV/2026/0002",
+      clientId: "client-1",
+      agentId: "agent_gtt_direct",
+      agentName: "GTT Direct",
+      clientName: "Yassir",
+      clientLabel: "01. Yassir",
+      clientInitials: "Y",
+      issuedDateIso: "2026-07-01",
+      dueDateIso: "2026-07-31",
+      // Stored amount is the NET total (gross 10,000,000 minus 1,500,000 discount).
+      amount: 8_500_000,
+      downPaymentIdr: 0,
+      discountIdr: 1_500_000,
+      status: "Pending",
+      monthKey: "2026-07",
+      items: [
+        {
+          description: "Paket",
+          pax: 4,
+          currency: "IDR",
+          unitPrice: 2_500_000,
+          totalPrice: 10_000_000,
+          totalPriceIdr: 10_000_000,
+        },
+      ],
+    });
+
+    assert.equal(totals.currency, "IDR");
+    assert.equal(totals.grossSubtotal, 10_000_000);
+    assert.equal(totals.discount, 1_500_000);
+    assert.equal(totals.subtotal, 8_500_000);
+    assert.equal(totals.remainingBalance, 8_500_000);
+  });
 });

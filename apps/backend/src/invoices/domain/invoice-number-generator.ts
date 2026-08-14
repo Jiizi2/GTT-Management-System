@@ -17,8 +17,8 @@ export class InvoiceNumberGenerator {
     return serialValue;
   }
 
-  buildInvoiceNumber(year: string, serial: number): string {
-    return `GTT/INV/${year}/${String(serial).padStart(4, "0")}`;
+  buildInvoiceNumber(year: string, serial: number, prefix = "GTT"): string {
+    return `${prefix}/INV/${year}/${String(serial).padStart(4, "0")}`;
   }
 
   extractYearFromIsoDate(isoDate: string): string {
@@ -47,12 +47,14 @@ export class InvoiceNumberGenerator {
     // and the alternatives are coupling this file to Prisma's generated arg
     // types or adding generics that buy nothing.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    prismaClient: { invoice: { findFirst: (args: any) => Promise<any>; findMany: (args: any) => Promise<any[]> } }
+    prismaClient: { invoice: { findFirst: (args: any) => Promise<any>; findMany: (args: any) => Promise<any[]> } },
+    prefix = "GTT",
   ): Promise<string> {
+    const startsWith = `${prefix}/INV/${year}/`;
     const latest = await prismaClient.invoice.findFirst({
       where: {
         invoiceNumber: {
-          startsWith: `GTT/INV/${year}/`,
+          startsWith,
         },
       },
       select: {
@@ -64,19 +66,19 @@ export class InvoiceNumberGenerator {
     });
 
     if (!latest) {
-      return this.buildInvoiceNumber(year, 1);
+      return this.buildInvoiceNumber(year, 1, prefix);
     }
 
     const latestSerial = this.extractInvoiceSerial(latest.invoiceNumber);
     if (latestSerial) {
-      return this.buildInvoiceNumber(year, latestSerial + 1);
+      return this.buildInvoiceNumber(year, latestSerial + 1, prefix);
     }
 
     // Fallback for legacy malformed invoice formats that break lexical ordering.
     const records = await prismaClient.invoice.findMany({
       where: {
         invoiceNumber: {
-          startsWith: `GTT/INV/${year}/`,
+          startsWith,
         },
       },
       select: {
@@ -85,6 +87,6 @@ export class InvoiceNumberGenerator {
     });
 
     const nextSerial = this.resolveNextSerial(records.map((entry) => entry.invoiceNumber));
-    return this.buildInvoiceNumber(year, nextSerial);
+    return this.buildInvoiceNumber(year, nextSerial, prefix);
   }
 }

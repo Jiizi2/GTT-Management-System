@@ -38,6 +38,7 @@ export type BackendInvoiceRow = {
   dueDateIso: string;
   amount: number;
   downPaymentIdr: number;
+  discountIdr: number;
   status: BackendInvoiceStatus;
   monthKey: string;
   recipientName?: string;
@@ -56,6 +57,7 @@ export type CreateBackendInvoicePayload = {
   dueDateIso: string;
   amount: number;
   downPaymentIdr?: number;
+  discountIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
   description?: string;
@@ -73,6 +75,7 @@ export type UpdateBackendInvoicePayload = {
   dueDateIso?: string;
   amount?: number;
   downPaymentIdr?: number;
+  discountIdr?: number;
   status?: BackendInvoiceStatus;
   notes?: string;
   description?: string;
@@ -105,6 +108,7 @@ type BackendInvoiceRecord = {
   dueDateIso?: unknown;
   amount?: unknown;
   downPaymentIdr?: unknown;
+  discountIdr?: unknown;
   status?: unknown;
   monthKey?: unknown;
   recipientName?: unknown;
@@ -259,6 +263,7 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
   const amount = clampMoney(readNumber(record.amount, 0));
   const rawDownPaymentIdr = clampMoney(readNumber(record.downPaymentIdr, 0));
   const downPaymentIdr = rawDownPaymentIdr > 0 ? Math.min(rawDownPaymentIdr, amount) : status === "Paid" ? amount : 0;
+  const discountIdr = clampMoney(readNumber(record.discountIdr, 0));
   const defaultClientInitials = clientName
     .split(/\s+/)
     .map((chunk) => chunk[0]?.toUpperCase())
@@ -281,6 +286,7 @@ function mapBackendInvoice(record: BackendInvoiceRecord): BackendInvoiceRow | nu
     dueDateIso,
     amount,
     downPaymentIdr,
+    discountIdr,
     status,
     monthKey: readString(record.monthKey, monthKeyFromDueDate),
     recipientName: readOptionalString(record.recipientName),
@@ -420,6 +426,7 @@ export async function createInvoiceInBackend(payload: CreateBackendInvoicePayloa
       dueDate: payload.dueDateIso.trim(),
       amount: clampMoney(payload.amount),
       downPaymentIdr: payload.downPaymentIdr !== undefined ? clampMoney(payload.downPaymentIdr) : undefined,
+      discountIdr: payload.discountIdr !== undefined ? clampMoney(payload.discountIdr) : undefined,
       status: payload.status ? mapInvoiceStatusForBackend(payload.status) : undefined,
       notes: payload.notes?.trim() || undefined,
       description: payload.description?.trim() || undefined,
@@ -473,6 +480,9 @@ export async function updateInvoiceInBackend(
   }
   if (payload.downPaymentIdr !== undefined) {
     requestBody.downPaymentIdr = clampMoney(payload.downPaymentIdr);
+  }
+  if (payload.discountIdr !== undefined) {
+    requestBody.discountIdr = clampMoney(payload.discountIdr);
   }
   if (payload.status !== undefined) {
     requestBody.status = mapInvoiceStatusForBackend(payload.status);

@@ -27,6 +27,7 @@ export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
   const items = useWatch({ control, name: "items" }) || [];
   const payments = useWatch({ control, name: "payments" }) || [];
   const dueDateIso = useWatch({ control, name: "dueDateIso" });
+  const discountIdr = useWatch({ control, name: "discountIdr" }) || 0;
 
   const derived = useMemo(() => {
     return deriveInvoiceState({
@@ -36,11 +37,12 @@ export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
       sarToIdr,
       dueDateIso,
       keepValasCurrency,
+      discountIdr,
     });
-  }, [items, payments, usdToIdr, sarToIdr, dueDateIso, keepValasCurrency]);
+  }, [items, payments, usdToIdr, sarToIdr, dueDateIso, keepValasCurrency, discountIdr]);
 
   const subtotal = derived.paymentSummary.subtotal;
-  const taxAmount = 0;
+  const discountAmount = derived.paymentSummary.discount;
   const totalPayable = derived.paymentSummary.totalPayable;
   const normalizedDownPayment = derived.paymentSummary.totalPaid;
   const remainingBalance = derived.paymentSummary.remainingBalance;
@@ -71,10 +73,15 @@ export const InvoiceSummaryCard = memo(function InvoiceSummaryCard({
               <strong className="text-xs text-on-surface">{formatNumberInput(subtotal, invoiceCurrency)}</strong>
             </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-on-surface-variant">Tax (0%)</span>
-            <strong className="text-xs text-on-surface">{formatNumberInput(taxAmount)}</strong>
-          </div>
+          {discountAmount > 0 ? (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-on-surface-variant">Diskon</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-[10px] font-bold text-rose-500/70">{invoiceCurrency}</span>
+                <strong className="text-xs text-rose-600">-{formatNumberInput(discountAmount, invoiceCurrency)}</strong>
+              </div>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between">
             <span className="text-xs text-on-surface-variant">Preview Status</span>
             <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold border ${getStatusClasses(previewStatus as any, isDarkMode)}`}>

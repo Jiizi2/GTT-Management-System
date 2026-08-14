@@ -12,4 +12,5 @@ export interface InvoiceRepository {
   delete(id: string): Promise<void>;
   ensureInvoiceDownPaymentColumn(): Promise<boolean>;
   ensureInvoiceRecipientNameColumn(): Promise<boolean>;
+  ensureInvoiceDiscountColumn(): Promise<boolean>;
 }

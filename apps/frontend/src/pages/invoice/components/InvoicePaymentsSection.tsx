@@ -5,6 +5,7 @@ import { DatePickerInput } from "../../../components/date-time-pickers";
 import {
   calculateSubtotalInCurrency,
   formatNumberInput,
+  resolveDiscountInCurrency,
 } from "../helpers/invoice-page-shared";
 import { clampMoney, sumMoney } from "../../../shared/money";
 import { MoneyInput } from "./MoneyInput";
@@ -23,6 +24,7 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
   const { control, setValue, watch } = useFormContext();
   const payments = useWatch({ control, name: "payments" }) || [];
   const items = useWatch({ control, name: "items" }) || [];
+  const discountIdr = useWatch({ control, name: "discountIdr" }) || 0;
 
   const {
     fields: paymentFields,
@@ -37,8 +39,11 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
     return calculateSubtotalInCurrency(items, keepValasCurrency, usdToIdr, sarToIdr);
   }, [items, keepValasCurrency, usdToIdr, sarToIdr]);
 
-  const taxAmount = 0;
-  const totalPayable = subtotal + taxAmount;
+  const discountInCurrency = useMemo(
+    () => resolveDiscountInCurrency(discountIdr, keepValasCurrency, usdToIdr, sarToIdr, subtotal),
+    [discountIdr, keepValasCurrency, usdToIdr, sarToIdr, subtotal],
+  );
+  const totalPayable = clampMoney(subtotal - discountInCurrency);
   const totalPaid = useMemo(() => {
     return sumMoney(payments.map((p: any) => Number(p.amount) || 0));
   }, [payments]);
@@ -67,6 +72,31 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
           <span className="material-symbols-outlined text-[12px]" aria-hidden="true">add</span>
           <span>Tambah Pembayaran</span>
         </button>
+      </div>
+
+      <div className="rounded-xl border border-rose-200/60 bg-rose-50/40 dark:border-rose-900/40 dark:bg-rose-950/10 p-3 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <label
+            htmlFor="invoice-discount-input"
+            className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-rose-600"
+          >
+            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">sell</span>
+            Diskon (Rp)
+          </label>
+          <div className="flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-surface-container-lowest px-2 py-1 h-9 w-40">
+            <span className="text-[9px] font-extrabold text-rose-500">IDR</span>
+            <MoneyInput
+              id="invoice-discount-input"
+              className="min-w-0 flex-1 border-none bg-transparent p-0 text-right text-xs font-extrabold text-on-surface outline-none ring-0 focus:ring-0"
+              value={discountIdr}
+              onChange={(nextDiscount) => setValue("discountIdr", nextDiscount, { shouldDirty: true })}
+              ariaLabel="Nominal diskon invoice dalam rupiah"
+            />
+          </div>
+        </div>
+        <p className="text-[9px] leading-snug text-on-surface-variant/70">
+          Potongan langsung dari subtotal. Selalu dalam Rupiah; total tagihan &amp; sisa dihitung setelah diskon.
+        </p>
       </div>
 
       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
