@@ -26,7 +26,7 @@ export function VisaDetailHeader() {
       <header>
         <button
           type="button"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-sm font-bold leading-none text-on-surface transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
           onClick={onBack}
         >
           <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -38,13 +38,13 @@ export function VisaDetailHeader() {
       </header>
 
       {group?.parentGroupId && (
-        <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-xs dark:border-sky-500/40 dark:bg-sky-900/20 dark:text-sky-200">
-          <span className="material-symbols-outlined text-base text-sky-700 dark:text-sky-300" aria-hidden="true">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-xs">
+          <span className="material-symbols-outlined text-base text-sky-700" aria-hidden="true">
             info
           </span>
           <div>
             <strong>Grup Operasional Terhubung</strong>
-            <p className="mt-0.5 text-[11px] text-sky-600 font-medium dark:text-sky-300">
+            <p className="mt-0.5 text-[11px] text-sky-600 font-medium">
               Grup ini mengikuti data operasional dari Group (
               {
                 groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)
@@ -56,23 +56,23 @@ export function VisaDetailHeader() {
         </div>
       )}
 
-      <section className="flex flex-col gap-4 rounded-3xl border border-outline-variant/40 bg-brand-neutral p-4 shadow-sm sm:p-5 md:flex-row md:items-start md:justify-between">
+      <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-brand-neutral p-4 shadow-sm sm:p-5 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-primary">
             Visa Detail
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <h1 className="break-words text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
+            <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               {row.groupCode}
             </h1>
             {familyGroups.length > 1 && (
               <div
-                className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-outline-variant/50 bg-surface-container-low px-2 py-1 font-semibold text-on-surface-variant sm:inline-flex ${
+                className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 sm:inline-flex ${
                   familyGroups.length > 2 ? "text-[10px]" : "text-xs"
                 }`}
               >
                 <div className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm text-on-surface-variant/70" aria-hidden="true">
+                  <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">
                     link
                   </span>
                   <span>Terhubung:</span>
@@ -82,18 +82,18 @@ export function VisaDetailHeader() {
                     .filter((g) => g.code !== activeGroupCode)
                     .map((g, index) => (
                       <span key={g.code} className="inline-flex items-center gap-0.5">
-                        {index > 0 && <span className="mr-1.5 text-on-surface-variant/60">,</span>}
+                        {index > 0 && <span className="mr-1.5 text-slate-300">,</span>}
                         <button
                           type="button"
                           onClick={() => setActiveGroupCode(g.code)}
-                          className="font-bold text-on-surface hover:underline"
+                          className="font-bold text-slate-900 hover:underline"
                         >
                           {g.code}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenUnlinkModal(g)}
-                          className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-on-surface-variant/70 hover:text-rose-600 transition dark:hover:bg-rose-900/30 dark:hover:text-rose-300"
+                          className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
                           title="Pisahkan grup ini"
                         >
                           <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
@@ -106,7 +106,7 @@ export function VisaDetailHeader() {
               </div>
             )}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <p className="min-w-0 break-words">{group?.name ?? row.groupName}</p>
             <span className="inline-flex rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary">
               <span className="sm:hidden">{totalPax} Pax</span>
@@ -118,7 +118,7 @@ export function VisaDetailHeader() {
         <div className="flex w-full flex-wrap items-center gap-2 self-start md:w-auto">
           <button
             type="button"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface transition hover:border-brand-primary hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
             onClick={openGroupEditModal}
             disabled={!group}
             aria-label={`Edit group info for ${row.groupCode}`}
@@ -145,7 +145,7 @@ export function VisaDetailHeader() {
             className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition sm:flex-none ${
               isWhatsappCopied
                 ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
-                : "border-outline-variant/60 bg-surface-container-lowest text-on-surface hover:border-brand-primary hover:text-brand-primary"
+                : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-brand-primary hover:text-brand-primary"
             }`}
             onClick={handleCopyWhatsapp}
             aria-label={`Copy WhatsApp formatted details for ${row.groupCode}`}

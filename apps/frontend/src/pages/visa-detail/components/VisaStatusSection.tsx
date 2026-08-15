@@ -20,9 +20,9 @@ export function VisaStatusSection() {
   return (
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Quick status">
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Visa Status</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Status</p>
             <div
               className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 visaTone
@@ -44,9 +44,9 @@ export function VisaStatusSection() {
           </button>
         </article>
 
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Visa Type</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visa Type</p>
             <div
               className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 "success"
@@ -68,9 +68,9 @@ export function VisaStatusSection() {
           </button>
         </article>
 
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Payment Status</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Status</p>
             <div
               className={`mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-sm font-bold leading-tight ${getToneClasses(
                 paymentTone
@@ -92,9 +92,9 @@ export function VisaStatusSection() {
           </button>
         </article>
 
-        <article className="flex items-start justify-between gap-3 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3 sm:p-4">
+        <article className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-3 sm:p-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               <span className="sm:hidden">Raudhah</span>
               <span className="hidden sm:inline">Raudhah Appointment</span>
             </p>
@@ -124,8 +124,8 @@ export function VisaStatusSection() {
         <section
           className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm ${
             draftAssignFeedback.tone === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-900/20 dark:text-emerald-300"
-              : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-900/20 dark:text-rose-300"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-rose-200 bg-rose-50 text-rose-700"
           }`}
           role="status"
           aria-live="polite"

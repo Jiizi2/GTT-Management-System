@@ -229,14 +229,14 @@ export function VisaDetailModals() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" aria-hidden="true">
+              <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
                 warning
               </span>
               <div className="min-w-0">
-                <h3 id="delete-agreement-title" className="text-lg font-extrabold text-on-surface">
+                <h3 id="delete-agreement-title" className="text-lg font-extrabold text-slate-900">
                   {deleteAgreementDraft.draft ? "Unassign" : "Delete"} {deleteAgreementCityLabel} Agreement?
                 </h3>
-                <p id="delete-agreement-description" className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+                <p id="delete-agreement-description" className="mt-1 text-sm leading-relaxed text-slate-600">
                   Agreement <strong>{deleteAgreementDraft.agreement.agreementNumber}</strong> untuk hotel{" "}
                   <strong>{deleteAgreementDraft.agreement.hotelName}</strong>{" "}
                   {deleteAgreementDraft.draft ? (
@@ -256,7 +256,7 @@ export function VisaDetailModals() {
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                className="rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
+                className="rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-surface-container-high"
                 onClick={() => setDeleteAgreementDraft(null)}
               >
                 Batal
@@ -293,14 +293,14 @@ export function VisaDetailModals() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" aria-hidden="true">
+              <span className="material-symbols-outlined rounded-full bg-rose-100 p-2 text-rose-700" aria-hidden="true">
                 warning
               </span>
               <div className="min-w-0">
-                <h3 id="clear-raudhah-title" className="text-lg font-extrabold text-on-surface">
+                <h3 id="clear-raudhah-title" className="text-lg font-extrabold text-slate-900">
                   Clear Raudhah Dates?
                 </h3>
-                <p id="clear-raudhah-description" className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+                <p id="clear-raudhah-description" className="mt-1 text-sm leading-relaxed text-slate-600">
                   Semua tanggal appointment Raudhah untuk group <strong>{row.groupCode}</strong> akan dihapus. Tindakan
                   ini tidak bisa dibatalkan.
                 </p>
@@ -310,7 +310,7 @@ export function VisaDetailModals() {
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                className="rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high"
+                className="rounded-xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-surface-container-high"
                 onClick={() => setIsClearRaudhahConfirmOpen(false)}
               >
                 Batal
