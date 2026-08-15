@@ -171,7 +171,7 @@ async function testNavigationItems(): Promise<void> {
   assertEqual(sidebarAccountItem.id, "profile");
   assertStringArrayEqual(
     mobileItems.map((item) => item.id),
-    ["overview", "checklist", "visa", "profile"],
+    ["overview", "checklist", "visa", "statistics"],
   );
 }
 

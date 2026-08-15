@@ -20,12 +20,6 @@ const quickActions: QuickAction[] = [
     icon: "add_circle",
   },
   {
-    id: "statistics",
-    label: "Statistics",
-    description: "Lihat tren performa operasional, visa, dan agent.",
-    icon: "monitoring",
-  },
-  {
     id: "agreement-inbox",
     label: "Agreement Inbox",
     description: "Input agreement hotel sebelum group number tersedia.",
@@ -36,6 +30,12 @@ const quickActions: QuickAction[] = [
     label: "Invoice List",
     description: "Kelola daftar invoice dan status pembayarannya.",
     icon: "request_quote",
+  },
+  {
+    id: "profile",
+    label: "Profile",
+    description: "Pengaturan akun dan preferensi operator.",
+    icon: "account_circle",
   },
   {
     id: "master-data",
