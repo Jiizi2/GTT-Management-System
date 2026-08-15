@@ -33,6 +33,7 @@ import { ConfigService } from "@nestjs/config";
 import { resolveConfiguredDataSource } from "../../config/app-config";
 import { GroupRepository } from "../../domain/repositories/group.repository";
 import { AgentsService, GTT_DIRECT_AGENT_ID } from "../../agents/agents.service";
+import { DirectoryService } from "../../directory/directory.service";
 
 @Injectable()
 export class GroupsService {
@@ -45,6 +46,7 @@ export class GroupsService {
     @Inject("GroupRepository") private readonly groupRepo: GroupRepository,
     private readonly configService?: ConfigService,
     private readonly agentsService?: AgentsService,
+    private readonly directoryService?: DirectoryService,
   ) {
     this.dataSource = resolveConfiguredDataSource(this.configService);
 
@@ -345,6 +347,25 @@ export class GroupsService {
       idOrCode,
       payload,
     );
+
+    // Silently record the driver into the global directory. Best-effort: a
+    // directory hiccup must never block the checklist confirmation.
+    if (this.directoryService) {
+      try {
+        await this.directoryService.upsertDriverFromCheckin({
+          name: payload.driver.name,
+          phone: payload.driver.phone,
+          plateNumber: payload.driver.plateNumber,
+          muassasahId: payload.driver.muassasahId,
+        });
+      } catch (error) {
+        this.logger.warn(
+          { err: error, idOrCode },
+          "Failed to record checklist driver into the directory",
+        );
+      }
+    }
+
     const auditGroupIdentity = {
       groupCode: confirmed.groupCode,
     };

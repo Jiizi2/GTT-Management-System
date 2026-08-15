@@ -5,9 +5,10 @@ import { HotelAgreementDraftsService } from "./application/hotel-agreement-draft
 import { HotelAgreementDraftsController } from "./http/hotel-agreement-drafts.controller";
 import { RepositoriesModule } from "../infrastructure/repositories/repositories.module";
 import { AgentsModule } from "../agents/agents.module";
+import { DirectoryModule } from "../directory/directory.module";
 
 @Module({
-  imports: [forwardRef(() => RepositoriesModule), AgentsModule],
+  imports: [forwardRef(() => RepositoriesModule), AgentsModule, DirectoryModule],
   controllers: [GroupsController, HotelAgreementDraftsController],
   providers: [GroupsService, HotelAgreementDraftsService],
   exports: [GroupsService],
