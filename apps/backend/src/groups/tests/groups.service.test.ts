@@ -536,6 +536,65 @@ describe("GroupsService", () => {
     }
   });
 
+  runCase("assigning an agreement auto-advances visa status DRAFT <-> PENDING", async () => {
+    const { service, restore } = await createMemoryService();
+
+    type VisaView = { visaSetup: { visaStatus: VisaStatus; hotelAgreements: Array<{ id: string }> } };
+    const makkah = {
+      city: AgreementCity.MAKKAH,
+      hotelName: "Swissotel",
+      agreementNumber: "MAK-AUTO",
+      pax: 40,
+      status: AgreementApprovalStatus.WAITING,
+      stayStart: "2026-04-10",
+      stayEnd: "2026-04-13",
+    };
+
+    try {
+      // A fresh group has no visa setup yet; it is created lazily on first agreement.
+      await service.create(createGroupPayload({ code: "G-AUTO" }));
+
+      const afterAdd = (await service.addVisaHotelAgreement("G-AUTO", makkah)) as VisaView;
+      expect(afterAdd.visaSetup.visaStatus).toBe(VisaStatus.PENDING);
+      const hotelId = afterAdd.visaSetup.hotelAgreements[0].id;
+
+      const afterRemove = (await service.removeVisaHotelAgreement("G-AUTO", hotelId)) as VisaView;
+      expect(afterRemove.visaSetup.hotelAgreements.length).toBe(0);
+      expect(afterRemove.visaSetup.visaStatus).toBe(VisaStatus.DRAFT);
+    } finally {
+      restore();
+    }
+  });
+
+  runCase("auto visa status never overrides a manually ISSUED visa", async () => {
+    const { service, restore } = await createMemoryService();
+
+    type VisaView = { visaSetup: { visaStatus: VisaStatus } };
+
+    try {
+      await service.create(
+        createGroupPayload({
+          code: "G-ISSUED",
+          visaSetup: { visaStatus: VisaStatus.ISSUED, issuedDate: "2026-04-01", syarikah: "Provider" },
+        }),
+      );
+
+      const afterAdd = (await service.addVisaHotelAgreement("G-ISSUED", {
+        city: AgreementCity.MAKKAH,
+        hotelName: "Swissotel",
+        agreementNumber: "MAK-ISSUED",
+        pax: 40,
+        status: AgreementApprovalStatus.WAITING,
+        stayStart: "2026-04-10",
+        stayEnd: "2026-04-13",
+      })) as VisaView;
+
+      expect(afterAdd.visaSetup.visaStatus).toBe(VisaStatus.ISSUED);
+    } finally {
+      restore();
+    }
+  });
+
   runCase("visa agreement rules", async () => {
     const { service, restore } = await createMemoryService();
 

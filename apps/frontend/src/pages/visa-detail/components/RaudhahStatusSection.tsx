@@ -24,18 +24,18 @@ export function RaudhahStatusSection() {
 
   return (
     <section className="grid gap-4 lg:grid-cols-3">
-      <article className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+      <article className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
               calendar_today
             </span>
-            <h3 className="text-lg font-bold text-slate-900">Raudhah</h3>
+            <h3 className="text-lg font-bold text-on-surface">Raudhah</h3>
           </div>
 
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary"
+            className="inline-flex items-center gap-1 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-1.5 text-xs font-bold leading-none text-on-surface transition hover:border-brand-primary hover:text-brand-primary"
             onClick={handleCopyRaudhahReminder}
             aria-label={`Copy Raudhah reminder template for ${row.groupCode}`}
           >
@@ -52,15 +52,15 @@ export function RaudhahStatusSection() {
         </div>
 
         <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Raudhah Dates</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Raudhah Dates</p>
           {hasRaudhahDates ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {raudhahAppointments.map((appointment, index) => (
                 <div
                   key={`${appointment.dateLabel}-${appointment.status}-${index}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/50 bg-surface-container-low px-2.5 py-1 text-xs"
                 >
-                  <span className="font-semibold text-slate-700">{appointment.dateLabel}</span>
+                  <span className="font-semibold text-on-surface">{appointment.dateLabel}</span>
                   <span
                     className={`inline-flex rounded-lg border px-1.5 py-0.5 text-[10px] font-bold leading-none ${getRaudhahStatusBadgeClasses(
                       appointment.status
@@ -76,7 +76,7 @@ export function RaudhahStatusSection() {
               Not Set
             </strong>
           )}
-          <small className="mt-2 block text-xs text-slate-500">
+          <small className="mt-2 block text-xs text-on-surface-variant">
             <span className="sm:hidden">
               Status: {raudhahStatusText} - {raudhahSecondaryTextMobile}
             </span>
@@ -96,7 +96,7 @@ export function RaudhahStatusSection() {
           </button>
           <button
             type="button"
-            className="inline-flex rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-bold leading-none text-slate-700 transition hover:border-slate-400"
+            className="inline-flex rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-1.5 text-xs font-bold leading-none text-on-surface transition hover:border-outline-variant"
             onClick={() => setIsClearRaudhahConfirmOpen(true)}
           >
             Clear
@@ -104,18 +104,18 @@ export function RaudhahStatusSection() {
         </div>
       </article>
 
-      <article className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+      <article className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
             business
           </span>
-          <h3 className="text-lg font-bold text-slate-900">Syarikah</h3>
+          <h3 className="text-lg font-bold text-on-surface">Syarikah</h3>
         </div>
 
         <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Provider Agency</p>
-          <strong className="block break-words text-base font-semibold text-slate-900">{providerName}</strong>
-          <small className="block break-words text-xs text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Provider Agency</p>
+          <strong className="block break-words text-base font-semibold text-on-surface">{providerName}</strong>
+          <small className="block break-words text-xs text-on-surface-variant">
             <span className="sm:hidden">Package: {row.packageName}</span>
             <span className="hidden sm:inline">Assigned for {row.packageName} package</span>
           </small>
@@ -131,18 +131,18 @@ export function RaudhahStatusSection() {
         </button>
       </article>
 
-      <article className="rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+      <article className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
             business
           </span>
-          <h3 className="text-lg font-bold text-slate-900">Agent</h3>
+          <h3 className="text-lg font-bold text-on-surface">Agent</h3>
         </div>
 
         <div className="mt-3 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Agent</p>
-          <strong className="block break-words text-base font-semibold text-slate-900">{assignedAgentName}</strong>
-          <small className="block break-words text-xs text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Assigned Agent</p>
+          <strong className="block break-words text-base font-semibold text-on-surface">{assignedAgentName}</strong>
+          <small className="block break-words text-xs text-on-surface-variant">
             {group?.agent ? `Responsible for ${row.groupCode}` : "Select an agent for this visa group"}
           </small>
         </div>

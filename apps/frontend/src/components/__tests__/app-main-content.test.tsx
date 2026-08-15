@@ -115,6 +115,7 @@ const createMockController = (overrides: Partial<AppController> = {}): AppContro
   handleSaveVisaGroupDetail: vi.fn(),
   handleUpdateVisaStatus: vi.fn(),
   handleUpdateVisaType: vi.fn(),
+  handleToggleHotelWaiver: vi.fn(),
   handleUpdatePaymentStatus: vi.fn(),
   handleUpdateSyarikah: vi.fn(),
   handleUpdateVisaHotel: vi.fn(),

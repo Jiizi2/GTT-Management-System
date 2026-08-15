@@ -61,6 +61,7 @@ export type AppController = {
   handleUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
   handleUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus, issuedDateIso?: string) => void;
   handleUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
+  handleToggleHotelWaiver: (groupCode: string, city: "makkah" | "madinah", waived: boolean) => void;
   handleUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   handleUpdateSyarikah: (groupCode: string, syarikah: string) => void;
   handleUpdateVisaHotel: (

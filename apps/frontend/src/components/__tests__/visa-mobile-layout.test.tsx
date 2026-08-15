@@ -30,6 +30,8 @@ const row: VisaTrackingRow = {
   raudhahTone: "muted",
   makkahVerified: 11,
   madinahVerified: 0,
+  makkahHotelWaived: false,
+  madinahHotelWaived: false,
 };
 
 const group: GroupData = {

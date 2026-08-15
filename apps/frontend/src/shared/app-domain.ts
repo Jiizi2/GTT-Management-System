@@ -247,6 +247,7 @@ export const musyrifAvatar =
 
 export const sidebarItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: "dashboard" },
+  { id: "statistics", label: "Statistics", icon: "monitoring" },
   { id: "checklist", label: "H-1 Checklist", icon: "fact_check" },
   { id: "visa", label: "Visa Tracking", icon: "fact_check" },
   { id: "agreement-inbox", label: "Agreement Inbox", icon: "inventory_2" },

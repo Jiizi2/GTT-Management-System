@@ -25,6 +25,9 @@ const LazyGroupItineraryBuilderPage = lazy(async () => ({
 const LazyOverviewScreen = lazy(async () => ({
   default: (await import("../pages/overview-page")).OverviewScreen,
 }));
+const LazyStatisticsScreen = lazy(async () => ({
+  default: (await import("../pages/statistics/statistics-page")).StatisticsScreen,
+}));
 const LazyUserManagementScreen = lazy(async () => ({
   default: (await import("../pages/manage-role-page")).UserManagementScreen,
 }));
@@ -158,6 +161,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
               />
             }
           />
+          <Route path="/statistics" element={<LazyStatisticsScreen />} />
           <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
           <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
           <Route path="/agreement-inbox" element={<LazyAgreementInboxScreen />} />
@@ -184,6 +188,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                   onSaveGroup={controller.handleSaveVisaGroupDetail}
                   onUpdateVisaStatus={controller.handleUpdateVisaStatus}
                   onUpdateVisaType={controller.handleUpdateVisaType}
+                  onToggleHotelWaiver={controller.handleToggleHotelWaiver}
                   onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
                   onUpdateSyarikah={controller.handleUpdateSyarikah}
                   onUpdateVisaHotel={controller.handleUpdateVisaHotel}

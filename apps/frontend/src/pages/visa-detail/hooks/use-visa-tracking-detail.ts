@@ -45,6 +45,7 @@ interface UseVisaTrackingDetailProps {
   onSaveGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   onUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus, issuedDateIso?: string) => void;
   onUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
+  onToggleHotelWaiver: (groupCode: string, city: "makkah" | "madinah", waived: boolean) => void;
   onUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   onUpdateSyarikah: (groupCode: string, syarikah: string) => void;
   onUpdateVisaHotel: (
@@ -66,6 +67,7 @@ export function useVisaTrackingDetail({
   onSaveGroup,
   onUpdateVisaStatus,
   onUpdateVisaType,
+  onToggleHotelWaiver,
   onUpdatePaymentStatus,
   onUpdateSyarikah,
   onUpdateVisaHotel,
@@ -536,6 +538,10 @@ export function useVisaTrackingDetail({
     closeModal();
   };
 
+  const toggleHotelWaiver = (city: "makkah" | "madinah", waived: boolean) => {
+    onToggleHotelWaiver(row.groupCode, city, waived);
+  };
+
   const savePaymentStatus = (nextValue: VisaPaymentStatus) => {
     onUpdatePaymentStatus(row.groupCode, nextValue);
     setPaymentStatus(nextValue);
@@ -755,6 +761,7 @@ export function useVisaTrackingDetail({
     group,
     groups,
     familyGroups,
+    toggleHotelWaiver,
     activeGroupCode,
     setActiveGroupCode,
     unlinkingGroup,

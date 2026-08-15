@@ -1,7 +1,7 @@
 import { describe, expect } from "vitest";
 import { runCase } from "../../test/run-case";
 import { NotFoundException } from "@nestjs/common";
-import { AgreementApprovalStatus, AgreementCity } from "@prisma/client";
+import { AgreementApprovalStatus, AgreementCity, VisaStatus } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service";
 import { GroupsService } from "../application/groups.service";
 import { PrismaGroupRepository } from "../../infrastructure/repositories/prisma/prisma-group.repository";
@@ -61,7 +61,9 @@ describe("GroupsServicePrismaVisa", () => {
         upsert: async () => ({
           id: "visa-1",
           groupId: "grp-1",
+          visaStatus: VisaStatus.DRAFT,
         }),
+        update: async () => ({ id: "visa-1" }),
       },
       visaHotelAgreement: {
         findMany: async () => [],
@@ -206,6 +208,10 @@ describe("GroupsServicePrismaVisa", () => {
         group: {
           findFirst: createGroupFindFirstMock(),
         },
+        visaSetup: {
+          upsert: async () => ({ id: "visa-1", groupId: "grp-1", visaStatus: VisaStatus.PENDING }),
+          update: async () => ({ id: "visa-1" }),
+        },
         visaHotelAgreement: {
           findMany: async () => [
             {
@@ -246,6 +252,10 @@ describe("GroupsServicePrismaVisa", () => {
         group: {
           findFirst: createGroupFindFirstMock(),
         },
+        visaSetup: {
+          upsert: async () => ({ id: "visa-1", groupId: "grp-1", visaStatus: VisaStatus.PENDING }),
+          update: async () => ({ id: "visa-1" }),
+        },
         visaHotelAgreement: {
           findMany: async () => [
             {
@@ -280,6 +290,10 @@ describe("GroupsServicePrismaVisa", () => {
       const prismaMock = {
         group: {
           findFirst: createGroupFindFirstMock(),
+        },
+        visaSetup: {
+          upsert: async () => ({ id: "visa-1", groupId: "grp-1", visaStatus: VisaStatus.PENDING }),
+          update: async () => ({ id: "visa-1" }),
         },
         visaHotelAgreement: {
           findMany: async () => [

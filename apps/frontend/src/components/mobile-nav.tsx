@@ -15,6 +15,7 @@ export function MobileNav({
   const isQuickActionActive =
     isActionsOpen ||
     activeNav === "new-group" ||
+    activeNav === "statistics" ||
     activeNav === "agreement-inbox" ||
     activeNav === "invoice" ||
     activeNav === "raudhah-reminder" ||

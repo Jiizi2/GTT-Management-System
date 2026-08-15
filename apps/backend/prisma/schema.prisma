@@ -552,6 +552,8 @@ model VisaSetup {
   syarikah            String
   busStatus           VisaBusStatus?
   paymentStatus       VisaPaymentStatus    @default(UNPAID)
+  makkahHotelWaived   Boolean              @default(false)
+  madinahHotelWaived  Boolean              @default(false)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   group               Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)

@@ -18,7 +18,7 @@ import { validateConnectedAgreementDates } from "../../../shared/agreement-date-
 const { isIsoDateValue, formatVisaShortDate } = Domain;
 
 const agreementWarnClassName =
-  "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
+  "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200";
 
 /**
  * Soft warning for non-contiguous Makkah/Madinah stay dates.
@@ -44,36 +44,36 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
 
   return (
     <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)_5.5rem] gap-2 overflow-hidden md:grid-cols-[minmax(0,1fr)_5.5rem_minmax(12rem,1fr)]">
-      <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
-        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+      <div className="min-w-0 rounded-xl border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             confirmation_number
           </span>
           Agreement No
         </span>
-        <strong className="mt-1 block break-all text-sm font-extrabold leading-snug text-slate-900">
+        <strong className="mt-1 block break-all text-sm font-extrabold leading-snug text-on-surface">
           {agreementNumber}
         </strong>
       </div>
 
-      <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
-        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+      <div className="min-w-0 rounded-xl border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             group
           </span>
           Pax
         </span>
-        <strong className="mt-1 block text-lg font-black leading-none text-slate-900">{paxLabel}</strong>
+        <strong className="mt-1 block text-lg font-black leading-none text-on-surface">{paxLabel}</strong>
       </div>
 
-      <div className="col-span-2 min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2 md:col-span-1">
-        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+      <div className="col-span-2 min-w-0 rounded-xl border border-outline-variant/50 bg-surface-container-low px-3 py-2 md:col-span-1">
+        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             event
           </span>
           Stay
         </span>
-        <strong className="mt-1 block break-words text-sm font-extrabold leading-snug text-slate-900">
+        <strong className="mt-1 block break-words text-sm font-extrabold leading-snug text-on-surface">
           {formatAgreementStayRange(agreement)}
         </strong>
       </div>
@@ -84,15 +84,15 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
 function AgreementExpandedFields({ agreement }: { agreement: GroupAgreementHotel }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <div className="rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Check In</span>
-        <strong className="mt-1 block text-sm font-extrabold text-slate-900">
+      <div className="rounded-xl border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">Check In</span>
+        <strong className="mt-1 block text-sm font-extrabold text-on-surface">
           {formatAgreementStayDate(agreement.stayStartIso)}
         </strong>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Check Out</span>
-        <strong className="mt-1 block text-sm font-extrabold text-slate-900">
+      <div className="rounded-xl border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">Check Out</span>
+        <strong className="mt-1 block text-sm font-extrabold text-on-surface">
           {formatAgreementStayDate(agreement.stayEndIso)}
         </strong>
       </div>
@@ -228,7 +228,7 @@ function AgreementInboxDraftAssignmentList({
   const renderDraftList = (items: typeof eligibleDrafts, typeLabel: "Full" | "Partial") => {
     return (
       <div className="space-y-2 mt-4">
-        <h4 className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 mb-2">
+        <h4 className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-on-surface-variant mb-2">
           {typeLabel === "Full" ? "Full Coverage Available" : "Partial Coverage Available"} ({items.length})
         </h4>
         {items.map(({ draft, minRemaining, overlapStart, overlapEnd }) => {
@@ -241,19 +241,19 @@ function AgreementInboxDraftAssignmentList({
           return (
             <article
               key={draft.id}
-              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-surface-container-low p-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-low p-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h5 className="break-words text-sm font-bold text-slate-900">{draft.hotelName}</h5>
-                  <span className="inline-flex rounded-md border border-slate-200 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
+                  <h5 className="break-words text-sm font-bold text-on-surface">{draft.hotelName}</h5>
+                  <span className="inline-flex rounded-md border border-outline-variant/50 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
                     Pax {draft.remainingPax !== undefined && draft.remainingPax < draft.pax ? `${minRemaining}/${draft.pax}` : draft.pax}
                   </span>
                   <span
                     className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
                       typeLabel === "Full"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-amber-200 bg-amber-50 text-amber-700"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-900/20 dark:text-emerald-300"
+                        : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-300"
                     }`}
                   >
                     {typeLabel === "Full" ? "Full Coverage" : "Partial Coverage"}
@@ -262,15 +262,15 @@ function AgreementInboxDraftAssignmentList({
                 {draft.agentName ? (
                   <p className="mt-1 text-xs font-semibold text-brand-primary">Agent: {draft.agentName}</p>
                 ) : null}
-                <p className="mt-1 break-words text-xs font-semibold text-slate-700">{draft.agreementNumber}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                <p className="mt-1 break-words text-xs font-semibold text-on-surface">{draft.agreementNumber}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-on-surface-variant">
                   Validity: {formatAgreementDraftStayRange(draft)}
                 </p>
-                <p className="mt-1 text-xs font-bold text-slate-700">
+                <p className="mt-1 text-xs font-bold text-on-surface">
                   Coverage: {formatVisaShortDate(overlapStart)} - {formatVisaShortDate(overlapEnd)}
                 </p>
                 {isAlreadyAssignedToGroup ? (
-                  <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                  <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
                     Sudah di-assign ke grup ini.
                   </p>
                 ) : null}
@@ -295,15 +295,15 @@ function AgreementInboxDraftAssignmentList({
   };
 
   return (
-    <section className="mt-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+    <section className="mt-3 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand-primary">Agreement Inbox</p>
-          <h3 className="mt-0.5 text-sm font-bold text-slate-900">Available {cityLabel} Agreements</h3>
+          <h3 className="mt-0.5 text-sm font-bold text-on-surface">Available {cityLabel} Agreements</h3>
         </div>
         <button
           type="button"
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-xs font-semibold text-slate-700 transition hover:border-brand-tertiary hover:text-brand-tertiary"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface transition hover:border-brand-tertiary hover:text-brand-tertiary"
           onClick={onCancel}
         >
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -313,25 +313,25 @@ function AgreementInboxDraftAssignmentList({
         </button>
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 rounded-xl border border-slate-200 bg-surface-container-low p-3 shadow-sm sm:flex-row sm:items-center">
+      <div className="mt-3 flex flex-col gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-low p-3 shadow-sm sm:flex-row sm:items-center">
         <div className="flex-1">
-          <label htmlFor={`coverage-start-${city}`} className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
+          <label htmlFor={`coverage-start-${city}`} className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-on-surface-variant">
             Start Date
           </label>
           <DatePickerInput
             id={`coverage-start-${city}`}
-            inputClassName="mt-1 block w-full rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+            inputClassName="mt-1 block w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
             value={coverageStartIso}
             onChange={(val) => onCoverageDatesChange(val, coverageEndIso)}
           />
         </div>
         <div className="flex-1">
-          <label htmlFor={`coverage-end-${city}`} className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500">
+          <label htmlFor={`coverage-end-${city}`} className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-on-surface-variant">
             End Date
           </label>
           <DatePickerInput
             id={`coverage-end-${city}`}
-            inputClassName="mt-1 block w-full rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+            inputClassName="mt-1 block w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
             value={coverageEndIso}
             onChange={(val) => onCoverageDatesChange(coverageStartIso, val)}
           />
@@ -339,19 +339,19 @@ function AgreementInboxDraftAssignmentList({
       </div>
 
       {isLoading ? (
-        <p className="mt-3 rounded-xl bg-surface-container-low px-3 py-2 text-xs font-semibold text-slate-600">
+        <p className="mt-3 rounded-xl bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant">
           Loading agreement inbox...
         </p>
       ) : null}
 
       {isError ? (
-        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-500/40 dark:bg-rose-900/20 dark:text-rose-300">
           Agreement inbox belum berhasil dimuat.
         </p>
       ) : null}
 
       {!isLoading && eligibleDrafts.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500">
+        <p className="mt-3 rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low px-3 py-3 text-xs font-semibold text-on-surface-variant">
           Tidak ada draft {cityLabel} yang cocok dengan periode dan kapasitas yang dicari.
         </p>
       ) : null}
@@ -362,8 +362,48 @@ function AgreementInboxDraftAssignmentList({
   );
 }
 
+/**
+ * Lets ops mark that a group genuinely does not need a hotel in this city, so
+ * the "missing hotel" warning/stat is bypassed. Purely a per-city override.
+ */
+function HotelWaiverToggle({
+  city,
+  waived,
+  onToggle,
+}: {
+  city: "makkah" | "madinah";
+  waived: boolean;
+  onToggle: (city: "makkah" | "madinah", waived: boolean) => void;
+}) {
+  const cityLabel = city === "makkah" ? "Makkah" : "Madinah";
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold leading-none transition ${
+        waived
+          ? "border-amber-300 bg-amber-100 text-amber-800 hover:brightness-95 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200"
+          : "border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:border-brand-primary hover:text-brand-primary"
+      }`}
+      onClick={() => onToggle(city, !waived)}
+      aria-pressed={waived}
+      title={
+        waived
+          ? `Aktifkan kembali persyaratan hotel ${cityLabel}`
+          : `Tandai grup ini tidak butuh hotel ${cityLabel}`
+      }
+    >
+      <span className="material-symbols-outlined text-sm" aria-hidden="true">
+        {waived ? "block" : "hotel"}
+      </span>
+      <span>{waived ? "Tidak perlu hotel" : "Tandai tak perlu"}</span>
+    </button>
+  );
+}
+
 export function HotelAgreementSection() {
   const {
+    row,
+    toggleHotelWaiver,
     group,
     familyGroups,
     activeGroupCode,
@@ -405,25 +445,28 @@ export function HotelAgreementSection() {
           <AgreementDateGapWarning message={dateGapWarnings.crossCityWarning} />
         </div>
       ) : null}
-      <article className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+      <article className="min-w-0 overflow-hidden rounded-3xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
               mosque
             </span>
-            <h2 className="text-xl font-bold text-slate-900">Makkah</h2>
+            <h2 className="text-xl font-bold text-on-surface">Makkah</h2>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
-            onClick={() => openAddHotelInline("makkah")}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              add
-            </span>
-            <span>Add Hotel</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <HotelWaiverToggle city="makkah" waived={Boolean(row.makkahHotelWaived)} onToggle={toggleHotelWaiver} />
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-on-surface transition hover:border-brand-primary hover:text-brand-primary sm:py-1.5"
+              onClick={() => openAddHotelInline("makkah")}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                add
+              </span>
+              <span>Add Hotel</span>
+            </button>
+          </div>
         </div>
 
         {dateGapWarnings.cityWarnings.makkah ? (
@@ -459,13 +502,13 @@ export function HotelAgreementSection() {
                   <div className="flex w-full min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-slate-900">
+                        <h3 className="truncate text-base font-semibold text-on-surface">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                         </h3>
                         {agreement.ownerGroupCode &&
                           familyGroups.length > 1 &&
                           agreement.ownerGroupCode !== activeGroupCode && (
-                            <span className="inline-flex max-w-full break-all rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            <span className="inline-flex max-w-full break-all rounded border border-outline-variant/50 bg-surface-container-high px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant">
                               Milik: {agreement.ownerGroupCode}
                             </span>
                           )}
@@ -570,25 +613,28 @@ export function HotelAgreementSection() {
         </div>
       </article>
 
-      <article className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+      <article className="min-w-0 overflow-hidden rounded-3xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
             <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
               apartment
             </span>
-            <h2 className="text-xl font-bold text-slate-900">Madinah</h2>
+            <h2 className="text-xl font-bold text-on-surface">Madinah</h2>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
-            onClick={() => openAddHotelInline("madinah")}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              add
-            </span>
-            <span>Add Hotel</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <HotelWaiverToggle city="madinah" waived={Boolean(row.madinahHotelWaived)} onToggle={toggleHotelWaiver} />
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-on-surface transition hover:border-brand-primary hover:text-brand-primary sm:py-1.5"
+              onClick={() => openAddHotelInline("madinah")}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                add
+              </span>
+              <span>Add Hotel</span>
+            </button>
+          </div>
         </div>
 
         {dateGapWarnings.cityWarnings.madinah ? (
@@ -624,13 +670,13 @@ export function HotelAgreementSection() {
                   <div className="flex w-full min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-slate-900">
+                        <h3 className="truncate text-base font-semibold text-on-surface">
                           {agreement.hotelName.trim() || `Hotel ${index + 1}`}
                         </h3>
                         {agreement.ownerGroupCode &&
                           familyGroups.length > 1 &&
                           agreement.ownerGroupCode !== activeGroupCode && (
-                            <span className="inline-flex max-w-full break-all rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            <span className="inline-flex max-w-full break-all rounded border border-outline-variant/50 bg-surface-container-high px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant">
                               Milik: {agreement.ownerGroupCode}
                             </span>
                           )}

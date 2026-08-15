@@ -142,6 +142,7 @@ export interface VisaDetailContextType {
   saveGroupEdit: (val: any) => { ok: true } | { ok: false; message: string };
   saveVisaStatus: (nextStatus: VisaStatus, issuedDateIso: string) => void;
   saveVisaType: (nextType: "Visa Only" | "Visa+") => void;
+  toggleHotelWaiver: (city: "makkah" | "madinah", waived: boolean) => void;
   savePaymentStatus: (nextValue: VisaPaymentStatus) => void;
   saveAgentAssignment: (agentId: string) => Promise<void>;
   saveSyarikah: (nextValue: string) => void;

@@ -34,7 +34,8 @@ export function AppSidebar({
   const accountDisplayName = sessionUserName.trim() || "Operator";
   const accountAccessLabel = sessionAccessTier === "super-admin" ? "Super Admin" : "Admin";
   const primaryNavItems = sidebarItems.filter(
-    (item) => item.id === "overview" || item.id === "checklist" || item.id === "visa",
+    (item) =>
+      item.id === "overview" || item.id === "statistics" || item.id === "checklist" || item.id === "visa",
   );
   const utilityNavItems = sidebarItems.filter(
     (item) => item.id === "agreement-inbox" || item.id === "invoice" || item.id === "raudhah-reminder",

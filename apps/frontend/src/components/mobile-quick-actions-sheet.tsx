@@ -20,6 +20,12 @@ const quickActions: QuickAction[] = [
     icon: "add_circle",
   },
   {
+    id: "statistics",
+    label: "Statistics",
+    description: "Lihat tren performa operasional, visa, dan agent.",
+    icon: "monitoring",
+  },
+  {
     id: "agreement-inbox",
     label: "Agreement Inbox",
     description: "Input agreement hotel sebelum group number tersedia.",

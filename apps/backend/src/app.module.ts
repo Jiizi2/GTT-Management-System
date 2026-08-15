@@ -20,6 +20,7 @@ import { AgentsModule } from "./agents/agents.module";
 import { AgentAuthModule } from "./agent-auth/agent-auth.module";
 import { AgentPortalReadModule } from "./agent-portal-read/agent-portal-read.module";
 import { VisaApplicationsModule } from "./visa-applications/visa-applications.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
 
 type HttpLogRequest = {
   id?: unknown;
@@ -227,6 +228,7 @@ function resolveHttpSuccessMessage(
     AgentAuthModule,
     AgentPortalReadModule,
     VisaApplicationsModule,
+    AnalyticsModule,
     PrismaModule,
     RuntimeMaintenanceModule,
     HealthModule,

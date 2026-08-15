@@ -132,6 +132,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     handleUpdateAgreementStatus: groupRecordsState.handleUpdateAgreementStatus,
     handleUpdateVisaStatus: groupRecordsState.handleUpdateVisaStatus,
     handleUpdateVisaType: groupRecordsState.handleUpdateVisaType,
+    handleToggleHotelWaiver: groupRecordsState.handleToggleHotelWaiver,
     handleUpdatePaymentStatus: groupRecordsState.handleUpdatePaymentStatus,
     handleUpdateSyarikah: groupRecordsState.handleUpdateSyarikah,
     handleUpdateVisaHotel: groupRecordsState.handleUpdateVisaHotel,

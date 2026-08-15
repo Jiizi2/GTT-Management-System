@@ -20,6 +20,7 @@ import type {
 import type { ResetChecklistDriverDto } from "../../../../groups/dto/reset-checklist-driver.dto";
 import type { UpdateGroupDto } from "../../../../groups/dto/update-group.dto";
 import { validateHotelAgreementRules } from "../../../../groups/domain/groups.hotel-validation";
+import { resolveAgreementDrivenVisaStatus } from "../../../../groups/domain/visa-status-transition";
 import { resolveItineraryTitle } from "../../../../groups/domain/groups-itinerary-title";
 import {
   parseIsoDateOnly,
@@ -124,6 +125,8 @@ export function ensureMemoryVisaSetup(group: MemoryGroupRecord): MemoryVisaSetup
       issuedDate: undefined,
       syarikah: "Not assigned",
       paymentStatus: VisaPaymentStatus.UNPAID,
+      makkahHotelWaived: false,
+      madinahHotelWaived: false,
       hotelAgreements: [],
       raudhahAppointments: [],
     };
@@ -248,6 +251,8 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
           syarikah: payload.visaSetup.syarikah.trim(),
           busStatus: payload.visaSetup.busStatus,
           paymentStatus: payload.visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
+          makkahHotelWaived: payload.visaSetup.makkahHotelWaived ?? false,
+          madinahHotelWaived: payload.visaSetup.madinahHotelWaived ?? false,
           hotelAgreements: (payload.visaSetup.hotelAgreements ?? []).map((hotel) => ({
             id: randomUUID(),
             city: hotel.city ?? AgreementCity.MAKKAH,
@@ -937,6 +942,11 @@ export function addVisaHotelAgreementInMemory(
     return left.stayStart.localeCompare(right.stayStart);
   });
 
+  visaSetup.visaStatus = resolveAgreementDrivenVisaStatus(
+    visaSetup.visaStatus,
+    visaSetup.hotelAgreements.length > 0,
+  );
+
   group.updatedAt = new Date().toISOString();
   return group;
 }
@@ -1006,6 +1016,10 @@ export function removeVisaHotelAgreementInMemory(
     requireMakkah: false,
   });
   visaSetup.hotelAgreements = nextHotelAgreements;
+  visaSetup.visaStatus = resolveAgreementDrivenVisaStatus(
+    visaSetup.visaStatus,
+    visaSetup.hotelAgreements.length > 0,
+  );
   group.updatedAt = new Date().toISOString();
   return group;
 }
