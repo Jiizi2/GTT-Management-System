@@ -213,6 +213,33 @@ model MasterDataOption {
   @@index([categoryKey, isActive])
 }
 
+model Muassasah {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  drivers   Driver[]
+
+  @@index([isActive])
+}
+
+model Driver {
+  id          String     @id @default(cuid())
+  name        String
+  phone       String?
+  plateNumber String?
+  isActive    Boolean    @default(true)
+  muassasahId String?
+  muassasah   Muassasah? @relation(fields: [muassasahId], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([muassasahId])
+  @@index([isActive])
+  @@index([name])
+}
+
 model Agent {
   id        String      @id @default(cuid())
   code      String      @unique
