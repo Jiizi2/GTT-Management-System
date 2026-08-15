@@ -153,13 +153,9 @@ export function VisaTrackingRowGroup({
             <p className="mt-1 break-words text-sm font-medium leading-snug text-slate-700">{row.groupName}</p>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <Badge
-              status="neutral"
-              className="px-2.5 py-1 text-[11px] font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
-            >
-              {row.pax} Pax
-            </Badge>
+          <div className="flex shrink-0 items-baseline gap-1">
+            <span className="text-base font-bold tabular-nums text-slate-800">{row.pax}</span>
+            <span className="text-[11px] font-medium text-slate-500">Pax</span>
           </div>
         </div>
 
@@ -292,13 +288,9 @@ export function VisaTrackingRowGroup({
 
         <div className="min-w-0 break-words py-1 font-medium leading-snug text-slate-700">{row.groupName}</div>
 
-        <div className="flex min-w-0 justify-self-center py-1">
-          <Badge
-            status="neutral"
-            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
-          >
-            {row.pax} Pax
-          </Badge>
+        <div className="flex min-w-0 items-baseline justify-center gap-1 justify-self-center py-1">
+          <span className="text-sm font-bold tabular-nums text-slate-800">{row.pax}</span>
+          <span className="text-[11px] font-medium text-slate-500">Pax</span>
         </div>
 
         <div className="min-w-0 space-y-0.5 py-1">{renderAgreementCell(row, "makkah", "desktop")}</div>
@@ -318,23 +310,17 @@ export function VisaTrackingRowGroup({
           </Badge>
         </div>
 
-        <div className="flex min-w-0 flex-col items-center justify-self-center py-1">
-          <Badge
-            status="neutral"
-            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
-          >
-            {visaTypeLabel}
-          </Badge>
+        <div className="flex min-w-0 items-center justify-center justify-self-center py-1">
+          <span className="text-sm font-semibold text-slate-700">{visaTypeLabel}</span>
         </div>
 
-        <div className="flex min-w-0 items-center justify-self-center py-1">
-          <Badge
-            status="neutral"
-            className="px-3 py-1.5 text-xs font-bold !border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155] w-fit"
+        <div className="flex min-w-0 items-center justify-center justify-self-center py-1">
+          <span
+            className="max-w-[120px] truncate text-sm font-medium text-slate-600"
             title={group?.visaSetup?.syarikah || "-"}
           >
-            <span className="truncate max-w-[120px]">{formatSyarikahName(group?.visaSetup?.syarikah)}</span>
-          </Badge>
+            {formatSyarikahName(group?.visaSetup?.syarikah)}
+          </span>
         </div>
 
         <div className="flex min-w-0 justify-self-center py-1">
