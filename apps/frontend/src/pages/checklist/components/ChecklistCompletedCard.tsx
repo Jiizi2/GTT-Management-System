@@ -50,7 +50,7 @@ export function ChecklistCompletedCard({
 
   return (
     <article className="checklist-complete-card rounded-2xl px-4 py-3">
-      <div className="grid items-center gap-3 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.9fr_1.3fr_auto_auto]">
+      <div className="grid items-center gap-3 lg:grid-cols-[1.35fr_0.9fr_1.3fr_auto_auto]">
         <div className="min-w-0">
           <p className={`truncate font-extrabold tracking-tight text-on-surface ${codesFontSizeClass}`}>
             {codesText}
