@@ -311,6 +311,16 @@ export class CreateVisaSetupDto {
   @IsEnum(VisaBusStatus)
   busStatus?: VisaBusStatus;
 
+  @ApiPropertyOptional({ description: "Grup ini tidak butuh hotel Makkah (bypass warning).", example: false })
+  @IsOptional()
+  @IsBoolean()
+  makkahHotelWaived?: boolean;
+
+  @ApiPropertyOptional({ description: "Grup ini tidak butuh hotel Madinah (bypass warning).", example: false })
+  @IsOptional()
+  @IsBoolean()
+  madinahHotelWaived?: boolean;
+
   @ApiPropertyOptional({
     enum: VisaPaymentStatus,
     example: VisaPaymentStatus.PARTIAL,

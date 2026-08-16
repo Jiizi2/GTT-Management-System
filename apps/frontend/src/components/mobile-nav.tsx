@@ -18,6 +18,7 @@ export function MobileNav({
     activeNav === "agreement-inbox" ||
     activeNav === "invoice" ||
     activeNav === "raudhah-reminder" ||
+    activeNav === "profile" ||
     activeNav === "master-data" ||
     activeNav === "user-management";
 
@@ -37,16 +38,21 @@ export function MobileNav({
         aria-label={item.label}
       >
         <span
-          className={`material-symbols-outlined text-[1.32rem] leading-none transition ${iconClassName}`}
-          aria-hidden="true"
+          className={`inline-flex items-center justify-center rounded-full px-3 py-0.5 transition ${
+            isActive ? "bg-primary/12" : "bg-transparent"
+          }`}
         >
-          {item.icon}
+          <span
+            className={`material-symbols-outlined text-[1.32rem] leading-none transition ${iconClassName}`}
+            aria-hidden="true"
+          >
+            {item.icon}
+          </span>
         </span>
         <span
           className={`min-h-[0.7rem] text-[0.61rem] font-semibold leading-none transition ${
-            isActive ? "text-primary opacity-100" : "text-on-surface-variant opacity-0"
+            isActive ? "text-primary" : "text-on-surface-variant"
           }`}
-          aria-hidden={isActive ? undefined : "true"}
         >
           {item.label}
         </span>
@@ -72,20 +78,25 @@ export function MobileNav({
             aria-expanded={isActionsOpen}
           >
             <span
-              className={`material-symbols-outlined text-[1.32rem] leading-none transition ${
-                isQuickActionActive
-                  ? "text-primary [font-variation-settings:'FILL'_1,'wght'_500,'GRAD'_0,'opsz'_24]"
-                  : "text-on-surface-variant [font-variation-settings:'FILL'_0,'wght'_400,'GRAD'_0,'opsz'_24]"
+              className={`inline-flex items-center justify-center rounded-full px-3 py-0.5 transition ${
+                isQuickActionActive ? "bg-primary/12" : "bg-transparent"
               }`}
-              aria-hidden="true"
             >
-              apps
+              <span
+                className={`material-symbols-outlined text-[1.32rem] leading-none transition ${
+                  isQuickActionActive
+                    ? "text-primary [font-variation-settings:'FILL'_1,'wght'_500,'GRAD'_0,'opsz'_24]"
+                    : "text-on-surface-variant [font-variation-settings:'FILL'_0,'wght'_400,'GRAD'_0,'opsz'_24]"
+                }`}
+                aria-hidden="true"
+              >
+                apps
+              </span>
             </span>
             <span
               className={`min-h-[0.7rem] text-[0.61rem] font-semibold leading-none transition ${
-                isQuickActionActive ? "text-primary opacity-100" : "text-on-surface-variant opacity-0"
+                isQuickActionActive ? "text-primary" : "text-on-surface-variant"
               }`}
-              aria-hidden={isQuickActionActive ? undefined : "true"}
             >
               Tools
             </span>

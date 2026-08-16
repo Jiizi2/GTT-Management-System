@@ -12,6 +12,8 @@ const REQUIRED_PRISMA_SCHEMA_COLUMNS: Array<{ tableName: string; columnName: str
   { tableName: "Group", columnName: "lifecycleStatus" },
   { tableName: "VisaHotelAgreement", columnName: "sourceDraftId" },
   { tableName: "VisaSetup", columnName: "busStatus" },
+  { tableName: "VisaSetup", columnName: "makkahHotelWaived" },
+  { tableName: "VisaSetup", columnName: "madinahHotelWaived" },
 ];
 
 @Injectable()

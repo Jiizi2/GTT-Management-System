@@ -210,6 +210,12 @@ export class GroupVisaSetupResponseDto {
   })
   paymentStatus!: VisaPaymentStatus;
 
+  @ApiPropertyOptional({ description: "Grup tidak butuh hotel Makkah.", example: false })
+  makkahHotelWaived?: boolean;
+
+  @ApiPropertyOptional({ description: "Grup tidak butuh hotel Madinah.", example: false })
+  madinahHotelWaived?: boolean;
+
   @ApiProperty({ type: () => GroupVisaHotelAgreementResponseDto, isArray: true })
   hotelAgreements!: GroupVisaHotelAgreementResponseDto[];
 

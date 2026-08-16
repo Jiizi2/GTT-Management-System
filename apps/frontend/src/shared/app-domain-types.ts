@@ -1,5 +1,6 @@
 export type NavId =
   | "overview"
+  | "statistics"
   | "input"
   | "checklist"
   | "visa"
@@ -105,6 +106,8 @@ export type GroupVisaSetup = {
   syarikah: string;
   busStatus?: BusStatus;
   paymentStatus: "Paid" | "Unpaid" | "Partial";
+  makkahHotelWaived?: boolean;
+  madinahHotelWaived?: boolean;
   makkahHotels: GroupAgreementHotel[];
   madinahHotels: GroupAgreementHotel[];
   raudhahAppointments: GroupRaudhahAppointment[];
@@ -241,6 +244,7 @@ export type ChecklistDriverProfile = {
   name: string;
   phone: string;
   plateNumber: string;
+  muassasahId?: string;
   isVerified?: boolean;
 };
 
@@ -326,6 +330,8 @@ export type VisaTrackingRow = {
   raudhahTone: VisaRaudhahTone;
   makkahVerified: number;
   madinahVerified: number;
+  makkahHotelWaived: boolean;
+  madinahHotelWaived: boolean;
   parentGroupId?: string | null;
 };
 

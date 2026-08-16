@@ -40,6 +40,7 @@ import {
   validateHotelAgreementRules,
 } from "../../../groups/domain/groups.hotel-validation";
 import { resolveItineraryTitle } from "../../../groups/domain/groups-itinerary-title";
+import { resolveAgreementDrivenVisaStatus } from "../../../groups/domain/visa-status-transition";
 import { buildGroupSearchDocument } from "../../../groups/domain/groups.search-document";
 import {
   buildChecklistAssignmentIdentity,
@@ -843,6 +844,9 @@ export class PrismaGroupRepository implements GroupRepository {
       },
     });
 
+    // The group now has at least one agreement.
+    await this.syncAgreementDrivenVisaStatus(visaSetup, true);
+
     return this.findOneByIdOrCode(group.id);
   }
 
@@ -911,6 +915,7 @@ export class PrismaGroupRepository implements GroupRepository {
 
   async removeVisaHotelAgreement(idOrCode: string, hotelId: string): Promise<GroupDetailRecord> {
     const group = await this.resolvePrismaGroupIdentity(idOrCode);
+    const visaSetup = await this.resolveOrCreatePrismaVisaSetup(group.id);
     const existingHotels = await this.prisma.visaHotelAgreement.findMany({
       where: {
         visaSetup: {
@@ -957,6 +962,8 @@ export class PrismaGroupRepository implements GroupRepository {
         `Hotel agreement '${hotelId}' not found in group '${idOrCode}'.`,
       );
     }
+
+    await this.syncAgreementDrivenVisaStatus(visaSetup, nextHotelAgreements.length > 0);
 
     return this.findOneByIdOrCode(group.id);
   }
@@ -1286,7 +1293,9 @@ export class PrismaGroupRepository implements GroupRepository {
     return group;
   }
 
-  private async resolveOrCreatePrismaVisaSetup(groupId: string): Promise<{ id: string; groupId: string }> {
+  private async resolveOrCreatePrismaVisaSetup(
+    groupId: string,
+  ): Promise<{ id: string; groupId: string; visaStatus: VisaStatus }> {
     return this.prisma.visaSetup.upsert({
       where: {
         groupId,
@@ -1301,8 +1310,23 @@ export class PrismaGroupRepository implements GroupRepository {
       select: {
         id: true,
         groupId: true,
+        visaStatus: true,
       },
     });
+  }
+
+  /** Persist the agreement-driven visa status when it actually changes. */
+  private async syncAgreementDrivenVisaStatus(
+    visaSetup: { id: string; visaStatus: VisaStatus },
+    hasAgreement: boolean,
+  ): Promise<void> {
+    const nextStatus = resolveAgreementDrivenVisaStatus(visaSetup.visaStatus, hasAgreement);
+    if (nextStatus !== visaSetup.visaStatus) {
+      await this.prisma.visaSetup.update({
+        where: { id: visaSetup.id },
+        data: { visaStatus: nextStatus },
+      });
+    }
   }
 
   private async resolveNextPrismaItinerarySortOrder(groupId: string): Promise<number> {

@@ -196,6 +196,24 @@ export function useVisaMutations({
     [updateVisaSetupForGroupAndSync],
   );
 
+  const handleToggleHotelWaiver = useCallback(
+    (groupCode: string, city: "makkah" | "madinah", waived: boolean) => {
+      updateVisaSetupForGroupAndSync(
+        groupCode,
+        ({ visaSetup }) => ({
+          ...visaSetup,
+          ...(city === "makkah" ? { makkahHotelWaived: waived } : { madinahHotelWaived: waived }),
+        }),
+        {
+          successMessage: waived
+            ? `Hotel ${city === "makkah" ? "Makkah" : "Madinah"} ditandai tidak diperlukan.`
+            : `Persyaratan hotel ${city === "makkah" ? "Makkah" : "Madinah"} diaktifkan kembali.`,
+        },
+      );
+    },
+    [updateVisaSetupForGroupAndSync],
+  );
+
   const handleUpdateSyarikah = useCallback(
     (groupCode: string, syarikah: string) => {
       updateVisaSetupForGroupAndSync(groupCode, ({ visaSetup }) => ({
@@ -366,6 +384,7 @@ export function useVisaMutations({
     handleUpdateVisaStatus,
     handleUpdateVisaType,
     handleUpdatePaymentStatus,
+    handleToggleHotelWaiver,
     handleUpdateSyarikah,
     handleUpdateVisaHotel,
     handleDeleteVisaHotel,

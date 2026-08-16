@@ -22,6 +22,7 @@ export function VisaTrackingDetailScreen({
   onSaveGroup,
   onUpdateVisaStatus,
   onUpdateVisaType,
+  onToggleHotelWaiver,
   onUpdatePaymentStatus,
   onUpdateSyarikah,
   onUpdateVisaHotel,
@@ -47,6 +48,7 @@ export function VisaTrackingDetailScreen({
   onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
   onUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
+  onToggleHotelWaiver: (groupCode: string, city: "makkah" | "madinah", waived: boolean) => void;
 }) {
   const detailState = useVisaTrackingDetail({
     row,
@@ -56,6 +58,7 @@ export function VisaTrackingDetailScreen({
     onSaveGroup,
     onUpdateVisaStatus,
     onUpdateVisaType,
+    onToggleHotelWaiver,
     onUpdatePaymentStatus,
     onUpdateSyarikah,
     onUpdateVisaHotel,

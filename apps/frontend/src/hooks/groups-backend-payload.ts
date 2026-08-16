@@ -88,6 +88,8 @@ type BackendCreateGroupPayload = {
     syarikah: string;
     busStatus?: BackendVisaBusStatus;
     paymentStatus?: BackendVisaPaymentStatus;
+    makkahHotelWaived?: boolean;
+    madinahHotelWaived?: boolean;
     outstandingAmount?: number;
     hotelAgreements?: Array<{
       city: "MAKKAH" | "MADINAH";
@@ -404,6 +406,8 @@ export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPa
       syarikah: resolvedSyarikah,
       busStatus: mapBusStatusToBackend(group.visaSetup.busStatus),
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
+      makkahHotelWaived: group.visaSetup.makkahHotelWaived ?? false,
+      madinahHotelWaived: group.visaSetup.madinahHotelWaived ?? false,
       hotelAgreements: [
         ...group.visaSetup.makkahHotels.map((hotel) => ({
           city: "MAKKAH" as const,

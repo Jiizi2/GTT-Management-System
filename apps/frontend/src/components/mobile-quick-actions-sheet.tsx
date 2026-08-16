@@ -32,6 +32,12 @@ const quickActions: QuickAction[] = [
     icon: "request_quote",
   },
   {
+    id: "profile",
+    label: "Profile",
+    description: "Pengaturan akun dan preferensi operator.",
+    icon: "account_circle",
+  },
+  {
     id: "master-data",
     label: "Master Data",
     description: "Atur referensi data utama untuk seluruh modul.",

@@ -362,8 +362,47 @@ function AgreementInboxDraftAssignmentList({
   );
 }
 
+/**
+ * Lets ops mark that a group genuinely does not need a hotel in this city, so
+ * the "missing hotel" warning/stat is bypassed. Matches the production light-chip
+ * styling (readable in light & dark without extra dark: variants).
+ */
+function HotelWaiverToggle({
+  city,
+  waived,
+  onToggle,
+}: {
+  city: "makkah" | "madinah";
+  waived: boolean;
+  onToggle: (city: "makkah" | "madinah", waived: boolean) => void;
+}) {
+  const cityLabel = city === "makkah" ? "Makkah" : "Madinah";
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold leading-none transition ${
+        waived
+          ? "border-amber-300 bg-amber-50 text-amber-800 hover:brightness-[0.97]"
+          : "border-slate-300 bg-surface-container-lowest text-slate-600 hover:border-brand-primary hover:text-brand-primary"
+      }`}
+      onClick={() => onToggle(city, !waived)}
+      aria-pressed={waived}
+      title={
+        waived ? `Aktifkan kembali persyaratan hotel ${cityLabel}` : `Tandai grup ini tidak butuh hotel ${cityLabel}`
+      }
+    >
+      <span className="material-symbols-outlined text-sm" aria-hidden="true">
+        {waived ? "block" : "hotel"}
+      </span>
+      <span>{waived ? "Tidak perlu hotel" : "Tandai tak perlu"}</span>
+    </button>
+  );
+}
+
 export function HotelAgreementSection() {
   const {
+    row,
+    toggleHotelWaiver,
     group,
     familyGroups,
     activeGroupCode,
@@ -414,16 +453,19 @@ export function HotelAgreementSection() {
             <h2 className="text-xl font-bold text-slate-900">Makkah</h2>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
-            onClick={() => openAddHotelInline("makkah")}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              add
-            </span>
-            <span>Add Hotel</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <HotelWaiverToggle city="makkah" waived={Boolean(row.makkahHotelWaived)} onToggle={toggleHotelWaiver} />
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:py-1.5"
+              onClick={() => openAddHotelInline("makkah")}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                add
+              </span>
+              <span>Add Hotel</span>
+            </button>
+          </div>
         </div>
 
         {dateGapWarnings.cityWarnings.makkah ? (
@@ -579,16 +621,19 @@ export function HotelAgreementSection() {
             <h2 className="text-xl font-bold text-slate-900">Madinah</h2>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:w-auto sm:justify-start sm:py-1.5"
-            onClick={() => openAddHotelInline("madinah")}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              add
-            </span>
-            <span>Add Hotel</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <HotelWaiverToggle city="madinah" waived={Boolean(row.madinahHotelWaived)} onToggle={toggleHotelWaiver} />
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:py-1.5"
+              onClick={() => openAddHotelInline("madinah")}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                add
+              </span>
+              <span>Add Hotel</span>
+            </button>
+          </div>
         </div>
 
         {dateGapWarnings.cityWarnings.madinah ? (

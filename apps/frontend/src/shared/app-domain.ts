@@ -247,8 +247,9 @@ export const musyrifAvatar =
 
 export const sidebarItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: "dashboard" },
-  { id: "checklist", label: "H-1 Checklist", icon: "fact_check" },
-  { id: "visa", label: "Visa Tracking", icon: "fact_check" },
+  { id: "statistics", label: "Statistics", icon: "monitoring" },
+  { id: "checklist", label: "H-1 Checklist", icon: "checklist" },
+  { id: "visa", label: "Visa Tracking", icon: "travel_explore" },
   { id: "agreement-inbox", label: "Agreement Inbox", icon: "inventory_2" },
   { id: "invoice", label: "Invoice", icon: "request_quote" },
 ];
@@ -261,9 +262,9 @@ export const sidebarAccountItem: NavItem = {
 
 export const mobileItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: "dashboard" },
-  { id: "checklist", label: "Checklist", icon: "fact_check" },
-  { id: "visa", label: "Visa", icon: "fact_check" },
-  { id: "profile", label: "Profile", icon: "account_circle" },
+  { id: "checklist", label: "Checklist", icon: "checklist" },
+  { id: "visa", label: "Visa", icon: "travel_explore" },
+  { id: "statistics", label: "Statistics", icon: "monitoring" },
 ];
 
 export const baseGroups: GroupData[] = createBaseGroupsFixture({

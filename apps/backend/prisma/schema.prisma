@@ -213,6 +213,51 @@ model MasterDataOption {
   @@index([categoryKey, isActive])
 }
 
+model Muassasah {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  drivers   Driver[]
+  vehicles  Vehicle[]
+
+  @@index([isActive])
+}
+
+model Driver {
+  id            String     @id @default(cuid())
+  name          String
+  phone         String?
+  note          String?
+  isProblematic Boolean    @default(false)
+  isActive      Boolean    @default(true)
+  muassasahId   String?
+  muassasah     Muassasah? @relation(fields: [muassasahId], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([muassasahId])
+  @@index([isActive])
+  @@index([name])
+}
+
+model Vehicle {
+  id            String     @id @default(cuid())
+  plateNumber   String
+  note          String?
+  isProblematic Boolean    @default(false)
+  isActive      Boolean    @default(true)
+  muassasahId   String?
+  muassasah     Muassasah? @relation(fields: [muassasahId], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([muassasahId])
+  @@index([isActive])
+  @@index([plateNumber])
+}
+
 model Agent {
   id        String      @id @default(cuid())
   code      String      @unique
@@ -552,6 +597,8 @@ model VisaSetup {
   syarikah            String
   busStatus           VisaBusStatus?
   paymentStatus       VisaPaymentStatus    @default(UNPAID)
+  makkahHotelWaived   Boolean              @default(false)
+  madinahHotelWaived  Boolean              @default(false)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   group               Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)

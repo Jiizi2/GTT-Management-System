@@ -9,6 +9,7 @@ export type DashboardRouteState = {
 
 const DASHBOARD_PATH_BY_NAV: Record<NavId, string> = {
   overview: "/overview",
+  statistics: "/statistics",
   input: "/new-group",
   checklist: "/checklist",
   visa: "/visa",
@@ -129,6 +130,15 @@ export function resolveDashboardRouteFromPathname(pathname: string): DashboardRo
       selectedGroupCode: null,
       selectedVisaGroupCode: null,
       canonicalPath: "/overview",
+    };
+  }
+
+  if (normalizedLowerPathname === "/statistics") {
+    return {
+      activeNav: "statistics",
+      selectedGroupCode: null,
+      selectedVisaGroupCode: null,
+      canonicalPath: "/statistics",
     };
   }
 

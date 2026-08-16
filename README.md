@@ -33,6 +33,7 @@ Monorepo memakai **npm workspaces** (`apps/*`):
 | Modul | Deskripsi |
 |---|---|
 | **Overview** | Statistik, daftar grup, pencarian, filter aktif/non-aktif |
+| **Statistics** | Analytics performa: tren keberangkatan (grup/jamaah), funnel & throughput visa, dan tabel performa per agent, dengan filter periode & agent |
 | **Visa Tracking** | Monitoring status visa di Ops dan tampilan read-only yang external-friendly di Portal Agent |
 | **Add New Group** | Wizard pembuatan grup dengan itinerary dan data visa awal |
 | **Group Detail** | Detail lengkap grup: itinerary builder, timeline, notes, visa, checklist |

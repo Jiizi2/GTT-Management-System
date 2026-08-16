@@ -17,6 +17,11 @@ export class ConfirmChecklistDriverProfileDto {
   @IsString()
   @IsNotEmpty()
   plateNumber!: string;
+
+  @ApiPropertyOptional({ example: "muassasah-id", description: "Muassasah tempat supir ini bernaung (untuk direktori)." })
+  @IsOptional()
+  @IsString()
+  muassasahId?: string;
 }
 
 export class ConfirmChecklistDriverDto {

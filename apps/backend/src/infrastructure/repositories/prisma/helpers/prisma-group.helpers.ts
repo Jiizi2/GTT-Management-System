@@ -94,6 +94,9 @@ export const groupSummarySelection = {
       syarikah: true,
       busStatus: true,
       paymentStatus: true,
+      makkahHotelWaived: true,
+      madinahHotelWaived: true,
+      createdAt: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
@@ -164,6 +167,9 @@ export const groupDetailSelection = {
       syarikah: true,
       busStatus: true,
       paymentStatus: true,
+      makkahHotelWaived: true,
+      madinahHotelWaived: true,
+      createdAt: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
@@ -466,6 +472,8 @@ function buildVisaSetupCreate(visaSetup: CreateGroupDto["visaSetup"]) {
       syarikah: visaSetup.syarikah.trim(),
       busStatus: visaSetup.busStatus ?? null,
       paymentStatus: visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
+      makkahHotelWaived: visaSetup.makkahHotelWaived ?? false,
+      madinahHotelWaived: visaSetup.madinahHotelWaived ?? false,
       hotelAgreements:
         visaSetup.hotelAgreements && visaSetup.hotelAgreements.length > 0
           ? {

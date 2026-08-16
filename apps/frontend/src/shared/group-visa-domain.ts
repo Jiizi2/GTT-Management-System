@@ -222,6 +222,11 @@ export function resolveGroupCompleteness(
   const hasMakkahAgreement = makkahAgreements.length > 0;
   const hasMadinahAgreement = madinahAgreements.length > 0;
   const hasAnyAgreement = hasMakkahAgreement || hasMadinahAgreement;
+  // A city can be explicitly waived when the group genuinely does not stay there.
+  const makkahWaived = Boolean(group.visaSetup?.makkahHotelWaived);
+  const madinahWaived = Boolean(group.visaSetup?.madinahHotelWaived);
+  const makkahSatisfied = hasMakkahAgreement || makkahWaived;
+  const madinahSatisfied = hasMadinahAgreement || madinahWaived;
   const hasItinerary = group.itinerary.length > 0;
   const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(group.itinerary, dependencies);
 
@@ -234,7 +239,7 @@ export function resolveGroupCompleteness(
     });
   }
 
-  if (!hasAnyAgreement) {
+  if (!makkahSatisfied && !madinahSatisfied) {
     issues.push({
       key: "missing-agreement",
       severity: "warning",
@@ -242,7 +247,7 @@ export function resolveGroupCompleteness(
       message: "Agreement hotel belum tersambung.",
     });
   } else {
-    if (!hasMakkahAgreement) {
+    if (!makkahSatisfied) {
       issues.push({
         key: "missing-makkah-agreement",
         severity: "warning",
@@ -251,7 +256,7 @@ export function resolveGroupCompleteness(
       });
     }
 
-    if (!hasMadinahAgreement) {
+    if (!madinahSatisfied) {
       issues.push({
         key: "missing-madinah-agreement",
         severity: "warning",
@@ -390,6 +395,8 @@ export function buildVisaTrackingRowsFromGroups(
       raudhahTone,
       makkahVerified,
       madinahVerified,
+      makkahHotelWaived: Boolean(visaSetup?.makkahHotelWaived),
+      madinahHotelWaived: Boolean(visaSetup?.madinahHotelWaived),
       parentGroupId: group.parentGroupId,
     };
   });

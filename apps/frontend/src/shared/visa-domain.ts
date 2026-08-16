@@ -229,7 +229,9 @@ export function resolveVisaProvider(packageName: string): string {
 }
 
 export function hasMissingHotelAllocation(row: VisaTrackingRow): boolean {
-  return row.makkahVerified < row.pax || row.madinahVerified < row.pax;
+  const makkahShort = !row.makkahHotelWaived && row.makkahVerified < row.pax;
+  const madinahShort = !row.madinahHotelWaived && row.madinahVerified < row.pax;
+  return makkahShort || madinahShort;
 }
 
 export function isVisaRowActionRequired(row: VisaTrackingRow): boolean {
