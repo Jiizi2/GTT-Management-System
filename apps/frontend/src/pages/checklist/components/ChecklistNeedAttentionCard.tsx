@@ -54,17 +54,17 @@ export function ChecklistNeedAttentionCard({
       className="overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-surface-container-lowest shadow-sm"
     >
       <div className="grid gap-0 lg:grid-cols-[0.78fr_1.22fr]">
-        <div className="border-b border-dashed border-black/45 bg-surface-container-lowest p-4 sm:p-5 lg:border-b-0 lg:border-r">
+        <div className="min-w-0 border-b border-dashed border-black/45 bg-surface-container-lowest p-4 sm:p-5 lg:border-b-0 lg:border-r">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Group No</p>
-              <p className={`mt-2 font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
+              <p className={`mt-2 break-words font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
                 {codesText}
               </p>
             </div>
             <button
               type="button"
-              className="inline-flex items-center rounded-lg bg-surface-container-lowest/90 p-1.5 text-slate-900 transition hover:bg-surface-container-lowest"
+              className="inline-flex shrink-0 items-center rounded-lg bg-surface-container-lowest/90 p-1.5 text-slate-900 transition hover:bg-surface-container-lowest"
               onClick={() => onCopyTripWithoutDriverName(item.id)}
               title={copiedItemId === item.id ? "Copied" : "Copy details"}
               aria-label={copiedItemId === item.id ? "Copied" : "Copy trip details"}
