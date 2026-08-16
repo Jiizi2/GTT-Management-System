@@ -36,11 +36,16 @@ export class CreateDriverDto {
   @MaxLength(60)
   phone?: string;
 
-  @ApiPropertyOptional({ example: "B 1234 ABC" })
+  @ApiPropertyOptional({ example: "Ramah, tepat waktu." })
   @IsOptional()
   @IsString()
-  @MaxLength(60)
-  plateNumber?: string;
+  @MaxLength(2000)
+  note?: string;
+
+  @ApiPropertyOptional({ example: false, description: "Tandai supir bermasalah (kurang berkesan)." })
+  @IsOptional()
+  @IsBoolean()
+  isProblematic?: boolean;
 
   @ApiPropertyOptional({ example: "muassasah-id" })
   @IsOptional()
@@ -63,11 +68,16 @@ export class UpdateDriverDto {
   @MaxLength(60)
   phone?: string;
 
-  @ApiPropertyOptional({ example: "B 1234 ABC" })
+  @ApiPropertyOptional({ example: "Sering terlambat." })
   @IsOptional()
   @IsString()
-  @MaxLength(60)
-  plateNumber?: string;
+  @MaxLength(2000)
+  note?: string;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isProblematic?: boolean;
 
   @ApiPropertyOptional({ example: "muassasah-id" })
   @IsOptional()
@@ -86,6 +96,76 @@ export class ListDriversDto {
   @IsOptional()
   @IsString()
   @MaxLength(160)
+  q?: string;
+
+  @ApiPropertyOptional({ example: "muassasah-id" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(191)
+  muassasahId?: string;
+}
+
+export class CreateVehicleDto {
+  @ApiProperty({ example: "B 1234 ABC" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
+  plateNumber!: string;
+
+  @ApiPropertyOptional({ example: "AC dingin, bersih." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
+
+  @ApiPropertyOptional({ example: false, description: "Tandai kendaraan bermasalah (mis. kotor)." })
+  @IsOptional()
+  @IsBoolean()
+  isProblematic?: boolean;
+
+  @ApiPropertyOptional({ example: "muassasah-id" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(191)
+  muassasahId?: string;
+}
+
+export class UpdateVehicleDto {
+  @ApiPropertyOptional({ example: "B 1234 ABC" })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
+  plateNumber?: string;
+
+  @ApiPropertyOptional({ example: "Bis kotor, kurang perawatan." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isProblematic?: boolean;
+
+  @ApiPropertyOptional({ example: "muassasah-id" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(191)
+  muassasahId?: string | null;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class ListVehiclesDto {
+  @ApiPropertyOptional({ example: "1234" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
   q?: string;
 
   @ApiPropertyOptional({ example: "muassasah-id" })

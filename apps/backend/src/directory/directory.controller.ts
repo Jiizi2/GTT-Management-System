@@ -4,9 +4,12 @@ import { DirectoryService } from "./directory.service";
 import {
   CreateDriverDto,
   CreateMuassasahDto,
+  CreateVehicleDto,
   ListDriversDto,
+  ListVehiclesDto,
   UpdateDriverDto,
   UpdateMuassasahDto,
+  UpdateVehicleDto,
 } from "./dto/directory.dto";
 
 @Controller("directory")
@@ -59,5 +62,29 @@ export class DirectoryController {
   @Roles("super-admin")
   removeDriver(@Param("id") id: string) {
     return this.directory.removeDriver(id);
+  }
+
+  @Get("vehicles")
+  @Header("Cache-Control", "private, no-store")
+  listVehicles(@Query() query: ListVehiclesDto) {
+    return this.directory.listVehicles(query.q, query.muassasahId);
+  }
+
+  @Post("vehicles")
+  @Roles("super-admin")
+  createVehicle(@Body() payload: CreateVehicleDto) {
+    return this.directory.createVehicle(payload);
+  }
+
+  @Patch("vehicles/:id")
+  @Roles("super-admin")
+  updateVehicle(@Param("id") id: string, @Body() payload: UpdateVehicleDto) {
+    return this.directory.updateVehicle(id, payload);
+  }
+
+  @Delete("vehicles/:id")
+  @Roles("super-admin")
+  removeVehicle(@Param("id") id: string) {
+    return this.directory.removeVehicle(id);
   }
 }

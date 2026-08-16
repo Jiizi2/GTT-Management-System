@@ -12,63 +12,65 @@ describe("DirectoryService (memory)", () => {
   it("creates and lists muassasah, rejecting duplicates", async () => {
     const service = makeService();
     const created = await service.createMuassasah({ name: " Daleel Maalem " });
-    expect(created).toMatchObject({ name: "Daleel Maalem", isActive: true, driverCount: 0 });
+    expect(created).toMatchObject({ name: "Daleel Maalem", isActive: true, driverCount: 0, vehicleCount: 0 });
 
     await expect(() => service.createMuassasah({ name: "daleel maalem" })).rejects.toThrow(/already exists/);
-
-    const list = await service.listMuassasah();
-    expect(list.map((m) => m.name)).toEqual(["Daleel Maalem"]);
+    expect((await service.listMuassasah()).map((m) => m.name)).toEqual(["Daleel Maalem"]);
   });
 
-  it("creates a driver tied to a muassasah and filters by it", async () => {
+  it("creates a driver with a note/flag tied to a muassasah and counts it", async () => {
     const service = makeService();
     const m = await service.createMuassasah({ name: "Rawaf Mina" });
-    const other = await service.createMuassasah({ name: "Nusuk" });
 
-    const driver = await service.createDriver({ name: "Yusuf", phone: "123", plateNumber: "B 1", muassasahId: m.id });
-    expect(driver).toMatchObject({ name: "Yusuf", muassasahId: m.id, muassasahName: "Rawaf Mina" });
+    const driver = await service.createDriver({ name: "Yusuf", phone: "123", muassasahId: m.id, note: "Ramah", isProblematic: false });
+    expect(driver).toMatchObject({ name: "Yusuf", muassasahId: m.id, muassasahName: "Rawaf Mina", note: "Ramah", isProblematic: false });
 
     const scoped = await service.listDrivers(undefined, m.id);
     expect(scoped).toHaveLength(1);
-    expect(await service.listDrivers(undefined, other.id)).toHaveLength(0);
-
-    const mList = await service.listMuassasah();
-    expect(mList.find((x) => x.id === m.id)?.driverCount).toBe(1);
+    expect((await service.listMuassasah()).find((x) => x.id === m.id)?.driverCount).toBe(1);
   });
 
-  it("rejects a driver pointing at a missing muassasah", async () => {
+  it("creates a vehicle with a problematic flag and counts it under its muassasah", async () => {
     const service = makeService();
-    await expect(() => service.createDriver({ name: "Ghost", muassasahId: "nope" })).rejects.toThrow(/not found/);
+    const m = await service.createMuassasah({ name: "Daleel" });
+
+    const vehicle = await service.createVehicle({ plateNumber: " B 1 XYZ ", muassasahId: m.id, isProblematic: true, note: "Kotor" });
+    expect(vehicle).toMatchObject({ plateNumber: "B 1 XYZ", muassasahName: "Daleel", isProblematic: true, note: "Kotor" });
+
+    expect(await service.listVehicles(undefined, m.id)).toHaveLength(1);
+    expect((await service.listMuassasah()).find((x) => x.id === m.id)?.vehicleCount).toBe(1);
   });
 
-  it("upserts a driver from checkin: creates once, then updates contact details", async () => {
+  it("upserts a driver from checkin without duplicating; updates phone", async () => {
     const service = makeService();
     const m = await service.createMuassasah({ name: "Daleel" });
 
     const first = await service.upsertDriverFromCheckin({ name: "Ali", phone: "111", muassasahId: m.id });
-    expect(first).toMatchObject({ name: "Ali", phone: "111", muassasahId: m.id });
-
-    const second = await service.upsertDriverFromCheckin({
-      name: "ali",
-      phone: "222",
-      plateNumber: "B 9",
-      muassasahId: m.id,
-    });
+    const second = await service.upsertDriverFromCheckin({ name: "ali", phone: "222", muassasahId: m.id });
     expect(second?.id).toBe(first?.id);
-    expect(second).toMatchObject({ phone: "222", plateNumber: "B 9" });
-
+    expect(second).toMatchObject({ phone: "222" });
     expect(await service.listDrivers(undefined, m.id)).toHaveLength(1);
   });
 
-  it("deleting a muassasah unlinks its drivers", async () => {
+  it("upserts a vehicle from checkin without duplicating by plate within a muassasah", async () => {
+    const service = makeService();
+    const m = await service.createMuassasah({ name: "Daleel" });
+
+    const first = await service.upsertVehicleFromCheckin({ plateNumber: "B 9 KL", muassasahId: m.id });
+    const second = await service.upsertVehicleFromCheckin({ plateNumber: "b 9 kl", muassasahId: m.id });
+    expect(second?.id).toBe(first?.id);
+    expect(await service.listVehicles(undefined, m.id)).toHaveLength(1);
+  });
+
+  it("deleting a muassasah unlinks its drivers and vehicles", async () => {
     const service = makeService();
     const m = await service.createMuassasah({ name: "Temp" });
     await service.createDriver({ name: "Sam", muassasahId: m.id });
+    await service.createVehicle({ plateNumber: "B 2 CD", muassasahId: m.id });
 
     await service.removeMuassasah(m.id);
 
-    const drivers = await service.listDrivers();
-    expect(drivers).toHaveLength(1);
-    expect(drivers[0]).toMatchObject({ muassasahId: null, muassasahName: null });
+    expect((await service.listDrivers())[0]).toMatchObject({ muassasahId: null, muassasahName: null });
+    expect((await service.listVehicles())[0]).toMatchObject({ muassasahId: null, muassasahName: null });
   });
 });

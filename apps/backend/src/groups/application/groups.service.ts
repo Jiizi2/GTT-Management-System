@@ -348,20 +348,23 @@ export class GroupsService {
       payload,
     );
 
-    // Silently record the driver into the global directory. Best-effort: a
-    // directory hiccup must never block the checklist confirmation.
+    // Silently record the driver and bus (plate) into the global directory.
+    // Best-effort: a directory hiccup must never block the checklist confirmation.
     if (this.directoryService) {
       try {
         await this.directoryService.upsertDriverFromCheckin({
           name: payload.driver.name,
           phone: payload.driver.phone,
+          muassasahId: payload.driver.muassasahId,
+        });
+        await this.directoryService.upsertVehicleFromCheckin({
           plateNumber: payload.driver.plateNumber,
           muassasahId: payload.driver.muassasahId,
         });
       } catch (error) {
         this.logger.warn(
           { err: error, idOrCode },
-          "Failed to record checklist driver into the directory",
+          "Failed to record checklist driver/vehicle into the directory",
         );
       }
     }
