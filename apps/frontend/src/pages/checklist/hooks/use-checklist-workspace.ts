@@ -70,11 +70,13 @@ const sanitizeDriverProfile = (source: unknown): ChecklistDriverProfile | null =
     name?: unknown;
     phone?: unknown;
     plateNumber?: unknown;
+    muassasahId?: unknown;
     isVerified?: unknown;
   };
   const name = readTrimmedString(raw.name);
   const phone = readTrimmedString(raw.phone);
   const plateNumber = readTrimmedString(raw.plateNumber);
+  const muassasahId = readTrimmedString(raw.muassasahId);
   if (!name || !phone || !plateNumber) {
     return null;
   }
@@ -83,6 +85,7 @@ const sanitizeDriverProfile = (source: unknown): ChecklistDriverProfile | null =
     name,
     phone,
     plateNumber,
+    ...(muassasahId ? { muassasahId } : {}),
     isVerified: Boolean(raw.isVerified),
   };
 };
@@ -185,6 +188,7 @@ const syncChecklistDriverToBackend = async ({
           name: driver.name,
           phone: driver.phone,
           plateNumber: driver.plateNumber,
+          muassasahId: driver.muassasahId || undefined,
         },
       }),
     },

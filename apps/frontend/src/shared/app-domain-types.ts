@@ -244,6 +244,7 @@ export type ChecklistDriverProfile = {
   name: string;
   phone: string;
   plateNumber: string;
+  muassasahId?: string;
   isVerified?: boolean;
 };
 

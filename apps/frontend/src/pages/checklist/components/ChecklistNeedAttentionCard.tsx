@@ -1,6 +1,7 @@
 import type { ChecklistItem, ChecklistDriverDraft, ChecklistDriverProfile, GroupData } from "../../../shared/app-domain";
 import { getChecklistDayLabel, formatScheduleTime } from "../../../shared/app-domain";
 import { resolveGroupServiceType, isExternalTransportGroup, CHECKLIST_NEUTRAL_BADGE_CLASS } from "../hooks/use-checklist-workspace";
+import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
 
 export function ChecklistNeedAttentionCard({
   item,
@@ -30,6 +31,7 @@ export function ChecklistNeedAttentionCard({
   const assignedProgressCount = assignedDrivers.length;
   const isComplete = assignedProgressCount >= requiredDriverCount;
   const isMultiDriver = requiredDriverCount > 1;
+  const muassasahOptions = useMuassasahQuery().data ?? [];
   
   const serviceType = resolveGroupServiceType(groupRecord);
   const isExternalTransport = isExternalTransportGroup(groupRecord);
@@ -123,7 +125,7 @@ export function ChecklistNeedAttentionCard({
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="space-y-1.5">
               <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                 Driver Name
@@ -161,6 +163,24 @@ export function ChecklistNeedAttentionCard({
                 onChange={(event) => onDraftChange(item.id, "plateNumber", event.target.value)}
                 placeholder="ABC-123"
               />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
+                Muassasah
+              </span>
+              <select
+                className="serene-input h-auto rounded-xl px-3 py-2.5 text-sm font-medium"
+                value={draft.muassasahId ?? ""}
+                onChange={(event) => onDraftChange(item.id, "muassasahId", event.target.value)}
+              >
+                <option value="">Tanpa muassasah</option>
+                {muassasahOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 

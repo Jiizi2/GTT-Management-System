@@ -414,7 +414,7 @@ export function MasterDataOptionForm({
 // 2. MASTER DATA CATEGORY TABS
 // ==========================================
 
-export type MasterDataCategoryTabKey = MasterDataCategoryKey | "agents";
+export type MasterDataCategoryTabKey = MasterDataCategoryKey | "agents" | "directory";
 
 export function MasterDataCategoryTabs({
   categories,

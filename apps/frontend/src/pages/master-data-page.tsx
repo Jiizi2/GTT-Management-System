@@ -10,6 +10,8 @@ import {
 } from "../hooks/use-master-data-query";
 import type { MasterDataCategoryKey, MasterDataOption } from "../hooks/use-master-data-backend";
 import { useAgentsQuery } from "../hooks/use-agents-backend";
+import { useMuassasahQuery } from "../hooks/use-directory-backend";
+import { DirectoryManager } from "./master-data/components/DirectoryManager";
 import { useThemeMode } from "../theme/theme-provider";
 import { AgentsScreen } from "./agents-page";
 import {
@@ -145,6 +147,7 @@ export function MasterDataScreen() {
   const isDarkMode = theme === "dark";
   const categoriesQuery = useMasterDataCategoriesQuery();
   const agentsQuery = useAgentsQuery();
+  const muassasahQuery = useMuassasahQuery();
   const [activeCategoryKey, setActiveCategoryKey] = useState<MasterDataCategoryTabKey | null>(null);
   const [statusFilter, setStatusFilter] = useState<OptionStatusFilter>("active");
   const [optionSearch, setOptionSearch] = useState("");
@@ -163,6 +166,7 @@ export function MasterDataScreen() {
   );
   const categoryTabs = useMemo(() => {
     const agents = agentsQuery.data ?? [];
+    const muassasah = muassasahQuery.data ?? [];
     return [
       ...sortedCategories,
       {
@@ -172,8 +176,15 @@ export function MasterDataScreen() {
         activeOptions: agents.filter((agent) => agent.status === "ACTIVE").length,
         totalOptions: agents.length,
       },
+      {
+        key: "directory" as const,
+        label: "Direktori Supir",
+        description: "Kelola muassasah dan direktori supir untuk H-1 checklist.",
+        activeOptions: muassasah.length,
+        totalOptions: muassasah.length,
+      },
     ];
-  }, [agentsQuery.data, sortedCategories]);
+  }, [agentsQuery.data, muassasahQuery.data, sortedCategories]);
 
   useEffect(() => {
     setActiveCategoryKey((current) => {
@@ -181,7 +192,9 @@ export function MasterDataScreen() {
         return current;
       }
 
-      const firstMasterDataCategory = categoryTabs.find((category) => category.key !== "agents");
+      const firstMasterDataCategory = categoryTabs.find(
+        (category) => category.key !== "agents" && category.key !== "directory",
+      );
       if (firstMasterDataCategory) {
         return firstMasterDataCategory.key;
       }
@@ -191,16 +204,16 @@ export function MasterDataScreen() {
   }, [categoriesQuery.isLoading, categoryTabs]);
 
   const activeCategory =
-    activeCategoryKey !== null && activeCategoryKey !== "agents"
+    activeCategoryKey !== null && activeCategoryKey !== "agents" && activeCategoryKey !== "directory"
       ? (sortedCategories.find((category) => category.key === activeCategoryKey) ?? null)
       : null;
   const activeCategoryFormConfig =
-    activeCategoryKey !== null && activeCategoryKey !== "agents" ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
+    activeCategoryKey !== null && activeCategoryKey !== "agents" && activeCategoryKey !== "directory" ? CATEGORY_FORM_CONFIG[activeCategoryKey] : null;
 
   const optionsQuery = useMasterDataOptionsQuery({
-    categoryKey: activeCategoryKey && activeCategoryKey !== "agents" ? activeCategoryKey : "invoice-issuing-office",
+    categoryKey: activeCategoryKey && activeCategoryKey !== "agents" && activeCategoryKey !== "directory" ? activeCategoryKey : "invoice-issuing-office",
     includeInactive: statusFilter !== "active",
-    enabled: activeCategoryKey !== null && activeCategoryKey !== "agents",
+    enabled: activeCategoryKey !== null && activeCategoryKey !== "agents" && activeCategoryKey !== "directory",
   });
   const options = useMemo(() => optionsQuery.data ?? [], [optionsQuery.data]);
   const filteredOptions = useMemo(() => {
@@ -288,7 +301,7 @@ export function MasterDataScreen() {
   };
 
   const handleCreateSubmit = async (values: MasterDataOptionFormValues) => {
-    if (!activeCategoryKey || activeCategoryKey === "agents") {
+    if (!activeCategoryKey || activeCategoryKey === "agents" || activeCategoryKey === "directory") {
       return;
     }
 
@@ -412,7 +425,9 @@ export function MasterDataScreen() {
           isLoading={categoriesQuery.isLoading}
         />
 
-        {activeCategoryKey === "agents" ? (
+        {activeCategoryKey === "directory" ? (
+          <DirectoryManager />
+        ) : activeCategoryKey === "agents" ? (
           <AgentsScreen embedded />
         ) : (
           <article className="min-w-0 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5">
