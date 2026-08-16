@@ -2,6 +2,7 @@ import type { ChecklistItem, ChecklistDriverDraft, ChecklistDriverProfile, Group
 import { getChecklistDayLabel, formatScheduleTime } from "../../../shared/app-domain";
 import { resolveGroupServiceType, isExternalTransportGroup, CHECKLIST_NEUTRAL_BADGE_CLASS } from "../hooks/use-checklist-workspace";
 import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
+import { SereneSelect } from "../../../components/serene-select";
 
 export function ChecklistNeedAttentionCard({
   item,
@@ -169,10 +170,11 @@ export function ChecklistNeedAttentionCard({
               <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                 Muassasah
               </span>
-              <select
-                className="serene-input h-auto rounded-xl px-3 py-2.5 text-sm font-medium"
+              <SereneSelect
+                className="serene-select"
                 value={draft.muassasahId ?? ""}
                 onChange={(event) => onDraftChange(item.id, "muassasahId", event.target.value)}
+                aria-label="Muassasah supir"
               >
                 <option value="">Tanpa muassasah</option>
                 {muassasahOptions.map((option) => (
@@ -180,7 +182,7 @@ export function ChecklistNeedAttentionCard({
                     {option.name}
                   </option>
                 ))}
-              </select>
+              </SereneSelect>
             </label>
           </div>
 

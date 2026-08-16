@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { SereneSelect } from "../../../components/serene-select";
 import {
   createDriver,
   createMuassasah,
@@ -130,8 +131,8 @@ export function DirectoryManager() {
             <h2 className="text-base font-bold text-on-surface">Supir</h2>
             <p className="mt-0.5 text-xs text-on-surface-variant">Direktori supir, terikat ke muassasah.</p>
           </div>
-          <select
-            className="h-8 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-2 text-xs font-semibold text-on-surface-variant"
+          <SereneSelect
+            className="serene-select h-9 text-xs"
             value={driverFilter}
             onChange={(event) => setDriverFilter(event.target.value)}
             aria-label="Filter supir per muassasah"
@@ -140,15 +141,15 @@ export function DirectoryManager() {
             {muassasahList.map((item) => (
               <option key={item.id} value={item.id}>{item.name}</option>
             ))}
-          </select>
+          </SereneSelect>
         </div>
 
         <div className="grid gap-2 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
           <input className={INPUT} placeholder="Nama supir" value={driverForm.name} onChange={(e) => setDriverForm((s) => ({ ...s, name: e.target.value }))} />
           <input className={INPUT} placeholder="No. HP (opsional)" value={driverForm.phone} onChange={(e) => setDriverForm((s) => ({ ...s, phone: e.target.value }))} />
           <input className={INPUT} placeholder="Plat (opsional)" value={driverForm.plateNumber} onChange={(e) => setDriverForm((s) => ({ ...s, plateNumber: e.target.value }))} />
-          <select
-            className={INPUT}
+          <SereneSelect
+            className="serene-select h-9"
             value={driverForm.muassasahId}
             onChange={(e) => setDriverForm((s) => ({ ...s, muassasahId: e.target.value }))}
             aria-label="Muassasah supir"
@@ -157,7 +158,7 @@ export function DirectoryManager() {
             {muassasahList.map((item) => (
               <option key={item.id} value={item.id}>{item.name}</option>
             ))}
-          </select>
+          </SereneSelect>
         </div>
         <div className="px-4 pb-3">
           <button type="button" className={BTN} onClick={handleAddDriver} disabled={busy || !driverForm.name.trim()}>
