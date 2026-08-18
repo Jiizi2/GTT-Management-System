@@ -112,7 +112,7 @@ export function AgreementInboxScreen() {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 shadow-sm sm:hidden">
+      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 shadow-sm lg:hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-base font-bold text-slate-900">New Draft Agreement</h2>
