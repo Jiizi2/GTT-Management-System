@@ -92,7 +92,7 @@ export function ChecklistCompletedCard({
           ) : null}
         </div>
 
-        <div className="space-y-0.5">
+        <div className="min-w-0 space-y-0.5">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.11em] text-on-surface-variant/70">
             {requiredDriverCount > 1 ? "Assigned Drivers" : "Assigned Driver"}
           </span>
@@ -101,13 +101,13 @@ export function ChecklistCompletedCard({
               assignedDriverNames.map((driverName, index) => (
                 <div
                   key={`${item.id}-driver-${index}`}
-                  className="checklist-complete-driver flex items-center gap-2 rounded-lg px-2 py-1"
+                  className="checklist-complete-driver flex min-w-0 items-center gap-2 rounded-lg px-2 py-1"
                 >
-                  <span className="checklist-complete-driver-slot inline-flex min-w-[52px] justify-center rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em]">
+                  <span className="checklist-complete-driver-slot inline-flex min-w-[52px] shrink-0 justify-center rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em]">
                     Supir {index + 1}
                   </span>
                   <strong
-                    className="truncate text-sm font-bold leading-tight text-on-surface"
+                    className="min-w-0 flex-1 truncate text-sm font-bold leading-tight text-on-surface"
                     title={driverName}
                   >
                     {driverName}
