@@ -283,6 +283,26 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       where: agentId ? { agentId } : undefined, orderBy: { createdAt: "desc" }, include: { agent: { select: { id: true, code: true, name: true } } },
     });
 
+    // Auto-reject WAITING drafts that have gone past the 24h approval window,
+    // mirroring the lazy expiry already enforced in assign(). Persist so the
+    // status is truthful in the inbox, not just visually inferred.
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const expiredIds = drafts
+      .filter((draft) => draft.status === AgreementApprovalStatus.WAITING && draft.updatedAt < cutoff)
+      .map((draft) => draft.id);
+    if (expiredIds.length > 0) {
+      await this.prisma.hotelAgreementDraft.updateMany({
+        where: { id: { in: expiredIds } },
+        data: { status: AgreementApprovalStatus.REJECTED },
+      });
+      const expiredSet = new Set(expiredIds);
+      for (const draft of drafts) {
+        if (expiredSet.has(draft.id)) {
+          draft.status = AgreementApprovalStatus.REJECTED;
+        }
+      }
+    }
+
     const mapped = await Promise.all(
       drafts.map(async (draft) => {
         const { remainingPax, assignedGroups } = await this.getPrismaDraftRemainingAndGroups(draft);
