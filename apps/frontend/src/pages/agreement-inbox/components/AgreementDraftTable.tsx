@@ -320,8 +320,8 @@ export function AgreementDraftTable({
 
   return (
     <div className="serene-table-shell">
-      {/* Mobile: compact list rows */}
-      <div className="flex flex-col gap-2 p-2 sm:hidden">
+      {/* Mobile + tablet: compact list rows (spreadsheet table needs ~1080px) */}
+      <div className="flex flex-col gap-2 p-2 lg:hidden">
         {drafts.map((draft) => (
           <article
             key={`${draft.id}-mobile`}
@@ -357,19 +357,19 @@ export function AgreementDraftTable({
       </div>
 
       {/* Desktop: table */}
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[1080px] table-fixed border-collapse text-left text-sm">
           <colgroup>
-            <col className="w-[7%]" />
+            <col className="w-[9%]" />
+            <col className="w-[11%]" />
             <col className="w-[11%]" />
             <col className="w-[12%]" />
-            <col className="w-[13%]" />
+            <col className="w-[11%]" />
+            <col className="w-[6%]" />
             <col className="w-[12%]" />
-            <col className="w-[7%]" />
-            <col className="w-[13%]" />
-            <col className="w-[12%]" />
+            <col className="w-[11%]" />
+            <col className="w-[9%]" />
             <col className="w-[8%]" />
-            <col className="w-[5%]" />
           </colgroup>
           <thead className="border-b border-outline-variant/30 bg-surface-container-low">
             <tr>
@@ -444,8 +444,8 @@ export function AgreementDraftTable({
         </div>
       ) : null}
 
-      {/* Add-row trigger (desktop only; mobile uses the composer form) */}
-      <div className="hidden border-t border-outline-variant/25 p-2 sm:block">
+      {/* Add-row trigger (desktop only; mobile + tablet use the composer form) */}
+      <div className="hidden border-t border-outline-variant/25 p-2 lg:block">
         <Button
           variant="secondary"
           size="sm"
