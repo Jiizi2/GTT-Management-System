@@ -16,6 +16,7 @@ import {
   getLocalIsoDateWithOffset,
   type HotelAgreementDraft,
   type HotelAgreementDraftFormState,
+  type AgreementApprovalStatus,
   getInclusiveDays,
 } from "../../../shared/app-domain";
 import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-keys";
@@ -75,6 +76,7 @@ export function useAgreementInbox() {
   const [agentFilter, setAgentFilter] = useState("all");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+  const [remainingPaxOnly, setRemainingPaxOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDraftComposerOpen, setIsDraftComposerOpen] = useState(false);
   const [editingDraft, setEditingDraft] = useState<HotelAgreementDraft | null>(null);
@@ -101,6 +103,10 @@ export function useAgreementInbox() {
     let result = drafts;
     if (agentFilter !== "all") result = result.filter((draft) => draft.agentId === agentFilter);
 
+    if (remainingPaxOnly) {
+      result = result.filter((draft) => (draft.remainingPax ?? draft.pax) > 0);
+    }
+
     if (hasDatesSelected && !isDateRangeInvalid) {
       result = result.filter((draft) => {
         return draft.stayStartIso <= endDateFilter && draft.stayEndIso >= startDateFilter;
@@ -121,7 +127,7 @@ export function useAgreementInbox() {
     }
 
     return result;
-  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter, agentFilter]);
+  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter, agentFilter, remainingPaxOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDrafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
@@ -225,6 +231,57 @@ export function useAgreementInbox() {
     setFeedback(null);
   };
 
+  const buildFormValues = (draft: HotelAgreementDraft): HotelAgreementDraftFormState => ({
+    city: draft.city,
+    agentId: draft.agentId,
+    groupName: draft.groupName ?? "",
+    hotelName: draft.hotelName,
+    agreementNumber: draft.agreementNumber,
+    pax: draft.pax.toString(),
+    status: draft.status,
+    stayStartIso: draft.stayStartIso,
+    stayEndIso: draft.stayEndIso,
+    notes: draft.notes ?? "",
+  });
+
+  // Inline status change from the table row (no modal). Reuses the same save
+  // mutation as the edit modal, only swapping the status field.
+  const updateDraftStatus = async (draft: HotelAgreementDraft, nextStatus: AgreementApprovalStatus) => {
+    if (draft.status === nextStatus) return;
+    setFeedback(null);
+    try {
+      await saveDraftMutation.mutateAsync({
+        draftId: draft.id,
+        draft: { ...buildFormValues(draft), status: nextStatus },
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
+      setFeedback({ tone: "success", message: `Status agreement ${draft.agreementNumber} diperbarui menjadi ${nextStatus}.` });
+    } catch (error: unknown) {
+      setFeedback({ tone: "error", message: formatMutationError(error, "Status agreement belum berhasil diperbarui.") });
+    }
+  };
+
+  // Inline row insert from the table footer. Returns true on success so the row
+  // can reset/close; keeps the row open with an error on failure.
+  const createDraftInline = async (values: HotelAgreementDraftFormState): Promise<boolean> => {
+    setFeedback(null);
+    try {
+      await saveDraftMutation.mutateAsync({ draft: values });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
+      ]);
+      setFeedback({ tone: "success", message: "Draft agreement berhasil disimpan." });
+      return true;
+    } catch (error: unknown) {
+      setFeedback({ tone: "error", message: formatMutationError(error, "Draft agreement belum berhasil disimpan.") });
+      return false;
+    }
+  };
+
   const updateAssignmentGroupCode = (draftId: string, groupCode: string) => {
     setAssignmentGroupCodes((current) => ({
       ...current,
@@ -322,7 +379,7 @@ export function useAgreementInbox() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, startDateFilter, endDateFilter, agentFilter]);
+  }, [query, statusFilter, startDateFilter, endDateFilter, agentFilter, remainingPaxOnly]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -340,6 +397,8 @@ export function useAgreementInbox() {
     setStartDateFilter,
     endDateFilter,
     setEndDateFilter,
+    remainingPaxOnly,
+    setRemainingPaxOnly,
     currentPage,
     setCurrentPage,
     isDraftComposerOpen,
@@ -368,6 +427,8 @@ export function useAgreementInbox() {
     startEditDraft,
     closeEditDraftModal,
     updateDraft,
+    updateDraftStatus,
+    createDraftInline,
     requestDeleteDraft,
     updateAssignmentGroupCode,
     assignDraftToGroup,

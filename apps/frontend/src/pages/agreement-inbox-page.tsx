@@ -4,7 +4,7 @@ import { PaginationControls } from "../components/pagination-controls";
 import { Button } from "../components/button";
 import { useAgreementInbox, AGREEMENT_DRAFT_PAGE_SIZE } from "./agreement-inbox/hooks/use-agreement-inbox";
 import { AgreementDraftFields } from "./agreement-inbox/components/AgreementDraftFields";
-import { AgreementDraftCard } from "./agreement-inbox/components/AgreementDraftCard";
+import { AgreementDraftTable } from "./agreement-inbox/components/AgreementDraftTable";
 import { AgreementDraftEditModal, DeleteAgreementDraftModal } from "./agreement-inbox/components/AgreementInboxModals";
 import type { AgreementDraftStatusFilter } from "../hooks/use-agreement-drafts-query";
 import { AgentFilterSelect } from "../components/agent-filter-select";
@@ -25,6 +25,8 @@ export function AgreementInboxScreen() {
     setStartDateFilter,
     endDateFilter,
     setEndDateFilter,
+    remainingPaxOnly,
+    setRemainingPaxOnly,
     currentPage,
     setCurrentPage,
     isDraftComposerOpen,
@@ -32,13 +34,10 @@ export function AgreementInboxScreen() {
     editingDraft,
     deleteDraftTarget,
     setDeleteDraftTarget,
-    assignmentGroupCodes,
     feedback,
-    hasDatesSelected,
     isDateRangeInvalid,
     draftsQuery,
     drafts,
-    filteredDrafts,
     totalPages,
     paginatedDrafts,
     rangeStart,
@@ -48,19 +47,16 @@ export function AgreementInboxScreen() {
     startEditDraft,
     closeEditDraftModal,
     updateDraft,
+    updateDraftStatus,
+    createDraftInline,
     requestDeleteDraft,
-    updateAssignmentGroupCode,
-    assignDraftToGroup,
     deleteDraft,
-    unassignDraftFromGroup,
     deleteDraftMutationPending,
-    assignDraftMutationPending,
-    unassignDraftMutationPending,
     form,
   } = state;
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5 py-5 sm:py-6">
+    <div className="mx-auto flex max-w-screen-2xl flex-col gap-5 py-5 sm:py-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-brand-primary">Hotel Agreement</p>
@@ -116,7 +112,7 @@ export function AgreementInboxScreen() {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 shadow-sm sm:px-4">
+      <section className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 shadow-sm sm:hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-base font-bold text-slate-900">New Draft Agreement</h2>
@@ -233,8 +229,24 @@ export function AgreementInboxScreen() {
           </div>
         )}
 
-        {agentFilter !== "all" || startDateFilter || endDateFilter ? (
-          <div className="mt-2 flex justify-end">
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setRemainingPaxOnly((value) => !value)}
+            aria-pressed={remainingPaxOnly}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${
+              remainingPaxOnly
+                ? "border-brand-primary/30 bg-brand-primary/10 text-brand-primary"
+                : "border-slate-200 bg-surface-container-lowest text-on-surface-variant hover:border-brand-primary/25"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              {remainingPaxOnly ? "check_box" : "check_box_outline_blank"}
+            </span>
+            <span>Masih ada sisa pax</span>
+          </button>
+
+          {agentFilter !== "all" || startDateFilter || endDateFilter || remainingPaxOnly ? (
             <button
               type="button"
               className="text-xs font-bold text-brand-primary hover:underline"
@@ -242,50 +254,32 @@ export function AgreementInboxScreen() {
                 setAgentFilter("all");
                 setStartDateFilter("");
                 setEndDateFilter("");
+                setRemainingPaxOnly(false);
               }}
             >
               Reset filters
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </section>
 
-      <section className={`space-y-2 transition-opacity duration-200 ${draftsQuery.isFetching ? "opacity-60" : ""}`}>
+      <section className={`transition-opacity duration-200 ${draftsQuery.isFetching ? "opacity-60" : ""}`}>
         {draftsQuery.isLoading ? (
           <div className="rounded-2xl border border-slate-200 bg-surface-container-lowest px-4 py-6 text-sm font-semibold text-slate-600">
             Loading agreement drafts...
           </div>
-        ) : null}
-
-        {!draftsQuery.isLoading && filteredDrafts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-surface-container-lowest px-4 py-8 text-center">
-            <span className="material-symbols-outlined text-3xl text-slate-400" aria-hidden="true">
-              inventory_2
-            </span>
-            <h2 className="mt-2 text-lg font-bold text-slate-900">No agreement drafts found</h2>
-          </div>
-        ) : null}
-
-        {paginatedDrafts.map((draft) => (
-          <AgreementDraftCard
-            key={draft.id}
-            draft={draft}
-            linkedGroupCode={linkedGroupCode}
-            assignmentGroupCode={assignmentGroupCodes[draft.id] ?? linkedGroupCode}
-            hasDatesSelected={hasDatesSelected}
-            isDateRangeInvalid={isDateRangeInvalid}
-            startDateFilter={startDateFilter}
-            endDateFilter={endDateFilter}
-            deleteDraftMutationPending={deleteDraftMutationPending}
-            assignDraftMutationPending={assignDraftMutationPending}
-            unassignDraftMutationPending={unassignDraftMutationPending}
+        ) : (
+          <AgreementDraftTable
+            drafts={paginatedDrafts}
             onStartEdit={startEditDraft}
             onDeleteRequest={requestDeleteDraft}
-            onAssignmentGroupCodeChange={updateAssignmentGroupCode}
-            onAssignToGroup={assignDraftToGroup}
-            onUnassignFromGroup={unassignDraftFromGroup}
+            onStatusChange={(draft, next) => void updateDraftStatus(draft, next)}
+            onCreateInline={createDraftInline}
+            statusChangePending={isSaving}
+            deleteDraftMutationPending={deleteDraftMutationPending}
+            isSaving={isSaving}
           />
-        ))}
+        )}
       </section>
 
       <PaginationControls
