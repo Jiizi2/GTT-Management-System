@@ -1,8 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { sidebarAccountItem, sidebarItems } from "../shared/app-domain";
+import { buildDashboardPath } from "../shared/app-route";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { NavId, SessionAccessTier } from "../shared/app-domain";
+
+// Let the browser handle new-tab / new-window intents (right-click "Open link
+// in new tab", Ctrl/Cmd-click, middle-click, Shift-click); only intercept a
+// plain left click for in-app SPA navigation.
+function isModifiedNavClick(event: ReactMouseEvent<HTMLAnchorElement>): boolean {
+  return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+}
 
 function SidebarModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") {
@@ -76,6 +85,14 @@ export function AppSidebar({
     };
   }, [isLogoutModalOpen]);
 
+  const handleNavClick = (event: ReactMouseEvent<HTMLAnchorElement>, navId: NavId) => {
+    if (isModifiedNavClick(event)) {
+      return;
+    }
+    event.preventDefault();
+    onNavigate(navId);
+  };
+
   const closeLogoutModal = () => setIsLogoutModalOpen(false);
   const handleConfirmLogout = () => {
     setIsLogoutModalOpen(false);
@@ -122,9 +139,10 @@ export function AppSidebar({
           {!isCollapsed ? <p className={sectionLabelClass}>Main</p> : null}
 
           {primaryNavItems.map((item) => (
-            <button
+            <a
               key={item.id}
-              type="button"
+              href={buildDashboardPath(item.id)}
+              aria-current={activeNav === item.id ? "page" : undefined}
               className={`group flex items-center gap-3.5 rounded-full text-on-surface-variant transition ${
                 isCollapsed ? "h-14 w-14 justify-center px-0" : "px-4 py-3.5"
               } ${
@@ -132,14 +150,14 @@ export function AppSidebar({
                   ? "bg-surface-container-lowest text-primary shadow-ambient"
                   : "text-on-surface-variant hover:translate-x-1 hover:bg-surface-container-lowest hover:text-primary"
               }`}
-              onClick={() => onNavigate(item.id)}
+              onClick={(event) => handleNavClick(event, item.id)}
               title={isCollapsed ? item.label : undefined}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 {item.icon}
               </span>
               {!isCollapsed ? <span className="text-[0.98rem] font-bold">{item.label}</span> : null}
-            </button>
+            </a>
           ))}
 
           <div className={sectionDividerClass} aria-hidden="true" />
@@ -147,9 +165,10 @@ export function AppSidebar({
           {!isCollapsed ? <p className={sectionLabelClass}>Tools</p> : null}
 
           {toolsNavItems.map((item) => (
-            <button
+            <a
               key={item.id}
-              type="button"
+              href={buildDashboardPath(item.id)}
+              aria-current={activeNav === item.id ? "page" : undefined}
               className={`group flex items-center gap-3.5 rounded-full text-on-surface-variant transition ${
                 isCollapsed ? "h-14 w-14 justify-center px-0" : "px-4 py-3.5"
               } ${
@@ -157,14 +176,14 @@ export function AppSidebar({
                   ? "bg-surface-container-lowest text-primary shadow-ambient"
                   : "text-on-surface-variant hover:translate-x-1 hover:bg-surface-container-lowest hover:text-primary"
               }`}
-              onClick={() => onNavigate(item.id)}
+              onClick={(event) => handleNavClick(event, item.id)}
               title={isCollapsed ? item.label : undefined}
             >
               <span className="material-symbols-outlined" aria-hidden="true">
                 {item.icon}
               </span>
               {!isCollapsed ? <span className="text-[0.98rem] font-bold">{item.label}</span> : null}
-            </button>
+            </a>
           ))}
 
           <div className={sectionDividerClass} aria-hidden="true" />
@@ -188,8 +207,9 @@ export function AppSidebar({
         </div>
 
         <div className={`mt-4 pt-3 ${isCollapsed ? "px-0" : ""}`}>
-          <button
-            type="button"
+          <a
+            href={buildDashboardPath(sidebarAccountItem.id)}
+            aria-current={activeNav === sidebarAccountItem.id ? "page" : undefined}
             className={`group flex items-center gap-3 rounded-[1rem] transition ${
               isCollapsed
                 ? "h-14 w-14 justify-center p-0"
@@ -199,7 +219,7 @@ export function AppSidebar({
                 ? "bg-surface-container-lowest/85 text-primary"
                 : "text-on-surface-variant hover:text-on-surface"
             }`}
-            onClick={() => onNavigate(sidebarAccountItem.id)}
+            onClick={(event) => handleNavClick(event, sidebarAccountItem.id)}
             title={isCollapsed ? sidebarAccountItem.label : undefined}
             aria-label="Open Profile"
           >
@@ -228,7 +248,7 @@ export function AppSidebar({
                 </span>
               </>
             ) : null}
-          </button>
+          </a>
 
           <button
             type="button"
