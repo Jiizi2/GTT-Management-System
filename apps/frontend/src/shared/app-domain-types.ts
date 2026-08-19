@@ -38,6 +38,14 @@ export type NextActivity = {
   icon: string;
 };
 
+/**
+ * Explicit transportation mode for an itinerary segment. Orthogonal to the
+ * activity category: an arrival/departure may be a flight or a land bus, and an
+ * intercity transfer may be a bus or a high-speed train. Legacy items without
+ * this field fall back to inference via `resolveTransportMode`.
+ */
+export type TransportMode = "flight" | "bus" | "train";
+
 export type ItineraryItem = {
   date: string;
   year: string;
@@ -49,6 +57,7 @@ export type ItineraryItem = {
   categoryKey?: string;
   isoDate?: string;
   time?: string;
+  transportMode?: TransportMode;
   flightNumber?: string;
   hotelName?: string;
   fromHotelName?: string;
@@ -177,6 +186,7 @@ export type ScheduleFormState = {
   category: string;
   date: string;
   time: string;
+  transportMode: TransportMode;
   flightNumber: string;
   hotelName: string;
   fromHotelName: string;
@@ -195,6 +205,7 @@ export type EditScheduleFormState = {
   date: string;
   time: string;
   category: string;
+  transportMode: TransportMode;
   flightNumber: string;
   hotelName: string;
   fromHotelName: string;
@@ -230,6 +241,7 @@ export type ChecklistItem = {
   activity: string;
   trip: string;
   activityIcon: string;
+  transportMode?: TransportMode;
   requiredBusCount: number;
   scheduledTime: string;
   transferByTrain: boolean;
@@ -341,6 +353,7 @@ export type InputItineraryItem = {
   time: string;
   category: string;
   categoryKey: string;
+  transportMode?: TransportMode;
   hotelName?: string;
   fromHotelName?: string;
   from: string;
@@ -360,6 +373,7 @@ export type InputItineraryFormState = {
   date: string;
   time: string;
   category: string;
+  transportMode?: TransportMode;
   hotelName?: string;
   fromHotelName?: string;
   from: string;
@@ -452,6 +466,7 @@ export type VisaRaudhahEditFormState = {
 
 export type TransferTrainFields = {
   category: string;
+  transportMode?: TransportMode;
   transferByTrain: boolean;
   trainDepartureTime: string;
   destinationPickupTime: string;

@@ -53,6 +53,7 @@
     "fact_check",
     "filter_alt",
     "flag",
+    "flight",
     "flight_land",
     "flight_takeoff",
     "group",

@@ -4,9 +4,10 @@ import { Controller, UseFormReturn } from "react-hook-form";
 import { DatePickerInput, TimePickerInput } from "../../../components/date-time-pickers";
 import { SereneSelect } from "../../../components/serene-select";
 import {
+  getAllowedTransportModes,
   getRouteFieldConfigByCategory,
   getScheduleTypeOption,
-  isTransferActivityType,
+  TRANSPORT_MODE_META,
 } from "../../../shared/app-domain";
 import { shouldUseSaudiCityDropdown } from "../helpers/add-group-workspace-helpers";
 import type { ManualScheduleFormValues } from "../hooks/use-add-group-workspace-form";
@@ -50,7 +51,6 @@ export function ManualScheduleModal({
   form,
   scheduleMethods,
   handleFormChange,
-  applyManualScheduleDraft,
   isGroupReadyForItinerary,
   saudiCityOptions,
   showFridayCityTourWarning,
@@ -144,6 +144,11 @@ export function ManualScheduleModal({
   const errorCount = Object.keys(scheduleErrors).length;
 
   const routeFieldConfig = getRouteFieldConfigByCategory(form.category);
+  const allowedTransportModes = getAllowedTransportModes(form.category);
+  const showTransportModeField = allowedTransportModes.length > 0;
+  const showRequiresBusField = allowedTransportModes.length === 0;
+  const manualScheduleModeChipBaseClassName =
+    "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition";
 
   return createPortal(
     <div
@@ -406,44 +411,45 @@ export function ManualScheduleModal({
               title="Route & transportation"
               description="Origin, destination, train transfer, pickup, and bus requirements."
             >
-              {isTransferActivityType(form.category) ? (
-                <>
-                  <div className={manualScheduleInfoClassName}>
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      info
-                    </span>
-                    <p>
-                      If transfer uses a high-speed train, buses are still needed for hotel luggage pickup, pilgrim
-                      drop-off at the station, and pickup at the destination station.
-                    </p>
-                  </div>
-
-                  <label className={manualScheduleCheckClassName}>
-                    <Controller
-                      name="transferByTrain"
-                      control={scheduleMethods.control}
-                      render={({ field }) => (
-                        <input
-                          className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                          type="checkbox"
-                          checked={field.value}
-                          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                            const current = scheduleMethods.getValues();
-                            applyManualScheduleDraft({
-                              ...current,
-                              transferByTrain: event.target.checked,
-                              requiresBus: event.target.checked ? true : current.requiresBus,
-                              trainDepartureTime: event.target.checked ? current.trainDepartureTime : "",
-                              destinationPickupTime: event.target.checked ? current.destinationPickupTime : "",
-                            });
-                          }}
+              {showTransportModeField ? (
+                <div className={manualScheduleWideFieldClassName}>
+                  <span>Transport Mode</span>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {allowedTransportModes.map((mode) => {
+                      const isActive = (form.transportMode ?? "") === mode;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          className={`${manualScheduleModeChipBaseClassName} ${
+                            isActive
+                              ? "border-primary/55 bg-primary/12 text-primary"
+                              : "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                          }`}
+                          onClick={() => handleFormChange("transportMode", mode)}
                           disabled={!isGroupReadyForItinerary}
-                        />
-                      )}
-                    />
-                    <span>Transfer using High-Speed Train (HHR)</span>
-                  </label>
-                </>
+                        >
+                          <span className="material-symbols-outlined text-base" aria-hidden="true">
+                            {TRANSPORT_MODE_META[mode].icon}
+                          </span>
+                          <span>{TRANSPORT_MODE_META[mode].label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {showTransferTrainFields ? (
+                <div className={manualScheduleInfoClassName}>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    info
+                  </span>
+                  <p>
+                    High-speed train transfer. Enter the train departure and destination station pickup times. Add a
+                    separate bus segment if the group needs road transport to or from the station.
+                  </p>
+                </div>
               ) : null}
 
               <label className={manualScheduleFieldClassName}>
@@ -610,24 +616,26 @@ export function ManualScheduleModal({
                 </div>
               ) : null}
 
-              <label className={manualScheduleCheckClassName}>
-                <Controller
-                  name="requiresBus"
-                  control={scheduleMethods.control}
-                  render={({ field }) => (
-                    <input
-                      className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                      type="checkbox"
-                      checked={showTransferTrainFields ? true : field.value}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        handleFormChange("requiresBus", event.target.checked)
-                      }
-                      disabled={!isGroupReadyForItinerary || showTransferTrainFields}
-                    />
-                  )}
-                />
-                <span>{showTransferTrainFields ? "Bus Required (Luggage + Station Pickup)" : "Requires Bus"}</span>
-              </label>
+              {showRequiresBusField ? (
+                <label className={manualScheduleCheckClassName}>
+                  <Controller
+                    name="requiresBus"
+                    control={scheduleMethods.control}
+                    render={({ field }) => (
+                      <input
+                        className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          handleFormChange("requiresBus", event.target.checked)
+                        }
+                        disabled={!isGroupReadyForItinerary}
+                      />
+                    )}
+                  />
+                  <span>Requires Bus</span>
+                </label>
+              ) : null}
             </OperationalFormSection>
 
             <OperationalFormSection

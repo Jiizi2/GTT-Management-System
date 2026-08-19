@@ -34,8 +34,10 @@ const {
   isTransferActivityType,
   normalizeAgreementCityKey,
   parseTimeForInput,
+  resolveFormTransportMode,
   resolveGroupCompleteness,
   resolveTotalBusCount,
+  getTransportModeIcon,
   shouldShowFridayCityTourWarning,
 } = Domain;
 
@@ -648,7 +650,9 @@ export function useGroupDetailDashboard({
 
     const typeOption = getScheduleTypeOption(scheduleForm.category);
     const formattedDate = formatScheduleDate(scheduleForm.date);
-    const nextFlightNumber = isFlightActivityType(scheduleForm.category) ? scheduleForm.flightNumber.trim() : "";
+    const transportMode = resolveFormTransportMode(scheduleForm.category, scheduleForm.transportMode);
+    const nextFlightNumber =
+      transportMode === "flight" && isFlightActivityType(scheduleForm.category) ? scheduleForm.flightNumber.trim() : "";
     const shouldPersistHotelName =
       scheduleForm.category === "arrival" ||
       scheduleForm.category === "city-tour" ||
@@ -659,11 +663,14 @@ export function useGroupDetailDashboard({
     const nextFromHotelName = "";
     const nextHotelPickupRequestTime =
       scheduleForm.category === "departure" ? scheduleForm.hotelPickupRequestTime.trim() : "";
-    const isTransferByTrain = isTransferActivityType(scheduleForm.category) && scheduleForm.transferByTrain;
+    const isTransferByTrain = isTransferActivityType(scheduleForm.category) && transportMode === "train";
     const scheduleTime = isTransferByTrain ? scheduleForm.trainDepartureTime : scheduleForm.time;
-    const transferTrainSummary = buildTransferTrainSummary(scheduleForm);
+    const transferTrainSummary = buildTransferTrainSummary({ ...scheduleForm, transportMode });
     const nextCityTourCity = isCityTourActivityType(scheduleForm.category) ? scheduleForm.cityTourCity.trim() : "";
     const nextTitle = formatRouteSummary(scheduleForm.category, scheduleForm.from, scheduleForm.to, nextCityTourCity);
+    const nextRequiresBus = isCityTourActivityType(scheduleForm.category) ? false : transportMode === "bus";
+    const nextIcon =
+      scheduleForm.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, scheduleForm.category);
     const nextItem: ItineraryItem = {
       date: formattedDate.date,
       year: formattedDate.year,
@@ -682,11 +689,12 @@ export function useGroupDetailDashboard({
         note: scheduleForm.note,
         transferTrainSummary,
       }),
-      icon: typeOption.icon,
+      icon: nextIcon,
       highlighted: scheduleForm.highlighted,
       categoryKey: typeOption.value,
       isoDate: scheduleForm.date,
       time: scheduleTime,
+      transportMode,
       flightNumber: nextFlightNumber,
       hotelName: nextHotelName,
       fromHotelName: nextFromHotelName,
@@ -694,7 +702,7 @@ export function useGroupDetailDashboard({
       to: scheduleForm.to.trim(),
       cityTourCity: nextCityTourCity,
       notes: scheduleForm.note.trim(),
-      requiresBus: isTransferByTrain,
+      requiresBus: nextRequiresBus,
       transferByTrain: isTransferByTrain,
       trainDepartureTime: isTransferByTrain ? scheduleForm.trainDepartureTime.trim() : "",
       destinationPickupTime: isTransferByTrain ? scheduleForm.destinationPickupTime.trim() : "",

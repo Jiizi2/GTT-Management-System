@@ -64,6 +64,7 @@ type BackendCreateGroupPayload = {
     highlighted?: boolean;
     isoDate?: string;
     time?: string;
+    transportMode?: string;
     flightNumber?: string;
     hotelName?: string;
     fromHotelName?: string;
@@ -326,6 +327,7 @@ export function mapGroupItineraryToBackendPayload(group: GroupData) {
       highlighted: item.highlighted,
       isoDate: item.isoDate?.trim(),
       time: normalizeStoredTimeLabel(item.time?.trim() ?? "") || undefined,
+      transportMode: item.transportMode,
       flightNumber: item.flightNumber?.trim(),
       hotelName: item.hotelName?.trim(),
       fromHotelName: item.fromHotelName?.trim(),

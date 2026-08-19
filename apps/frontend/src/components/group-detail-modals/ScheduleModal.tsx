@@ -3,6 +3,8 @@ import { SereneSelect } from "../serene-select";
 import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { useSaudiCityOptions } from "../../hooks/use-saudi-city-options";
 import {
+  getAllowedTransportModes,
+  getDefaultTransportMode,
   getRouteFieldConfigByCategory,
   isCityTourActivityType,
   isFlightActivityType,
@@ -10,6 +12,7 @@ import {
   normalizeSaudiCityValue,
   saudiCityOptions as defaultSaudiCityOptions,
   scheduleTypeOptions,
+  TRANSPORT_MODE_META,
 } from "../../shared/app-domain";
 import { shouldUseSaudiCityDropdown } from "./helpers";
 import { ModalPortal, ModalShell, ModalHeader, ModalFooter, ModalFooterButton } from "./shared";
@@ -28,8 +31,6 @@ const modalInfoClassName =
   "md:col-span-2 flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800";
 const modalWarnClassName =
   "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
-const modalCheckClassName =
-  "md:col-span-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2 text-sm font-medium text-slate-700";
 const modalTransferCardClassName = "md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 p-3";
 const modalMetaClassName =
   "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2";
@@ -88,12 +89,14 @@ export function ScheduleModal({
 }: ScheduleModalProps) {
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
-  const showFlightNumberField = isFlightActivityType(form.category);
+  const allowedTransportModes = getAllowedTransportModes(form.category);
+  const showTransportModeField = allowedTransportModes.length > 0;
+  const showFlightNumberField = isFlightActivityType(form.category) && form.transportMode === "flight";
   const showPrimaryHotelNameField = form.category === "arrival" || form.category === "departure";
   const showTransferHotelFields = false;
   const showSingleHotelNameField = showPrimaryHotelNameField && !showTransferHotelFields;
   const showDeparturePickupField = form.category === "departure";
-  const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
+  const showTransferTrainFields = isTransferActivityType(form.category) && form.transportMode === "train";
   const showCityTourCityField = isCityTourActivityType(form.category);
   const routeFieldConfig = getRouteFieldConfigByCategory(form.category);
   const scheduleStatusMessage = isSaveDisabled ? "Complete all required schedule fields before saving." : null;
@@ -128,7 +131,9 @@ export function ScheduleModal({
                       }`}
                       onClick={() => {
                         const nextCategory = option.value;
+                        const nextMode = getDefaultTransportMode(nextCategory);
                         onChange("category", nextCategory);
+                        onChange("transportMode", nextMode);
 
                         if (shouldUseSaudiCityDropdown(nextCategory, "from")) {
                           onChange("from", normalizeSaudiCityValue(form.from));
@@ -138,7 +143,7 @@ export function ScheduleModal({
                           onChange("to", normalizeSaudiCityValue(form.to));
                         }
 
-                        if (!isFlightActivityType(nextCategory)) {
+                        if (nextMode !== "flight") {
                           onChange("flightNumber", "");
                         }
 
@@ -150,11 +155,14 @@ export function ScheduleModal({
                           onChange("cityTourCity", "");
                         }
 
-                        if (!isTransferActivityType(nextCategory)) {
-                          onChange("fromHotelName", "");
+                        if (nextMode !== "train") {
                           onChange("transferByTrain", false);
                           onChange("trainDepartureTime", "");
                           onChange("destinationPickupTime", "");
+                        }
+
+                        if (!isTransferActivityType(nextCategory)) {
+                          onChange("fromHotelName", "");
                         }
                       }}
                     >
@@ -167,6 +175,45 @@ export function ScheduleModal({
                 </div>
               </div>
 
+              {showTransportModeField ? (
+                <div className={`${modalFieldClassName} ${modalWideClassName}`}>
+                  <span>Transport Mode</span>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {allowedTransportModes.map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={`${modalToggleChipClassName} ${
+                          form.transportMode === mode
+                            ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
+                            : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                        }`}
+                        onClick={() => {
+                          onChange("transportMode", mode);
+
+                          if (mode !== "flight") {
+                            onChange("flightNumber", "");
+                          }
+
+                          if (mode !== "train") {
+                            onChange("transferByTrain", false);
+                            onChange("trainDepartureTime", "");
+                            onChange("destinationPickupTime", "");
+                          } else {
+                            onChange("transferByTrain", true);
+                          }
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">
+                          {TRANSPORT_MODE_META[mode].icon}
+                        </span>
+                        <span>{TRANSPORT_MODE_META[mode].label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <label className={modalFieldClassName}>
                 <span>Date</span>
                 <DatePickerInput
@@ -178,7 +225,9 @@ export function ScheduleModal({
 
               {!showTransferTrainFields ? (
                 <label className={modalFieldClassName}>
-                  <span>{form.category === "departure" ? "Flight Return Time" : "Time"}</span>
+                  <span>
+                    {form.category === "departure" && form.transportMode === "flight" ? "Flight Return Time" : "Time"}
+                  </span>
                   <TimePickerInput
                     inputClassName={modalInputClassName}
                     value={form.time}
@@ -351,35 +400,16 @@ export function ScheduleModal({
                 </label>
               ) : null}
 
-              {isTransferActivityType(form.category) ? (
-                <>
-                  <div className={modalInfoClassName}>
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      info
-                    </span>
-                    <p>
-                      For high-speed train transfers, enter the train departure time and destination station pickup
-                      time.
-                    </p>
-                  </div>
-
-                  <label className={modalCheckClassName}>
-                    <input
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/25"
-                      type="checkbox"
-                      checked={form.transferByTrain}
-                      onChange={(event) => {
-                        onChange("transferByTrain", event.target.checked);
-
-                        if (!event.target.checked) {
-                          onChange("trainDepartureTime", "");
-                          onChange("destinationPickupTime", "");
-                        }
-                      }}
-                    />
-                    <span>Transfer using High-Speed Train (HHR)</span>
-                  </label>
-                </>
+              {showTransferTrainFields ? (
+                <div className={modalInfoClassName}>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    info
+                  </span>
+                  <p>
+                    High-speed train transfer. Enter the train departure time and destination station pickup time. Add a
+                    separate bus segment if the group needs road transport to or from the station.
+                  </p>
+                </div>
               ) : null}
 
               {showTransferTrainFields ? (

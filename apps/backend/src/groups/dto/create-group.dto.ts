@@ -16,6 +16,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -149,6 +150,11 @@ export class CreateItineraryItemDto {
   @IsOptional()
   @IsString()
   time?: string;
+
+  @ApiPropertyOptional({ example: "flight", enum: ["flight", "bus", "train"] })
+  @IsOptional()
+  @IsIn(["flight", "bus", "train"])
+  transportMode?: string;
 
   @ApiPropertyOptional({ example: "SV-827" })
   @IsOptional()

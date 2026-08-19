@@ -1,5 +1,5 @@
 import type { ItineraryItem } from "../../../shared/app-domain";
-import { getScheduleTypeOption, inferCategoryKey } from "../../../shared/app-domain";
+import { getScheduleTypeOption, inferCategoryKey, resolveItineraryIcon } from "../../../shared/app-domain";
 import { useGroupDetailContext } from "../context/GroupDetailContext";
 import { buildItineraryFacts, buildItinerarySummary } from "./group-itinerary-display";
 
@@ -86,6 +86,7 @@ export function GroupItineraryTab() {
           const activityHeading = formatItineraryActivityHeading(item, categoryKey, typeOption.cardLabel);
           const itinerarySummary = buildItinerarySummary(item, categoryKey);
           const itineraryFacts = buildItineraryFacts(item, categoryKey);
+          const itineraryIcon = resolveItineraryIcon(item);
 
           return (
             <li
@@ -109,7 +110,7 @@ export function GroupItineraryTab() {
                 ) : null}
                 <span className="relative z-10 mt-2 inline-flex h-9 w-9 items-center justify-center rounded-full border-4 border-surface-container-lowest bg-brand-primary text-on-primary shadow-sm md:h-10 md:w-10">
                   <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                    {typeOption.icon}
+                    {itineraryIcon}
                   </span>
                 </span>
               </div>

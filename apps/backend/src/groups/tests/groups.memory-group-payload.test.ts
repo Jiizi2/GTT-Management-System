@@ -76,6 +76,7 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
         fromLocation: " Lobby ",
         toLocation: " Quba ",
         cityTourCity: " Madinah ",
+        transportMode: " train ",
         transferByTrain: true,
         trainDepartureTime: " 09:00 ",
         destinationPickupTime: " 10:10 ",
@@ -210,6 +211,8 @@ describe("GroupsMemoryGroupPayload", () => {
     expect(fields.itinerary[0].title).toBe("Landing at JED and heading to Makkah");
     expect(fields.itinerary[1].title).toBe("City Tour in Madinah: Lobby -> Quba");
     expect(fields.itinerary[1].transferByTrain).toBe(true);
+    expect(fields.itinerary[1].transportMode).toBe("train");
+    expect(fields.itinerary[0].transportMode).toBeUndefined();
     expect(fields.itinerary[1].trainDepartureTime).toBe("09:00");
     expect(fields.itinerary[1].destinationPickupTime).toBe("10:10");
     expect(fields.itinerary[1].hotelPickupRequestTime).toBe("07:45");

@@ -8,6 +8,7 @@ const initialValues: ManualScheduleFormValues = {
   date: "2026-07-20",
   time: "08:00",
   category: "arrival",
+  transportMode: "flight",
   hotelName: "Operational Hotel",
   fromHotelName: "",
   from: "JED Airport",
@@ -25,7 +26,7 @@ const initialValues: ManualScheduleFormValues = {
 function ItineraryFormHarness() {
   const scheduleMethods = useForm<ManualScheduleFormValues>({ defaultValues: initialValues });
   const form = scheduleMethods.watch();
-  const isTransferByTrain = form.category === "transfer" && form.transferByTrain;
+  const isTransferByTrain = form.category === "transfer" && form.transportMode === "train";
   const handleFormChange = <Key extends keyof ManualScheduleFormValues>(
     field: Key,
     value: ManualScheduleFormValues[Key],
@@ -41,7 +42,8 @@ function ItineraryFormHarness() {
       handleSaveItem={vi.fn()}
       isFormDisabled={false}
       validationState={{
-        showFlightNumberField: form.category === "arrival" || form.category === "departure",
+        showFlightNumberField:
+          (form.category === "arrival" || form.category === "departure") && form.transportMode === "flight",
         showHotelNameField: form.category === "arrival" || form.category === "departure",
         showTransferTrainFields: isTransferByTrain,
         showDeparturePickupField: form.category === "departure",
@@ -87,8 +89,8 @@ describe("mobile itinerary form", () => {
     expect(screen.getByText("Hotel Name")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /transfer/i }));
-    expect(screen.getByText("Transfer using High-Speed Train (HHR)")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("checkbox", { name: /High-Speed Train/i }));
+    expect(screen.getByText("Transport Mode")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Train$/i }));
     expect(screen.getByText("Train Departure Time")).toBeInTheDocument();
     expect(screen.getByText("Destination Station Pickup Time")).toBeInTheDocument();
 

@@ -555,6 +555,7 @@ model ItineraryItem {
   highlighted           Boolean  @default(false)
   isoDate               DateTime?
   time                  String?
+  transportMode         String?
   flightNumber          String?
   hotelName             String?
   fromHotelName         String?
