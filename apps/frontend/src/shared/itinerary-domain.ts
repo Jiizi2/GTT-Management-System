@@ -4,6 +4,7 @@ import type {
   ItineraryItem,
   TransferTrainFields,
   TransferTrainSegment,
+  TransportMode,
 } from "./app-domain-types";
 
 export const scheduleTypeOptions = [
@@ -12,6 +13,105 @@ export const scheduleTypeOptions = [
   { value: "transfer", cardLabel: "Transfer", modalLabel: "Transfer", icon: "airport_shuttle" },
   { value: "departure", cardLabel: "Departure", modalLabel: "Departure", icon: "flight_takeoff" },
 ] as const;
+
+/** Display metadata (label + Material Symbol icon) for each transport mode. */
+export const TRANSPORT_MODE_META: Record<TransportMode, { label: string; icon: string }> = {
+  flight: { label: "Flight", icon: "flight" },
+  bus: { label: "Bus", icon: "directions_bus" },
+  train: { label: "Train", icon: "train" },
+};
+
+/**
+ * Transport modes selectable for a given activity category. Empty for
+ * categories where transport is not a primary choice (e.g. city-tour).
+ */
+export function getAllowedTransportModes(category: string): TransportMode[] {
+  const normalizedCategory = category.toLowerCase();
+  if (normalizedCategory === "arrival" || normalizedCategory === "departure") {
+    return ["flight", "bus"];
+  }
+  if (normalizedCategory === "transfer") {
+    return ["bus", "train"];
+  }
+  return [];
+}
+
+/** Default transport mode when a category is first selected. */
+export function getDefaultTransportMode(category: string): TransportMode {
+  const normalizedCategory = category.toLowerCase();
+  if (normalizedCategory === "arrival" || normalizedCategory === "departure") {
+    return "flight";
+  }
+  return "bus";
+}
+
+/**
+ * Resolve the authoritative transport mode for an itinerary item. Uses the
+ * explicit `transportMode` when present, otherwise infers it for legacy data
+ * from category + the old `transferByTrain` flag so existing groups keep the
+ * correct icons and labels.
+ */
+export function resolveTransportMode(item: ItineraryItem): TransportMode {
+  if (item.transportMode) {
+    return item.transportMode;
+  }
+
+  const categoryKey = inferCategoryKey(item);
+  if (categoryKey === "arrival" || categoryKey === "departure") {
+    return "flight";
+  }
+  if (categoryKey === "transfer") {
+    if (item.transferByTrain) {
+      return "train";
+    }
+    // Legacy train transfers get split into segments whose `transferByTrain`
+    // flag is cleared; recover the mode from the segment's category label.
+    const normalizedCategory = item.category.toLowerCase();
+    if (normalizedCategory.includes("train") || normalizedCategory.includes("station pickup")) {
+      return "train";
+    }
+    return "bus";
+  }
+
+  return "bus";
+}
+
+/** Material Symbol icon for a transport mode within a category context. */
+export function getTransportModeIcon(mode: TransportMode, category: string): string {
+  if (mode === "flight") {
+    const normalizedCategory = category.toLowerCase();
+    if (normalizedCategory === "arrival") {
+      return "flight_land";
+    }
+    if (normalizedCategory === "departure") {
+      return "flight_takeoff";
+    }
+    return "flight";
+  }
+
+  return TRANSPORT_MODE_META[mode].icon;
+}
+
+/** Resolve the timeline node icon for an itinerary item based on its mode. */
+export function resolveItineraryIcon(item: ItineraryItem): string {
+  const categoryKey = inferCategoryKey(item);
+  if (categoryKey === "city-tour") {
+    return "tour";
+  }
+
+  return getTransportModeIcon(resolveTransportMode(item), categoryKey);
+}
+
+/** Whether a transfer's transport fields represent a high-speed train trip. */
+function isTrainTransferFields(fields: TransferTrainFields): boolean {
+  if (!isTransferActivityType(fields.category)) {
+    return false;
+  }
+  if (fields.transportMode) {
+    return fields.transportMode === "train";
+  }
+  return fields.transferByTrain;
+}
 
 export const saudiCityOptions = [
   "Makkah",
@@ -127,7 +227,7 @@ export function isDepartureActivityType(category: string): boolean {
 }
 
 export function hasIncompleteTransferTrainFields(fields: TransferTrainFields): boolean {
-  if (!isTransferActivityType(fields.category) || !fields.transferByTrain) {
+  if (!isTrainTransferFields(fields)) {
     return false;
   }
 
@@ -135,7 +235,7 @@ export function hasIncompleteTransferTrainFields(fields: TransferTrainFields): b
 }
 
 export function buildTransferTrainSummary(fields: TransferTrainFields): string {
-  if (!isTransferActivityType(fields.category) || !fields.transferByTrain) {
+  if (!isTrainTransferFields(fields)) {
     return "";
   }
 
@@ -407,7 +507,8 @@ export function inferCityTourCity(item: ItineraryItem): string {
 export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormState {
   const category = inferCategoryKey(item);
   const parsedTime = item.time ?? parseTimeForInput(item.meta.split(" | ")[0] ?? "");
-  const isTransferByTrain = category === "transfer" && (item.transferByTrain ?? false);
+  const transportMode = resolveTransportMode(item);
+  const isTransferByTrain = category === "transfer" && transportMode === "train";
   const isDepartureActivity = isDepartureActivityType(category);
   const rawFromValue = (item.from ?? "").trim();
   const rawToValue = (item.to ?? item.title).trim();
@@ -418,6 +519,7 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
     date: item.isoDate ?? parseDisplayDateToIso(item.date, item.year),
     time: parsedTime,
     category,
+    transportMode,
     flightNumber: item.flightNumber ?? "",
     hotelName: item.hotelName ?? "",
     fromHotelName: category === "transfer" ? (item.fromHotelName ?? "") : "",
@@ -436,20 +538,27 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
 export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form: EditScheduleFormState): ItineraryItem {
   const typeOption = getScheduleTypeOption(form.category);
   const formattedDate = formatScheduleDate(form.date);
+  // Fall back to the legacy `transferByTrain` flag when a caller supplies a form
+  // without an explicit transport mode (older payloads / tests).
+  const requestedMode =
+    form.transportMode ?? (isTransferActivityType(form.category) && form.transferByTrain ? "train" : undefined);
+  const transportMode = resolveFormTransportMode(form.category, requestedMode);
   const nextCityTourCity = isCityTourActivityType(form.category) ? form.cityTourCity.trim() : "";
   const nextTitle =
     form.from.trim() && form.to.trim()
       ? formatRouteSummary(form.category, form.from, form.to, nextCityTourCity)
       : currentItem.title;
-  const nextFlightNumber = isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
+  const nextFlightNumber = transportMode === "flight" && isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
   const shouldPersistHotelName =
     form.category === "arrival" || form.category === "city-tour" || form.category === "departure";
   const nextHotelName = shouldPersistHotelName ? (form.hotelName?.trim() ?? "") : "";
   const nextFromHotelName = "";
   const nextHotelPickupRequestTime = isDepartureActivityType(form.category) ? form.hotelPickupRequestTime.trim() : "";
-  const isTransferByTrain = isTransferActivityType(form.category) && form.transferByTrain;
+  const isTransferByTrain = isTransferActivityType(form.category) && transportMode === "train";
   const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
-  const transferTrainSummary = buildTransferTrainSummary(form);
+  const transferTrainSummary = buildTransferTrainSummary({ ...form, transportMode });
+  const nextRequiresBus = isCityTourActivityType(form.category) ? form.requiresBus : transportMode === "bus";
+  const nextIcon = form.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, form.category);
 
   return {
     ...currentItem,
@@ -470,23 +579,40 @@ export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form:
       note: form.notes,
       transferTrainSummary,
     }),
-    icon: typeOption.icon,
+    icon: nextIcon,
     categoryKey: typeOption.value,
     isoDate: form.date,
     time: scheduleTime,
+    transportMode,
     flightNumber: nextFlightNumber,
     hotelName: nextHotelName,
     fromHotelName: nextFromHotelName,
     from: form.from.trim(),
     to: form.to.trim(),
     cityTourCity: nextCityTourCity,
-    requiresBus: isTransferByTrain ? true : form.requiresBus,
+    requiresBus: nextRequiresBus,
     notes: form.notes.trim(),
     transferByTrain: isTransferByTrain,
     trainDepartureTime: isTransferByTrain ? form.trainDepartureTime.trim() : "",
     destinationPickupTime: isTransferByTrain ? form.destinationPickupTime.trim() : "",
     hotelPickupRequestTime: nextHotelPickupRequestTime,
   };
+}
+
+/**
+ * Normalize a form's transport mode to one valid for its category. Falls back to
+ * the category default when the stored mode is not allowed (e.g. after switching
+ * category), keeping persisted items consistent.
+ */
+export function resolveFormTransportMode(category: string, mode: TransportMode | undefined): TransportMode {
+  const allowed = getAllowedTransportModes(category);
+  if (allowed.length === 0) {
+    return mode ?? getDefaultTransportMode(category);
+  }
+  if (mode && allowed.includes(mode)) {
+    return mode;
+  }
+  return getDefaultTransportMode(category);
 }
 
 export function isFridayDate(value: string): boolean {
@@ -603,7 +729,7 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
     }
 
     const transferCategoryKey = "transfer";
-    const transferIcon = "airport_shuttle";
+    const transferIcon = TRANSPORT_MODE_META.train.icon;
     const departureTime = item.trainDepartureTime.trim() || item.time.trim();
     const pickupTime = item.destinationPickupTime.trim() || departureTime;
     const trimmedFrom = item.from.trim();
@@ -619,13 +745,14 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
         time: departureTime,
         category: getTransferTrainSegmentCategory("train-departure"),
         categoryKey: transferCategoryKey,
+        transportMode: "train",
         hotelName: trimmedHotelName,
         fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
         flightNumber: "",
-        requiresBus: true,
+        requiresBus: false,
         notes: trimmedNotes,
         icon: transferIcon,
         transferByTrain: false,
@@ -639,13 +766,14 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
         time: pickupTime,
         category: getTransferTrainSegmentCategory("station-pickup"),
         categoryKey: transferCategoryKey,
+        transportMode: "train",
         hotelName: trimmedHotelName,
         fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
         flightNumber: "",
-        requiresBus: true,
+        requiresBus: false,
         notes: "",
         icon: transferIcon,
         transferByTrain: false,
@@ -671,7 +799,7 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
     const isoDate = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
     const formattedDate = isoDate ? formatScheduleDate(isoDate) : { date: item.date, year: item.year };
     const transferCategoryKey = "transfer";
-    const transferIcon = "airport_shuttle";
+    const transferIcon = TRANSPORT_MODE_META.train.icon;
     const trimmedFrom = item.from?.trim() ?? "";
     const trimmedTo = item.to?.trim() ?? "";
     const trimmedHotelName = item.hotelName?.trim() ?? "";
@@ -702,13 +830,14 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         categoryKey: transferCategoryKey,
         isoDate: isoDate ?? item.isoDate,
         time: departureTime,
+        transportMode: "train",
         flightNumber: "",
         hotelName: trimmedHotelName,
         fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
-        requiresBus: true,
+        requiresBus: false,
         notes: trimmedNotes,
         transferByTrain: false,
         trainDepartureTime: "",
@@ -734,13 +863,14 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         categoryKey: transferCategoryKey,
         isoDate: isoDate ?? item.isoDate,
         time: pickupTime,
+        transportMode: "train",
         flightNumber: "",
         hotelName: trimmedHotelName,
         fromHotelName: trimmedFromHotelName,
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
-        requiresBus: true,
+        requiresBus: false,
         notes: "",
         transferByTrain: false,
         trainDepartureTime: "",

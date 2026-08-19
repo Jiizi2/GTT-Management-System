@@ -264,9 +264,17 @@ export function generateWhatsappCopyText(
   lines.push("");
 
   lines.push("✈️ *Flight Detail*");
-  const flightItems = (group.itinerary || []).filter(
-    (item) => item.category?.toLowerCase() === "arrival" || item.category?.toLowerCase() === "departure"
-  );
+  const flightItems = (group.itinerary || []).filter((item) => {
+    const category = item.category?.toLowerCase();
+    const isArrivalOrDeparture = category === "arrival" || category === "departure";
+    if (!isArrivalOrDeparture) {
+      return false;
+    }
+    // Arrivals/departures can now be by land (bus) instead of flight. Only real
+    // flights belong in the flight manifest; legacy items without a mode default
+    // to flight for backward compatibility.
+    return item.transportMode ? item.transportMode === "flight" : true;
+  });
 
   const formatFlightDate = (isoDateStr?: string, dateStr?: string, yearStr?: string) => {
     if (isoDateStr) {

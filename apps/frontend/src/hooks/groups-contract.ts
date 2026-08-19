@@ -35,6 +35,7 @@ const backendItineraryItemSchema = z
     highlighted: z.boolean().optional(),
     isoDate: backendDateValueSchema.nullable().optional(),
     time: z.string().nullable().optional(),
+    transportMode: z.string().nullable().optional(),
     flightNumber: z.string().nullable().optional(),
     hotelName: z.string().nullable().optional(),
     fromHotelName: z.string().nullable().optional(),

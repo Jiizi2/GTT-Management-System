@@ -1,5 +1,10 @@
 import type { ItineraryItem } from "../../../shared/app-domain";
-import { formatScheduleTime } from "../../../shared/app-domain";
+import {
+  formatScheduleTime,
+  getTransportModeIcon,
+  resolveTransportMode,
+  TRANSPORT_MODE_META,
+} from "../../../shared/app-domain";
 
 export type ItineraryFact = {
   icon: string;
@@ -51,9 +56,18 @@ export function buildItinerarySummary(item: ItineraryItem, categoryKey: string):
 }
 
 export function buildItineraryFacts(item: ItineraryItem, categoryKey: string): ItineraryFact[] {
+  const transportMode = resolveTransportMode(item);
+  const transportFact: ItineraryFact = {
+    icon: getTransportModeIcon(transportMode, categoryKey),
+    label: "Transportation",
+    value: TRANSPORT_MODE_META[transportMode].label,
+  };
+
   if (categoryKey === "arrival") {
     return [
-      { icon: "confirmation_number", label: "Flight Number", value: valueOrNotSet(item.flightNumber) },
+      transportMode === "flight"
+        ? { icon: "confirmation_number", label: "Flight Number", value: valueOrNotSet(item.flightNumber) }
+        : transportFact,
       { icon: "schedule", label: "Arrival Time", value: formatLocalTime(item.time) },
       { icon: "hotel", label: "Destination Hotel", value: valueOrNotSet(item.hotelName) },
     ];
@@ -61,7 +75,9 @@ export function buildItineraryFacts(item: ItineraryItem, categoryKey: string): I
 
   if (categoryKey === "departure") {
     const facts: ItineraryFact[] = [
-      { icon: "confirmation_number", label: "Flight Number", value: valueOrNotSet(item.flightNumber) },
+      transportMode === "flight"
+        ? { icon: "confirmation_number", label: "Flight Number", value: valueOrNotSet(item.flightNumber) }
+        : transportFact,
       { icon: "schedule", label: "Departure Time", value: formatLocalTime(item.time) },
       { icon: "hotel", label: "Origin Hotel", value: valueOrNotSet(item.hotelName) },
     ];
@@ -81,19 +97,16 @@ export function buildItineraryFacts(item: ItineraryItem, categoryKey: string): I
     const normalizedCategory = item.category.toLowerCase();
     const isDestinationPickupSegment =
       normalizedCategory.includes("station pickup") || normalizedCategory.includes("train arrival");
+    const isTrain = transportMode === "train";
     const facts: ItineraryFact[] = [
       {
-        icon: item.transferByTrain ? "train" : "directions_bus",
+        icon: getTransportModeIcon(transportMode, categoryKey),
         label: "Transportation",
-        value: item.transferByTrain ? "High-speed train" : item.requiresBus ? "Bus" : "Ground transfer",
+        value: isTrain ? "High-speed train" : "Bus",
       },
       {
         icon: "schedule",
-        label: isDestinationPickupSegment
-          ? "Station Pickup"
-          : item.transferByTrain
-            ? "Train Departure"
-            : "Departure Time",
+        label: isDestinationPickupSegment ? "Station Pickup" : isTrain ? "Train Departure" : "Departure Time",
         value: formatLocalTime(
           isDestinationPickupSegment ? item.time || item.destinationPickupTime : item.trainDepartureTime || item.time,
         ),

@@ -29,6 +29,7 @@ describe('EditScheduleModal', () => {
       category: 'arrival',
       date: '2024-03-15',
       time: '14:30',
+      transportMode: 'flight' as const,
       flightNumber: 'SV-827',
       from: 'Jeddah',
       to: 'Makkah',
@@ -80,6 +81,7 @@ describe('EditScheduleModal', () => {
         category: '',
         date: '',
         time: '',
+        transportMode: 'flight' as const,
         flightNumber: '',
         from: '',
         to: '',
@@ -168,16 +170,17 @@ describe('EditScheduleModal', () => {
       expect(screen.getByText(/City Tour on Friday detected/i)).toBeInTheDocument();
     });
 
-    it('should show transfer train checkbox when category is transfer', () => {
+    it('should show transport mode selector with a Train option when category is transfer', () => {
       render(
         <EditScheduleModal
           {...defaultProps}
-          form={{ ...defaultProps.form, category: 'transfer' }}
+          form={{ ...defaultProps.form, category: 'transfer', transportMode: 'bus' }}
         />,
         { wrapper: createWrapper() }
       );
 
-      expect(screen.getByText(/Transfer using High-Speed Train/i)).toBeInTheDocument();
+      expect(screen.getByText('Transport Mode')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Train/i })).toBeInTheDocument();
     });
 
     it('should show hotel name field for arrival category', () => {
@@ -204,8 +207,11 @@ describe('EditScheduleModal', () => {
       expect(screen.getByText('Hotel Name')).toBeInTheDocument();
     });
 
-    it('should show requires bus checkbox', () => {
-      render(<EditScheduleModal {...defaultProps} />, { wrapper: createWrapper() });
+    it('should show requires bus checkbox for city-tour category', () => {
+      render(
+        <EditScheduleModal {...defaultProps} form={{ ...defaultProps.form, category: 'city-tour' }} />,
+        { wrapper: createWrapper() }
+      );
 
       expect(screen.getByText('Requires Bus')).toBeInTheDocument();
     });

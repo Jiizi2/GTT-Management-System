@@ -90,6 +90,9 @@ export class GroupItineraryItemResponseDto {
   @ApiPropertyOptional({ example: "09:30" })
   time?: string;
 
+  @ApiPropertyOptional({ example: "flight", enum: ["flight", "bus", "train"] })
+  transportMode?: string;
+
   @ApiPropertyOptional({ example: "SV-827" })
   flightNumber?: string;
 

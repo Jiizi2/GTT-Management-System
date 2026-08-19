@@ -27,6 +27,11 @@ import {
   formatRouteSummary,
   formatScheduleDate,
   formatScheduleTime,
+  getAllowedTransportModes,
+  getDefaultTransportMode,
+  getTransportModeIcon,
+  resolveItineraryIcon,
+  resolveTransportMode,
   getChecklistRangeDates,
   getChecklistDayLabel,
   getLocalIsoDateWithOffset,
@@ -971,7 +976,10 @@ function testScheduleEditingAndCityInferenceHelpers(): void {
   });
   assert.equal(updatedTransfer.categoryKey, "transfer");
   assert.equal(updatedTransfer.transferByTrain, true);
-  assert.equal(updatedTransfer.requiresBus, true);
+  assert.equal(updatedTransfer.transportMode, "train");
+  // Train transfers no longer auto-require a bus; operators add a bus segment
+  // manually when the group needs road transport around the station.
+  assert.equal(updatedTransfer.requiresBus, false);
   assert.equal(updatedTransfer.time, "08:20");
   assert.equal(updatedTransfer.destinationPickupTime, "09:40");
   assert.equal(updatedTransfer.meta.includes("HHR Transfer"), true);
@@ -1326,7 +1334,71 @@ function testItineraryDateToleranceWarning(): void {
   );
 }
 
+function testTransportModeHelpersAndBusDeparture(): void {
+  // Allowed modes + defaults per category.
+  assert.deepEqual(getAllowedTransportModes("arrival"), ["flight", "bus"]);
+  assert.deepEqual(getAllowedTransportModes("transfer"), ["bus", "train"]);
+  assert.deepEqual(getAllowedTransportModes("city-tour"), []);
+  assert.equal(getDefaultTransportMode("departure"), "flight");
+  assert.equal(getDefaultTransportMode("transfer"), "bus");
+
+  // Explicit mode wins.
+  assert.equal(resolveTransportMode(createBaseItineraryItem({ categoryKey: "departure", transportMode: "bus" })), "bus");
+
+  // Legacy inference: arrival/departure default to flight; transfer to bus;
+  // train recovered from the legacy flag and from split-segment category labels.
+  assert.equal(resolveTransportMode(createBaseItineraryItem({ categoryKey: "arrival", icon: "flight_land" })), "flight");
+  assert.equal(resolveTransportMode(createBaseItineraryItem({ categoryKey: "transfer", category: "Transfer" })), "bus");
+  assert.equal(
+    resolveTransportMode(createBaseItineraryItem({ categoryKey: "transfer", transferByTrain: true })),
+    "train",
+  );
+  assert.equal(
+    resolveTransportMode(
+      createBaseItineraryItem({ categoryKey: "transfer", category: "Transfer - Arrival Station Pickup" }),
+    ),
+    "train",
+  );
+
+  // Icons.
+  assert.equal(getTransportModeIcon("flight", "arrival"), "flight_land");
+  assert.equal(getTransportModeIcon("flight", "departure"), "flight_takeoff");
+  assert.equal(getTransportModeIcon("bus", "transfer"), "directions_bus");
+  assert.equal(getTransportModeIcon("train", "transfer"), "train");
+  assert.equal(resolveItineraryIcon(createBaseItineraryItem({ categoryKey: "city-tour" })), "tour");
+  assert.equal(
+    resolveItineraryIcon(createBaseItineraryItem({ categoryKey: "departure", transportMode: "bus" })),
+    "directions_bus",
+  );
+
+  // A bus departure clears the flight number and reflects the bus mode/icon.
+  const busDeparture = buildItineraryItemFromEditForm(createBaseItineraryItem({ categoryKey: "departure" }), {
+    date: "2026-04-12",
+    time: "07:00",
+    category: "departure",
+    transportMode: "bus",
+    flightNumber: "SV-999",
+    hotelName: "Madinah Hotel",
+    fromHotelName: "",
+    from: "Madinah",
+    to: "Amman",
+    cityTourCity: "",
+    requiresBus: false,
+    notes: "",
+    transferByTrain: false,
+    trainDepartureTime: "",
+    destinationPickupTime: "",
+    hotelPickupRequestTime: "06:00",
+  });
+  assert.equal(busDeparture.transportMode, "bus");
+  assert.equal(busDeparture.flightNumber, "");
+  assert.equal(busDeparture.icon, "directions_bus");
+  assert.equal(busDeparture.requiresBus, true);
+  assert.equal(busDeparture.transferByTrain, false);
+}
+
 describe("app-domain", () => {
+  runCase("transport mode helpers and bus departure", testTransportModeHelpersAndBusDeparture);
   runCase("raudhah appointment normalization", testResolveValidRaudhahAppointmentsNormalization);
   runCase("route helper behavior", testRouteHelpersForCategorySpecificBehavior);
   runCase("transfer train expansion", testTransferTrainExpansionCreatesTwoChecklistSegments);

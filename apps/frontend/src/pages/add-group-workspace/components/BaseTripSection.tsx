@@ -2,13 +2,17 @@ import React from "react";
 import { DatePickerInput, TimePickerInput } from "../../../components/date-time-pickers";
 import { SereneSelect } from "../../../components/serene-select";
 import {
+  getAllowedTransportModes,
   getRouteFieldConfigByCategory,
   getScheduleTypeOption,
   isCityTourActivityType,
   isFlightActivityType,
   isTransferActivityType,
+  resolveFormTransportMode,
   shouldShowFridayCityTourWarning,
+  TRANSPORT_MODE_META,
   type InputItineraryFormState,
+  type TransportMode,
 } from "../../../shared/app-domain";
 import {
   isBaseTripDraftInvalid,
@@ -228,11 +232,24 @@ export function BaseTripSection({
         </div>
 
         {(activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
-          const showFlightNumberInput = isFlightActivityType(item.category);
+          const transportMode = resolveFormTransportMode(item.category, item.transportMode);
+          const allowedTransportModes = getAllowedTransportModes(item.category);
+          const showTransportModeInput = allowedTransportModes.length > 0;
+          const showRequiresBusInput = allowedTransportModes.length === 0;
+          const showFlightNumberInput = isFlightActivityType(item.category) && transportMode === "flight";
           const showHotelNameInput = item.category === "arrival" || item.category === "departure";
           const showDeparturePickupRequestInput = item.category === "departure";
-          const showTransferTrainInputs = isTransferActivityType(item.category) && item.transferByTrain;
+          const showTransferTrainInputs = isTransferActivityType(item.category) && transportMode === "train";
           const showCityTourCityInput = isCityTourActivityType(item.category);
+          const handleBaseTripModeChange = (mode: TransportMode) =>
+            updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
+              ...trip,
+              transportMode: mode,
+              flightNumber: mode === "flight" ? trip.flightNumber : "",
+              transferByTrain: mode === "train",
+              trainDepartureTime: mode === "train" ? trip.trainDepartureTime : "",
+              destinationPickupTime: mode === "train" ? trip.destinationPickupTime : "",
+            }));
           const activityCardToneClass =
             activityTypeCardClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-lowest";
           const routeFieldConfigForItem = getRouteFieldConfigByCategory(item.category);
@@ -297,7 +314,11 @@ export function BaseTripSection({
 
                   {!showTransferTrainInputs ? (
                     <label className={fieldClassName}>
-                      <span>{item.category === "departure" ? "Flight Return Time" : "Time (Optional)"}</span>
+                      <span>
+                        {item.category === "departure" && transportMode === "flight"
+                          ? "Flight Return Time"
+                          : "Time (Optional)"}
+                      </span>
                       <TimePickerInput
                         inputClassName={inputClassName}
                         value={item.time}
@@ -478,23 +499,33 @@ export function BaseTripSection({
                     <p className={routeHintClassName}>{routeFieldConfigForItem.helperText}</p>
                   ) : null}
 
-                  {isTransferActivityType(item.category) ? (
-                    <label className={checkClassName}>
-                      <input
-                        className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                        type="checkbox"
-                        checked={item.transferByTrain}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
-                            ...trip,
-                            transferByTrain: event.target.checked,
-                            requiresBus: event.target.checked ? true : trip.requiresBus,
-                          }))
-                        }
-                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                      />
-                      <span>Transfer menggunakan Kereta Cepat (HHR)</span>
-                    </label>
+                  {showTransportModeInput ? (
+                    <div className={fieldClassName}>
+                      <span>Transport Mode</span>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {allowedTransportModes.map((mode) => {
+                          const isActive = transportMode === mode;
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                                isActive
+                                  ? "border-primary/55 bg-primary/12 text-primary"
+                                  : "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                              }`}
+                              onClick={() => handleBaseTripModeChange(mode)}
+                              disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                            >
+                              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                                {TRANSPORT_MODE_META[mode].icon}
+                              </span>
+                              <span>{TRANSPORT_MODE_META[mode].label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ) : null}
 
                   {showTransferTrainInputs ? (
@@ -540,18 +571,20 @@ export function BaseTripSection({
                     </div>
                   ) : null}
 
-                  <label className={checkClassName}>
-                    <input
-                      className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                      type="checkbox"
-                      checked={showTransferTrainInputs ? true : item.requiresBus}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
-                      }
-                      disabled={!isGroupReadyForItinerary || showTransferTrainInputs || !item.isEnabled}
-                    />
-                    <span>{showTransferTrainInputs ? "Bus Required (Luggage + Station Pickup)" : "Requires Bus"}</span>
-                  </label>
+                  {showRequiresBusInput ? (
+                    <label className={checkClassName}>
+                      <input
+                        className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
+                        type="checkbox"
+                        checked={item.requiresBus}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                          handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
+                        }
+                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                      />
+                      <span>Requires Bus</span>
+                    </label>
+                  ) : null}
                 </OperationalFormSection>
 
                 <OperationalFormSection

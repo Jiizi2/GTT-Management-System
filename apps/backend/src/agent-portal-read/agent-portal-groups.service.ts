@@ -40,6 +40,7 @@ type ItinerarySource = {
   title: string;
   isoDate?: Date | string | null;
   time?: string | null;
+  transportMode?: string | null;
   flightNumber?: string | null;
   hotelName?: string | null;
   fromHotelName?: string | null;
@@ -291,6 +292,7 @@ export class AgentPortalGroupsService {
     return {
       id: item.id, sortOrder: item.sortOrder, dateLabel: item.dateLabel, yearLabel: item.yearLabel,
       category: item.category, title: item.title, isoDate: toIso(item.isoDate), time: item.time ?? null,
+      transportMode: item.transportMode ?? null,
       flightNumber: item.flightNumber ?? null, hotelName: item.hotelName ?? null,
       fromHotelName: item.fromHotelName ?? null, fromLocation: item.fromLocation ?? null,
       toLocation: item.toLocation ?? null, cityTourCity: item.cityTourCity ?? null,

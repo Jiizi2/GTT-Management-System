@@ -10,6 +10,8 @@ const {
   parseDisplayDateToIso,
   parseTimeForInput,
   resolveTotalBusCount,
+  resolveTransportMode,
+  TRANSPORT_MODE_META,
 } = Domain;
 
 function formatItineraryActivityHeading(item: ItineraryItem, categoryKey: string, fallbackLabel: string): string {
@@ -78,8 +80,16 @@ function formatItinerarySupportDetail(
   const hotelPickupRequestTime = item.hotelPickupRequestTime?.trim() ?? "";
   const notes = item.notes?.trim() ?? "";
 
-  if ((categoryKey === "arrival" || categoryKey === "departure") && flightNumber) {
-    detailSegments.push(`Flight ${flightNumber}`);
+  const transportMode = resolveTransportMode(item);
+
+  if (categoryKey === "arrival" || categoryKey === "departure") {
+    if (transportMode === "flight" && flightNumber) {
+      detailSegments.push(`Flight ${flightNumber}`);
+    } else if (transportMode !== "flight") {
+      detailSegments.push(TRANSPORT_MODE_META[transportMode].label);
+    }
+  } else if (categoryKey === "transfer") {
+    detailSegments.push(transportMode === "train" ? "Train" : "Bus");
   }
 
   if (categoryKey === "transfer" && (fromHotelName || hotelName)) {
@@ -100,7 +110,7 @@ function formatItinerarySupportDetail(
     detailSegments.push(`Hotel pickup ${formatScheduleTime(hotelPickupRequestTime)}`);
   }
 
-  if (item.requiresBus) {
+  if (categoryKey === "city-tour" && item.requiresBus) {
     detailSegments.push("Requires Bus");
   }
 

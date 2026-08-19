@@ -1,4 +1,4 @@
-import type { ChecklistItem, GroupData, ItineraryItem } from "./app-domain-types";
+import type { ChecklistItem, GroupData, ItineraryItem, TransportMode } from "./app-domain-types";
 
 export type ChecklistDomainDependencies = {
   getLocalIsoDateWithOffset: (days: number) => string;
@@ -7,6 +7,8 @@ export type ChecklistDomainDependencies = {
   parseDisplayDateToIso: (date: string, year: string) => string;
   inferCategoryKey: (item: ItineraryItem) => string;
   getScheduleTypeOption: (category: string) => { icon: string };
+  resolveItineraryIcon: (item: ItineraryItem) => string;
+  resolveTransportMode: (item: ItineraryItem) => TransportMode;
   parseTimeForInput: (value: string) => string;
   formatScheduleTime: (value: string) => string;
   resolveTotalBusCount: (pax: number, requestedTotalBuses?: number) => number;
@@ -130,9 +132,13 @@ export function buildChecklistItemsFromGroups(
       }
 
       const categoryKey = dependencies.inferCategoryKey(item);
-      const typeOption = dependencies.getScheduleTypeOption(categoryKey);
+      const transportMode = dependencies.resolveTransportMode(item);
+      const activityIcon = dependencies.resolveItineraryIcon(item);
       const parsedTime = item.time ?? dependencies.parseTimeForInput(item.meta.split(" | ")[0] ?? "");
       const normalizedTime = parsedTime ? dependencies.formatScheduleTime(parsedTime) : "TBD";
+      // Use the raw flag (not the resolved mode) for scheduling: by the time the
+      // itinerary reaches here it is already split into flat segments whose
+      // `transferByTrain` is cleared, so each carries its own plain `time`.
       const transferByTrain = categoryKey === "transfer" && (item.transferByTrain ?? false);
       const isDepartureActivity = categoryKey === "departure";
       const requiredBusCount = dependencies.resolveTotalBusCount(group.pax, group.totalBuses);
@@ -158,7 +164,8 @@ export function buildChecklistItemsFromGroups(
           item.from && item.to
             ? dependencies.formatRouteSummary(categoryKey, item.from, item.to, item.cityTourCity)
             : item.title,
-        activityIcon: typeOption.icon,
+        activityIcon,
+        transportMode,
         requiredBusCount,
         scheduledTime,
         transferByTrain,

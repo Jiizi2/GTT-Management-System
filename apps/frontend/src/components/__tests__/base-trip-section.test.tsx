@@ -41,15 +41,14 @@ function BaseTripTransferHarness() {
 }
 
 describe("BaseTripSection", () => {
-  it("allows a transfer trip to enable high-speed train details", () => {
+  it("allows a transfer trip to switch to high-speed train mode", () => {
     render(<BaseTripTransferHarness />);
 
-    const trainToggle = screen.getByRole("checkbox", { name: /Kereta Cepat/i });
-    expect(trainToggle).not.toBeChecked();
+    // Train time fields are hidden until the train transport mode is selected.
+    expect(screen.queryByText("Train Departure Time")).not.toBeInTheDocument();
 
-    fireEvent.click(trainToggle);
+    fireEvent.click(screen.getByRole("button", { name: /^Train$/i }));
 
-    expect(trainToggle).toBeChecked();
     expect(screen.getByText("Train Departure Time")).toBeInTheDocument();
     expect(screen.getByText("Destination Station Pickup Time")).toBeInTheDocument();
   });

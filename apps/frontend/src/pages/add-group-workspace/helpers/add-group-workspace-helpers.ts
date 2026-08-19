@@ -18,6 +18,7 @@ import {
   isFlightActivityType,
   isTransferActivityType,
   normalizeAgreementCityKey,
+  resolveFormTransportMode,
   shiftIsoDate,
 } from "../../../shared/app-domain.js";
 
@@ -393,9 +394,10 @@ export function buildInputItineraryValidationState({
     !!effectiveMusyrifPhone.trim();
   const isGroupReadyForItinerary = isGroupInformationComplete && !hasInvalidDateRange && !isTotalBusBelowMinimum;
 
-  const showFlightNumberField = isFlightActivityType(form.category);
+  const transportMode = resolveFormTransportMode(form.category, form.transportMode);
+  const showFlightNumberField = isFlightActivityType(form.category) && transportMode === "flight";
   const showHotelNameField = form.category === "arrival" || form.category === "departure";
-  const showTransferTrainFields = isTransferActivityType(form.category) && form.transferByTrain;
+  const showTransferTrainFields = isTransferActivityType(form.category) && transportMode === "train";
   const showDeparturePickupField = form.category === "departure";
   const showCityTourCityField = isCityTourActivityType(form.category);
   const isFlightNumberMissing = showFlightNumberField && !form.flightNumber.trim();
@@ -403,7 +405,7 @@ export function buildInputItineraryValidationState({
   const isDepartureFlightTimeMissing = form.category === "departure" && !form.time.trim();
   const isDeparturePickupTimeMissing = showDeparturePickupField && !form.hotelPickupRequestTime.trim();
   const isCityTourCityMissing = showCityTourCityField && !form.cityTourCity.trim();
-  const hasTransferTrainFieldsMissing = hasIncompleteTransferTrainFields(form);
+  const hasTransferTrainFieldsMissing = hasIncompleteTransferTrainFields({ ...form, transportMode });
   const isFormDisabled =
     !isGroupReadyForItinerary ||
     !form.date ||

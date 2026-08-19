@@ -15,6 +15,7 @@ import type {
   GroupData,
   GroupRaudhahAppointment,
   GroupVisaSetup,
+  TransportMode,
 } from "../shared/app-domain";
 import {
   mapBackendAgreementStatus,
@@ -291,6 +292,11 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
       .map((item) => {
         const isoDate = toIsoDate(item.isoDate);
         const fallbackDate = isoDate ? formatScheduleDate(isoDate) : { date: "-", year: "2026" };
+        const rawTransportMode = readString(item.transportMode ?? "", "");
+        const transportMode: TransportMode | undefined =
+          rawTransportMode === "flight" || rawTransportMode === "bus" || rawTransportMode === "train"
+            ? (rawTransportMode as TransportMode)
+            : undefined;
 
         return {
           date: readString(item.dateLabel, fallbackDate.date),
@@ -303,6 +309,7 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
           highlighted: Boolean(item.highlighted),
           isoDate: isoDate ?? undefined,
           time: normalizeStoredTimeLabel(readString(item.time ?? "", "")),
+          transportMode,
           flightNumber: readString(item.flightNumber ?? "", ""),
           hotelName: inferHotelNameFromItineraryRecord(item) || undefined,
           fromHotelName: readString(item.fromHotelName ?? "", "") || undefined,

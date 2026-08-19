@@ -1,6 +1,6 @@
 import { AgreementApprovalStatus, AgreementCity, GroupRaudhahStatus } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, ValidateNested } from "class-validator";
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, ValidateNested } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UpsertGroupItineraryItemDto {
@@ -59,6 +59,11 @@ export class UpsertGroupItineraryItemDto {
   @IsOptional()
   @IsString()
   time?: string;
+
+  @ApiPropertyOptional({ example: "flight", enum: ["flight", "bus", "train"] })
+  @IsOptional()
+  @IsIn(["flight", "bus", "train"])
+  transportMode?: string;
 
   @ApiPropertyOptional({ example: "SV-827" })
   @IsOptional()
