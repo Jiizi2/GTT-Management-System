@@ -23,6 +23,8 @@ export interface GroupDetailContextType {
   isWhatsappCopied: boolean;
   isScheduleModalOpen: boolean;
   scheduleForm: ScheduleFormState;
+  pendingScheduleItems: ItineraryItem[];
+  isScheduleCommitDisabled: boolean;
   editingIndex: number | null;
   editScheduleForm: EditScheduleFormState | null;
   deletingIndex: number | null;
@@ -43,6 +45,8 @@ export interface GroupDetailContextType {
 
   // Handlers
   handleSaveSchedule: () => void;
+  handleAddAnotherSchedule: () => void;
+  handleRemovePendingSchedule: (index: number) => void;
   handleCloseScheduleModal: () => void;
   handleOpenScheduleModal: () => void;
   handleScheduleFieldChange: (field: keyof ScheduleFormState, value: any) => void;

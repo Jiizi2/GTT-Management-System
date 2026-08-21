@@ -44,10 +44,14 @@ describe('ScheduleModal', () => {
       highlighted: false,
     },
     isSaveDisabled: false,
+    isAddAnotherDisabled: false,
+    pendingItems: [],
     showFridayCityTourWarning: false,
     onChange: vi.fn(),
     onClose: vi.fn(),
     onSave: vi.fn(),
+    onAddAnother: vi.fn(),
+    onRemovePending: vi.fn(),
   };
 
   beforeEach(() => {
@@ -106,10 +110,14 @@ describe('ScheduleModal', () => {
       const props = {
         form: defaultProps.form,
         isSaveDisabled: false,
+        isAddAnotherDisabled: false,
+        pendingItems: [],
         showFridayCityTourWarning: false,
         onChange: vi.fn(),
         onClose: vi.fn(),
         onSave: vi.fn(),
+        onAddAnother: vi.fn(),
+        onRemovePending: vi.fn(),
       };
 
       expect(() => {
@@ -127,6 +135,64 @@ describe('ScheduleModal', () => {
       expect(() => {
         render(<ScheduleModal {...defaultProps} showFridayCityTourWarning={true} />, { wrapper: createWrapper() });
       }).not.toThrow();
+    });
+  });
+
+  describe('batch add (queue)', () => {
+    const pendingItems = [
+      {
+        date: '10 Sep',
+        year: '2026',
+        category: 'Arrival',
+        title: 'Jeddah to Makkah',
+        meta: '',
+        icon: 'flight_land',
+        categoryKey: 'arrival',
+        isoDate: '2026-09-10',
+        time: '19:30',
+      },
+      {
+        date: '11 Sep',
+        year: '2026',
+        category: 'City Tour',
+        title: 'City Tour Madinah',
+        meta: '',
+        icon: 'tour',
+        categoryKey: 'city-tour',
+        isoDate: '2026-09-11',
+        time: '09:00',
+      },
+    ];
+
+    it('renders the queued trips with a count and per-row remove', () => {
+      const onRemovePending = vi.fn();
+      render(
+        <ScheduleModal {...defaultProps} pendingItems={pendingItems} onRemovePending={onRemovePending} />,
+        { wrapper: createWrapper() },
+      );
+
+      expect(screen.getByText('Added this session (2)')).toBeInTheDocument();
+      expect(screen.getByText('Arrival · Jeddah to Makkah')).toBeInTheDocument();
+      expect(screen.getByText('City Tour · City Tour Madinah')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Arrival Jeddah to Makkah' }));
+      expect(onRemovePending).toHaveBeenCalledWith(0);
+    });
+
+    it('labels Save with the total count (queue + current entry)', () => {
+      // Empty/invalid form (isAddAnotherDisabled) + 2 queued -> "Save 2 Trips".
+      render(
+        <ScheduleModal {...defaultProps} isAddAnotherDisabled pendingItems={pendingItems} />,
+        { wrapper: createWrapper() },
+      );
+      expect(screen.getByRole('button', { name: /Save 2 Trips/ })).toBeInTheDocument();
+    });
+
+    it('queues the current entry via "Add another"', () => {
+      const onAddAnother = vi.fn();
+      render(<ScheduleModal {...defaultProps} onAddAnother={onAddAnother} />, { wrapper: createWrapper() });
+      fireEvent.click(screen.getByRole('button', { name: 'Add another' }));
+      expect(onAddAnother).toHaveBeenCalledTimes(1);
     });
   });
 
