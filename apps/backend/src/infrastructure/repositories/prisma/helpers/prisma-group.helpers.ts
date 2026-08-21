@@ -97,6 +97,10 @@ export const groupSummarySelection = {
       paymentStatus: true,
       makkahHotelWaived: true,
       madinahHotelWaived: true,
+      arrivalFlightNumber: true,
+      arrivalTime: true,
+      departureFlightNumber: true,
+      departureTime: true,
       createdAt: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
@@ -170,6 +174,10 @@ export const groupDetailSelection = {
       paymentStatus: true,
       makkahHotelWaived: true,
       madinahHotelWaived: true,
+      arrivalFlightNumber: true,
+      arrivalTime: true,
+      departureFlightNumber: true,
+      departureTime: true,
       createdAt: true,
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
@@ -476,6 +484,10 @@ function buildVisaSetupCreate(visaSetup: CreateGroupDto["visaSetup"]) {
       paymentStatus: visaSetup.paymentStatus ?? VisaPaymentStatus.UNPAID,
       makkahHotelWaived: visaSetup.makkahHotelWaived ?? false,
       madinahHotelWaived: visaSetup.madinahHotelWaived ?? false,
+      arrivalFlightNumber: visaSetup.arrivalFlightNumber?.trim() || null,
+      arrivalTime: visaSetup.arrivalTime?.trim() || null,
+      departureFlightNumber: visaSetup.departureFlightNumber?.trim() || null,
+      departureTime: visaSetup.departureTime?.trim() || null,
       hotelAgreements:
         visaSetup.hotelAgreements && visaSetup.hotelAgreements.length > 0
           ? {

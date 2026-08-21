@@ -1,9 +1,30 @@
 import * as Domain from "../../shared/app-domain";
-import type { GroupAgreementHotel, HotelAgreementDraft } from "../../shared/app-domain";
+import type { GroupAgreementHotel, GroupData, HotelAgreementDraft, VisaFlightDetailsInput } from "../../shared/app-domain";
 
 export type Tone = "success" | "warning" | "muted" | "info" | "error";
 
-const { formatVisaDateWithYear, isIsoDateValue } = Domain;
+const { formatVisaDateWithYear, isIsoDateValue, inferCategoryKey } = Domain;
+
+/**
+ * Resolve the flight details to show/seed in Visa Detail. Prefers the explicit
+ * VisaSetup columns, but falls back to the arrival/departure legs of the group's
+ * existing itinerary so groups whose flight was entered in Group Detail (before
+ * the VisaSetup flight fields existed) still display it — keeping the two views a
+ * single source instead of drifting apart.
+ */
+export function resolveGroupFlightDetails(group: GroupData | null | undefined): VisaFlightDetailsInput {
+  const visaSetup = group?.visaSetup;
+  const itinerary = group?.itinerary ?? [];
+  const arrivalItem = itinerary.find((item) => inferCategoryKey(item) === "arrival");
+  const departureItem = itinerary.find((item) => inferCategoryKey(item) === "departure");
+
+  return {
+    arrivalFlightNumber: visaSetup?.arrivalFlightNumber?.trim() || arrivalItem?.flightNumber?.trim() || "",
+    arrivalTime: visaSetup?.arrivalTime?.trim() || arrivalItem?.time?.trim() || "",
+    departureFlightNumber: visaSetup?.departureFlightNumber?.trim() || departureItem?.flightNumber?.trim() || "",
+    departureTime: visaSetup?.departureTime?.trim() || departureItem?.time?.trim() || "",
+  };
+}
 
 export function getToneClasses(tone: Tone): string {
   if (tone === "success") {

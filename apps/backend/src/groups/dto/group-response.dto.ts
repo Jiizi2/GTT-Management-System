@@ -219,6 +219,18 @@ export class GroupVisaSetupResponseDto {
   @ApiPropertyOptional({ description: "Grup tidak butuh hotel Madinah.", example: false })
   madinahHotelWaived?: boolean;
 
+  @ApiPropertyOptional({ description: "Arrival flight number for MOFA visa.", example: "JT-104", nullable: true })
+  arrivalFlightNumber?: string | null;
+
+  @ApiPropertyOptional({ description: "Arrival flight local time (HH:mm).", example: "19:30", nullable: true })
+  arrivalTime?: string | null;
+
+  @ApiPropertyOptional({ description: "Departure flight number for MOFA visa.", example: "JT-105", nullable: true })
+  departureFlightNumber?: string | null;
+
+  @ApiPropertyOptional({ description: "Departure flight local time (HH:mm).", example: "21:00", nullable: true })
+  departureTime?: string | null;
+
   @ApiProperty({ type: () => GroupVisaHotelAgreementResponseDto, isArray: true })
   hotelAgreements!: GroupVisaHotelAgreementResponseDto[];
 

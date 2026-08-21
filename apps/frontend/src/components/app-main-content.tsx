@@ -191,8 +191,10 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                   onToggleHotelWaiver={controller.handleToggleHotelWaiver}
                   onUpdatePaymentStatus={controller.handleUpdatePaymentStatus}
                   onUpdateSyarikah={controller.handleUpdateSyarikah}
+                  onUpdateFlightDetails={controller.handleUpdateFlightDetails}
                   onUpdateVisaHotel={controller.handleUpdateVisaHotel}
                   onDeleteVisaHotel={controller.handleDeleteVisaHotel}
+                  onSyncVisaItinerary={controller.handleSyncVisaItinerary}
                   onUpdateRaudhahAppointment={controller.handleUpdateRaudhahAppointment}
                   onClearRaudhahAppointment={controller.handleClearRaudhahAppointment}
                 />

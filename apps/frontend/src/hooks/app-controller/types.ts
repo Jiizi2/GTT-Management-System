@@ -4,6 +4,7 @@ import type {
   GroupVisaSetup,
   NavId,
   SessionAccessTier,
+  VisaFlightDetailsInput,
   VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaRaudhahEditFormState,
@@ -64,6 +65,8 @@ export type AppController = {
   handleToggleHotelWaiver: (groupCode: string, city: "makkah" | "madinah", waived: boolean) => void;
   handleUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   handleUpdateSyarikah: (groupCode: string, syarikah: string) => void;
+  handleUpdateFlightDetails: (groupCode: string, flight: VisaFlightDetailsInput) => void;
+  handleSyncVisaItinerary: (groupCode: string) => void;
   handleUpdateVisaHotel: (
     groupCode: string,
     city: "makkah" | "madinah",

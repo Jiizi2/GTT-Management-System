@@ -43,8 +43,8 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
   const paxLabel = Number.isFinite(agreement.pax) ? agreement.pax.toString() : "-";
 
   return (
-    <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)_5.5rem] gap-2 overflow-hidden md:grid-cols-[minmax(0,1fr)_5.5rem_minmax(12rem,1fr)]">
-      <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+    <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)_5.5rem] gap-x-3 gap-y-2 overflow-hidden border-t border-slate-200 pt-3 md:grid-cols-[minmax(0,1fr)_5.5rem_minmax(12rem,1fr)]">
+      <div className="min-w-0">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             confirmation_number
@@ -56,7 +56,7 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
         </strong>
       </div>
 
-      <div className="min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+      <div className="min-w-0 border-l border-slate-200 pl-3">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             group
@@ -66,7 +66,7 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
         <strong className="mt-1 block text-lg font-black leading-none text-slate-900">{paxLabel}</strong>
       </div>
 
-      <div className="col-span-2 min-w-0 rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2 md:col-span-1">
+      <div className="col-span-2 min-w-0 border-t border-slate-200 pt-2 md:col-span-1 md:border-l md:border-t-0 md:pl-3 md:pt-0">
         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
           <span className="material-symbols-outlined text-sm" aria-hidden="true">
             event
@@ -83,14 +83,14 @@ export function AgreementSummaryFields({ agreement }: { agreement: GroupAgreemen
 
 function AgreementExpandedFields({ agreement }: { agreement: GroupAgreementHotel }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      <div className="rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+    <div className="grid gap-3 sm:grid-cols-2 sm:gap-0">
+      <div className="sm:pr-4">
         <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Check In</span>
         <strong className="mt-1 block text-sm font-extrabold text-slate-900">
           {formatAgreementStayDate(agreement.stayStartIso)}
         </strong>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-surface-container-low px-3 py-2">
+      <div className="border-t border-slate-200 pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
         <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">Check Out</span>
         <strong className="mt-1 block text-sm font-extrabold text-slate-900">
           {formatAgreementStayDate(agreement.stayEndIso)}

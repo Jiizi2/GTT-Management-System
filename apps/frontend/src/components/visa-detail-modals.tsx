@@ -3,12 +3,13 @@ import { type ReactNode, useId } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
-import { DatePickerInput } from "./date-time-pickers";
+import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "./form-accessibility";
 import { SereneSelect } from "./serene-select";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
 import type { AgentOption } from "../hooks/use-agents-backend";
 import type {
+  VisaFlightDetailsInput,
   VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaRaudhahEditFormState,
@@ -33,6 +34,18 @@ const modalItemCardClassName = "rounded-2xl border border-slate-200 bg-surface-c
 
 const syarikahModalSchema = z.object({
   value: z.string().trim().min(1, "Syarikah wajib diisi."),
+});
+
+const flightTimeSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.length === 0 || /^([01]\d|2[0-3]):[0-5]\d$/.test(value), "Format jam harus HH:mm.");
+
+const flightDetailsModalSchema = z.object({
+  arrivalFlightNumber: z.string().trim(),
+  arrivalTime: flightTimeSchema,
+  departureFlightNumber: z.string().trim(),
+  departureTime: flightTimeSchema,
 });
 
 const visaStatusModalSchema = z
@@ -424,6 +437,119 @@ export function SyarikahModal({
         />
       </label>
       <FieldErrorMessage fieldId="visa-syarikah" message={valueErrorMessage} className={modalErrorClassName} />
+    </ModalShell>
+  );
+}
+
+export function FlightDetailsModal({
+  initialValue,
+  onClose,
+  onSave,
+}: {
+  initialValue: VisaFlightDetailsInput;
+  onClose: () => void;
+  onSave: (flight: VisaFlightDetailsInput) => void | Promise<void>;
+}) {
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<VisaFlightDetailsInput>({
+    resolver: zodResolver(flightDetailsModalSchema),
+    defaultValues: initialValue,
+  });
+
+  const arrivalTimeError = errors.arrivalTime?.message;
+  const departureTimeError = errors.departureTime?.message;
+
+  return (
+    <ModalShell
+      title="Detail Penerbangan"
+      description="Nomor penerbangan kedatangan & kepulangan untuk pengajuan MOFA visa. Dipakai untuk auto-build itinerary."
+      icon="flight"
+      widthClassName="max-w-lg"
+      onClose={onClose}
+      footer={
+        <SaveFooter
+          onClose={onClose}
+          onSave={() =>
+            void handleSubmit((values) =>
+              void onSave({
+                arrivalFlightNumber: values.arrivalFlightNumber.trim(),
+                arrivalTime: values.arrivalTime.trim(),
+                departureFlightNumber: values.departureFlightNumber.trim(),
+                departureTime: values.departureTime.trim(),
+              }),
+            )()
+          }
+          saveLabel="Save Changes"
+          isSaving={isSubmitting}
+        />
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className={modalFieldClassName}>
+          <span>Flight Kedatangan</span>
+          <input
+            id="flight-arrival-number"
+            className={modalInputClassName}
+            type="text"
+            placeholder="e.g. JT-104"
+            {...register("arrivalFlightNumber")}
+          />
+        </label>
+        <label className={modalFieldClassName}>
+          <span>Jam Kedatangan (LT)</span>
+          <Controller
+            control={control}
+            name="arrivalTime"
+            render={({ field }) => (
+              <TimePickerInput
+                id="flight-arrival-time"
+                inputClassName={modalInputClassName}
+                value={field.value}
+                onChange={field.onChange}
+                ariaInvalid={getFieldAriaInvalid(arrivalTimeError)}
+                ariaDescribedBy={getFieldDescribedBy("flight-arrival-time", { errorMessage: arrivalTimeError })}
+              />
+            )}
+          />
+          <FieldErrorMessage fieldId="flight-arrival-time" message={arrivalTimeError} className={modalErrorClassName} />
+        </label>
+        <label className={modalFieldClassName}>
+          <span>Flight Kepulangan</span>
+          <input
+            id="flight-departure-number"
+            className={modalInputClassName}
+            type="text"
+            placeholder="e.g. JT-105"
+            {...register("departureFlightNumber")}
+          />
+        </label>
+        <label className={modalFieldClassName}>
+          <span>Jam Kepulangan (LT)</span>
+          <Controller
+            control={control}
+            name="departureTime"
+            render={({ field }) => (
+              <TimePickerInput
+                id="flight-departure-time"
+                inputClassName={modalInputClassName}
+                value={field.value}
+                onChange={field.onChange}
+                ariaInvalid={getFieldAriaInvalid(departureTimeError)}
+                ariaDescribedBy={getFieldDescribedBy("flight-departure-time", { errorMessage: departureTimeError })}
+              />
+            )}
+          />
+          <FieldErrorMessage
+            fieldId="flight-departure-time"
+            message={departureTimeError}
+            className={modalErrorClassName}
+          />
+        </label>
+      </div>
     </ModalShell>
   );
 }

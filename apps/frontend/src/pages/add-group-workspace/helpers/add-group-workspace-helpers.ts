@@ -394,7 +394,12 @@ export function buildInputItineraryValidationState({
     !!effectiveMusyrifPhone.trim();
   const isGroupReadyForItinerary = isGroupInformationComplete && !hasInvalidDateRange && !isTotalBusBelowMinimum;
 
-  const transportMode = resolveFormTransportMode(form.category, form.transportMode);
+  // Mirror buildItineraryItemFromEditForm: fall back to the legacy `transferByTrain`
+  // flag when a form carries no explicit transport mode (older payloads / tests),
+  // so validation and the saved item agree on the mode.
+  const requestedTransportMode =
+    form.transportMode ?? (isTransferActivityType(form.category) && form.transferByTrain ? "train" : undefined);
+  const transportMode = resolveFormTransportMode(form.category, requestedTransportMode);
   const showFlightNumberField = isFlightActivityType(form.category) && transportMode === "flight";
   const showHotelNameField = form.category === "arrival" || form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && transportMode === "train";

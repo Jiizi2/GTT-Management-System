@@ -98,6 +98,10 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
       issuedDate: " 2026-04-01 ",
       syarikah: " Provider Test ",
       paymentStatus: VisaPaymentStatus.PARTIAL,
+      arrivalFlightNumber: " JT-104 ",
+      arrivalTime: " 19:30 ",
+      departureFlightNumber: " JT-105 ",
+      departureTime: " 21:00 ",
       hotelAgreements: [
         {
           city: AgreementCity.MAKKAH,
@@ -227,6 +231,10 @@ describe("GroupsMemoryGroupPayload", () => {
     expect(fields.visaSetup?.issuedDate).toBe("2026-04-01");
     expect(fields.visaSetup?.syarikah).toBe("Provider Test");
     expect(fields.visaSetup?.paymentStatus).toBe(VisaPaymentStatus.PARTIAL);
+    expect(fields.visaSetup?.arrivalFlightNumber).toBe("JT-104");
+    expect(fields.visaSetup?.arrivalTime).toBe("19:30");
+    expect(fields.visaSetup?.departureFlightNumber).toBe("JT-105");
+    expect(fields.visaSetup?.departureTime).toBe("21:00");
     expect(fields.visaSetup?.hotelAgreements.length).toBe(1);
     expect(fields.visaSetup?.hotelAgreements[0].hotelName).toBe("Swissotel");
     expect(fields.visaSetup?.raudhahAppointments[0].status).toBe(GroupRaudhahStatus.AFTER);
