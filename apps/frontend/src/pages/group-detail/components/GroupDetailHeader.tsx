@@ -29,7 +29,7 @@ export function GroupDetailHeader() {
           size="sm"
           className={
             isWhatsappCopied
-              ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-500/15"
+              ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15"
               : ""
           }
           onClick={handleCopyWhatsapp}

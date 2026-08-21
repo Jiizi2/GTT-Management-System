@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 const tones = {
   neutral: "bg-surface-container-high text-on-surface-variant",
   primary: "bg-primary/10 text-primary",
-  success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  warning: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  danger: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
-  info: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  success: "bg-emerald-100 text-emerald-700",
+  warning: "bg-amber-100 text-amber-700",
+  danger: "bg-rose-100 text-rose-700",
+  info: "bg-sky-100 text-sky-700",
 } as const;
 
 export function MetricCard({

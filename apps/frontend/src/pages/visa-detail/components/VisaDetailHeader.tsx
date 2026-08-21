@@ -144,7 +144,7 @@ export function VisaDetailHeader() {
             type="button"
             className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition sm:flex-none ${
               isWhatsappCopied
-                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
+                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600"
                 : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-brand-primary hover:text-brand-primary"
             }`}
             onClick={handleCopyWhatsapp}
