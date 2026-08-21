@@ -162,7 +162,7 @@ export function RaudhahReminderCard({
           type="button"
           className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
             isCopied
-              ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-300"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
               : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-outline-variant/35 dark:bg-surface-container-low dark:text-slate-200 dark:hover:bg-surface-container-high"
           }`}
           onClick={() => onCopyTemplate(item)}

@@ -21,7 +21,7 @@ export function Badge({
     success: "serene-chip-complete",
     warning: "serene-chip-warning",
     error: "serene-chip-alert",
-    info: "bg-sky-100/90 text-sky-800 border-sky-200/60 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-800/30",
+    info: "bg-sky-100/90 text-sky-800 border-sky-200/60",
     neutral: "bg-slate-100/90 text-slate-800 border-slate-200/60 dark:bg-slate-800/40 dark:text-slate-200 dark:border-slate-700/40",
   };
 

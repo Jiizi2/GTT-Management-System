@@ -74,7 +74,7 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
         </button>
       </div>
 
-      <div className="rounded-xl border border-rose-200/60 bg-rose-50/40 dark:border-rose-900/40 dark:bg-rose-950/10 p-3 space-y-1.5">
+      <div className="rounded-xl border border-rose-200/60 bg-rose-50/40 p-3 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <label
             htmlFor="invoice-discount-input"
@@ -83,7 +83,7 @@ export const InvoicePaymentsSection = memo(function InvoicePaymentsSection({
             <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">sell</span>
             Diskon (Rp)
           </label>
-          <div className="flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-surface-container-lowest px-2 py-1 h-9 w-40">
+          <div className="flex items-center gap-1 rounded-lg border border-rose-200 bg-surface-container-lowest px-2 py-1 h-9 w-40">
             <span className="text-[9px] font-extrabold text-rose-500">IDR</span>
             <MoneyInput
               id="invoice-discount-input"
