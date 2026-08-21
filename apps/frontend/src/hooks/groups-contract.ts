@@ -91,6 +91,10 @@ const backendVisaSetupSchema = z
     paymentStatus: z.string().optional(),
     makkahHotelWaived: z.boolean().optional(),
     madinahHotelWaived: z.boolean().optional(),
+    arrivalFlightNumber: z.string().nullable().optional(),
+    arrivalTime: z.string().nullable().optional(),
+    departureFlightNumber: z.string().nullable().optional(),
+    departureTime: z.string().nullable().optional(),
     hotelAgreements: z.array(backendHotelAgreementSchema).nullable().optional(),
     raudhahAppointments: z.array(backendRaudhahAppointmentSchema).nullable().optional(),
   })

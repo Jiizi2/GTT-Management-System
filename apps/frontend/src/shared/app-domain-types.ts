@@ -117,6 +117,10 @@ export type GroupVisaSetup = {
   paymentStatus: "Paid" | "Unpaid" | "Partial";
   makkahHotelWaived?: boolean;
   madinahHotelWaived?: boolean;
+  arrivalFlightNumber?: string;
+  arrivalTime?: string;
+  departureFlightNumber?: string;
+  departureTime?: string;
   makkahHotels: GroupAgreementHotel[];
   madinahHotels: GroupAgreementHotel[];
   raudhahAppointments: GroupRaudhahAppointment[];
@@ -462,6 +466,14 @@ export type VisaRaudhahEditFormState = {
     status: GroupRaudhahStatus;
     tasrehPrinted?: boolean;
   }>;
+};
+
+/** Arrival/departure flight fields edited in Visa Detail and stored on VisaSetup. */
+export type VisaFlightDetailsInput = {
+  arrivalFlightNumber: string;
+  arrivalTime: string;
+  departureFlightNumber: string;
+  departureTime: string;
 };
 
 export type TransferTrainFields = {

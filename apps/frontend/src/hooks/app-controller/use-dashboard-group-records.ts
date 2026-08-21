@@ -222,6 +222,16 @@ export function useDashboardGroupRecords({
     groupRecordsRef.current = groupRecords;
   }, [groupRecords]);
 
+  // Reads the freshest group list straight from the query cache. After an
+  // agreement assign/unassign the caller awaits the refetch, which updates the
+  // cache synchronously but only reaches `groupRecordsRef` on the next render.
+  const getLatestGroups = useCallback((): GroupData[] => {
+    const cached = queryClient.getQueryData<GroupData[]>(
+      groupQueryKeys.list(requestedProjectionRef.current, shouldUseRemoteOverviewActiveOnlyRef.current),
+    );
+    return cached ?? groupRecordsRef.current;
+  }, [queryClient]);
+
   useEffect(() => {
     groupRecordsProjectionRef.current = groupRecordsProjection;
   }, [groupRecordsProjection]);
@@ -673,10 +683,13 @@ export function useDashboardGroupRecords({
     handleUpdatePaymentStatus,
     handleToggleHotelWaiver,
     handleUpdateSyarikah,
+    handleUpdateFlightDetails,
     handleUpdateVisaHotel,
     handleDeleteVisaHotel,
+    handleSyncVisaItinerary,
   } = useVisaMutations({
     groupRecordsRef,
+    getLatestGroups,
     updateVisaSetupForGroupAndSync,
     createDefaultVisaSetup,
     commitGroupRecords,
@@ -687,6 +700,8 @@ export function useDashboardGroupRecords({
     saveVisaHotelMutation,
     deleteVisaHotelMutation,
     deleteGroupMutation,
+    replaceGroupMutation,
+    replaceGroupItineraryMutation,
   });
 
 
@@ -739,8 +754,10 @@ export function useDashboardGroupRecords({
     handleUpdatePaymentStatus,
     handleToggleHotelWaiver,
     handleUpdateSyarikah,
+    handleUpdateFlightDetails,
     handleUpdateVisaHotel,
     handleDeleteVisaHotel,
+    handleSyncVisaItinerary,
     handleUpdateRaudhahAppointment,
     handleSetRaudhahTasrehPrinted,
     handleClearRaudhahAppointment,

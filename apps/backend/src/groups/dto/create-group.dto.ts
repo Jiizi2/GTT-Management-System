@@ -335,6 +335,26 @@ export class CreateVisaSetupDto {
   @IsEnum(VisaPaymentStatus)
   paymentStatus?: VisaPaymentStatus;
 
+  @ApiPropertyOptional({ description: "Arrival flight number for MOFA visa.", example: "JT-104" })
+  @IsOptional()
+  @IsString()
+  arrivalFlightNumber?: string;
+
+  @ApiPropertyOptional({ description: "Arrival flight local time (HH:mm).", example: "19:30" })
+  @IsOptional()
+  @IsString()
+  arrivalTime?: string;
+
+  @ApiPropertyOptional({ description: "Departure flight number for MOFA visa.", example: "JT-105" })
+  @IsOptional()
+  @IsString()
+  departureFlightNumber?: string;
+
+  @ApiPropertyOptional({ description: "Departure flight local time (HH:mm).", example: "21:00" })
+  @IsOptional()
+  @IsString()
+  departureTime?: string;
+
   @ApiPropertyOptional({
     type: () => CreateVisaHotelAgreementDto,
     isArray: true,

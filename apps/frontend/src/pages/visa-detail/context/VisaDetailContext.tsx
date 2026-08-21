@@ -6,6 +6,7 @@ import type {
   VisaPaymentStatus,
   VisaHotelEditFormState,
   VisaRaudhahEditFormState,
+  VisaFlightDetailsInput,
   GroupAgreementHotel,
   HotelAgreementDraft,
 } from "../../../shared/app-domain";
@@ -21,8 +22,8 @@ export interface VisaDetailContextType {
   setUnlinkingGroup: (group: GroupData | null) => void;
   paymentStatus: VisaPaymentStatus;
   setPaymentStatus: (status: VisaPaymentStatus) => void;
-  activeModal: "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | null;
-  setActiveModal: (modal: "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | null) => void;
+  activeModal: "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | "flight" | null;
+  setActiveModal: (modal: "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | "flight" | null) => void;
   hotelCityDraft: "makkah" | "madinah";
   setHotelCityDraft: (city: "makkah" | "madinah") => void;
   hotelDraftMode: "add" | "edit";
@@ -146,6 +147,8 @@ export interface VisaDetailContextType {
   savePaymentStatus: (nextValue: VisaPaymentStatus) => void;
   saveAgentAssignment: (agentId: string) => Promise<void>;
   saveSyarikah: (nextValue: string) => void;
+  openFlightModal: () => void;
+  saveFlightDetails: (flight: VisaFlightDetailsInput) => void;
   saveHotel: (hotel: VisaHotelEditFormState) => void;
   saveRaudhah: (appointment: VisaRaudhahEditFormState) => void;
   onUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;

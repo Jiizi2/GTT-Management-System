@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 import { formatLocalIsoDate } from "../../../shared/app-domain";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
+import { resolveGroupFlightDetails } from "../visa-detail-helpers";
 
 const LazyDeleteGroupModal = lazy(async () => ({
   default: (await import("../../../components/group-detail-modals")).DeleteGroupModal,
@@ -18,6 +19,9 @@ const LazyPaymentStatusModal = lazy(async () => ({
 }));
 const LazySyarikahModal = lazy(async () => ({
   default: (await import("../../../components/visa-detail-modals")).SyarikahModal,
+}));
+const LazyFlightDetailsModal = lazy(async () => ({
+  default: (await import("../../../components/visa-detail-modals")).FlightDetailsModal,
 }));
 const LazyAgentAssignmentModal = lazy(async () => ({
   default: (await import("../../../components/visa-detail-modals")).AgentAssignmentModal,
@@ -83,6 +87,7 @@ export function VisaDetailModals() {
     savePaymentStatus,
     saveAgentAssignment,
     saveSyarikah,
+    saveFlightDetails,
     saveHotel,
     saveRaudhah,
     buildHotelDraft,
@@ -166,6 +171,14 @@ export function VisaDetailModals() {
 
           {activeModal === "syarikah" ? (
             <LazySyarikahModal initialValue={syarikahValue} onClose={closeModal} onSave={saveSyarikah} />
+          ) : null}
+
+          {activeModal === "flight" ? (
+            <LazyFlightDetailsModal
+              initialValue={resolveGroupFlightDetails(group)}
+              onClose={closeModal}
+              onSave={saveFlightDetails}
+            />
           ) : null}
 
           {activeModal === "agent" ? (

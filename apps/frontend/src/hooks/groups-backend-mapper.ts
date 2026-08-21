@@ -449,6 +449,10 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
       paymentStatus: mapBackendPaymentStatus(group.visaSetup?.paymentStatus),
       makkahHotelWaived: Boolean(group.visaSetup?.makkahHotelWaived),
       madinahHotelWaived: Boolean(group.visaSetup?.madinahHotelWaived),
+      arrivalFlightNumber: readString(group.visaSetup?.arrivalFlightNumber),
+      arrivalTime: readString(group.visaSetup?.arrivalTime),
+      departureFlightNumber: readString(group.visaSetup?.departureFlightNumber),
+      departureTime: readString(group.visaSetup?.departureTime),
       makkahHotels: mappedHotelsByCity.makkahHotels,
       madinahHotels: mappedHotelsByCity.madinahHotels,
       raudhahAppointments: (group.visaSetup?.raudhahAppointments ?? [])

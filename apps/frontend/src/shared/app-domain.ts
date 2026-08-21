@@ -76,6 +76,8 @@ import {
 
 import { createBaseGroupsFixture, overviewDummySeeds } from "./app-domain-fixtures";
 
+import { buildItineraryFromVisaData } from "./visa-itinerary-generator";
+
 import type {
   NavItem,
   TimelineItem,
@@ -157,6 +159,7 @@ export type {
   NewGroupRaudhahFormState,
   VisaHotelEditFormState,
   VisaRaudhahEditFormState,
+  VisaFlightDetailsInput,
   TransferTrainFields,
   TransferTrainSegment,
   DummyGroupSeed,
@@ -219,6 +222,8 @@ export {
   sortInputItineraryItems,
   TRANSPORT_MODE_META,
 };
+export { buildItineraryFromVisaData };
+export type { VisaFlightInput, VisaItineraryInput } from "./visa-itinerary-generator";
 
 export function formatLocalIsoDate(date: Date): string {
   const year = date.getFullYear();

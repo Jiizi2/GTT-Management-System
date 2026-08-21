@@ -600,6 +600,10 @@ model VisaSetup {
   paymentStatus       VisaPaymentStatus    @default(UNPAID)
   makkahHotelWaived   Boolean              @default(false)
   madinahHotelWaived  Boolean              @default(false)
+  arrivalFlightNumber String?
+  arrivalTime         String?
+  departureFlightNumber String?
+  departureTime       String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   group               Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)

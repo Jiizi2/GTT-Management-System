@@ -91,6 +91,10 @@ type BackendCreateGroupPayload = {
     paymentStatus?: BackendVisaPaymentStatus;
     makkahHotelWaived?: boolean;
     madinahHotelWaived?: boolean;
+    arrivalFlightNumber?: string;
+    arrivalTime?: string;
+    departureFlightNumber?: string;
+    departureTime?: string;
     outstandingAmount?: number;
     hotelAgreements?: Array<{
       city: "MAKKAH" | "MADINAH";
@@ -410,6 +414,10 @@ export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPa
       paymentStatus: mapPaymentStatusToBackend(group.visaSetup.paymentStatus),
       makkahHotelWaived: group.visaSetup.makkahHotelWaived ?? false,
       madinahHotelWaived: group.visaSetup.madinahHotelWaived ?? false,
+      arrivalFlightNumber: group.visaSetup.arrivalFlightNumber?.trim() || undefined,
+      arrivalTime: group.visaSetup.arrivalTime?.trim() || undefined,
+      departureFlightNumber: group.visaSetup.departureFlightNumber?.trim() || undefined,
+      departureTime: group.visaSetup.departureTime?.trim() || undefined,
       hotelAgreements: [
         ...group.visaSetup.makkahHotels.map((hotel) => ({
           city: "MAKKAH" as const,

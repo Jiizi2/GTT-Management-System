@@ -3,10 +3,12 @@ import { useVisaTrackingDetail } from "./visa-detail/hooks/use-visa-tracking-det
 import { VisaDetailHeader } from "./visa-detail/components/VisaDetailHeader";
 import { VisaStatusSection } from "./visa-detail/components/VisaStatusSection";
 import { HotelAgreementSection } from "./visa-detail/components/HotelAgreementSection";
+import { FlightDetailsSection } from "./visa-detail/components/FlightDetailsSection";
 import { RaudhahStatusSection } from "./visa-detail/components/RaudhahStatusSection";
 import { VisaDetailModals } from "./visa-detail/components/VisaDetailModals";
 import type {
   GroupData,
+  VisaFlightDetailsInput,
   VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaRaudhahEditFormState,
@@ -25,8 +27,10 @@ export function VisaTrackingDetailScreen({
   onToggleHotelWaiver,
   onUpdatePaymentStatus,
   onUpdateSyarikah,
+  onUpdateFlightDetails,
   onUpdateVisaHotel,
   onDeleteVisaHotel,
+  onSyncVisaItinerary,
   onUpdateRaudhahAppointment,
   onClearRaudhahAppointment,
 }: {
@@ -38,6 +42,7 @@ export function VisaTrackingDetailScreen({
   onUpdateVisaStatus: (groupCode: string, visaStatus: VisaStatus, issuedDateIso?: string) => void;
   onUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   onUpdateSyarikah: (groupCode: string, syarikah: string) => void;
+  onUpdateFlightDetails: (groupCode: string, flight: VisaFlightDetailsInput) => void;
   onUpdateVisaHotel: (
     groupCode: string,
     city: "makkah" | "madinah",
@@ -45,6 +50,7 @@ export function VisaTrackingDetailScreen({
     hotelId?: string,
   ) => void;
   onDeleteVisaHotel: (groupCode: string, city: "makkah" | "madinah", hotelId: string) => void;
+  onSyncVisaItinerary: (groupCode: string) => void;
   onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
   onUpdateVisaType: (groupCode: string, visaType: "Visa Only" | "Visa+") => void;
@@ -61,8 +67,10 @@ export function VisaTrackingDetailScreen({
     onToggleHotelWaiver,
     onUpdatePaymentStatus,
     onUpdateSyarikah,
+    onUpdateFlightDetails,
     onUpdateVisaHotel,
     onDeleteVisaHotel,
+    onSyncVisaItinerary,
     onUpdateRaudhahAppointment,
     onClearRaudhahAppointment,
   });
@@ -73,6 +81,7 @@ export function VisaTrackingDetailScreen({
         <VisaDetailHeader />
         <VisaStatusSection />
         <HotelAgreementSection />
+        <FlightDetailsSection />
         <RaudhahStatusSection />
         <VisaDetailModals />
       </div>

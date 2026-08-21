@@ -106,33 +106,33 @@ export function GroupVisaTab() {
 
         <div className="mt-2 divide-y divide-outline-variant/25">
           {compactAgreementSummaries.map((summary: any) => (
-            <div key={summary.city} className="py-2 first:pt-0 last:pb-0">
-              <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
-                <div className="flex min-w-0 items-center gap-2">
-                  <Badge
-                    status={summary.isMissing ? "error" : "success"}
-                    className="h-6 min-w-[4.75rem] justify-center rounded-lg px-2 font-extrabold uppercase tracking-[0.08em] border-none"
-                  >
-                    {summary.cityLabel}
-                  </Badge>
+            <div key={summary.city} className="flex items-start gap-2.5 py-2.5 first:pt-0 last:pb-0">
+              <Badge
+                status={summary.isMissing ? "error" : "success"}
+                className="mt-0.5 h-6 min-w-[4.5rem] shrink-0 justify-center rounded-lg px-2 font-extrabold uppercase tracking-[0.08em] border-none"
+              >
+                {summary.cityLabel}
+              </Badge>
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
                   <p className="truncate font-bold text-on-surface" title={summary.primaryHotelLabel}>
                     {summary.primaryHotelLabel}
                   </p>
+                  <span
+                    className={`shrink-0 text-[11px] font-bold ${
+                      summary.isMissing ? "text-brand-tertiary" : "text-on-surface-variant"
+                    }`}
+                  >
+                    {summary.paxLabel}
+                  </span>
                 </div>
-                <span
-                  className={`shrink-0 text-[11px] font-bold ${
-                    summary.isMissing ? "text-brand-tertiary" : "text-on-surface-variant"
-                  }`}
-                >
-                  {summary.paxLabel}
-                </span>
-              </div>
-              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-[5.25rem] text-[11px] font-medium text-on-surface-variant">
-                <span className="truncate">{summary.hotelLabel}</span>
-                <span className="text-on-surface-variant/40" aria-hidden="true">
-                  |
-                </span>
-                <span className="truncate">{summary.stayLabel}</span>
+                <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-on-surface-variant">
+                  <span className="truncate">{summary.hotelLabel}</span>
+                  <span className="text-on-surface-variant/40" aria-hidden="true">
+                    |
+                  </span>
+                  <span className="truncate">{summary.stayLabel}</span>
+                </div>
               </div>
             </div>
           ))}

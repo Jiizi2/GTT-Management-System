@@ -14,6 +14,7 @@ import type {
   GroupAgreementHotel,
   GroupData,
   HotelAgreementDraft,
+  VisaFlightDetailsInput,
   VisaHotelEditFormState,
   VisaPaymentStatus,
   VisaRaudhahEditFormState,
@@ -48,6 +49,7 @@ interface UseVisaTrackingDetailProps {
   onToggleHotelWaiver: (groupCode: string, city: "makkah" | "madinah", waived: boolean) => void;
   onUpdatePaymentStatus: (groupCode: string, paymentStatus: VisaPaymentStatus) => void;
   onUpdateSyarikah: (groupCode: string, syarikah: string) => void;
+  onUpdateFlightDetails: (groupCode: string, flight: VisaFlightDetailsInput) => void;
   onUpdateVisaHotel: (
     groupCode: string,
     city: "makkah" | "madinah",
@@ -55,6 +57,7 @@ interface UseVisaTrackingDetailProps {
     hotelId?: string,
   ) => void;
   onDeleteVisaHotel: (groupCode: string, city: "makkah" | "madinah", hotelId: string) => void;
+  onSyncVisaItinerary: (groupCode: string) => void;
   onUpdateRaudhahAppointment: (groupCode: string, appointment: VisaRaudhahEditFormState) => void;
   onClearRaudhahAppointment: (groupCode: string) => void;
 }
@@ -70,8 +73,10 @@ export function useVisaTrackingDetail({
   onToggleHotelWaiver,
   onUpdatePaymentStatus,
   onUpdateSyarikah,
+  onUpdateFlightDetails,
   onUpdateVisaHotel,
   onDeleteVisaHotel,
+  onSyncVisaItinerary,
   onUpdateRaudhahAppointment,
   onClearRaudhahAppointment,
 }: UseVisaTrackingDetailProps) {
@@ -114,7 +119,7 @@ export function useVisaTrackingDetail({
   }, [activeRow.groupCode, activeRow.paymentStatus]);
 
   const [activeModal, setActiveModal] = useState<
-    "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | null
+    "visa-status" | "payment-status" | "syarikah" | "agent" | "hotel" | "raudhah" | "visa-type" | "flight" | null
   >(null);
   const [hotelCityDraft, setHotelCityDraft] = useState<"makkah" | "madinah">("makkah");
   const [hotelDraftMode, setHotelDraftMode] = useState<"add" | "edit">("edit");
@@ -564,6 +569,16 @@ export function useVisaTrackingDetail({
     closeModal();
   };
 
+  const openFlightModal = () => setActiveModal("flight");
+
+  // Persisting flight details also regenerates the base trip structure in the
+  // same group record (see handleUpdateFlightDetails), so Group Detail's
+  // itinerary stays a single source derived from the visa data.
+  const saveFlightDetails = (flight: VisaFlightDetailsInput) => {
+    onUpdateFlightDetails(activeGroupCode, flight);
+    closeModal();
+  };
+
   const saveHotel = (hotel: VisaHotelEditFormState) => {
     const targetGroupCode = hotelDraftOwnerGroupCode ?? activeGroupCode;
     onUpdateVisaHotel(
@@ -598,6 +613,9 @@ export function useVisaTrackingDetail({
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
       ]);
+      // Newly-assigned agreement can complete the second city; regenerate the base
+      // trips (incl. the Makkah<->Madinah transfer) from the refetched group.
+      onSyncVisaItinerary(activeGroupCode);
       setAddingHotelCity(null);
       setDraftAssignFeedback({
         tone: "success",
@@ -634,14 +652,18 @@ export function useVisaTrackingDetail({
     setUnassigningAgreementDraftId(deleteAgreementDraft.draft.id);
     setDraftAssignFeedback(null);
     try {
+      const unassignedGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? activeGroupCode;
       await unassignAgreementDraftInBackend({
         draftId: deleteAgreementDraft.draft.id,
-        groupCode: deleteAgreementDraft.agreement.ownerGroupCode ?? activeGroupCode,
+        groupCode: unassignedGroupCode,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: groupQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: agreementDraftQueryKeys.all }),
       ]);
+      // Removing the agreement can drop a city (and its transfer); resync the
+      // base trips from the refetched group.
+      onSyncVisaItinerary(unassignedGroupCode);
       setDraftAssignFeedback({
         tone: "success",
         message: `Agreement ${deleteAgreementDraft.agreement.agreementNumber} berhasil dikembalikan ke Unassigned.`,
@@ -863,6 +885,8 @@ export function useVisaTrackingDetail({
     savePaymentStatus,
     saveAgentAssignment,
     saveSyarikah,
+    openFlightModal,
+    saveFlightDetails,
     saveHotel,
     saveRaudhah,
     onUpdatePaymentStatus,
