@@ -88,11 +88,15 @@ export function GroupDetail({
     hasOpenModal,
     isScheduleModalOpen,
     scheduleForm,
+    pendingScheduleItems,
     isScheduleSaveDisabled,
+    isScheduleCommitDisabled,
     showScheduleFridayCityTourWarning,
     handleScheduleFieldChange,
     handleCloseScheduleModal,
     handleSaveSchedule,
+    handleAddAnotherSchedule,
+    handleRemovePendingSchedule,
     isMusyrifModalOpen,
     musyrifProfile,
     handleCloseMusyrifModal,
@@ -190,11 +194,15 @@ export function GroupDetail({
             {isScheduleModalOpen ? (
               <LazyScheduleModal
                 form={scheduleForm}
-                isSaveDisabled={isScheduleSaveDisabled}
+                isSaveDisabled={isScheduleCommitDisabled}
+                isAddAnotherDisabled={isScheduleSaveDisabled}
+                pendingItems={pendingScheduleItems}
                 showFridayCityTourWarning={showScheduleFridayCityTourWarning}
                 onChange={handleScheduleFieldChange}
                 onClose={handleCloseScheduleModal}
                 onSave={handleSaveSchedule}
+                onAddAnother={handleAddAnotherSchedule}
+                onRemovePending={handleRemovePendingSchedule}
               />
             ) : null}
 

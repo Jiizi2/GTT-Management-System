@@ -16,7 +16,7 @@ import {
 } from "../../shared/app-domain";
 import { shouldUseSaudiCityDropdown } from "./helpers";
 import { ModalPortal, ModalShell, ModalHeader, ModalFooter, ModalFooterButton } from "./shared";
-import type { ScheduleFormState } from "../../shared/app-domain";
+import type { ItineraryItem, ScheduleFormState } from "../../shared/app-domain";
 
 const modalFieldClassName = "serene-field";
 const modalInputClassName = "serene-input";
@@ -44,16 +44,24 @@ const modalToggleChipClassName =
 type ScheduleModalProps = {
   /** State form untuk itinerary schedule */
   form: ScheduleFormState;
-  /** Apakah tombol save dinonaktifkan */
+  /** Apakah tombol Save (commit) dinonaktifkan — antrean kosong & form belum lengkap */
   isSaveDisabled: boolean;
+  /** Apakah tombol "Add another" dinonaktifkan — form saat ini belum lengkap */
+  isAddAnotherDisabled: boolean;
+  /** Trip yang sudah diantre lewat "Add another" tapi belum disimpan */
+  pendingItems: ItineraryItem[];
   /** Apakah akan menampilkan warning city tour pada hari Jumat */
   showFridayCityTourWarning: boolean;
   /** Callback ketika field form berubah */
   onChange: <Key extends keyof ScheduleFormState>(field: Key, value: ScheduleFormState[Key]) => void;
   /** Callback ketika modal ditutup */
   onClose: () => void;
-  /** Callback ketika form di-submit */
+  /** Callback ketika form di-submit (commit antrean + entri form saat ini) */
   onSave: () => void;
+  /** Callback untuk mengantre entri form saat ini lalu reset untuk entri berikutnya */
+  onAddAnother: () => void;
+  /** Callback untuk menghapus satu entri dari antrean */
+  onRemovePending: (index: number) => void;
 };
 
 /**
@@ -82,12 +90,19 @@ type ScheduleModalProps = {
 export function ScheduleModal({
   form,
   isSaveDisabled,
+  isAddAnotherDisabled,
+  pendingItems,
   showFridayCityTourWarning,
   onChange,
   onClose,
   onSave,
+  onAddAnother,
+  onRemovePending,
 }: ScheduleModalProps) {
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+  // Save commits the queued trips plus the current entry when it is complete.
+  const saveCount = pendingItems.length + (isAddAnotherDisabled ? 0 : 1);
+  const saveLabel = saveCount > 1 ? `Save ${saveCount} Trips` : "Save Schedule";
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const allowedTransportModes = getAllowedTransportModes(form.category);
   const showTransportModeField = allowedTransportModes.length > 0;
@@ -491,14 +506,59 @@ export function ScheduleModal({
                 </span>
               </button>
             </div>
+
+            {pendingItems.length > 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    playlist_add_check
+                  </span>
+                  <span>Added this session ({pendingItems.length})</span>
+                </div>
+                <ul className="divide-y divide-slate-200">
+                  {pendingItems.map((item, index) => (
+                    <li
+                      key={`${item.isoDate ?? item.date}-${item.categoryKey ?? item.category}-${index}`}
+                      className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">
+                          {item.category} · {item.title}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {item.date} {item.year}
+                          {item.time ? ` · ${item.time}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onRemovePending(index)}
+                        aria-label={`Remove ${item.category} ${item.title}`}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-surface-container-lowest text-slate-500 transition hover:border-rose-300 hover:text-rose-600"
+                      >
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">
+                          close
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           <ModalFooter>
+            <ModalFooterButton variant="secondary" onClick={onAddAnother} disabled={isAddAnotherDisabled}>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                add
+              </span>
+              <span>Add another</span>
+            </ModalFooterButton>
             <ModalFooterButton variant="primary" onClick={onSave} disabled={isSaveDisabled}>
               <span className="material-symbols-outlined" aria-hidden="true">
                 check_circle
               </span>
-              <span>Save Schedule</span>
+              <span>{saveLabel}</span>
             </ModalFooterButton>
             <ModalFooterButton variant="secondary" onClick={onClose}>
               Cancel

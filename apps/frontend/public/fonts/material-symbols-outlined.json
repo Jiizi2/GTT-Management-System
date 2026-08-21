@@ -91,6 +91,7 @@
     "person_add",
     "person_pin",
     "picture_as_pdf",
+    "playlist_add_check",
     "print",
     "print_disabled",
     "push_pin",

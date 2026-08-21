@@ -289,6 +289,9 @@ export function useGroupDetailDashboard({
   
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(createInitialScheduleForm);
+  // Trips queued via "Add another" but not yet committed. They are appended to the
+  // itinerary together with the current form entry when the user hits Save.
+  const [pendingScheduleItems, setPendingScheduleItems] = useState<ItineraryItem[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editScheduleForm, setEditScheduleForm] = useState<EditScheduleFormState | null>(null);
   
@@ -398,7 +401,10 @@ export function useGroupDetailDashboard({
     isScheduleDeparturePickupTimeMissing ||
     isScheduleCityTourCityMissing ||
     hasScheduleTransferTrainFieldsMissing;
-  
+  // Save commits the queue plus the current entry (if valid), so it stays enabled
+  // whenever there is at least one queued trip even if the form is mid-edit.
+  const isScheduleCommitDisabled = pendingScheduleItems.length === 0 && isScheduleSaveDisabled;
+
   const hasEditTransferTrainFieldsMissing = editScheduleForm
     ? hasIncompleteTransferTrainFields(editScheduleForm)
     : false;
@@ -625,6 +631,7 @@ export function useGroupDetailDashboard({
     scheduleSuggestedHotelNameRef.current = "";
     scheduleSuggestedFromHotelNameRef.current = "";
     setScheduleForm(applyScheduleHotelAutofill(createInitialScheduleForm()));
+    setPendingScheduleItems([]);
     setIsScheduleModalOpen(true);
   }, [applyScheduleHotelAutofill]);
 
@@ -641,75 +648,107 @@ export function useGroupDetailDashboard({
 
   const handleCloseScheduleModal = () => {
     setIsScheduleModalOpen(false);
+    setPendingScheduleItems([]);
   };
 
-  const handleSaveSchedule = () => {
-    if (isScheduleSaveDisabled) {
-      return;
-    }
-
-    const typeOption = getScheduleTypeOption(scheduleForm.category);
-    const formattedDate = formatScheduleDate(scheduleForm.date);
-    const transportMode = resolveFormTransportMode(scheduleForm.category, scheduleForm.transportMode);
+  // Build a single ItineraryItem from a schedule form (pre transfer-train
+  // expansion). Shared by the immediate Save and the "Add another" queue.
+  const buildScheduleItem = (form: ScheduleFormState): ItineraryItem => {
+    const typeOption = getScheduleTypeOption(form.category);
+    const formattedDate = formatScheduleDate(form.date);
+    const transportMode = resolveFormTransportMode(form.category, form.transportMode);
     const nextFlightNumber =
-      transportMode === "flight" && isFlightActivityType(scheduleForm.category) ? scheduleForm.flightNumber.trim() : "";
+      transportMode === "flight" && isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
     const shouldPersistHotelName =
-      scheduleForm.category === "arrival" ||
-      scheduleForm.category === "city-tour" ||
-      scheduleForm.category === "departure";
-    const nextHotelName = shouldPersistHotelName
-      ? scheduleForm.hotelName.trim() || resolveSuggestedHotelName(scheduleForm)
-      : "";
+      form.category === "arrival" || form.category === "city-tour" || form.category === "departure";
+    const nextHotelName = shouldPersistHotelName ? form.hotelName.trim() || resolveSuggestedHotelName(form) : "";
     const nextFromHotelName = "";
-    const nextHotelPickupRequestTime =
-      scheduleForm.category === "departure" ? scheduleForm.hotelPickupRequestTime.trim() : "";
-    const isTransferByTrain = isTransferActivityType(scheduleForm.category) && transportMode === "train";
-    const scheduleTime = isTransferByTrain ? scheduleForm.trainDepartureTime : scheduleForm.time;
-    const transferTrainSummary = buildTransferTrainSummary({ ...scheduleForm, transportMode });
-    const nextCityTourCity = isCityTourActivityType(scheduleForm.category) ? scheduleForm.cityTourCity.trim() : "";
-    const nextTitle = formatRouteSummary(scheduleForm.category, scheduleForm.from, scheduleForm.to, nextCityTourCity);
-    const nextRequiresBus = isCityTourActivityType(scheduleForm.category) ? false : transportMode === "bus";
-    const nextIcon =
-      scheduleForm.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, scheduleForm.category);
-    const nextItem: ItineraryItem = {
+    const nextHotelPickupRequestTime = form.category === "departure" ? form.hotelPickupRequestTime.trim() : "";
+    const isTransferByTrain = isTransferActivityType(form.category) && transportMode === "train";
+    const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
+    const transferTrainSummary = buildTransferTrainSummary({ ...form, transportMode });
+    const nextCityTourCity = isCityTourActivityType(form.category) ? form.cityTourCity.trim() : "";
+    const nextTitle = formatRouteSummary(form.category, form.from, form.to, nextCityTourCity);
+    const nextRequiresBus = isCityTourActivityType(form.category) ? false : transportMode === "bus";
+    const nextIcon = form.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, form.category);
+    return {
       date: formattedDate.date,
       year: formattedDate.year,
       category: typeOption.cardLabel,
       title: nextTitle,
       meta: createScheduleMeta({
-        category: scheduleForm.category,
+        category: form.category,
         time: scheduleTime,
         flightNumber: nextFlightNumber,
         hotelName: nextHotelName,
         fromHotelName: nextFromHotelName,
         hotelPickupRequestTime: nextHotelPickupRequestTime,
-        from: scheduleForm.from,
-        to: scheduleForm.to,
+        from: form.from,
+        to: form.to,
         cityTourCity: nextCityTourCity,
-        note: scheduleForm.note,
+        note: form.note,
         transferTrainSummary,
       }),
       icon: nextIcon,
-      highlighted: scheduleForm.highlighted,
+      highlighted: form.highlighted,
       categoryKey: typeOption.value,
-      isoDate: scheduleForm.date,
+      isoDate: form.date,
       time: scheduleTime,
       transportMode,
       flightNumber: nextFlightNumber,
       hotelName: nextHotelName,
       fromHotelName: nextFromHotelName,
-      from: scheduleForm.from.trim(),
-      to: scheduleForm.to.trim(),
+      from: form.from.trim(),
+      to: form.to.trim(),
       cityTourCity: nextCityTourCity,
-      notes: scheduleForm.note.trim(),
+      notes: form.note.trim(),
       requiresBus: nextRequiresBus,
       transferByTrain: isTransferByTrain,
-      trainDepartureTime: isTransferByTrain ? scheduleForm.trainDepartureTime.trim() : "",
-      destinationPickupTime: isTransferByTrain ? scheduleForm.destinationPickupTime.trim() : "",
+      trainDepartureTime: isTransferByTrain ? form.trainDepartureTime.trim() : "",
+      destinationPickupTime: isTransferByTrain ? form.destinationPickupTime.trim() : "",
       hotelPickupRequestTime: nextHotelPickupRequestTime,
     };
-    const nextItems = expandTransferTrainItineraryItems([nextItem]);
-    const nextItinerary = sortItineraryByNearestDate([...itineraryItems, ...nextItems]);
+  };
+
+  // Reset the form for the next queued entry: keep the day and activity type
+  // (usually the next trip shares them) and, for transfers, chain the previous
+  // destination into the next origin. Everything else clears.
+  const resetScheduleFormForNextEntry = () => {
+    setScheduleForm((current) =>
+      applyScheduleHotelAutofill({
+        ...createInitialScheduleForm(),
+        date: current.date,
+        category: current.category,
+        transportMode: current.transportMode,
+        from: isTransferActivityType(current.category) ? current.to : "",
+      }),
+    );
+  };
+
+  const handleAddAnotherSchedule = () => {
+    if (isScheduleSaveDisabled) {
+      return;
+    }
+    const queuedItem = buildScheduleItem(scheduleForm);
+    setPendingScheduleItems((current) => [...current, queuedItem]);
+    resetScheduleFormForNextEntry();
+  };
+
+  const handleRemovePendingSchedule = (index: number) => {
+    setPendingScheduleItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const handleSaveSchedule = () => {
+    // Commit the queued trips plus the current entry when it is complete; a
+    // half-filled or empty form is simply ignored so Save can flush the queue.
+    const formItems = isScheduleSaveDisabled ? [] : [buildScheduleItem(scheduleForm)];
+    const newItems = [...pendingScheduleItems, ...formItems];
+    if (newItems.length === 0) {
+      return;
+    }
+
+    const expandedItems = expandTransferTrainItineraryItems(newItems);
+    const nextItinerary = sortItineraryByNearestDate([...itineraryItems, ...expandedItems]);
     setItineraryItems(nextItinerary);
     persistGroupSnapshot({ nextItinerary });
 
@@ -1001,6 +1040,8 @@ export function useGroupDetailDashboard({
     isWhatsappCopied,
     isScheduleModalOpen,
     scheduleForm,
+    pendingScheduleItems,
+    isScheduleCommitDisabled,
     editingIndex,
     editScheduleForm,
     deletingIndex,
@@ -1016,6 +1057,8 @@ export function useGroupDetailDashboard({
 
     // Handlers
     handleSaveSchedule,
+    handleAddAnotherSchedule,
+    handleRemovePendingSchedule,
     handleCloseScheduleModal,
     handleOpenScheduleModal,
     handleScheduleFieldChange,
