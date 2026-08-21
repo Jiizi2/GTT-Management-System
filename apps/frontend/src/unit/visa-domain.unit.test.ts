@@ -365,6 +365,15 @@ function testGenerateWhatsappCopyText(): void {
   assert.equal(familyText.includes("├─ 902133273 (5 PAX)"), true);
   assert.equal(familyText.includes("└─ 902133274 (12 PAX)"), true);
   assert.equal(familyText.includes("*TOTAL: 17 PAX*"), true);
+  // Multi-group: each group is its own block (code as header), cities ordered by
+  // earliest stay (Madinah 23/03 before Makkah 28/03), BRN line without the code.
+  assert.equal(
+    familyText.includes(
+      "*902133273 (5 PAX)*\n🏨 *BRN MADINAH*\n*Burj Almarjan*\n📅 23/03/2026 - 28/03/2026\n└─ 15762599591351269 (40 PAX)\n\n🏨 *BRN MAKKAH*\n*Swissotel*\n📅 28/03/2026 - 31/03/2026\n└─ 18014399405337794 (40 PAX)",
+    ),
+    true,
+  );
+  assert.equal(familyText.includes("*902133274 (12 PAX)*\n🏨 *BRN MADINAH*"), true);
 
   // Test with completely empty data (should yield placeholders)
   const emptyGroup: GroupData = {

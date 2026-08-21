@@ -350,37 +350,24 @@ export function generateWhatsappCopyText(
 
   const allGroups = familyGroups && familyGroups.length > 0 ? familyGroups : [group];
 
-  const makkahHotels: HotelEntry[] = [];
-  const madinahHotels: HotelEntry[] = [];
+  const toEntries = (
+    g: GroupData,
+    list: NonNullable<GroupData["visaSetup"]>["makkahHotels"] | undefined,
+  ): HotelEntry[] =>
+    (list ?? []).map((h) => ({
+      groupCode: g.code,
+      hotelName: h.hotelName,
+      stayStartIso: h.stayStartIso,
+      stayEndIso: h.stayEndIso,
+      agreementNumber: h.agreementNumber,
+      pax: h.pax,
+    }));
 
-  allGroups.forEach((g) => {
-    g.visaSetup?.makkahHotels.forEach((h) => {
-      makkahHotels.push({
-        groupCode: g.code,
-        hotelName: h.hotelName,
-        stayStartIso: h.stayStartIso,
-        stayEndIso: h.stayEndIso,
-        agreementNumber: h.agreementNumber,
-        pax: h.pax,
-      });
-    });
-    g.visaSetup?.madinahHotels.forEach((h) => {
-      madinahHotels.push({
-        groupCode: g.code,
-        hotelName: h.hotelName,
-        stayStartIso: h.stayStartIso,
-        stayEndIso: h.stayEndIso,
-        agreementNumber: h.agreementNumber,
-        pax: h.pax,
-      });
-    });
-  });
-
-  const printHotels = (hotels: HotelEntry[], defaultName: string) => {
+  const printCityHotels = (hotels: HotelEntry[], defaultName: string, showGroupCode: boolean) => {
     if (hotels.length === 0) {
       lines.push(`*${defaultName}*`);
       lines.push("📅 [START_DATE] - [END_DATE]");
-      lines.push("└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)");
+      lines.push(showGroupCode ? "└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)" : "└─ [BRN_CODE] ([PAX] PAX)");
       return;
     }
 
@@ -391,12 +378,12 @@ export function generateWhatsappCopyText(
       grouped.get(key)!.push(h);
     }
 
-    let isFirstGroup = true;
+    let isFirstHotel = true;
     for (const entries of grouped.values()) {
-      if (!isFirstGroup) {
+      if (!isFirstHotel) {
         lines.push("");
       }
-      isFirstGroup = false;
+      isFirstHotel = false;
 
       const first = entries[0];
       lines.push(`*${first.hotelName?.trim() || defaultName}*`);
@@ -407,17 +394,58 @@ export function generateWhatsappCopyText(
         const e = entries[i];
         const brnCode = e.agreementNumber?.trim() || "[BRN_CODE]";
         const prefix = i === entries.length - 1 ? "└─" : "├─";
-        lines.push(`${prefix} ${e.groupCode}: ${brnCode} (${e.pax} PAX)`);
+        lines.push(
+          showGroupCode
+            ? `${prefix} ${e.groupCode}: ${brnCode} (${e.pax} PAX)`
+            : `${prefix} ${brnCode} (${e.pax} PAX)`,
+        );
       }
     }
   };
 
-  lines.push("🏨 *BRN MAKKAH*");
-  printHotels(makkahHotels, "[HOTEL MAKKAH NAME]");
-  lines.push("");
+  // Earliest stay-start ISO among a set of hotels; empty sorts last so a city
+  // with no dates is listed after one that has them.
+  const earliestStart = (hotels: HotelEntry[]): string =>
+    hotels
+      .map((h) => (h.stayStartIso || "").trim())
+      .filter(Boolean)
+      .sort()[0] ?? "";
 
-  lines.push("🏨 *BRN MADINAH*");
-  printHotels(madinahHotels, "[HOTEL MADINAH NAME]");
+  // Multiple groups → each group becomes its own block (code as the header) with
+  // its own Makkah/Madinah hotels; single group keeps the flat layout with the
+  // code inline on the BRN line.
+  const isMultiGroup = allGroups.length > 1;
+
+  allGroups.forEach((g, gi) => {
+    const makkahHotels = toEntries(g, g.visaSetup?.makkahHotels);
+    const madinahHotels = toEntries(g, g.visaSetup?.madinahHotels);
+
+    // Order the two city sections by whichever stay starts first (chronological).
+    const cities = [
+      { label: "🏨 *BRN MAKKAH*", hotels: makkahHotels, defaultName: "[HOTEL MAKKAH NAME]", start: earliestStart(makkahHotels) },
+      { label: "🏨 *BRN MADINAH*", hotels: madinahHotels, defaultName: "[HOTEL MADINAH NAME]", start: earliestStart(madinahHotels) },
+    ].sort((a, b) => {
+      if (a.start && b.start) return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
+      if (a.start) return -1;
+      if (b.start) return 1;
+      return 0;
+    });
+
+    if (isMultiGroup) {
+      if (gi > 0) {
+        lines.push("");
+      }
+      lines.push(`*${g.code || "[GROUP_CODE]"} (${g.pax || 0} PAX)*`);
+    }
+
+    cities.forEach((city, ci) => {
+      if (ci > 0) {
+        lines.push("");
+      }
+      lines.push(city.label);
+      printCityHotels(city.hotels, city.defaultName, !isMultiGroup);
+    });
+  });
 
   return lines.join("\n");
 }
