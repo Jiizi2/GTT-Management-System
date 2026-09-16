@@ -172,6 +172,9 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("19")).toBeInTheDocument();
     expect(screen.getByText("721")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "5 catatan perhatian" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Perhatian visa/i })).toHaveAttribute("href", "/agent/visa");
+    expect(screen.getByRole("link", { name: /Perhatian hotel/i })).toHaveAttribute("href", "/agent/groups");
     expect(screen.getByRole("link", { name: /Buka Perjalanan/i })).toHaveAttribute("href", "/agent/groups");
     expect(screen.getByRole("link", { name: /Lihat Visa Tracking/i })).toHaveAttribute("href", "/agent/visa");
     expect(portalGetMock).toHaveBeenCalledTimes(1);
