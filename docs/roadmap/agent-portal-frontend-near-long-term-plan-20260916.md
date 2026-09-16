@@ -8,11 +8,10 @@ Baseline: `origin/master` at `07afaaa`
 
 ### Job and audience
 
-Agent Portal is a read-only operational workspace for partner Agents who need to
-understand the state of their assigned groups quickly, especially visa, journey,
-hotel, transportation, and checklist information. The primary visitor mode is
-**Operate**: users arrive to find a group, identify what needs attention, and open
-the relevant detail without interpreting internal system structure.
+Agent Portal is a read-only operational workspace organized around three primary
+destinations: Dashboard for statistics, Visa Tracking for visa progress and
+verified document readiness, and Perjalanan for group itineraries. The primary
+visitor mode is **Operate**.
 
 Portal Admin remains secondary. It may receive small improvements when they
 directly support Agent onboarding, data clarity, or cross-portal consistency.
@@ -22,10 +21,9 @@ directly support Agent onboarding, data clarity, or cross-portal consistency.
 The first success condition is that an Agent can answer these questions without
 assistance:
 
-1. Which groups are active or upcoming?
-2. Which group needs attention, and why?
-3. What is the next known operational activity?
-4. Where can the Agent inspect visa, hotel, transportation, and checklist detail?
+1. What does the current assigned workload look like statistically?
+2. How far has each group's visa application progressed?
+3. What itinerary belongs to each assigned group?
 
 Proof comes from the existing production-aligned data and endpoints, not invented
 status or inferred workflow. The local production snapshot currently contains 32
@@ -38,9 +36,10 @@ assignments.
 
 Refine the existing GTT interface rather than replace it. Use the archived GTT
 Serene work as visual and accessibility reference only. The structural thesis is
-"one operational briefing, followed by direct routes to factual detail." The
-dashboard should prioritize group identity, current status, the next known
-activity, and a clear detail action before aggregate statistics.
+"summary, visa, journey." Dashboard carries factual statistics, Visa Tracking
+carries visa progress, and Perjalanan carries group discovery and itinerary
+detail. Profile, theme, and logout remain utilities rather than primary
+destinations.
 
 ### Scope and boundaries
 
@@ -71,9 +70,9 @@ Every changed surface must cover:
 
 ### Interaction and layout
 
-- Identity and attention come before metrics.
-- Search and filtering remain close to the group list and expose a clear reset.
-- Desktop uses the existing sidebar; mobile keeps four destinations with labels
+- Dashboard leads with server-authoritative statistics and concise summaries.
+- Search and filtering live with the group list under Perjalanan.
+- Desktop uses the existing sidebar; mobile keeps three destinations with labels
   visible, adequate touch targets, and no content hidden behind the bottom dock.
 - Detail navigation is explicit and reversible. Back actions return users to their
   previous list/filter context where practical.
@@ -97,24 +96,29 @@ Goal: establish repeatable evidence before changing the interface.
 Exit gate: baseline evidence is reproducible and no application/schema change was
 needed to obtain it.
 
-### Phase N1 — Agent shell and Home clarity (week 1)
+### Phase N1 — Three-destination foundation (week 1)
 
 Goal: deliver the first visible improvement without changing data behavior.
 
-- Clarify page identity and navigation hierarchy.
-- Keep all four mobile navigation labels visible and touch-safe.
+- Establish exactly three primary destinations: Dashboard, Visa Tracking, and
+  Perjalanan.
+- Keep all three mobile navigation labels visible and touch-safe.
 - Add/preserve a usable skip-to-content and visible focus path.
-- Recompose Home as one briefing: relevant group list first, compact factual totals
-  second, with clearer search/filter/reset behavior.
+- Recompose Dashboard around current factual statistics and concise summaries.
+- Move/reuse group discovery as a minimum Perjalanan index at `/agent/groups`, with
+  current search/filter/reset behavior.
+- Keep Profile, theme, and logout available as account utilities.
 - Improve loading, request error, no-group, and no-filter-result messages.
-- Preserve `/dashboard` and `/groups` requests exactly as they are.
+- Preserve `/dashboard` and `/groups` requests exactly as they are; add no backend
+  route.
 
 Acceptance:
 
-- An Agent can find and open a known group from desktop or mobile without hidden
-  navigation labels.
+- An Agent can distinguish Dashboard, Visa Tracking, and Perjalanan, then find and
+  open a known group from Perjalanan.
 - 0, 2, and 19-group scenarios remain readable without horizontal overflow.
-- No new route, API request, response field, or business status appears in the diff.
+- No new backend route, API request, response field, or business status appears in
+  the diff; `/agent/groups` is a frontend-only index route.
 
 ### Phase N2 — Visa tracking usability (week 2)
 
@@ -125,6 +129,9 @@ Goal: make visa status and missing data easier to scan.
 - Keep status communication textual; color is secondary.
 - Distinguish request failure, no assigned groups, and an empty filter result.
 - Preserve existing Visa Detail behavior and validation semantics.
+- Audit the server for an existing authorized source of required-document data.
+  The current frontend contract has no per-document status, so do not fabricate a
+  checklist. If no source exists, record it as a future additive contract gap.
 
 Optional Admin companion: align labels or status presentation on the existing Admin
 Visa surface only when the same established status mapping is reused.
@@ -132,14 +139,15 @@ Visa surface only when the same established status mapping is reused.
 Acceptance: status meaning matches the server contract, long group identifiers wrap
 or truncate safely, and all actions remain keyboard/touch accessible.
 
-### Phase N3 — Group detail and checklist consistency (week 3)
+### Phase N3 — Perjalanan itinerary and readiness (week 3)
 
 Goal: create a coherent path from overview to operational evidence.
 
-- Align section order, headings, spacing, and empty states across Group Detail.
+- Align the Perjalanan index and Group Detail around itinerary comprehension.
 - Make itinerary chronology and next known activity easier to understand without
   creating a new lifecycle.
-- Clarify transportation/checklist completion states using existing fields.
+- Place transportation/H-1 checklist information as supporting trip readiness,
+  not a fourth primary navigation destination.
 - Preserve read-only behavior and current endpoints for group, visa, hotel, and
   transportation data.
 
@@ -168,9 +176,9 @@ and review explicitly confirms that backend/database work is unnecessary.
 
 Use one reviewable commit or pull request per slice:
 
-1. `agent-shell-home-clarity`
+1. `agent-three-destination-foundation`
 2. `agent-visa-tracking-usability`
-3. `agent-group-detail-checklist-consistency`
+3. `agent-perjalanan-itinerary-readiness`
 4. `agent-frontend-hardening`
 
 Do not batch these into one large feature branch. Each slice must remain usable if
@@ -261,6 +269,5 @@ Pause the active slice and return to audit if it requires:
 
 ## Immediate next decision
 
-After this plan is approved, begin only Phase N0. Implementation of Phase N1 starts
-after the baseline screenshots and representative Agent scenarios are available.
-
+N0 is complete. Begin Phase N1 only after the revised three-destination brief is
+confirmed; do not combine N1 with the deeper Visa or Perjalanan slices.

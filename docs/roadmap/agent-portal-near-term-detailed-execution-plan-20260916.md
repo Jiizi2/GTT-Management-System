@@ -14,11 +14,10 @@ status, or production state.
 
 The near-term release is successful when an Agent can quickly:
 
-1. enter the portal and understand where they are;
-2. find an assigned group;
-3. identify its factual current status and next known activity;
-4. open visa, group, hotel, transportation, or checklist detail;
-5. distinguish missing data from completed work or request failure.
+1. read factual workload statistics on Dashboard;
+2. inspect visa progress in Visa Tracking;
+3. find an assigned group and inspect its itinerary in Perjalanan;
+4. distinguish missing data from completed work or request failure.
 
 Portal Admin work is optional and limited to low-risk changes caused by shared
 components or existing Agent-account administration. It is not a parallel redesign.
@@ -56,13 +55,17 @@ The implementation may consume only the existing Agent endpoints:
 - group facets: existing `/visa`, `/hotel-agreements`, and `/transportation` reads;
 - profile: `/agent/profile`.
 
-Existing routes remain unchanged:
+Existing detail and utility routes remain available:
 
 - `/agent/overview`;
 - `/agent/groups/:identity`;
 - `/agent/visa` and `/agent/visa/:identity`;
 - `/agent/checklist`;
 - `/agent/profile`.
+
+N1 may add the frontend index route `/agent/groups` by reusing the existing groups
+endpoint. Existing detail routes and bookmarks remain valid; no backend route is
+added.
 
 The reviewer must compare browser network traffic against this allowlist for every
 slice. A new request is a stop condition, not an implementation detail.
@@ -94,9 +97,9 @@ Work in four independently reviewable slices:
 | Slice | Target duration | Primary outcome | Code-change ceiling |
 | --- | ---: | --- | --- |
 | N0 — Baseline | 1–2 days | Reproducible current-state evidence | No runtime UI change |
-| N1 — Shell + Home | 3–5 days | Agent can orient, find, and open a group | One shell and one page flow |
+| N1 — Three destinations | 3–5 days | Dashboard, Visa, and Perjalanan have clear ownership | Shell plus minimum Dashboard/Perjalanan separation |
 | N2 — Visa | 3–4 days | Visa state is easy to scan and inspect | Visa list/detail only |
-| N3 — Detail + Checklist | 3–5 days | Operational detail reads coherently | Group detail/checklist only |
+| N3 — Perjalanan | 3–5 days | Itinerary and trip readiness read coherently | Perjalanan detail/readiness only |
 | N4 — Hardening | 2–3 days | Release candidate evidence | Fixes only; no new features |
 
 If capacity is limited to two weeks, stop after N2 and harden what is complete.
@@ -164,7 +167,7 @@ Produce a one-page N1 design brief containing only:
 
 N0 exit gate: baseline evidence is accepted before N1 code begins.
 
-## 7. Phase N1 — Agent shell and Home clarity
+## 7. Phase N1 — Three-destination foundation
 
 ### Target files
 
@@ -172,6 +175,7 @@ Primary:
 
 - `apps/frontend/src/agent/agent-shell.tsx`;
 - `apps/frontend/src/agent/pages/dashboard-page.tsx`;
+- `apps/frontend/src/agent/pages/trips-page.tsx`;
 - `apps/frontend/src/agent/components/data-state.tsx`;
 - a small number of Agent-scoped presentation components if extraction materially
   improves readability.
@@ -189,7 +193,11 @@ Prefer Agent wrappers or explicit variant props over global/shared behavior chan
 - Add or verify a skip-to-content path.
 - Give the main region a stable focus target on route change without stealing focus
   on initial page load.
-- Keep four mobile destination labels visible in active and inactive states.
+- Keep Dashboard, Visa Tracking, and Perjalanan labels visible in active and
+  inactive states.
+- Move Profile out of primary navigation while keeping it clearly reachable as an
+  account utility.
+- Treat Group Detail as Perjalanan context and Visa Detail as Visa Tracking context.
 - Ensure navigation and collapse/logout controls have accessible names and at least
   44 × 44 px touch targets.
 - Preserve sidebar collapse behavior and all permission filtering.
@@ -203,27 +211,28 @@ Acceptance tests:
 - active route conveyed independently of color;
 - no mobile content hidden behind the bottom navigation.
 
-### N1.2 — Home information hierarchy
+### N1.2 — Dashboard information hierarchy
 
 Order content by task value:
 
 1. page identity and Agent context;
-2. search/filter controls;
-3. relevant group list with identity, status, dates, and next known activity;
-4. compact factual totals as supporting context.
+2. server-authoritative workload statistics;
+3. concise upcoming/recent context already returned by the endpoint;
+4. direct routes to Visa Tracking and Perjalanan.
 
 Do not create deadlines, priority scores, or inferred attention reasons. Existing
-dashboard counts remain server-authoritative.
+dashboard counts remain server-authoritative. Do not keep the full searchable
+group list on Dashboard.
 
-### N1.3 — Search and filter behavior
+### N1.3 — Minimum Perjalanan index
 
-- Preserve existing group-code/name search, active-only filter, and month filter.
+- Move/reuse existing group-code/name search, active-only filter, month filter,
+  ordering, and pagination under `/agent/groups`.
 - Make active filters visible and offer one clear reset.
 - Keep filter state stable while opening and returning from a group when practical
   without introducing a new global store.
 - Show “no groups assigned” separately from “no results for these filters.”
-- Ensure the 19-group case remains responsive and does not render detached metric
-  cards as the primary experience.
+- Ensure the 19-group case remains responsive.
 
 ### N1.4 — State handling
 
@@ -254,7 +263,7 @@ N1 exit gate:
 
 - frontend-only diff;
 - existing API allowlist unchanged;
-- Agent Home approved at desktop and mobile;
+- Dashboard and minimum Perjalanan index approved at desktop and mobile;
 - shared Admin Overview regression test passes if any shared file changed.
 
 ## 8. Phase N2 — Visa Tracking and Visa Detail
@@ -286,6 +295,9 @@ Shared-risk files:
 - Group existing visa and hotel facts into clearly titled sections.
 - Distinguish “not recorded” from request failure or rejected status.
 - Preserve all current read-only behavior and tenant boundaries.
+- Treat required-document readiness as a separate evidence gate. The current
+  frontend contract exposes no per-document data; audit the current server before
+  proposing any document UI, and do not invent document names or completion.
 
 ### N2.3 — Tests and Admin impact
 
@@ -297,7 +309,7 @@ Shared-risk files:
 N2 exit gate: every presented label maps to a current response field or established
 display mapping, and no new status semantics are introduced.
 
-## 9. Phase N3 — Group Detail and Checklist consistency
+## 9. Phase N3 — Perjalanan itinerary and readiness
 
 ### Target files
 
@@ -312,14 +324,14 @@ Shared-risk files:
 - `apps/frontend/src/pages/group-detail-page.tsx` and its child components;
 - `apps/frontend/src/pages/checklist-page.tsx` and its child components.
 
-### N3.1 — Group Detail sequence
+### N3.1 — Perjalanan detail sequence
 
 Present existing content in this order:
 
 1. group identity, lifecycle status, and travel dates;
 2. next known activity and itinerary chronology;
 3. visa and hotel facts already returned by the current API;
-4. transportation/checklist facts;
+4. transportation/H-1 readiness facts;
 5. supporting notes that are already allowed for Agent users.
 
 The page must not merge records into a new Travel Group concept or synthesize a
@@ -335,9 +347,11 @@ canonical lifecycle.
 - Partial responses: retain available sections and isolate the failed section where
   the current query structure permits it; do not fabricate fallback values.
 
-### N3.3 — Checklist density and performance
+### N3.3 — Trip-readiness density and performance
 
 - Preserve current read-only checklist behavior.
+- Present H-1 Checklist as supporting Perjalanan information, not primary
+  navigation and not visa-document readiness.
 - Make incomplete versus assigned/verified states explicit in text.
 - Measure the maximum 19-group request pattern; record any fan-out cost.
 - Frontend-only batching/cache improvements are allowed only if requests and
@@ -410,8 +424,8 @@ Produce:
 Recommended commit boundaries:
 
 1. `test(agent): capture production-aligned portal baseline`
-2. `feat(agent-ui): clarify shell navigation and focus`
-3. `feat(agent-ui): improve home briefing and states`
+2. `feat(agent-ui): establish three primary destinations`
+3. `feat(agent-ui): separate dashboard and perjalanan flows`
 4. `feat(agent-ui): improve visa tracking flow`
 5. `feat(agent-ui): align group detail and checklist presentation`
 6. `test(agent-ui): harden responsive and accessibility coverage`
@@ -445,14 +459,13 @@ For each slice, record only material decisions:
 - bundle/test/accessibility deltas;
 - whether an Admin companion improvement was included or deferred.
 
-## 14. First executable checkpoint
+## 14. Next executable checkpoint
 
-The next authorized work after approval is **N0 only**:
+N0 is complete. The next reviewable slice is **N1 only**:
 
-1. create the baseline manifest;
-2. prepare a disposable local Agent-access database/account;
-3. capture current desktop/mobile states;
-4. return with the N1 screen brief for confirmation.
+1. establish the three-destination shell;
+2. separate factual Dashboard statistics from the group list;
+3. move/reuse group discovery in the minimum Perjalanan index;
+4. return with desktop/mobile evidence before beginning N2.
 
-No N1 UI implementation begins before that checkpoint is reviewed.
-
+No Visa or deep Perjalanan redesign begins in this checkpoint.
