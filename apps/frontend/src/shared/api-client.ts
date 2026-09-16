@@ -6,6 +6,8 @@ export type ParsedBackendResponse = {
   responseText: string;
 };
 
+const AUTH_PROBE_PATHS = ["/auth/login", "/auth/session"];
+
 function resolveBackendEndpoint(pathOrUrl: string): string {
   if (/^[a-z][a-z\d+.-]*:\/\//i.test(pathOrUrl)) {
     return pathOrUrl;
@@ -16,13 +18,16 @@ function resolveBackendEndpoint(pathOrUrl: string): string {
 }
 
 export async function fetchBackend(pathOrUrl: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(resolveBackendEndpoint(pathOrUrl), {
+  const endpoint = resolveBackendEndpoint(pathOrUrl);
+  const response = await fetch(endpoint, {
     ...init,
     credentials: "include",
     headers: new Headers(init?.headers),
   });
 
-  if (response.status === 401) {
+  const endpointPath = new URL(endpoint).pathname.replace(/\/+$/, "");
+  const isAuthProbe = AUTH_PROBE_PATHS.some((path) => endpointPath.endsWith(path));
+  if (response.status === 401 && !isAuthProbe) {
     clearAuthSession();
   }
 
