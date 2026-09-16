@@ -6,12 +6,12 @@ import { SereneSelect } from "../../components/serene-select";
 import { StatusBadge } from "../../components/status-badge";
 import type { GroupData } from "../../shared/app-domain";
 import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
-import type { VisaApplication, VisaApplicationStatus } from "../data/contracts";
+import type { VisaApplication } from "../data/contracts";
 import { useAgentGroupData } from "../data/use-agent-group-data";
 import { useAgentVisaApplications } from "../data/use-agent-visa-applications";
+import { buildVisaProcessStages, currentVisaProcessStage, visaProcessDefinition, type VisaProcessStage } from "../data/visa-process";
 
 type FilterId = "all" | "attention" | "process" | "issued";
-type Tone = "complete" | "in-progress" | "waiting" | "attention" | "neutral";
 type VisaListItem = {
   id: string;
   identity: string;
@@ -19,61 +19,17 @@ type VisaListItem = {
   name: string;
   pax: number;
   packageName: string;
-  status: { label: string; tone: Tone };
-  document: { label: string; tone: Tone };
-  payment: string;
+  currentStage: VisaProcessStage;
+  stages: VisaProcessStage[];
+  completedStages: number;
   bucket: Exclude<FilterId, "all">;
 };
 
-const applicationStatus: Record<VisaApplicationStatus, { label: string; tone: Tone }> = {
-  WAITING_DOCUMENT: { label: "Menunggu dokumen", tone: "waiting" },
-  NEED_REVISION: { label: "Dokumen perlu revisi", tone: "attention" },
-  DOCUMENT_VERIFIED: { label: "Dokumen terverifikasi", tone: "in-progress" },
-  WAITING_HOTEL_AGREEMENT: { label: "Menunggu hotel agreement", tone: "waiting" },
-  PASSENGER_ENTERED: { label: "Data jamaah tercatat", tone: "in-progress" },
-  GROUP_CREATED: { label: "Group Nusuk dibuat", tone: "in-progress" },
-  READY_TO_SEND: { label: "Siap dikirim", tone: "in-progress" },
-  VISA_SUBMITTED: { label: "Visa diajukan", tone: "in-progress" },
-  PAYMENT_COMPLETED: { label: "Pembayaran selesai", tone: "in-progress" },
-  VISA_PROCESSING: { label: "Visa diproses", tone: "in-progress" },
-  VISA_ISSUED: { label: "Visa terbit", tone: "complete" },
-  COMPLETED: { label: "Selesai", tone: "complete" },
-};
-
-function groupStatus(group: GroupData): { label: string; tone: Tone } {
-  if (group.visaSetup?.visaStatus === "Issued") return { label: "Visa terbit", tone: "complete" };
-  if (group.visaSetup?.visaStatus === "Pending") return { label: "Visa diproses", tone: "in-progress" };
-  return { label: "Persiapan", tone: "waiting" };
-}
-
-function documentStatus(application: VisaApplication | null): { label: string; tone: Tone } {
-  if (!application) return { label: "Belum dicatat", tone: "neutral" };
-  if (application.documentStatus === "VERIFIED") return { label: "Terverifikasi", tone: "complete" };
-  if (application.documentStatus === "NEED_REVISION") return { label: "Perlu revisi", tone: "attention" };
-  return { label: "Menunggu dokumen", tone: "waiting" };
-}
-
-function paymentLabel(group: GroupData | null, application: VisaApplication | null): string {
-  if (application) {
-    if (application.paymentStatus === "COMPLETED") return "Selesai";
-    if (application.paymentStatus === "WAITING_PAYMENT") return "Menunggu pembayaran";
-    return "Belum dimulai";
-  }
-  if (group?.visaSetup?.paymentStatus === "Paid") return "Lunas";
-  if (group?.visaSetup?.paymentStatus === "Partial") return "Sebagian";
-  if (group?.visaSetup?.paymentStatus === "Unpaid") return "Belum lunas";
-  return "Belum dicatat";
-}
-
 function toItem(group: GroupData | null, application: VisaApplication | null): VisaListItem {
-  const status = application ? applicationStatus[application.status] : groupStatus(group!);
-  const document = documentStatus(application);
-  const issued = application
-    ? application.visaStatus === "ISSUED" || application.visaStatus === "COMPLETED"
-    : group?.visaSetup?.visaStatus === "Issued";
-  const attention = application
-    ? application.documentStatus === "WAITING_DOCUMENT" || application.documentStatus === "NEED_REVISION"
-    : group?.visaSetup?.visaStatus === "Draft";
+  const stages = buildVisaProcessStages(application, group);
+  const currentStage = currentVisaProcessStage(stages);
+  const issued = stages.at(-1)?.complete ?? false;
+  const attention = stages.some((stage) => stage.tone === "attention") || group?.visaSetup?.visaStatus === "Draft";
   return {
     id: group?.id ?? application!.id,
     identity: group?.code ?? application!.id,
@@ -81,9 +37,9 @@ function toItem(group: GroupData | null, application: VisaApplication | null): V
     name: group?.name ?? application!.group?.name ?? application!.packageName,
     pax: group?.pax ?? application!.passengerCount,
     packageName: group?.packageName || application?.packageName || "Belum dicatat",
-    status,
-    document,
-    payment: paymentLabel(group, application),
+    currentStage,
+    stages,
+    completedStages: stages.filter((stage) => stage.complete).length,
     bucket: issued ? "issued" : attention ? "attention" : "process",
   };
 }
@@ -165,8 +121,10 @@ export function AgentVisaTrackingPage({
     <PageLayout>
       <PageHeader
         title="Visa Tracking"
-        description="Pantau progres pengajuan visa dan kesiapan dokumen untuk setiap group Anda."
+        description="Pantau posisi setiap group dari pengiriman dokumen hingga visa issued."
       />
+
+      <ProcessOverview />
 
       <section className="serene-section p-4 sm:p-5" aria-label="Ringkasan dan filter visa">
         <dl className="grid gap-3 border-b border-outline-variant/30 pb-4 sm:grid-cols-3">
@@ -204,8 +162,8 @@ export function AgentVisaTrackingPage({
         <VisaEmpty title="Tidak ada pengajuan yang sesuai" description="Ubah kata pencarian atau filter status untuk melihat pengajuan lainnya." action={<button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>Reset filter</button>} />
       ) : (
         <section className="serene-section overflow-hidden p-0" aria-label="Daftar pengajuan visa">
-          <div className="hidden grid-cols-[minmax(13rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] gap-4 border-b border-outline-variant/30 bg-surface-container-low px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-on-surface-variant lg:grid">
-            <span>Group</span><span>Progres visa</span><span>Dokumen</span><span className="sr-only">Aksi</span>
+          <div className="hidden grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,0.8fr)_minmax(13rem,1fr)_auto] gap-4 border-b border-outline-variant/30 bg-surface-container-low px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-on-surface-variant lg:grid">
+            <span>Group</span><span>Tahap saat ini</span><span>Progres proses</span><span className="sr-only">Aksi</span>
           </div>
           <div className="divide-y divide-outline-variant/30">
             {visibleItems.map((item) => <VisaRow key={item.id} item={item} onOpen={() => navigate(`/agent/visa/${encodeURIComponent(item.identity)}`, { state: { from: `${location.pathname}${location.search}` } })} />)}
@@ -216,18 +174,46 @@ export function AgentVisaTrackingPage({
   );
 }
 
+function ProcessOverview() {
+  return (
+    <section className="serene-section p-5 sm:p-6" aria-labelledby="visa-process-title">
+      <h2 id="visa-process-title" className="text-lg font-extrabold text-on-surface">Alur proses visa</h2>
+      <p className="mt-1 max-w-3xl text-sm leading-relaxed text-on-surface-variant">Setiap pengajuan bergerak melalui empat tahap utama berikut.</p>
+      <ol className="mt-5 grid border-y border-outline-variant/30 sm:grid-cols-2 lg:grid-cols-4">
+        {visaProcessDefinition.map((stage, index) => (
+          <li key={stage.label} className="flex gap-3 border-b border-outline-variant/30 py-4 last:border-b-0 sm:border-b-0 sm:px-4 lg:border-r lg:first:pl-0 lg:last:border-r-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-extrabold text-primary tabular-nums">{index + 1}</span>
+            <div className="min-w-0"><h3 className="text-sm font-extrabold text-on-surface">{stage.label}</h3><p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{stage.description}</p></div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function Summary({ label, value }: { label: string; value: number }) {
   return <div className="flex items-baseline justify-between gap-3 sm:block"><dt className="text-sm text-on-surface-variant">{label}</dt><dd className="mt-1 text-xl font-extrabold text-on-surface tabular-nums">{value}</dd></div>;
 }
 
 function VisaRow({ item, onOpen }: { item: VisaListItem; onOpen: () => void }) {
   return (
-    <article className="grid min-w-0 gap-4 p-5 lg:grid-cols-[minmax(13rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] lg:items-center">
+    <article className="grid min-w-0 gap-4 p-5 lg:grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,0.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
       <div className="min-w-0"><p className="break-all text-sm font-extrabold text-primary">{item.code}</p><h2 className="mt-1 break-words text-base font-extrabold text-on-surface">{item.name}</h2><p className="mt-1 text-sm text-on-surface-variant">{item.pax} jamaah · {item.packageName}</p></div>
-      <LabeledValue label="Progres visa"><StatusBadge tone={item.status.tone}>{item.status.label}</StatusBadge></LabeledValue>
-      <LabeledValue label="Dokumen"><StatusBadge tone={item.document.tone}>{item.document.label}</StatusBadge></LabeledValue>
-      <div className="flex flex-wrap items-center gap-3 lg:justify-end"><div className="text-xs text-on-surface-variant lg:hidden">Pembayaran: <strong className="text-on-surface">{item.payment}</strong></div><button type="button" className="serene-btn-secondary min-h-11 shrink-0" onClick={onOpen} aria-label={`Lihat detail visa ${item.code}`}>Lihat detail<span className="material-symbols-outlined text-lg" aria-hidden="true">arrow_forward</span></button></div>
+      <LabeledValue label="Tahap saat ini"><p className="mb-2 text-sm font-bold text-on-surface">{item.currentStage.label}</p><StatusBadge tone={item.currentStage.tone}>{item.currentStage.status}</StatusBadge></LabeledValue>
+      <ProcessSummary stages={item.stages} completed={item.completedStages} />
+      <div className="flex items-center lg:justify-end"><button type="button" className="serene-btn-secondary min-h-11 shrink-0" onClick={onOpen} aria-label={`Lihat detail visa ${item.code}`}>Lihat detail<span className="material-symbols-outlined text-lg" aria-hidden="true">arrow_forward</span></button></div>
     </article>
+  );
+}
+
+function ProcessSummary({ stages, completed }: { stages: VisaProcessStage[]; completed: number }) {
+  return (
+    <div className="min-w-0" aria-label={`${completed} dari 4 tahap selesai`}>
+      <p className="mb-2 text-xs font-semibold text-on-surface-variant"><span className="lg:sr-only">Progres proses: </span>{completed} dari 4 tahap selesai</p>
+      <ol className="grid grid-cols-4 gap-1" aria-hidden="true">
+        {stages.map((stage) => <li key={stage.id} className={`h-2 rounded-full ${stage.complete ? "bg-primary" : stage.tone === "attention" ? "bg-error" : stage.tone === "in-progress" ? "bg-tertiary" : "bg-outline-variant/45"}`} />)}
+      </ol>
+    </div>
   );
 }
 

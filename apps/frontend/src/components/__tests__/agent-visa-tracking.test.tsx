@@ -118,6 +118,12 @@ describe("Portal Agent Visa Tracking", () => {
         </Routes>
       </MemoryRouter>,
     );
+    expect(screen.getByRole("heading", { name: "Alur proses visa" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pengiriman dokumen" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agreement hotel" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Upload paspor ke Nusuk" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Visa issued" })).toBeInTheDocument();
+    expect(screen.getByText("2 dari 4 tahap selesai")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Lihat detail visa 480900308615" }));
     expect(screen.getByTestId("location")).toHaveTextContent("/agent/visa/480900308615");
   });
@@ -136,6 +142,13 @@ describe("Portal Agent Visa Tracking", () => {
     expect(screen.getByText("Hotel Makkah", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByText("Paspor")).toBeInTheDocument();
     expect(screen.getByText("Halaman identitas kurang jelas.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Alur proses visa" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pengiriman dokumen" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agreement hotel" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Upload paspor ke Nusuk" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Visa issued" })).toBeInTheDocument();
+    expect(screen.getByText("Agreement disetujui")).toBeInTheDocument();
+    expect(screen.getByText("Data paspor tercatat")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Edit Group/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Delete Group/i })).not.toBeInTheDocument();

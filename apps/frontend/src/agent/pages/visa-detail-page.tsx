@@ -9,6 +9,7 @@ import { ErrorState, LoadingState } from "../components/data-state";
 import type { VisaApplication, VisaApplicationDocument, VisaApplicationStatus } from "../data/contracts";
 import { useAgentGroupData } from "../data/use-agent-group-data";
 import { useAgentVisaApplications } from "../data/use-agent-visa-applications";
+import { buildVisaProcessStages } from "../data/visa-process";
 
 type Tone = "complete" | "in-progress" | "waiting" | "attention" | "neutral";
 
@@ -125,7 +126,7 @@ export function AgentVisaDetailPage({
         </dl>
       </section>
 
-      <ApplicationSteps application={application} />
+      <ApplicationSteps application={application} group={group} />
       <DocumentSection application={application} />
 
       <section className="grid gap-4 lg:grid-cols-2" aria-label="Hotel agreement">
@@ -136,17 +137,23 @@ export function AgentVisaDetailPage({
   );
 }
 
-function ApplicationSteps({ application }: { application: VisaApplication | null }) {
-  if (!application) {
-    return <section className="serene-section p-5 sm:p-6" aria-labelledby="stage-title"><h2 id="stage-title" className="text-lg font-extrabold text-on-surface">Tahapan proses</h2><p className="mt-3 rounded-xl bg-surface-container-low p-4 text-sm leading-relaxed text-on-surface-variant">Tahapan dokumen, agreement, Nusuk, dan pengajuan belum dicatat pada sumber pengajuan visa.</p></section>;
-  }
-  const stages = [
-    { label: "Dokumen", value: documentStatusLabel(application.documentStatus) },
-    { label: "Hotel agreement", value: enumLabel(application.agreementStatus) },
-    { label: "Nusuk", value: enumLabel(application.nusukStatus) },
-    { label: "Pengajuan visa", value: enumLabel(application.visaStatus) },
-  ];
-  return <section className="serene-section p-5 sm:p-6" aria-labelledby="stage-title"><h2 id="stage-title" className="text-lg font-extrabold text-on-surface">Tahapan proses</h2><ol className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{stages.map((stage, index) => <li key={stage.label} className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-extrabold text-primary tabular-nums">{index + 1}</span><div className="min-w-0"><p className="text-xs font-semibold text-on-surface-variant">{stage.label}</p><p className="mt-1 break-words text-sm font-bold text-on-surface">{stage.value}</p></div></li>)}</ol></section>;
+function ApplicationSteps({ application, group }: { application: VisaApplication | null; group: GroupData | null }) {
+  const stages = buildVisaProcessStages(application, group);
+  return (
+    <section className="serene-section p-5 sm:p-6" aria-labelledby="stage-title">
+      <h2 id="stage-title" className="text-lg font-extrabold text-on-surface">Alur proses visa</h2>
+      <p className="mt-1 max-w-3xl text-sm leading-relaxed text-on-surface-variant">Proses dimulai dari dokumen, dilanjutkan agreement hotel dan upload paspor ke Nusuk, lalu berakhir saat visa issued.</p>
+      <ol className="mt-5 divide-y divide-outline-variant/30 border-y border-outline-variant/30 lg:grid lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+        {stages.map((stage, index) => (
+          <li key={stage.id} className="flex gap-3 py-4 lg:px-4 lg:first:pl-0 lg:last:pr-0">
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold tabular-nums ${stage.complete ? "bg-primary text-on-primary" : stage.tone === "attention" ? "bg-error-container text-on-error-container" : "bg-primary/10 text-primary"}`}>{stage.complete ? <span className="material-symbols-outlined text-base" aria-hidden="true">check</span> : index + 1}</span>
+            <div className="min-w-0"><h3 className="text-sm font-extrabold text-on-surface">{stage.label}</h3><p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{stage.description}</p><div className="mt-3"><StatusBadge tone={stage.tone}>{stage.status}</StatusBadge></div></div>
+          </li>
+        ))}
+      </ol>
+      {!application ? <p className="mt-4 text-xs leading-relaxed text-on-surface-variant">Detail status dokumen dan Nusuk belum tersedia pada sumber pengajuan visa. Status yang terlihat hanya berasal dari data group yang sudah tercatat.</p> : null}
+    </section>
+  );
 }
 
 function DocumentSection({ application }: { application: VisaApplication | null }) {
@@ -185,9 +192,4 @@ function paymentLabel(groupStatus: NonNullable<GroupData["visaSetup"]>["paymentS
 
 function documentStatusLabel(status: VisaApplication["documentStatus"]): string {
   return status === "VERIFIED" ? "Terverifikasi" : status === "NEED_REVISION" ? "Perlu revisi" : "Menunggu dokumen";
-}
-
-function enumLabel(value: string): string {
-  const labels: Record<string, string> = { NOT_STARTED: "Belum dimulai", WAITING_APPROVAL: "Menunggu persetujuan", APPROVED: "Disetujui", PASSENGER_ENTRY: "Input jamaah", PASSENGER_ENTERED: "Data jamaah tercatat", GROUP_CREATED: "Group dibuat", READY_TO_SEND: "Siap dikirim", SUBMITTED: "Sudah diajukan", PROCESSING: "Sedang diproses", ISSUED: "Visa terbit", COMPLETED: "Selesai" };
-  return labels[value] ?? value.toLowerCase().replaceAll("_", " ");
 }
