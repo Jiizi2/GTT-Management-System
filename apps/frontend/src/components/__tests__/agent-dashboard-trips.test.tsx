@@ -3,12 +3,15 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardPage } from "../../agent/pages/dashboard-page";
+import { GroupDetailPage } from "../../agent/pages/group-detail-page";
 import { TripsPage } from "../../agent/pages/trips-page";
-import type { Dashboard, GroupSummary } from "../../agent/data/contracts";
+import type { Dashboard, GroupSummary, TransportationItem } from "../../agent/data/contracts";
+import type { GroupData } from "../../shared/app-domain";
 
-const { portalGetMock, getAllAgentGroupsMock } = vi.hoisted(() => ({
+const { portalGetMock, getAllAgentGroupsMock, useAgentTripDetailMock } = vi.hoisted(() => ({
   portalGetMock: vi.fn(),
   getAllAgentGroupsMock: vi.fn(),
+  useAgentTripDetailMock: vi.fn(),
 }));
 
 vi.mock("../../agent/data/portal-query", () => ({
@@ -17,6 +20,10 @@ vi.mock("../../agent/data/portal-query", () => ({
 
 vi.mock("../../agent/data/all-groups-query", () => ({
   getAllAgentGroups: (...args: unknown[]) => getAllAgentGroupsMock(...args),
+}));
+
+vi.mock("../../agent/data/use-agent-trip-detail", () => ({
+  useAgentTripDetail: (...args: unknown[]) => useAgentTripDetailMock(...args),
 }));
 
 const dashboard: Dashboard = {
@@ -68,6 +75,70 @@ function group(index: number): GroupSummary {
   };
 }
 
+function detailGroup(overrides: Partial<GroupData> = {}): GroupData {
+  return {
+    id: "group-2",
+    agentId: "agent-1",
+    code: "GTT-002",
+    name: "Perjalanan Umrah 2",
+    status: "ACTIVE",
+    lifecycleStatus: "ACTIVE",
+    tone: "active",
+    pax: 32,
+    totalBuses: 1,
+    packageName: "Paket Umrah",
+    durationDays: 9,
+    arrivalDate: "2026-10-10",
+    returnDate: "2026-10-18",
+    timeline: [
+      { date: "10 Okt", title: "Penerbangan menuju Jeddah", isCurrent: true },
+      { date: "11 Okt", title: "Check-in hotel" },
+    ],
+    nextActivity: { title: "Penerbangan menuju Jeddah", date: "10 Okt", time: "08:00", icon: "flight" },
+    itinerary: [{
+      date: "10 Okt",
+      year: "2026",
+      category: "Penerbangan",
+      title: "Penerbangan menuju Jeddah",
+      meta: "08:00 | Jakarta → Jeddah",
+      icon: "flight",
+      isoDate: "2026-10-10",
+      time: "08:00",
+      flightNumber: "GA-001",
+      from: "Jakarta",
+      to: "Jeddah",
+      requiresBus: true,
+    }],
+    notes: ["Pastikan jamaah berkumpul tiga jam sebelum keberangkatan."],
+    musyrif: { name: "Ustadz Ahmad", phone: "+628123456789", avatar: "" },
+    visaSetup: {
+      visaStatus: "Pending",
+      syarikah: "Provider A",
+      busStatus: "Visa+",
+      paymentStatus: "Partial",
+      makkahHotels: [{ id: "hotel-1", hotelName: "Hotel Makkah", agreementNumber: "AGR-001", pax: 32, status: "Approved", stayStartIso: "2026-10-11", stayEndIso: "2026-10-14" }],
+      madinahHotels: [],
+      raudhahAppointments: [],
+    },
+    ...overrides,
+  };
+}
+
+const transportation: TransportationItem[] = [{
+  id: "transport-1",
+  tripDate: "2026-10-10",
+  activity: "Transfer",
+  tripLabel: "Bandara ke hotel",
+  requiredBusCount: 1,
+  scheduledTime: "12:00",
+  transferByTrain: false,
+  trainDepartureTime: null,
+  stationPickupTime: null,
+  status: "ASSIGNED",
+  assignedDriverCount: 1,
+  verifiedDriverCount: 1,
+}];
+
 function renderPage(node: React.ReactNode, initialEntry = "/agent/overview") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -91,6 +162,7 @@ describe("Agent Dashboard and Perjalanan", () => {
   beforeEach(() => {
     portalGetMock.mockReset();
     getAllAgentGroupsMock.mockReset();
+    useAgentTripDetailMock.mockReset();
   });
 
   it("renders server-authoritative Dashboard statistics without loading the group index", async () => {
@@ -152,5 +224,52 @@ describe("Agent Dashboard and Perjalanan", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Lihat itinerary" }));
     expect(screen.getByTestId("location")).toHaveTextContent("/agent/groups/GTT-002");
+  });
+
+  it("presents complete trip evidence in an Agent-specific read-only sequence", () => {
+    useAgentTripDetailMock.mockReturnValue({ isPending: false, isError: false, data: { group: detailGroup(), transportation } });
+    renderPage(
+      <Routes>
+        <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />} />
+      </Routes>,
+      "/agent/groups/GTT-002",
+    );
+
+    expect(screen.getByRole("heading", { name: "GTT-002" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Aktivitas berikutnya" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Kronologi itinerary" })).toBeInTheDocument();
+    expect(screen.getByText("Driver terverifikasi")).toBeInTheDocument();
+    expect(screen.getByText("Hotel Makkah", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("Pastikan jamaah berkumpul tiga jam sebelum keberangkatan.")).toBeInTheDocument();
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Edit|Delete|Save/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps missing itinerary, transport, hotel, and notes visibly incomplete", () => {
+    useAgentTripDetailMock.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        group: detailGroup({
+          itinerary: [],
+          notes: [],
+          nextActivity: { title: "Belum ada aktivitas", date: "-", time: "-", icon: "schedule" },
+          visaSetup: { visaStatus: "Draft", syarikah: "", paymentStatus: "Unpaid", makkahHotels: [], madinahHotels: [], raudhahAppointments: [] },
+        }),
+        transportation: [],
+      },
+    });
+    renderPage(
+      <Routes>
+        <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />} />
+      </Routes>,
+      "/agent/groups/GTT-002",
+    );
+
+    expect(screen.getByText("Itinerary belum dicatat untuk perjalanan ini.")).toBeInTheDocument();
+    expect(screen.getByText("Belum ada penugasan transportasi atau checklist H-1 untuk perjalanan ini.")).toBeInTheDocument();
+    expect(screen.getAllByText("Hotel agreement belum dicatat.")).toHaveLength(2);
+    expect(screen.getByText("Belum ada catatan pendukung untuk perjalanan ini.")).toBeInTheDocument();
+    expect(screen.queryByText("Driver terverifikasi")).not.toBeInTheDocument();
   });
 });
