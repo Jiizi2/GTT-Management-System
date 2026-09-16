@@ -10,18 +10,18 @@ Setiap aktivitas tersebut menyiapkan tiga informasi operasional:
 
 - nama driver;
 - plat nomor;
-- muassasah.
+- nomor telepon.
 
 ## Current data boundary
 
 Kontrak Agent Portal saat ini hanya mengirim jumlah driver dan status
 verifikasinya. Karena itu, tampilan mempertahankan status faktual seperti
 **Terverifikasi**, **Menunggu verifikasi**, atau **Belum ditugaskan**, serta
-menandai identitas driver, plat nomor, dan muassasah sebagai belum tersedia di
+menandai identitas driver, plat nomor, dan nomor telepon sebagai belum tersedia di
 Portal Agent.
 
 Nama dan plat nomor internal sengaja tidak dibuka melalui perubahan frontend
-ini. Muassasah juga belum menjadi bagian dari data penugasan transportasi.
+ini. Nomor telepon driver juga belum dibuka melalui kontrak Agent Portal.
 Menampilkan nilai sebenarnya memerlukan keputusan akses data dan perubahan
 kontrak backend yang terpisah.
 

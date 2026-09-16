@@ -104,7 +104,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
   return (
     <section className="serene-section p-5 sm:p-6" aria-labelledby="itinerary-title">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="itinerary-title" className="text-xl font-extrabold text-on-surface">Kronologi itinerary</h2><p className="mt-1 text-sm text-on-surface-variant">Urutan aktivitas beserta penugasan transportasinya.</p></div>{items.length > 0 ? <span className="text-sm font-bold text-on-surface tabular-nums">{items.length} aktivitas</span> : null}</div>
-      {items.length === 0 ? <MissingPanel icon="event_busy" text="Itinerary belum dicatat untuk perjalanan ini." /> : <><ol className="mt-6 divide-y divide-outline-variant/30 border-y border-outline-variant/30">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} transportation={matches[index] ?? null} />)}</ol><p className="mt-4 text-xs leading-relaxed text-on-surface-variant">Portal Agent saat ini hanya menerima jumlah dan status verifikasi driver. Nama driver, plat nomor, dan muassasah disiapkan di tampilan tetapi belum dibuka oleh kontrak server.</p></>}
+      {items.length === 0 ? <MissingPanel icon="event_busy" text="Itinerary belum dicatat untuk perjalanan ini." /> : <><ol className="mt-6 divide-y divide-outline-variant/30 border-y border-outline-variant/30">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} transportation={matches[index] ?? null} />)}</ol><p className="mt-4 text-xs leading-relaxed text-on-surface-variant">Portal Agent saat ini hanya menerima jumlah dan status verifikasi driver. Nama driver, plat nomor, dan nomor telepon disiapkan di tampilan tetapi belum dibuka oleh kontrak server.</p></>}
     </section>
   );
 }
@@ -131,7 +131,7 @@ function DriverColumns({ row }: { row: TransportationItem | null }) {
       <dl className="mt-4 grid gap-4 sm:grid-cols-3">
         <DriverValue label="Nama driver" value={row ? "Belum tersedia di Portal Agent" : "Belum ditugaskan"} hint={row ? `${row.verifiedDriverCount} dari ${row.requiredBusCount} driver terverifikasi` : undefined} />
         <DriverValue label="Plat nomor" value="Belum tersedia di Portal Agent" />
-        <DriverValue label="Muassasah" value="Belum tersedia di Portal Agent" />
+        <DriverValue label="Nomor telepon" value="Belum tersedia di Portal Agent" />
       </dl>
     </div>
   );

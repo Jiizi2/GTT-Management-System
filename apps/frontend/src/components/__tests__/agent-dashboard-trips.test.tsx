@@ -242,7 +242,7 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.getByText("1 dari 1 driver terverifikasi")).toBeInTheDocument();
     expect(screen.getByText("Nama driver")).toBeInTheDocument();
     expect(screen.getByText("Plat nomor")).toBeInTheDocument();
-    expect(screen.getByText("Muassasah")).toBeInTheDocument();
+    expect(screen.getByText("Nomor telepon")).toBeInTheDocument();
     expect(screen.getAllByText("Belum tersedia di Portal Agent")).toHaveLength(3);
     expect(screen.queryByRole("heading", { name: "Kesiapan transportasi dan H-1" })).not.toBeInTheDocument();
     expect(screen.getByText("Hotel Makkah", { selector: "p" })).toBeInTheDocument();
@@ -278,7 +278,7 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.queryByText("Informasi pengemudi")).not.toBeInTheDocument();
   });
 
-  it("reserves driver, plate, and muassasah columns on bus itinerary without an assignment", () => {
+  it("reserves driver, plate, and phone columns on bus itinerary without an assignment", () => {
     useAgentTripDetailMock.mockReturnValue({ isPending: false, isError: false, data: { group: detailGroup(), transportation: [] } });
     renderPage(
       <Routes>
@@ -289,6 +289,6 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.getByText("Belum ditugaskan", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("Nama driver")).toBeInTheDocument();
     expect(screen.getByText("Plat nomor")).toBeInTheDocument();
-    expect(screen.getByText("Muassasah")).toBeInTheDocument();
+    expect(screen.getByText("Nomor telepon")).toBeInTheDocument();
   });
 });
