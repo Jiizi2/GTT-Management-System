@@ -33,7 +33,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
           </>
         }
         actions={<DashboardJourneyOrnament />}
-        className="relative overflow-hidden"
+        className="relative overflow-hidden xl:pr-20"
       />
 
       <section className="serene-section overflow-hidden" aria-labelledby="group-summary-title">
@@ -211,7 +211,7 @@ function DashboardValue({ label, value, icon }: { label: string; value: number; 
 
 function DashboardJourneyOrnament() {
   return (
-    <div className="hidden min-w-64 items-center self-stretch sm:flex" aria-hidden="true">
+    <div className="hidden min-w-64 items-center self-stretch xl:flex" aria-hidden="true">
       <div className="relative flex w-full items-center justify-between px-2">
         <span className="absolute left-8 right-8 top-1/2 border-t-2 border-dashed border-primary/20" />
         {[
@@ -221,9 +221,9 @@ function DashboardJourneyOrnament() {
         ].map(([icon, tone]) => (
           <span
             key={icon}
-            className={`material-symbols-outlined relative inline-flex h-12 w-12 items-center justify-center rounded-full shadow-sm ${tone}`}
+            className={`relative flex h-12 w-12 items-center justify-center rounded-full shadow-sm ${tone}`}
           >
-            {icon}
+            <span className="material-symbols-outlined text-[1.35rem] leading-none">{icon}</span>
           </span>
         ))}
       </div>
