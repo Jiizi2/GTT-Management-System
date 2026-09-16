@@ -127,8 +127,8 @@ function detailGroup(overrides: Partial<GroupData> = {}): GroupData {
 const transportation: TransportationItem[] = [{
   id: "transport-1",
   tripDate: "2026-10-10",
-  activity: "Transfer",
-  tripLabel: "Bandara ke hotel",
+  activity: "Penerbangan",
+  tripLabel: "Penerbangan menuju Jeddah",
   requiredBusCount: 1,
   scheduledTime: "12:00",
   transferByTrain: false,
@@ -238,14 +238,20 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.getByRole("heading", { name: "GTT-002" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktivitas berikutnya" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Kronologi itinerary" })).toBeInTheDocument();
-    expect(screen.getByText("Driver terverifikasi")).toBeInTheDocument();
+    expect(screen.getByText("Terverifikasi")).toBeInTheDocument();
+    expect(screen.getByText("1 dari 1 driver terverifikasi")).toBeInTheDocument();
+    expect(screen.getByText("Nama driver")).toBeInTheDocument();
+    expect(screen.getByText("Plat nomor")).toBeInTheDocument();
+    expect(screen.getByText("Muassasah")).toBeInTheDocument();
+    expect(screen.getAllByText("Belum tersedia di Portal Agent")).toHaveLength(3);
+    expect(screen.queryByRole("heading", { name: "Kesiapan transportasi dan H-1" })).not.toBeInTheDocument();
     expect(screen.getByText("Hotel Makkah", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Pastikan jamaah berkumpul tiga jam sebelum keberangkatan.")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Edit|Delete|Save/i })).not.toBeInTheDocument();
   });
 
-  it("keeps missing itinerary, transport, hotel, and notes visibly incomplete", () => {
+  it("keeps missing itinerary, hotel, and notes visibly incomplete", () => {
     useAgentTripDetailMock.mockReturnValue({
       isPending: false,
       isError: false,
@@ -267,9 +273,22 @@ describe("Agent Dashboard and Perjalanan", () => {
     );
 
     expect(screen.getByText("Itinerary belum dicatat untuk perjalanan ini.")).toBeInTheDocument();
-    expect(screen.getByText("Belum ada penugasan transportasi atau checklist H-1 untuk perjalanan ini.")).toBeInTheDocument();
     expect(screen.getAllByText("Hotel agreement belum dicatat.")).toHaveLength(2);
     expect(screen.getByText("Belum ada catatan pendukung untuk perjalanan ini.")).toBeInTheDocument();
-    expect(screen.queryByText("Driver terverifikasi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Informasi pengemudi")).not.toBeInTheDocument();
+  });
+
+  it("reserves driver, plate, and muassasah columns on bus itinerary without an assignment", () => {
+    useAgentTripDetailMock.mockReturnValue({ isPending: false, isError: false, data: { group: detailGroup(), transportation: [] } });
+    renderPage(
+      <Routes>
+        <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />} />
+      </Routes>,
+      "/agent/groups/GTT-002",
+    );
+    expect(screen.getByText("Belum ditugaskan", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("Nama driver")).toBeInTheDocument();
+    expect(screen.getByText("Plat nomor")).toBeInTheDocument();
+    expect(screen.getByText("Muassasah")).toBeInTheDocument();
   });
 });

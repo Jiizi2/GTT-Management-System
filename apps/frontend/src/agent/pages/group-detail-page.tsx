@@ -62,9 +62,8 @@ export function GroupDetailPage({
 
       <TripIdentity group={group} />
       <NextActivity group={group} />
-      <ItinerarySection items={group.itinerary} />
+      <ItinerarySection items={group.itinerary} transportation={transportation} />
       <VisaAndHotelSection group={group} />
-      <TransportationSection rows={transportation} />
       <NotesSection notes={group.notes} />
     </PageLayout>
   );
@@ -100,24 +99,61 @@ function NextActivity({ group }: { group: GroupData }) {
   );
 }
 
-function ItinerarySection({ items }: { items: ItineraryItem[] }) {
+function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; transportation: TransportationItem[] }) {
+  const matches = matchTransportation(items, transportation);
   return (
     <section className="serene-section p-5 sm:p-6" aria-labelledby="itinerary-title">
-      <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="itinerary-title" className="text-xl font-extrabold text-on-surface">Kronologi itinerary</h2><p className="mt-1 text-sm text-on-surface-variant">Urutan aktivitas perjalanan yang sudah dicatat.</p></div>{items.length > 0 ? <span className="text-sm font-bold text-on-surface tabular-nums">{items.length} aktivitas</span> : null}</div>
-      {items.length === 0 ? <MissingPanel icon="event_busy" text="Itinerary belum dicatat untuk perjalanan ini." /> : <ol className="mt-6 divide-y divide-outline-variant/30 border-y border-outline-variant/30">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} />)}</ol>}
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="itinerary-title" className="text-xl font-extrabold text-on-surface">Kronologi itinerary</h2><p className="mt-1 text-sm text-on-surface-variant">Urutan aktivitas beserta penugasan transportasinya.</p></div>{items.length > 0 ? <span className="text-sm font-bold text-on-surface tabular-nums">{items.length} aktivitas</span> : null}</div>
+      {items.length === 0 ? <MissingPanel icon="event_busy" text="Itinerary belum dicatat untuk perjalanan ini." /> : <><ol className="mt-6 divide-y divide-outline-variant/30 border-y border-outline-variant/30">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} transportation={matches[index] ?? null} />)}</ol><p className="mt-4 text-xs leading-relaxed text-on-surface-variant">Portal Agent saat ini hanya menerima jumlah dan status verifikasi driver. Nama driver, plat nomor, dan muassasah disiapkan di tampilan tetapi belum dibuka oleh kontrak server.</p></>}
     </section>
   );
 }
 
-function ItineraryRow({ item, index }: { item: ItineraryItem; index: number }) {
+function ItineraryRow({ item, index, transportation }: { item: ItineraryItem; index: number; transportation: TransportationItem | null }) {
   const facts = [item.time, item.flightNumber, item.from && item.to ? `${item.from} → ${item.to}` : null, item.hotelName, item.transferByTrain ? "Menggunakan kereta" : null].filter(Boolean);
   return (
     <li className="grid gap-3 py-5 sm:grid-cols-[2.5rem_8rem_minmax(0,1fr)] sm:gap-4">
       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-extrabold text-primary tabular-nums">{index + 1}</span>
       <div><p className="text-sm font-bold text-on-surface">{item.date || "Tanggal belum dicatat"}</p>{item.year ? <p className="mt-0.5 text-xs text-on-surface-variant">{item.year}</p> : null}</div>
-      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>{item.requiresBus ? <StatusBadge tone="waiting">Perlu bus</StatusBadge> : null}</div><h3 className="mt-1 break-words text-base font-extrabold text-on-surface">{item.title}</h3>{facts.length > 0 ? <p className="mt-2 break-words text-sm text-on-surface-variant">{facts.join(" · ")}</p> : item.meta ? <p className="mt-2 break-words text-sm text-on-surface-variant">{item.meta}</p> : null}</div>
+      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>{item.requiresBus ? <StatusBadge tone="waiting">Perlu bus</StatusBadge> : null}</div><h3 className="mt-1 break-words text-base font-extrabold text-on-surface">{item.title}</h3>{facts.length > 0 ? <p className="mt-2 break-words text-sm text-on-surface-variant">{facts.join(" · ")}</p> : item.meta ? <p className="mt-2 break-words text-sm text-on-surface-variant">{item.meta}</p> : null}{item.requiresBus || transportation ? <DriverColumns row={transportation} /> : null}</div>
     </li>
   );
+}
+
+function DriverColumns({ row }: { row: TransportationItem | null }) {
+  const verified = row && row.status === "ASSIGNED" && row.verifiedDriverCount >= row.requiredBusCount;
+  const assigned = row?.status === "ASSIGNED";
+  const tone: Tone = verified ? "complete" : assigned ? "waiting" : "attention";
+  const status = verified ? "Terverifikasi" : assigned ? "Menunggu verifikasi" : "Belum ditugaskan";
+  return (
+    <div className="mt-4 rounded-xl bg-surface-container-low p-4" aria-label="Informasi pengemudi">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-extrabold text-on-surface">Informasi pengemudi</h4><StatusBadge tone={tone}>{status}</StatusBadge></div>
+      <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+        <DriverValue label="Nama driver" value={row ? "Belum tersedia di Portal Agent" : "Belum ditugaskan"} hint={row ? `${row.verifiedDriverCount} dari ${row.requiredBusCount} driver terverifikasi` : undefined} />
+        <DriverValue label="Plat nomor" value="Belum tersedia di Portal Agent" />
+        <DriverValue label="Muassasah" value="Belum tersedia di Portal Agent" />
+      </dl>
+    </div>
+  );
+}
+
+function DriverValue({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return <div className="min-w-0"><dt className="text-xs font-semibold text-on-surface-variant">{label}</dt><dd className="mt-1 break-words text-sm font-bold text-on-surface">{value}</dd>{hint ? <p className="mt-1 text-xs text-on-surface-variant">{hint}</p> : null}</div>;
+}
+
+function matchTransportation(items: ItineraryItem[], rows: TransportationItem[]): Array<TransportationItem | null> {
+  const unused = new Set(rows.map((row) => row.id));
+  const normalized = (value: string | undefined | null) => value?.trim().toLocaleLowerCase("id-ID") ?? "";
+  const dateKey = (value: string | undefined | null) => value?.slice(0, 10) ?? "";
+  return items.map((item) => {
+    const exact = rows.find((row) => unused.has(row.id) && normalized(row.tripLabel) === normalized(item.title));
+    const sameDateAndActivity = rows.find(
+      (row) => unused.has(row.id) && dateKey(row.tripDate) === dateKey(item.isoDate) && normalized(row.activity) === normalized(item.category),
+    );
+    const match = exact ?? sameDateAndActivity ?? null;
+    if (match) unused.delete(match.id);
+    return match;
+  });
 }
 
 function VisaAndHotelSection({ group }: { group: GroupData }) {
@@ -133,23 +169,6 @@ function VisaAndHotelSection({ group }: { group: GroupData }) {
 
 function HotelSummary({ city, hotels }: { city: string; hotels: GroupAgreementHotel[] }) {
   return <div className="rounded-xl bg-surface-container-low p-4"><h3 className="font-extrabold text-on-surface">Hotel {city}</h3>{hotels.length === 0 ? <p className="mt-2 text-sm text-on-surface-variant">Hotel agreement belum dicatat.</p> : <ul className="mt-3 space-y-3">{hotels.map((hotel) => <li key={hotel.id} className="flex flex-col gap-2 border-t border-outline-variant/30 pt-3 first:border-0 first:pt-0 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="break-words text-sm font-bold text-on-surface">{hotel.hotelName}</p><p className="mt-1 break-all text-xs text-on-surface-variant">{hotel.agreementNumber || "Nomor agreement belum dicatat"}</p></div><AgreementStatus status={hotel.status} /></li>)}</ul>}</div>;
-}
-
-function TransportationSection({ rows }: { rows: TransportationItem[] }) {
-  return (
-    <section className="serene-section p-5 sm:p-6" aria-labelledby="transport-title">
-      <div><h2 id="transport-title" className="text-lg font-extrabold text-on-surface">Kesiapan transportasi dan H-1</h2><p className="mt-1 text-sm text-on-surface-variant">Penugasan bus dan verifikasi driver yang tercatat.</p></div>
-      {rows.length === 0 ? <MissingPanel icon="directions_bus" text="Belum ada penugasan transportasi atau checklist H-1 untuk perjalanan ini." /> : <ul className="mt-5 divide-y divide-outline-variant/30 border-y border-outline-variant/30">{rows.map((row) => <TransportationRow key={row.id} row={row} />)}</ul>}
-    </section>
-  );
-}
-
-function TransportationRow({ row }: { row: TransportationItem }) {
-  const assigned = row.status === "ASSIGNED";
-  const verified = assigned && row.verifiedDriverCount >= row.requiredBusCount;
-  const tone: Tone = verified ? "complete" : assigned ? "waiting" : "attention";
-  const label = verified ? "Driver terverifikasi" : assigned ? "Menunggu verifikasi" : "Belum ditugaskan";
-  return <li className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="break-words text-sm font-extrabold text-on-surface">{row.activity} · {row.tripLabel}</p><p className="mt-1 text-sm text-on-surface-variant">{formatDate(row.tripDate)}{row.scheduledTime ? ` · ${row.scheduledTime}` : ""}</p><p className="mt-1 text-xs text-on-surface-variant">{row.verifiedDriverCount} dari {row.requiredBusCount} driver terverifikasi</p></div><StatusBadge tone={tone}>{label}</StatusBadge></li>;
 }
 
 function NotesSection({ notes }: { notes: string[] }) {
