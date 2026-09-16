@@ -85,3 +85,67 @@ export type TransportationItem = {
 };
 
 export type Profile = { account: { displayName: string }; agent: { code: string; name: string } };
+
+export type VisaApplicationStatus =
+  | "WAITING_DOCUMENT"
+  | "NEED_REVISION"
+  | "DOCUMENT_VERIFIED"
+  | "WAITING_HOTEL_AGREEMENT"
+  | "PASSENGER_ENTERED"
+  | "GROUP_CREATED"
+  | "READY_TO_SEND"
+  | "VISA_SUBMITTED"
+  | "PAYMENT_COMPLETED"
+  | "VISA_PROCESSING"
+  | "VISA_ISSUED"
+  | "COMPLETED";
+
+export type VisaApplicationDocumentStatus = "WAITING_DOCUMENT" | "NEED_REVISION" | "VERIFIED";
+
+export type VisaApplicationDocument = {
+  id: string;
+  type: "PASSPORT" | "VACCINE_CERTIFICATE" | "MANIFEST" | "PACKAGE_INFORMATION";
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: VisaApplicationDocumentStatus;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type VisaApplication = {
+  id: string;
+  applicationNumber: string;
+  agentId: string;
+  groupId: string | null;
+  departureDate: string;
+  returnDate: string;
+  departureCity: string;
+  providerName: string | null;
+  packageName: string;
+  passengerCount: number;
+  status: VisaApplicationStatus;
+  documentStatus: VisaApplicationDocumentStatus;
+  agreementStatus: "NOT_STARTED" | "WAITING_APPROVAL" | "APPROVED";
+  nusukStatus: "NOT_STARTED" | "PASSENGER_ENTRY" | "PASSENGER_ENTERED" | "GROUP_CREATED";
+  paymentStatus: "NOT_STARTED" | "WAITING_PAYMENT" | "COMPLETED";
+  visaStatus: "NOT_STARTED" | "READY_TO_SEND" | "SUBMITTED" | "PROCESSING" | "ISSUED" | "COMPLETED";
+  nusukGroupNumber: string | null;
+  nusukReferenceNumber: string | null;
+  submittedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  group: null | {
+    id: string;
+    code: string;
+    name: string;
+    arrivalDate: string;
+    returnDate: string;
+    pax: number;
+    packageName: string;
+    agentId: string;
+  };
+  documents: VisaApplicationDocument[];
+};
