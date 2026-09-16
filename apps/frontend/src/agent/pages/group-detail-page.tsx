@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { GroupDetail } from "../../pages/group-detail-page";
 import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
 import { useAgentGroupData } from "../data/use-agent-group-data";
@@ -15,6 +15,7 @@ export function GroupDetailPage({
   agentName: string;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const identity = useParams().identity ?? "";
   const query = useAgentGroupData({ principalId, agentId, agentName });
 
@@ -30,7 +31,10 @@ export function GroupDetailPage({
       groups={query.data}
       readOnly
       showThemeToggle={false}
-      onBack={() => navigate("/agent/overview")}
+      onBack={() => {
+        const from = (location.state as { from?: unknown } | null)?.from;
+        navigate(typeof from === "string" && from.startsWith("/agent/groups") ? from : "/agent/groups");
+      }}
       onDeleteGroup={() => undefined}
       onSaveGroup={readOnlyResult}
       onPatchGroup={readOnlyResult}
