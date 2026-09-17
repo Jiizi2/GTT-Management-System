@@ -165,7 +165,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
       <div className="flex flex-wrap items-end justify-between gap-3 bg-surface-container-high p-5 sm:p-6">
         <div>
           <h2 id="itinerary-title" className="text-xl font-extrabold text-on-surface">Kronologi itinerary</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">Urutan aktivitas beserta penugasan transportasinya.</p>
+          <p className="mt-1 text-sm text-on-surface-variant">Agenda perjalanan secara berurutan.</p>
         </div>
         {items.length > 0 ? (
           <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-surface-container-lowest px-3 text-sm font-bold text-on-surface tabular-nums">
@@ -179,7 +179,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
       ) : (
         <>
           <ol className="px-5 sm:px-6">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} isLast={index === items.length - 1} transportation={matches[index] ?? null} />)}</ol>
-          <p className="border-t border-outline-variant/30 px-5 py-4 text-xs leading-relaxed text-on-surface-variant sm:px-6">Portal Agent saat ini hanya menerima jumlah dan status verifikasi driver. Nama driver, plat nomor, dan nomor telepon disiapkan di tampilan tetapi belum dibuka oleh kontrak server.</p>
+          <p className="border-t border-outline-variant/30 px-5 py-4 text-xs text-on-surface-variant sm:px-6">Detail pengemudi mengikuti data yang tersedia dari server.</p>
         </>
       )}
     </section>
@@ -199,12 +199,19 @@ function ItineraryRow({ item, index, isLast, transportation }: { item: Itinerary
         </div>
       </div>
       <div className="min-w-0 sm:pt-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>
-          {item.requiresBus ? <StatusBadge tone="waiting">Perlu bus</StatusBadge> : null}
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">{item.icon || "event"}</span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="break-words text-lg font-extrabold leading-snug text-on-surface">{item.title}</h3>
+            {facts.length > 0 ? <p className="mt-1 break-words text-sm text-on-surface-variant">{facts.join(" · ")}</p> : item.meta ? <p className="mt-1 break-words text-sm text-on-surface-variant">{item.meta}</p> : null}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>
+              {item.requiresBus ? <StatusBadge tone="waiting">Perlu bus</StatusBadge> : null}
+            </div>
+          </div>
         </div>
-        <h3 className="mt-1 break-words text-lg font-extrabold text-on-surface">{item.title}</h3>
-        {facts.length > 0 ? <p className="mt-2 break-words text-sm text-on-surface-variant">{facts.join(" · ")}</p> : item.meta ? <p className="mt-2 break-words text-sm text-on-surface-variant">{item.meta}</p> : null}
         {item.requiresBus || transportation ? <DriverColumns row={transportation} /> : null}
       </div>
     </li>
@@ -217,19 +224,27 @@ function DriverColumns({ row }: { row: TransportationItem | null }) {
   const tone: Tone = verified ? "complete" : assigned ? "waiting" : "attention";
   const status = verified ? "Terverifikasi" : assigned ? "Menunggu verifikasi" : "Belum ditugaskan";
   return (
-    <div className="mt-4 rounded-xl bg-surface-container-low p-4 sm:p-5" aria-label="Informasi pengemudi">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-extrabold text-on-surface">Informasi pengemudi</h4><StatusBadge tone={tone}>{status}</StatusBadge></div>
-      <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-        <DriverValue label="Nama driver" value={row ? "Belum tersedia di Portal Agent" : "Belum ditugaskan"} hint={row ? `${row.verifiedDriverCount} dari ${row.requiredBusCount} driver terverifikasi` : undefined} />
-        <DriverValue label="Plat nomor" value="Belum tersedia di Portal Agent" />
-        <DriverValue label="Nomor telepon" value="Belum tersedia di Portal Agent" />
+    <div className="mt-4 rounded-xl bg-surface-container-low px-4 py-3" aria-label="Informasi pengemudi">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">directions_bus</span>
+          <h4 className="text-sm font-extrabold text-on-surface">Armada & pengemudi</h4>
+          {row ? <span className="text-xs text-on-surface-variant">{row.requiredBusCount} bus</span> : null}
+        </div>
+        <StatusBadge tone={tone}>{status}</StatusBadge>
+      </div>
+      <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3">
+        <DriverValue label="Driver" value={row ? "—" : "Belum ditugaskan"} />
+        <DriverValue label="Plat" value="—" />
+        <DriverValue label="Telepon" value="—" />
       </dl>
+      {row ? <p className="mt-2 text-xs text-on-surface-variant">{row.verifiedDriverCount}/{row.requiredBusCount} driver terverifikasi</p> : null}
     </div>
   );
 }
 
-function DriverValue({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return <div className="min-w-0"><dt className="text-xs font-semibold text-on-surface-variant">{label}</dt><dd className="mt-1 break-words text-sm font-bold text-on-surface">{value}</dd>{hint ? <p className="mt-1 text-xs text-on-surface-variant">{hint}</p> : null}</div>;
+function DriverValue({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><dt className="text-[11px] font-semibold text-on-surface-variant">{label}</dt><dd className="mt-0.5 truncate text-sm font-bold text-on-surface" title={value}>{value}</dd></div>;
 }
 
 function matchTransportation(items: ItineraryItem[], rows: TransportationItem[]): Array<TransportationItem | null> {
