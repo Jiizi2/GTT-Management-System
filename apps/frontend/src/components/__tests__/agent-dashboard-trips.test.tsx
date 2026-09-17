@@ -193,6 +193,10 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(
       screen.getByText((_, element) => element?.textContent === "19 perjalanan ditemukan", { selector: "p" }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toBeInTheDocument();
+    expect(screen.getByText("19 group perjalanan")).toBeInTheDocument();
+    expect(screen.getAllByText("Musyrif")).toHaveLength(6);
+    expect(screen.getAllByText("Belum ditugaskan")).toHaveLength(6);
     expect(screen.getAllByRole("button", { name: /Lihat itinerary/i })).toHaveLength(6);
     expect(screen.getByRole("navigation", { name: "perjalanan pagination" })).toBeInTheDocument();
   });

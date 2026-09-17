@@ -12,6 +12,8 @@ import { agentQueryKeys } from "../query/agent-query-boundary";
 import { ErrorState, LoadingState } from "../components/data-state";
 
 const PAGE_SIZE = 6;
+const departureDay = new Intl.DateTimeFormat("id-ID", { day: "2-digit", timeZone: "Asia/Jakarta" });
+const departureMonth = new Intl.DateTimeFormat("id-ID", { month: "short", timeZone: "Asia/Jakarta" });
 
 const lifecycleLabels: Record<LifecycleStatus, string> = {
   ENTRY_ONLY: "Data awal",
@@ -87,9 +89,17 @@ export function TripsPage({ principalId }: { principalId: string }) {
   if (query.isPending) return <LoadingState label="Memuat perjalanan..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
 
+  const activeGroupCount = groups.filter((group) => group.lifecycleStatus === "ACTIVE").length;
+  const totalPax = groups.reduce((total, group) => total + group.pax, 0);
+
   return (
     <PageLayout>
-      <PageHeader title="Perjalanan" description="Temukan group yang ditugaskan dan buka itinerary perjalanannya." />
+      <PageHeader
+        title="Perjalanan"
+        description="Temukan group yang ditugaskan dan buka itinerary perjalanannya."
+        actions={<TripHeaderSummary total={groups.length} active={activeGroupCount} pax={totalPax} />}
+        className="overflow-hidden xl:pr-20"
+      />
 
       <section className="serene-section p-4 sm:p-5" aria-label="Filter perjalanan">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_13rem_auto] lg:items-end">
@@ -196,56 +206,134 @@ export function TripsPage({ principalId }: { principalId: string }) {
 
 function TripCard({ group, onOpen }: { group: GroupSummary; onOpen: () => void }) {
   const preview = group.itinerary.slice(0, 3);
+  const parsedDeparture = new Date(group.arrivalDate);
+  const departure = Number.isNaN(parsedDeparture.getTime())
+    ? { day: "--", month: "-" }
+    : {
+        day: departureDay.format(parsedDeparture),
+        month: departureMonth.format(parsedDeparture).replace(".", ""),
+      };
   return (
-    <article className="serene-card flex h-full flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-extrabold text-primary">{group.code}</p>
-          <h2 className="mt-1 line-clamp-2 text-lg font-extrabold text-on-surface">{group.name}</h2>
-        </div>
-        <span className="shrink-0 rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
-          {lifecycleLabels[group.lifecycleStatus]}
+    <article className="serene-card flex h-full flex-col overflow-hidden p-0">
+      <div className="relative overflow-hidden bg-surface-container-high p-5">
+        <span
+          className="material-symbols-outlined pointer-events-none absolute -bottom-7 -right-4 rotate-[-10deg] text-[7rem] leading-none text-primary/10"
+          aria-hidden="true"
+        >
+          route
         </span>
+        <div className="relative flex items-start gap-4">
+          <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 flex-col items-center justify-center rounded-2xl bg-primary text-on-primary shadow-sm">
+            <strong className="text-2xl font-extrabold leading-none tabular-nums">{departure.day}</strong>
+            <span className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em]">{departure.month}</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-extrabold text-primary">{group.code}</p>
+              <span className="shrink-0 rounded-lg bg-surface-container-lowest/80 px-2.5 py-1 text-xs font-bold text-primary">
+                {lifecycleLabels[group.lifecycleStatus]}
+              </span>
+            </div>
+            <h2 className="mt-2 line-clamp-2 text-lg font-extrabold leading-snug text-on-surface">{group.name}</h2>
+          </div>
+        </div>
       </div>
 
-      <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-outline-variant/30 py-4 text-sm">
-        <TripValue label="Berangkat" value={formatDate(group.arrivalDate)} />
-        <TripValue label="Kembali" value={formatDate(group.returnDate)} />
-        <TripValue label="Jamaah" value={`${group.pax} pax`} />
-        <TripValue label="Paket" value={group.packageName || "Belum tersedia"} />
-      </dl>
+      <div className="flex flex-1 flex-col p-5">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-outline-variant/30 pb-4 text-sm">
+          <TripValue label="Kembali" value={formatDate(group.returnDate)} />
+          <TripValue label="Jamaah" value={`${group.pax} pax`} />
+          <TripValue label="Paket" value={group.packageName || "Belum tersedia"} />
+          <TripValue label="Armada" value={group.totalBuses ? `${group.totalBuses} bus` : "Belum tersedia"} />
+        </dl>
 
-      <section className="mt-5 flex-1" aria-label={`Ringkasan itinerary ${group.code}`}>
-        <h3 className="text-sm font-extrabold text-on-surface">Itinerary terdekat</h3>
-        {preview.length > 0 ? (
-          <ol className="mt-3 space-y-3">
-            {preview.map((item) => (
-              <li key={item.id} className="grid grid-cols-[0.65rem_minmax(0,1fr)] gap-3">
-                <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-primary" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-on-surface">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-on-surface-variant">
-                    {item.dateLabel}
-                    {item.time ? ` · ${item.time}` : ""}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="mt-3 rounded-xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
-            Itinerary belum dicatat.
-          </p>
-        )}
-      </section>
+        <section className="mt-5 flex-1" aria-label={`Ringkasan itinerary ${group.code}`}>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-extrabold text-on-surface">Itinerary terdekat</h3>
+            <span className="text-xs font-semibold text-on-surface-variant">{formatDate(group.arrivalDate)}</span>
+          </div>
+          {preview.length > 0 ? (
+            <ol className="mt-3 space-y-3">
+              {preview.map((item, index) => (
+                <li key={item.id} className="relative grid grid-cols-[0.75rem_minmax(0,1fr)] gap-3 pb-1">
+                  {index < preview.length - 1 ? (
+                    <span
+                      className="absolute bottom-[-0.75rem] left-[0.34rem] top-3 w-px bg-outline-variant/70"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <span
+                    className="relative mt-1.5 h-3 w-3 rounded-full border-[3px] border-primary/20 bg-primary"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-on-surface">{item.title}</p>
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
+                      {item.dateLabel}
+                      {item.time ? ` · ${item.time}` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="mt-3 flex min-h-24 items-center gap-3 rounded-xl bg-surface-container-low p-4">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-primary">
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">
+                  route
+                </span>
+              </span>
+              <div>
+                <p className="text-sm font-bold text-on-surface">Itinerary belum dicatat</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-on-surface-variant">
+                  Detail perjalanan akan muncul setelah itinerary tersedia.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
 
-      <button type="button" className="serene-btn-secondary mt-5 min-h-11 w-full justify-center" onClick={onOpen}>
-        Lihat itinerary
-        <span className="material-symbols-outlined text-lg" aria-hidden="true">
-          arrow_forward
-        </span>
-      </button>
+        <div className="mt-5 flex items-center gap-3 border-t border-outline-variant/30 pt-4">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">
+              person
+            </span>
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-on-surface-variant">Musyrif</p>
+            <p className="truncate text-sm font-bold text-on-surface">{group.musyrif?.name || "Belum ditugaskan"}</p>
+          </div>
+        </div>
+
+        <button type="button" className="serene-btn-secondary mt-5 min-h-11 w-full justify-center" onClick={onOpen}>
+          Lihat itinerary
+          <span className="material-symbols-outlined text-lg" aria-hidden="true">
+            arrow_forward
+          </span>
+        </button>
+      </div>
     </article>
+  );
+}
+
+function TripHeaderSummary({ total, active, pax }: { total: number; active: number; pax: number }) {
+  return (
+    <div
+      className="hidden min-w-72 items-center gap-4 xl:flex"
+      aria-label={`${total} perjalanan, ${active} aktif, ${pax} jamaah`}
+    >
+      <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-sm">
+        <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+          luggage
+        </span>
+      </span>
+      <div className="min-w-0">
+        <p className="text-base font-extrabold text-on-surface">{total} group perjalanan</p>
+        <p className="mt-1 text-sm text-on-surface-variant">
+          <strong className="text-primary tabular-nums">{active}</strong> aktif · {pax} jamaah
+        </p>
+      </div>
+    </div>
   );
 }
 
