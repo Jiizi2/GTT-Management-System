@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardPage } from "../../agent/pages/dashboard-page";
-import { GroupDetailPage } from "../../agent/pages/group-detail-page";
+import { getItineraryFocusStates, GroupDetailPage } from "../../agent/pages/group-detail-page";
 import { TripsPage } from "../../agent/pages/trips-page";
 import type { Dashboard, GroupSummary, TransportationItem } from "../../agent/data/contracts";
 import type { GroupData } from "../../shared/app-domain";
@@ -262,6 +262,13 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.getByText("Pastikan jamaah berkumpul tiga jam sebelum keberangkatan.")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Edit|Delete|Save/i })).not.toBeInTheDocument();
+  });
+
+  it("highlights today's itinerary before falling back to the next schedule", () => {
+    const items = detailGroup().itinerary;
+    expect(getItineraryFocusStates(items, new Date("2026-10-10T01:00:00.000Z"))).toEqual(["today"]);
+    expect(getItineraryFocusStates(items, new Date("2026-10-09T01:00:00.000Z"))).toEqual(["next"]);
+    expect(getItineraryFocusStates(items, new Date("2026-10-11T01:00:00.000Z"))).toEqual([null]);
   });
 
   it("keeps missing itinerary, hotel, and notes visibly incomplete", () => {

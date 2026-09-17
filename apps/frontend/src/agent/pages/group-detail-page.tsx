@@ -11,6 +11,14 @@ import { formatDate } from "../data/format";
 import { useAgentTripDetail } from "../data/use-agent-trip-detail";
 
 type Tone = "complete" | "in-progress" | "waiting" | "attention" | "neutral";
+type ItineraryFocus = "today" | "next" | null;
+
+const jakartaDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Jakarta",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
 
 const lifecycleLabel: Record<string, string> = {
   ENTRY_ONLY: "Data awal",
@@ -160,6 +168,7 @@ function DatePoint({ icon, label, value, align = "left" }: { icon: string; label
 
 function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; transportation: TransportationItem[] }) {
   const matches = matchTransportation(items, transportation);
+  const focusStates = getItineraryFocusStates(items);
   return (
     <section className="serene-section overflow-hidden" aria-labelledby="itinerary-title">
       <div className="flex flex-wrap items-end justify-between gap-3 bg-surface-container-high p-5 sm:p-6">
@@ -178,7 +187,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
         <div className="p-5 sm:p-6"><MissingPanel icon="event_busy" text="Itinerary belum dicatat untuk perjalanan ini." /></div>
       ) : (
         <>
-          <ol className="px-5 sm:px-6">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} isLast={index === items.length - 1} transportation={matches[index] ?? null} />)}</ol>
+          <ol className="px-5 sm:px-6">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} isLast={index === items.length - 1} focus={focusStates[index]} transportation={matches[index] ?? null} />)}</ol>
           <p className="border-t border-outline-variant/30 px-5 py-4 text-xs text-on-surface-variant sm:px-6">Detail pengemudi mengikuti data yang tersedia dari server.</p>
         </>
       )}
@@ -186,12 +195,16 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
   );
 }
 
-function ItineraryRow({ item, index, isLast, transportation }: { item: ItineraryItem; index: number; isLast: boolean; transportation: TransportationItem | null }) {
+function ItineraryRow({ item, index, isLast, focus, transportation }: { item: ItineraryItem; index: number; isLast: boolean; focus: ItineraryFocus; transportation: TransportationItem | null }) {
   const facts = [item.time, item.flightNumber, item.from && item.to ? `${item.from} → ${item.to}` : null, item.hotelName, item.transferByTrain ? "Menggunakan kereta" : null].filter(Boolean);
+  const focusLabel = focus === "today" ? "Hari ini" : focus === "next" ? "Agenda berikutnya" : null;
   return (
-    <li className={`relative grid gap-4 py-6 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-6 ${isLast ? "" : "border-b border-outline-variant/30"}`}>
+    <li
+      className={`relative grid gap-4 py-6 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-6 ${isLast ? "" : "border-b border-outline-variant/30"} ${focus ? "-mx-3 rounded-2xl bg-primary/5 px-3 sm:-mx-4 sm:px-4" : ""}`}
+      aria-current={focus === "today" ? "date" : focus === "next" ? "step" : undefined}
+    >
       <div className="relative flex gap-3 sm:block">
-        <span className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-extrabold text-on-primary tabular-nums">{index + 1}</span>
+        <span className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-extrabold tabular-nums ${focus ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"}`}>{index + 1}</span>
         {!isLast ? <span className="absolute left-[1.1rem] top-9 hidden h-[calc(100%+1.5rem)] w-px bg-primary/20 sm:block" aria-hidden="true" /> : null}
         <div className="sm:mt-3">
           <p className="text-sm font-extrabold text-on-surface">{item.date || "Tanggal belum dicatat"}</p>
@@ -204,7 +217,10 @@ function ItineraryRow({ item, index, isLast, transportation }: { item: Itinerary
             <span className="material-symbols-outlined text-xl" aria-hidden="true">{item.icon || "event"}</span>
           </span>
           <div className="min-w-0 flex-1">
-            <h3 className="break-words text-lg font-extrabold leading-snug text-on-surface">{item.title}</h3>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h3 className="break-words text-lg font-extrabold leading-snug text-on-surface">{item.title}</h3>
+              {focusLabel ? <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${focus === "today" ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"}`}>{focusLabel}</span> : null}
+            </div>
             {facts.length > 0 ? <p className="mt-1 break-words text-sm text-on-surface-variant">{facts.join(" · ")}</p> : item.meta ? <p className="mt-1 break-words text-sm text-on-surface-variant">{item.meta}</p> : null}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>
@@ -216,6 +232,26 @@ function ItineraryRow({ item, index, isLast, transportation }: { item: Itinerary
       </div>
     </li>
   );
+}
+
+export function getItineraryFocusStates(items: ItineraryItem[], now = new Date()): ItineraryFocus[] {
+  const parts = Object.fromEntries(jakartaDateFormatter.formatToParts(now).map((part) => [part.type, part.value]));
+  const today = `${parts.year}-${parts.month}-${parts.day}`;
+  const dates = items.map((item) => {
+    const value = item.isoDate?.slice(0, 10) ?? "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  });
+  if (dates.some((date) => date === today)) return dates.map((date) => (date === today ? "today" : null));
+
+  let nextIndex = -1;
+  let nextDate: string | null = null;
+  dates.forEach((date, index) => {
+    if (date && date > today && (!nextDate || date < nextDate)) {
+      nextDate = date;
+      nextIndex = index;
+    }
+  });
+  return dates.map((_, index) => (index === nextIndex ? "next" : null));
 }
 
 function DriverColumns({ row }: { row: TransportationItem | null }) {
