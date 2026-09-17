@@ -174,7 +174,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
       <div className="flex flex-wrap items-end justify-between gap-3 bg-surface-container-high p-5 sm:p-6">
         <div>
           <h2 id="itinerary-title" className="text-xl font-extrabold text-on-surface">Kronologi itinerary</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">Agenda perjalanan secara berurutan.</p>
+          <p className="mt-1 hidden text-sm text-on-surface-variant sm:block">Agenda perjalanan secara berurutan.</p>
         </div>
         {items.length > 0 ? (
           <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-surface-container-lowest px-3 text-sm font-bold text-on-surface tabular-nums">
@@ -188,7 +188,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
       ) : (
         <>
           <ol className="px-5 sm:px-6">{items.map((item, index) => <ItineraryRow key={`${item.isoDate ?? item.date}-${index}`} item={item} index={index} isLast={index === items.length - 1} focus={focusStates[index]} transportation={matches[index] ?? null} />)}</ol>
-          <p className="border-t border-outline-variant/30 px-5 py-4 text-xs text-on-surface-variant sm:px-6">Detail pengemudi mengikuti data yang tersedia dari server.</p>
+          <p className="hidden border-t border-outline-variant/30 px-5 py-4 text-xs text-on-surface-variant sm:block sm:px-6">Detail pengemudi mengikuti data yang tersedia dari server.</p>
         </>
       )}
     </section>
@@ -198,6 +198,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
 function ItineraryRow({ item, index, isLast, focus, transportation }: { item: ItineraryItem; index: number; isLast: boolean; focus: ItineraryFocus; transportation: TransportationItem | null }) {
   const facts = [item.time, item.flightNumber, item.from && item.to ? `${item.from} → ${item.to}` : null, item.hotelName, item.transferByTrain ? "Menggunakan kereta" : null].filter(Boolean);
   const focusLabel = focus === "today" ? "Hari ini" : focus === "next" ? "Agenda berikutnya" : null;
+  const compactFacts = [item.time, item.flightNumber].filter(Boolean);
   return (
     <li
       className={`relative grid gap-4 py-6 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-6 ${isLast ? "" : "border-b border-outline-variant/30"} ${focus ? "-mx-3 rounded-2xl bg-primary/5 px-3 sm:-mx-4 sm:px-4" : ""}`}
@@ -208,7 +209,7 @@ function ItineraryRow({ item, index, isLast, focus, transportation }: { item: It
         {!isLast ? <span className="absolute left-[1.1rem] top-9 hidden h-[calc(100%+1.5rem)] w-px bg-primary/20 sm:block" aria-hidden="true" /> : null}
         <div className="sm:mt-3">
           <p className="text-sm font-extrabold text-on-surface">{item.date || "Tanggal belum dicatat"}</p>
-          {item.year ? <p className="mt-0.5 text-xs text-on-surface-variant">{item.year}</p> : null}
+          {item.year ? <p className="mt-0.5 hidden text-xs text-on-surface-variant sm:block">{item.year}</p> : null}
         </div>
       </div>
       <div className="min-w-0 sm:pt-1">
@@ -219,12 +220,13 @@ function ItineraryRow({ item, index, isLast, focus, transportation }: { item: It
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <h3 className="break-words text-lg font-extrabold leading-snug text-on-surface">{item.title}</h3>
-              {focusLabel ? <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${focus === "today" ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"}`}>{focusLabel}</span> : null}
+              {focusLabel ? <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${focus === "today" ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"}`}><span className="sm:hidden">{focus === "next" ? "Berikutnya" : focusLabel}</span><span className="hidden sm:inline">{focusLabel}</span></span> : null}
             </div>
-            {facts.length > 0 ? <p className="mt-1 break-words text-sm text-on-surface-variant">{facts.join(" · ")}</p> : item.meta ? <p className="mt-1 break-words text-sm text-on-surface-variant">{item.meta}</p> : null}
+            {compactFacts.length > 0 ? <p className="mt-1 text-sm text-on-surface-variant sm:hidden">{compactFacts.join(" · ")}</p> : null}
+            {facts.length > 0 ? <p className="mt-1 hidden break-words text-sm text-on-surface-variant sm:block">{facts.join(" · ")}</p> : item.meta ? <p className="mt-1 hidden break-words text-sm text-on-surface-variant sm:block">{item.meta}</p> : null}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>
-              {item.requiresBus ? <StatusBadge tone="waiting">Perlu bus</StatusBadge> : null}
+              {item.requiresBus ? <span className="hidden sm:inline-flex"><StatusBadge tone="waiting">Perlu bus</StatusBadge></span> : null}
             </div>
           </div>
         </div>
@@ -264,18 +266,33 @@ function DriverColumns({ row }: { row: TransportationItem | null }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">directions_bus</span>
-          <h4 className="text-sm font-extrabold text-on-surface">Armada & pengemudi</h4>
+          <h4 className="text-sm font-extrabold text-on-surface"><span className="sm:hidden">Armada</span><span className="hidden sm:inline">Armada & pengemudi</span></h4>
           {row ? <span className="text-xs text-on-surface-variant">{row.requiredBusCount} bus</span> : null}
         </div>
         <StatusBadge tone={tone}>{status}</StatusBadge>
       </div>
-      <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3">
+      <details className="mt-2 sm:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-xs font-bold text-primary">
+          Detail pengemudi
+          <span className="material-symbols-outlined text-lg" aria-hidden="true">expand_more</span>
+        </summary>
+        <DriverFields row={row} />
+      </details>
+      <div className="hidden sm:block"><DriverFields row={row} /></div>
+    </div>
+  );
+}
+
+function DriverFields({ row }: { row: TransportationItem | null }) {
+  return (
+    <>
+      <dl className="grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3">
         <DriverValue label="Driver" value={row ? "—" : "Belum ditugaskan"} />
         <DriverValue label="Plat" value="—" />
         <DriverValue label="Telepon" value="—" />
       </dl>
       {row ? <p className="mt-2 text-xs text-on-surface-variant">{row.verifiedDriverCount}/{row.requiredBusCount} driver terverifikasi</p> : null}
-    </div>
+    </>
   );
 }
 

@@ -252,11 +252,12 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.getByText("Musyrif perjalanan")).toBeInTheDocument();
     expect(screen.getByText("1 aktivitas")).toBeInTheDocument();
     expect(screen.getByText("Terverifikasi")).toBeInTheDocument();
-    expect(screen.getByText("1/1 driver terverifikasi")).toBeInTheDocument();
-    expect(screen.getByText("Driver")).toBeInTheDocument();
-    expect(screen.getByText("Plat")).toBeInTheDocument();
-    expect(screen.getByText("Telepon")).toBeInTheDocument();
-    expect(screen.getAllByText("—")).toHaveLength(3);
+    expect(screen.getAllByText("1/1 driver terverifikasi")).toHaveLength(2);
+    expect(screen.getAllByText("Driver")).toHaveLength(2);
+    expect(screen.getAllByText("Plat")).toHaveLength(2);
+    expect(screen.getAllByText("Telepon")).toHaveLength(2);
+    expect(screen.getAllByText("—")).toHaveLength(6);
+    expect(screen.getByText("Detail pengemudi")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Kesiapan transportasi dan H-1" })).not.toBeInTheDocument();
     expect(screen.getByText("Hotel Makkah", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Pastikan jamaah berkumpul tiga jam sebelum keberangkatan.")).toBeInTheDocument();
@@ -307,8 +308,8 @@ describe("Agent Dashboard and Perjalanan", () => {
       "/agent/groups/GTT-002",
     );
     expect(screen.getByText("Belum ditugaskan", { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByText("Driver")).toBeInTheDocument();
-    expect(screen.getByText("Plat")).toBeInTheDocument();
-    expect(screen.getByText("Telepon")).toBeInTheDocument();
+    expect(screen.getAllByText("Driver")).toHaveLength(2);
+    expect(screen.getAllByText("Plat")).toHaveLength(2);
+    expect(screen.getAllByText("Telepon")).toHaveLength(2);
   });
 });
