@@ -246,8 +246,11 @@ describe("Agent Dashboard and Perjalanan", () => {
     );
 
     expect(screen.getByRole("heading", { name: "GTT-002" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ringkasan perjalanan" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktivitas berikutnya" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Kronologi itinerary" })).toBeInTheDocument();
+    expect(screen.getByText("Musyrif perjalanan")).toBeInTheDocument();
+    expect(screen.getByText("1 aktivitas")).toBeInTheDocument();
     expect(screen.getByText("Terverifikasi")).toBeInTheDocument();
     expect(screen.getByText("1 dari 1 driver terverifikasi")).toBeInTheDocument();
     expect(screen.getByText("Nama driver")).toBeInTheDocument();
