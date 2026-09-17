@@ -68,6 +68,18 @@ export function AgentShell({ session }: { session: AgentSession }) {
       >
         Langsung ke konten utama
       </a>
+      <div
+        className="pointer-events-none fixed inset-y-0 right-0 z-0 hidden w-[30rem] overflow-hidden xl:block"
+        aria-hidden="true"
+      >
+        <span className="material-symbols-outlined absolute -right-28 top-[18%] text-[25rem] leading-none text-primary opacity-[0.035]">
+          map
+        </span>
+        <span className="absolute -right-12 top-[38%] h-64 w-64 rounded-full border border-dashed border-primary/10" />
+        <span className="material-symbols-outlined absolute right-20 top-[38%] -rotate-12 text-3xl text-primary/15">
+          flight_takeoff
+        </span>
+      </div>
       <aside
         className={`fixed inset-y-0 left-0 z-10 hidden flex-col bg-surface-container-low pb-7 pt-4 shadow-ambient transition-[width,padding] duration-200 xl:flex ${
           collapsed ? "w-[104px] px-3.5" : "w-[280px] pl-6 pr-5"
@@ -118,6 +130,34 @@ export function AgentShell({ session }: { session: AgentSession }) {
             </NavLink>
           ))}
         </nav>
+        {!collapsed ? (
+          <section
+            className="relative mt-8 overflow-hidden rounded-2xl bg-primary p-4 text-on-primary shadow-ambient"
+            aria-label={`Ruang kerja ${session.user.agentName}`}
+          >
+            <span
+              className="material-symbols-outlined pointer-events-none absolute -bottom-8 -right-5 rotate-[-12deg] text-[7.5rem] leading-none text-on-primary/10"
+              aria-hidden="true"
+            >
+              map
+            </span>
+            <div className="relative">
+              <div className="flex items-center gap-2 text-on-primary/75">
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                  route
+                </span>
+                <span className="text-xs font-bold">Ruang kerja Agent</span>
+              </div>
+              <strong className="mt-3 block truncate text-base font-extrabold">{session.user.agentName}</strong>
+              <span className="mt-1 inline-flex rounded-lg bg-on-primary/15 px-2 py-1 text-[11px] font-bold tracking-[0.08em]">
+                {session.user.agentCode}
+              </span>
+              <p className="mt-3 max-w-[12rem] text-xs leading-relaxed text-on-primary/75">
+                Dashboard, visa, dan perjalanan dalam satu ruang kerja.
+              </p>
+            </div>
+          </section>
+        ) : null}
         <div className="mt-auto pt-3">
           {profileAllowed ? (
             <NavLink
@@ -191,7 +231,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
         id="main-content"
         tabIndex={-1}
         aria-label="Konten utama"
-        className={`relative px-0 pb-28 pt-0 transition-[margin] duration-200 xl:pb-8 xl:pt-0 ${
+        className={`relative z-[1] px-0 pb-28 pt-0 transition-[margin] duration-200 xl:pb-8 xl:pt-0 ${
           collapsed ? "xl:ml-[104px]" : "xl:ml-[280px]"
         }`}
       >

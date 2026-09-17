@@ -126,7 +126,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
           </div>
         </section>
 
-        <section className="serene-section min-w-0 p-5 sm:p-6" aria-labelledby="upcoming-groups-title">
+        <section className="serene-section flex min-w-0 flex-col p-5 sm:p-6" aria-labelledby="upcoming-groups-title">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0 flex-1">
               <h2 id="upcoming-groups-title" className="text-xl font-extrabold text-on-surface">
@@ -151,9 +151,11 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
               ))}
             </ul>
           ) : (
-            <p className="mt-5 rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-              Belum ada group mendatang pada data saat ini.
-            </p>
+            <DashboardEmptyState
+              icon="event_upcoming"
+              title="Jadwal berikutnya belum tersedia"
+              description="Perjalanan yang memiliki tanggal keberangkatan mendatang akan muncul di area ini."
+            />
           )}
         </section>
       </div>
@@ -186,9 +188,11 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
             ))}
           </ol>
         ) : (
-          <p className="mt-5 rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-            Belum ada aktivitas itinerary yang dapat ditampilkan.
-          </p>
+          <DashboardEmptyState
+            icon="route"
+            title="Belum ada aktivitas itinerary"
+            description="Perubahan itinerary terbaru akan dirangkum di sini agar mudah dipantau."
+          />
         )}
       </section>
     </PageLayout>
@@ -304,5 +308,27 @@ function UpcomingGroup({ group }: { group: GroupSummary }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+function DashboardEmptyState({ icon, title, description }: { icon: string; title: string; description: string }) {
+  return (
+    <div className="mt-5 flex min-h-40 flex-1 flex-col justify-between gap-5 rounded-2xl bg-surface-container-low p-5 sm:flex-row sm:items-end">
+      <div className="max-w-lg">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container-high text-primary">
+          <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+            {icon}
+          </span>
+        </span>
+        <h3 className="mt-4 text-base font-extrabold text-on-surface">{title}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">{description}</p>
+      </div>
+      <Link to="/agent/groups" className="serene-btn-secondary min-h-11 shrink-0 justify-center">
+        Lihat Perjalanan
+        <span className="material-symbols-outlined text-lg" aria-hidden="true">
+          arrow_forward
+        </span>
+      </Link>
+    </div>
   );
 }

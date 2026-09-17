@@ -53,6 +53,10 @@ describe("AgentShell routes", () => {
     expect(screen.getAllByRole("link", { name: "Perjalanan" })).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "Checklist" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Buka profil" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Ruang kerja Agent A" })).toHaveTextContent("AA");
+    expect(screen.getByRole("region", { name: "Ruang kerja Agent A" })).toHaveTextContent(
+      "Dashboard, visa, dan perjalanan dalam satu ruang kerja.",
+    );
     for (const label of screen.getAllByText("Perjalanan")) {
       expect(label).not.toHaveClass("opacity-0");
     }
