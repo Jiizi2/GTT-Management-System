@@ -450,9 +450,33 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
       makkahHotelWaived: Boolean(group.visaSetup?.makkahHotelWaived),
       madinahHotelWaived: Boolean(group.visaSetup?.madinahHotelWaived),
       arrivalFlightNumber: readString(group.visaSetup?.arrivalFlightNumber),
+      arrivalFlightDate: toIsoDate(group.visaSetup?.arrivalFlightDate) ?? "",
       arrivalTime: readString(group.visaSetup?.arrivalTime),
       departureFlightNumber: readString(group.visaSetup?.departureFlightNumber),
+      departureFlightDate: toIsoDate(group.visaSetup?.departureFlightDate) ?? "",
       departureTime: readString(group.visaSetup?.departureTime),
+      flightLegs: (group.visaSetup?.flightLegs ?? [])
+        .map((leg, index) => ({
+          id: readString(leg.id, "") || undefined,
+          direction: leg.direction,
+          sortOrder: readNumber(leg.sortOrder, index),
+          departureAirportCode: readString(leg.departureAirportCode ?? "").toUpperCase(),
+          arrivalAirportCode: readString(leg.arrivalAirportCode ?? "").toUpperCase(),
+          departureDate: toIsoDate(leg.departureDate) ?? "",
+          departureTime: readString(leg.departureTime ?? ""),
+          arrivalDate: toIsoDate(leg.arrivalDate) ?? "",
+          arrivalTime: readString(leg.arrivalTime ?? ""),
+          carrierCode: readString(leg.carrierCode ?? "").toUpperCase(),
+          flightNumber: readString(leg.flightNumber ?? "").toUpperCase(),
+          remarks: readString(leg.remarks ?? ""),
+        }))
+        .sort((left, right) =>
+          left.direction === right.direction
+            ? left.sortOrder - right.sortOrder
+            : left.direction === "ONWARD"
+              ? -1
+              : 1,
+        ),
       makkahHotels: mappedHotelsByCity.makkahHotels,
       madinahHotels: mappedHotelsByCity.madinahHotels,
       raudhahAppointments: (group.visaSetup?.raudhahAppointments ?? [])

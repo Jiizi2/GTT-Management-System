@@ -1,31 +1,82 @@
 import { useVisaDetailContext } from "../context/VisaDetailContext";
+import { formatVisaDateWithYear } from "../../../shared/app-domain";
 import { resolveGroupFlightDetails } from "../visa-detail-helpers";
+import { getFlightLegsByDirection, hasFlightLegContent } from "../../../shared/flight-plan";
+import type { FlightDirection, GroupFlightLeg } from "../../../shared/app-domain";
 
-function FlightFact({
+function FlightLegRow({ leg }: { leg: GroupFlightLeg }) {
+  const from = leg.departureAirportCode.trim().toUpperCase();
+  const to = leg.arrivalAirportCode.trim().toUpperCase();
+  const routeComplete = Boolean(from && to);
+  return (
+    <li className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <strong className={`text-base font-black tracking-tight ${routeComplete ? "text-slate-900" : "text-slate-500"}`}>
+            {from || "—"} <span className="mx-1 text-slate-400">→</span> {to || "—"}
+          </strong>
+          {!routeComplete ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">Rute belum lengkap</span>
+          ) : null}
+        </div>
+        <p className="mt-1 text-xs font-semibold text-slate-600">
+          {[leg.carrierCode, leg.flightNumber].filter(Boolean).join(" · ") || "Nomor penerbangan belum diisi"}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-600 sm:justify-end">
+        <span>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">ETD</span>{" "}
+          {leg.departureDate ? formatVisaDateWithYear(leg.departureDate) : "—"} · {leg.departureTime || "—"}
+        </span>
+        <span>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">ETA</span>{" "}
+          {leg.arrivalDate ? formatVisaDateWithYear(leg.arrivalDate) : "—"} · {leg.arrivalTime || "—"}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function FlightDirectionPanel({
   label,
-  icon,
-  flightNumber,
-  time,
+  direction,
+  legs,
 }: {
   label: string;
-  icon: string;
-  flightNumber?: string;
-  time?: string;
+  direction: FlightDirection;
+  legs: GroupFlightLeg[];
 }) {
-  const trimmedFlight = flightNumber?.trim() ?? "";
-  const trimmedTime = time?.trim() ?? "";
+  const visibleLegs = legs.filter(hasFlightLegContent);
+  const hasCompleteRoute = visibleLegs.every(
+    (leg) => leg.departureAirportCode.trim() && leg.arrivalAirportCode.trim(),
+  );
+
   return (
     <div className="min-w-0">
-      <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-500">
-        <span className="material-symbols-outlined text-sm" aria-hidden="true">
-          {icon}
+      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-lg text-brand-primary" aria-hidden="true">
+            {direction === "ONWARD" ? "flight_takeoff" : "flight_land"}
+          </span>
+          <span className="text-sm font-extrabold text-slate-800">{label}</span>
+        </div>
+        <span className="text-[11px] font-bold text-slate-500">
+          {visibleLegs.length === 0
+            ? "Belum diisi"
+            : !hasCompleteRoute
+              ? "Perlu dilengkapi"
+              : visibleLegs.length === 1
+                ? "Direct"
+                : `${visibleLegs.length} segmen · Transit`}
         </span>
-        {label}
-      </span>
-      <strong className="mt-1 block truncate text-base font-black text-slate-900">
-        {trimmedFlight || "Belum diisi"}
-      </strong>
-      <span className="text-xs font-semibold text-slate-500">{trimmedTime ? `${trimmedTime} LT` : "Jam belum diisi"}</span>
+      </div>
+      {visibleLegs.length > 0 ? (
+        <ol className="divide-y divide-slate-200">
+          {visibleLegs.map((leg, index) => <FlightLegRow key={leg.id ?? `${direction}-${index}`} leg={leg} />)}
+        </ol>
+      ) : (
+        <p className="px-4 py-5 text-sm font-medium text-slate-500 sm:px-5">Belum ada rute penerbangan.</p>
+      )}
     </div>
   );
 }
@@ -39,50 +90,34 @@ function FlightFact({
 export function FlightDetailsSection() {
   const { group, openFlightModal } = useVisaDetailContext();
   const flight = resolveGroupFlightDetails(group);
+  const onwardLegs = getFlightLegsByDirection(flight.flightLegs, "ONWARD");
+  const returnLegs = getFlightLegsByDirection(flight.flightLegs, "RETURN");
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="material-symbols-outlined text-brand-primary" aria-hidden="true">
-            flight
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold text-slate-900">Detail Penerbangan</h2>
-            <p className="text-xs font-semibold text-slate-500">
-              Nomor & jam penerbangan untuk pengajuan MOFA visa. Struktur perjalanan dibuat otomatis di Group Detail.
-            </p>
-          </div>
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-surface-container-lowest">
+      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+        <div className="min-w-0">
+          <h2 className="text-lg font-extrabold text-slate-900">Detail Penerbangan</h2>
+          <p className="mt-0.5 text-sm font-medium text-slate-600">
+            Rute penerbangan internasional direct atau transit per segmen.
+          </p>
         </div>
 
         <button
           type="button"
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-surface-container-lowest px-3 py-2 text-xs font-bold leading-none text-slate-700 transition hover:border-brand-primary hover:text-brand-primary sm:py-1.5"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-bold text-brand-primary transition hover:bg-brand-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary sm:min-h-10"
           onClick={openFlightModal}
         >
-          <span className="material-symbols-outlined text-base" aria-hidden="true">
-            edit
-          </span>
-          <span>Edit Penerbangan</span>
+          Ubah detail
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 sm:gap-0">
-        <div className="border-b border-slate-200 pb-3 sm:border-b-0 sm:pr-4">
-          <FlightFact
-            label="Flight Kedatangan"
-            icon="flight_land"
-            flightNumber={flight.arrivalFlightNumber}
-            time={flight.arrivalTime}
-          />
+      <div className="relative border-t border-slate-200 bg-slate-50/60 lg:grid lg:grid-cols-2">
+        <div className="border-b border-slate-200 lg:border-b-0">
+          <FlightDirectionPanel label="Onward" direction="ONWARD" legs={onwardLegs} />
         </div>
-        <div className="pt-3 sm:border-l sm:border-slate-200 sm:pl-4 sm:pt-0">
-          <FlightFact
-            label="Flight Kepulangan"
-            icon="flight_takeoff"
-            flightNumber={flight.departureFlightNumber}
-            time={flight.departureTime}
-          />
+        <div className="lg:border-l lg:border-slate-200">
+          <FlightDirectionPanel label="Return" direction="RETURN" legs={returnLegs} />
         </div>
       </div>
     </section>

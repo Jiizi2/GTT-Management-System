@@ -6,6 +6,7 @@ export function PaginationControls({
   rangeEnd,
   itemLabel,
   onPageChange,
+  touchSafe = false,
 }: {
   currentPage: number;
   totalPages: number;
@@ -14,6 +15,7 @@ export function PaginationControls({
   rangeEnd: number;
   itemLabel: string;
   onPageChange: (page: number) => void;
+  touchSafe?: boolean;
 }) {
   if (totalItems === 0 || totalPages <= 1) {
     return null;
@@ -45,7 +47,7 @@ export function PaginationControls({
       <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
+          className={`inline-flex items-center justify-center rounded-md bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 ${touchSafe ? "h-11 w-11" : "h-9 w-9"}`}
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           aria-label="Previous page"
@@ -59,7 +61,7 @@ export function PaginationControls({
           <button
             key={pageNumber}
             type="button"
-            className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition ${
+            className={`inline-flex items-center justify-center rounded-md px-3 text-sm font-semibold transition ${touchSafe ? "h-11 w-11" : "h-9 min-w-9"} ${
               currentPage === pageNumber
                 ? "bg-primary text-on-primary shadow-cta-soft"
                 : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-primary"
@@ -74,7 +76,7 @@ export function PaginationControls({
 
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
+          className={`inline-flex items-center justify-center rounded-md bg-surface-container-lowest text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 ${touchSafe ? "h-11 w-11" : "h-9 w-9"}`}
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           aria-label="Next page"

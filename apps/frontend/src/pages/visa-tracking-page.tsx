@@ -124,12 +124,13 @@ export function VisaTrackingScreen({
       />
 
       <section
-        className="flex flex-col border-y border-outline-variant/40 sm:flex-row sm:items-center"
+        className="visa-filter-bar"
         aria-label="Visa tracking filters"
       >
-        <div className="min-w-0 flex-1 py-1.5 sm:py-0">
+        <div className="visa-filter-field">
+          <span className="material-symbols-outlined visa-filter-icon" aria-hidden="true">filter_alt</span>
           <SereneSelect
-            className="h-8 w-full bg-transparent px-3 pr-8 text-left text-xs font-semibold text-on-surface-variant outline-none transition hover:text-on-surface"
+            className="visa-filter-control"
             value={activeFilter}
             onChange={(event) => setActiveFilter(event.target.value as VisaFilterId)}
             aria-label="Filter visa record view"
@@ -143,10 +144,9 @@ export function VisaTrackingScreen({
           </SereneSelect>
         </div>
 
-        <span className="h-px w-full bg-outline-variant/40 sm:h-5 sm:w-px" aria-hidden="true" />
-
         {fixedAgentName ? (
-          <div className="flex h-11 min-w-0 flex-1 items-center px-3 text-xs font-semibold text-on-surface-variant sm:h-8">
+          <div className="visa-filter-field visa-filter-fixed">
+            <span className="material-symbols-outlined visa-filter-icon" aria-hidden="true">business</span>
             <span className="truncate">{fixedAgentName}</span>
           </div>
         ) : (
@@ -154,15 +154,15 @@ export function VisaTrackingScreen({
             value={agentFilter}
             onChange={setAgentFilter}
             variant="inline"
-            className="w-full flex-1 py-1.5 sm:py-0"
+            className="visa-filter-field"
+            leadingIcon="business"
           />
         )}
 
-        <span className="h-px w-full bg-outline-variant/40 sm:h-5 sm:w-px" aria-hidden="true" />
-
-        <div className="min-w-0 flex-1 py-1.5 sm:py-0">
+        <div className="visa-filter-field">
+          <span className="material-symbols-outlined visa-filter-icon" aria-hidden="true">calendar_month</span>
           <SereneSelect
-            className="h-8 w-full bg-transparent px-3 pr-8 text-left text-xs font-semibold text-on-surface-variant outline-none transition hover:text-on-surface"
+            className="visa-filter-control"
             value={issuedStatsMonth}
             onChange={(event) => setIssuedStatsMonth(event.target.value)}
             aria-label="Pilih bulan statistik visa issued"
@@ -213,20 +213,19 @@ export function VisaTrackingScreen({
 
           <section className="serene-table-shell hidden md:block" aria-label="Visa tracking table">
             <div className="overflow-x-auto">
-              <div className="min-w-[960px]">
+              <div className="min-w-[980px]">
                 <div
-                  className="grid items-center gap-2.5 border-b border-slate-200 bg-surface-container-low px-5 py-3 text-xs font-semibold uppercase tracking-[0.11em] text-on-surface-variant/80"
+                  className="visa-compact-header"
                   style={{ gridTemplateColumns: desktopTableGridTemplate }}
                 >
-                  <div>Group Number</div>
-                  <div>Group Name</div>
-                  <div className="text-center">Total Pax</div>
-                  <div>Makkah Agreement</div>
-                  <div>Madinah Agreement</div>
-                  <div className="text-center">Visa Status</div>
-                  <div className="text-center">Visa Type</div>
-                  <div className="text-center">Syarikah</div>
-                  <div className="text-center">Actions</div>
+                  <div>Group number / Name</div>
+                  <div>Pax</div>
+                  <div>Visa status</div>
+                  <div>Makkah agreement</div>
+                  <div>Madinah agreement</div>
+                  <div>Visa type</div>
+                  <div>Syarikah</div>
+                  <div>Action</div>
                 </div>
 
                 <div className="divide-y divide-slate-100">

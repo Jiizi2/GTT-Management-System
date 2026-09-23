@@ -456,7 +456,7 @@ async function saveBaseTripsFromItineraryBuilder(page: Page, groupCode: string):
   }
 
   await page.getByRole("button", { name: "Go to step 5" }).click();
-  await pickNowTime(page, "Flight Return Time");
+  await pickNowTime(page, "Departure Activity Time");
   await pickNowTime(page, "Hotel Pickup Request Time");
 
   await expect(saveBaseTripsButton).toBeEnabled();
@@ -754,11 +754,64 @@ test("deletes a group from group detail", async ({ page }) => {
   await expect(page.locator("article").filter({ hasText: groupCode })).toHaveCount(0);
 });
 
+test("compact visa tracking preserves search and detail navigation on desktop and mobile", async ({ page }, testInfo) => {
+  await openApp(page);
+  await page.getByRole("link", { name: "Visa Tracking", exact: true }).click();
+  const table = page.getByRole("region", { name: "Visa tracking table", exact: true });
+  await expect(table).toBeVisible();
+  const groupCode = "9017000001";
+  const desktopRow = table.getByRole("article", { name: `Group ${groupCode}`, exact: true });
+  await expect(desktopRow.locator(".visa-compact-number")).toHaveText(groupCode);
+  const filters = page.getByRole("region", { name: "Visa tracking filters", exact: true });
+  await filters.getByRole("button", { name: "Filter visa record view" }).click();
+  await page.getByRole("option", { name: /^Not Issued/ }).click();
+  await expect(desktopRow).toBeVisible();
+  await filters.getByRole("button", { name: "Filter visa record view" }).click();
+  await page.getByRole("option", { name: /^All Groups/ }).click();
+  await filters.getByRole("button", { name: "Filter by Agent" }).click();
+  await expect(page.getByRole("option", { name: "All Agents", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await filters.getByRole("button", { name: "Pilih bulan statistik visa issued" }).click();
+  await expect(page.getByRole("listbox", { name: "Pilih bulan statistik visa issued" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.mouse.move(0, 0);
+  await filters.screenshot({ path: testInfo.outputPath("visa-filters-desktop.png") });
+  const search = page.getByPlaceholder("Search groups...", { exact: true });
+  await search.fill("no-matching-visa-group");
+  await expect(page.getByRole("heading", { name: "No visa records found" })).toBeVisible();
+  await search.fill(groupCode);
+  await expect(desktopRow).toBeVisible();
+  const tableBounds = await table.boundingBox();
+  const detailBounds = await desktopRow.getByRole("button", { name: `View details for group ${groupCode}` }).boundingBox();
+  expect(detailBounds!.x + detailBounds!.width).toBeLessThanOrEqual(tableBounds!.x + tableBounds!.width);
+  await table.screenshot({ path: testInfo.outputPath("visa-desktop.png") });
+  await desktopRow.getByRole("button", { name: `View details for group ${groupCode}` }).click();
+  await expect(page.getByRole("heading", { name: groupCode, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back to Visa Tracking" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const cards = page.getByRole("region", { name: "Visa tracking cards", exact: true });
+  await expect(cards).toBeVisible();
+  const mobileRow = cards.getByRole("article", { name: `Group ${groupCode}`, exact: true });
+  await expect(mobileRow).toBeVisible();
+  await expect(mobileRow.locator(".visa-compact-footer").getByRole("button", { name: `View details for group ${groupCode}` })).toBeVisible();
+  const approval = mobileRow.getByRole("button", { name: `Update makkah agreement status for ${groupCode}` });
+  const approvalMetrics = await approval.evaluate((button) => ({
+    target: button.getBoundingClientRect().height,
+    chip: parseFloat(getComputedStyle(button, "::before").height),
+  }));
+  expect(approvalMetrics.target).toBeGreaterThanOrEqual(44);
+  expect(approvalMetrics.chip).toBeLessThanOrEqual(30);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await cards.screenshot({ path: testInfo.outputPath("visa-mobile.png") });
+  await mobileRow.getByRole("button", { name: `View details for group ${groupCode}` }).click();
+  await expect(page.getByRole("heading", { name: groupCode, exact: true })).toBeVisible();
+});
+
 test("updates payment status from visa detail", async ({ page }) => {
   await openApp(page);
 
   const groupCode = "9017000001";
-  await page.getByRole("button", { name: "Visa Tracking" }).click();
+  await page.getByRole("link", { name: "Visa Tracking", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Visa Tracking" })).toBeVisible();
 
   const visaTable = page.locator('section[aria-label="Visa tracking table"]');
@@ -766,7 +819,7 @@ test("updates payment status from visa detail", async ({ page }) => {
 
   const visaRow = visaTable.locator("article").filter({ hasText: groupCode }).first();
   await expect(visaRow).toBeVisible();
-  await visaRow.getByRole("button", { name: "View Details" }).click();
+  await visaRow.getByRole("button", { name: `View details for group ${groupCode}` }).click();
 
   await expect(page.getByRole("button", { name: "Back to Visa Tracking" })).toBeVisible();
   await expect(page.getByRole("heading", { name: groupCode, exact: true })).toBeVisible();

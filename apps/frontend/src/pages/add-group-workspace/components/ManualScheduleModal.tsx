@@ -7,6 +7,7 @@ import {
   getAllowedTransportModes,
   getRouteFieldConfigByCategory,
   getScheduleTypeOption,
+  isFlightActivityType,
   TRANSPORT_MODE_META,
 } from "../../../shared/app-domain";
 import { shouldUseSaudiCityDropdown } from "../helpers/add-group-workspace-helpers";
@@ -266,7 +267,7 @@ export function ManualScheduleModal({
 
               {!showTransferTrainFields ? (
                 <label className={manualScheduleFieldClassName}>
-                  <span>{form.category === "departure" ? "Flight Return Time" : "Time (Optional)"}</span>
+                  <span>{form.category === "departure" ? "Departure Activity Time" : "Time (Optional)"}</span>
                   <Controller
                     name="time"
                     control={scheduleMethods.control}
@@ -308,6 +309,13 @@ export function ManualScheduleModal({
                     <p className="text-xs font-semibold text-error">{scheduleErrors.flightNumber.message}</p>
                   ) : null}
                 </label>
+              ) : null}
+
+              {isFlightActivityType(form.category) ? (
+                <div className="md:col-span-2 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm font-medium text-sky-800">
+                  <span className="material-symbols-outlined text-lg" aria-hidden="true">flight</span>
+                  <p>Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.</p>
+                </div>
               ) : null}
 
               {showHotelNameField ? (

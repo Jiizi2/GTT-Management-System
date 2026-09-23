@@ -106,7 +106,8 @@ export function ScheduleModal({
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const allowedTransportModes = getAllowedTransportModes(form.category);
   const showTransportModeField = allowedTransportModes.length > 0;
-  const showFlightNumberField = isFlightActivityType(form.category) && form.transportMode === "flight";
+  const showFlightNumberField = false;
+  const showFlightPlanHint = isFlightActivityType(form.category);
   const showPrimaryHotelNameField = form.category === "arrival" || form.category === "departure";
   const showTransferHotelFields = false;
   const showSingleHotelNameField = showPrimaryHotelNameField && !showTransferHotelFields;
@@ -241,7 +242,7 @@ export function ScheduleModal({
               {!showTransferTrainFields ? (
                 <label className={modalFieldClassName}>
                   <span>
-                    {form.category === "departure" && form.transportMode === "flight" ? "Flight Return Time" : "Time"}
+                    {form.category === "departure" ? "Departure Activity Time" : "Time"}
                   </span>
                   <TimePickerInput
                     inputClassName={modalInputClassName}
@@ -262,6 +263,13 @@ export function ScheduleModal({
                     placeholder="e.g. SV-827"
                   />
                 </label>
+              ) : null}
+
+              {showFlightPlanHint ? (
+                <div className={`${modalInfoClassName} ${modalWideClassName}`}>
+                  <span className="material-symbols-outlined" aria-hidden="true">flight</span>
+                  <p>Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.</p>
+                </div>
               ) : null}
 
               {showCityTourCityField ? (

@@ -2,6 +2,7 @@ import {
   AgreementApprovalStatus,
   AgreementCity,
   ChecklistAssignmentStatus,
+  FlightDirection,
   GroupRaudhahStatus,
   GroupLifecycleStatus,
   GroupTone,
@@ -26,6 +27,62 @@ import {
   Min,
   ValidateNested,
 } from "class-validator";
+
+export class CreateFlightLegDto {
+  @ApiProperty({ enum: FlightDirection, example: FlightDirection.ONWARD })
+  @IsEnum(FlightDirection)
+  direction!: FlightDirection;
+
+  @ApiProperty({ example: 0 })
+  @IsInt()
+  @Min(0)
+  sortOrder!: number;
+
+  @ApiPropertyOptional({ example: "CGK" })
+  @IsOptional()
+  @IsString()
+  departureAirportCode?: string;
+
+  @ApiPropertyOptional({ example: "DOH" })
+  @IsOptional()
+  @IsString()
+  arrivalAirportCode?: string;
+
+  @ApiPropertyOptional({ example: "2026-09-21" })
+  @IsOptional()
+  @IsDateString()
+  departureDate?: string;
+
+  @ApiPropertyOptional({ example: "07:40" })
+  @IsOptional()
+  @IsString()
+  departureTime?: string;
+
+  @ApiPropertyOptional({ example: "2026-09-21" })
+  @IsOptional()
+  @IsDateString()
+  arrivalDate?: string;
+
+  @ApiPropertyOptional({ example: "12:10" })
+  @IsOptional()
+  @IsString()
+  arrivalTime?: string;
+
+  @ApiPropertyOptional({ example: "QR" })
+  @IsOptional()
+  @IsString()
+  carrierCode?: string;
+
+  @ApiPropertyOptional({ example: "QR-955" })
+  @IsOptional()
+  @IsString()
+  flightNumber?: string;
+
+  @ApiPropertyOptional({ example: "Transit in Doha" })
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
 
 export class CreateMusyrifDto {
   @ApiProperty({ example: "Ust. Ahmad Hidayat" })
@@ -340,6 +397,11 @@ export class CreateVisaSetupDto {
   @IsString()
   arrivalFlightNumber?: string;
 
+  @ApiPropertyOptional({ description: "Arrival flight date (YYYY-MM-DD).", example: "2026-09-21" })
+  @IsOptional()
+  @IsDateString()
+  arrivalFlightDate?: string;
+
   @ApiPropertyOptional({ description: "Arrival flight local time (HH:mm).", example: "19:30" })
   @IsOptional()
   @IsString()
@@ -350,10 +412,22 @@ export class CreateVisaSetupDto {
   @IsString()
   departureFlightNumber?: string;
 
+  @ApiPropertyOptional({ description: "Departure flight date (YYYY-MM-DD).", example: "2026-09-30" })
+  @IsOptional()
+  @IsDateString()
+  departureFlightDate?: string;
+
   @ApiPropertyOptional({ description: "Departure flight local time (HH:mm).", example: "21:00" })
   @IsOptional()
   @IsString()
   departureTime?: string;
+
+  @ApiPropertyOptional({ type: () => CreateFlightLegDto, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateFlightLegDto)
+  flightLegs?: CreateFlightLegDto[];
 
   @ApiPropertyOptional({
     type: () => CreateVisaHotelAgreementDto,

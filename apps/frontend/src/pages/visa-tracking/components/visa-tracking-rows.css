@@ -1,0 +1,489 @@
+.visa-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.35);
+  border-radius: 12px;
+  background: rgb(var(--color-surface-container-lowest));
+}
+.visa-filter-field {
+  position: relative;
+  min-width: 0;
+  border-radius: 8px;
+  background: rgb(var(--color-surface-container-low));
+}
+.visa-filter-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 18px;
+}
+.visa-filter-bar .visa-filter-field button,
+.visa-filter-fixed {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  padding: 0 36px 0 40px;
+  text-align: left;
+  color: rgb(var(--color-on-surface));
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+.visa-filter-bar .visa-filter-fixed {
+  display: flex;
+  align-items: center;
+}
+.visa-filter-bar .visa-filter-field button:hover,
+.visa-filter-bar .visa-filter-field button[aria-expanded="true"] {
+  background: rgb(var(--color-surface-container-high));
+}
+.visa-filter-bar .visa-filter-field button:focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 2px;
+}
+@media (max-width: 639px) {
+  .visa-filter-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.visa-compact-family {
+  color: rgb(var(--color-on-surface));
+  background: rgb(var(--color-surface-container-lowest));
+}
+.visa-compact-row,
+.visa-compact-header {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+}
+.visa-compact-row {
+  --visa-compact-control-radius: 8px;
+  position: relative;
+  min-height: 100px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.visa-compact-row > * {
+  min-width: 0;
+}
+.visa-compact-row:hover {
+  background: rgb(var(--color-surface-container-high) / 0.4);
+}
+.visa-compact-header {
+  min-height: 46px;
+  border-bottom: 1px solid rgb(var(--color-outline-variant) / 0.35);
+  background: rgb(var(--color-surface-container-low));
+  color: rgb(var(--color-on-surface-variant) / 0.8);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.visa-compact-number-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.visa-compact-number {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.visa-compact-role {
+  border: 1px solid rgb(var(--color-outline-variant) / 0.45);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 10px;
+  font-weight: 500;
+}
+.visa-compact-name {
+  margin-top: 4px;
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.visa-compact-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  margin-top: 3px;
+  border-radius: 4px;
+  color: rgb(var(--color-primary));
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+.visa-compact-toggle:hover {
+  background: rgb(var(--color-surface-container-high));
+}
+.visa-compact-toggle .material-symbols-outlined {
+  font-size: 16px;
+  transition: transform 160ms ease-out;
+}
+.visa-compact-toggle[aria-expanded="true"] .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+.visa-compact-family-total {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgb(var(--color-on-surface-variant));
+}
+.visa-compact-summary {
+  display: contents;
+}
+.visa-compact-pax {
+  grid-column: 2;
+  grid-row: 1;
+}
+.visa-compact-pax strong {
+  font-size: 0.9375rem;
+}
+.visa-compact-status {
+  grid-column: 3;
+  grid-row: 1;
+}
+.visa-compact-type {
+  grid-column: 6;
+  grid-row: 1;
+}
+.visa-compact-syarikah {
+  grid-column: 7;
+  grid-row: 1;
+  overflow-wrap: anywhere;
+}
+.visa-compact-makkah {
+  grid-column: 4;
+  grid-row: 1;
+}
+.visa-compact-madinah {
+  grid-column: 5;
+  grid-row: 1;
+}
+.visa-compact-label {
+  display: none;
+}
+.visa-compact-badge {
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Scoped token colors avoid OS dark-mode utilities overriding the portal theme. */
+.visa-compact-badge[data-visa-status="Draft"] {
+  background: rgb(var(--color-slate-100));
+  color: rgb(var(--color-slate-700));
+  border-color: rgb(var(--color-slate-200));
+}
+.visa-compact-badge[data-visa-status="Pending"] {
+  background: rgb(var(--color-amber-100));
+  color: rgb(var(--color-amber-800));
+  border-color: rgb(var(--color-amber-200));
+}
+.visa-compact-agreement-number {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.visa-compact-date {
+  display: block;
+  margin: 3px 0 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgb(var(--color-on-surface-variant));
+}
+.visa-compact-approval {
+  width: 112px;
+  max-width: 100%;
+  min-height: 32px;
+  border-width: 1px;
+  border-radius: var(--visa-compact-control-radius);
+  padding: 4px 26px 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.visa-compact-approval > .material-symbols-outlined {
+  right: 6px;
+  font-size: 16px;
+}
+.visa-compact-readonly-status {
+  display: inline-flex;
+  max-width: 100%;
+  border-width: 1px;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.visa-compact-row .visa-compact-detail {
+  grid-column: 8;
+  grid-row: 1;
+  min-height: 36px;
+  border: 1px solid rgb(var(--color-primary) / 0.55);
+  border-radius: var(--visa-compact-control-radius);
+  padding: 0 8px;
+  background: rgb(var(--color-surface-container-lowest));
+  color: rgb(var(--color-primary));
+  box-shadow: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.visa-compact-row .visa-compact-detail:hover {
+  background: rgb(var(--color-surface-container-high));
+  border-color: rgb(var(--color-primary));
+}
+.visa-compact-children {
+  background: rgb(var(--color-surface-container-low));
+}
+.visa-compact-child {
+  border-top: 1px solid rgb(var(--color-outline-variant) / 0.25);
+}
+.visa-compact-child::before {
+  content: "";
+  position: absolute;
+  width: 1px;
+  left: 28px;
+  top: 0;
+  bottom: 0;
+  background: rgb(var(--color-outline-variant) / 0.55);
+  pointer-events: none;
+}
+.visa-compact-child:last-child::before {
+  bottom: 50%;
+}
+.visa-compact-child .visa-compact-identity {
+  position: relative;
+  margin-left: 10px;
+  padding-left: 19px;
+}
+.visa-compact-child .visa-compact-identity::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 0;
+  width: 12px;
+  border-top: 1px solid rgb(var(--color-outline-variant) / 0.55);
+}
+.visa-compact-mobile {
+  border: 1px solid rgb(var(--color-outline-variant) / 0.35);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.visa-compact-mobile .visa-compact-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding: 16px;
+  min-height: 0;
+}
+.visa-compact-mobile .visa-compact-identity {
+  grid-column: 1 / -1;
+  padding-right: 0;
+}
+.visa-compact-mobile .visa-compact-number {
+  font-size: 18px;
+}
+.visa-compact-mobile .visa-compact-label {
+  display: block;
+  margin-bottom: 5px;
+  color: rgb(var(--color-on-surface-variant));
+  font-size: 10px;
+  font-weight: 600;
+}
+.visa-compact-mobile .visa-compact-pax {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.visa-compact-mobile .visa-compact-pax strong {
+  order: -1;
+  font-size: 16px;
+}
+.visa-compact-mobile .visa-compact-pax .visa-compact-label {
+  margin: 0;
+  font-size: 11px;
+}
+.visa-compact-mobile .visa-compact-status {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.visa-compact-mobile .visa-compact-status .visa-compact-label {
+  margin: 0;
+}
+.visa-compact-mobile .visa-compact-type {
+  grid-column: auto;
+  grid-row: auto;
+}
+.visa-compact-mobile .visa-compact-syarikah {
+  grid-column: auto;
+  grid-row: auto;
+}
+.visa-compact-mobile .visa-compact-summary > div {
+  align-self: start;
+  min-width: 0;
+}
+.visa-compact-mobile .visa-compact-makkah {
+  grid-column: 1;
+  grid-row: 1 / 5;
+}
+.visa-compact-mobile .visa-compact-madinah {
+  grid-column: 2;
+  grid-row: 1 / 5;
+}
+.visa-compact-mobile .visa-compact-agreements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto auto auto;
+  column-gap: 16px;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  align-items: stretch;
+}
+.visa-compact-mobile .visa-compact-agreement {
+  display: grid;
+  grid-template-rows: subgrid;
+  row-gap: 0;
+  border-top: 1px solid rgb(var(--color-outline-variant) / 0.25);
+  padding-top: 10px;
+  align-self: stretch;
+}
+.visa-compact-mobile .visa-compact-agreement-number {
+  font-size: 11px;
+  line-height: 1.45;
+  align-self: start;
+}
+.visa-compact-mobile .visa-compact-date {
+  align-self: start;
+}
+.visa-compact-mobile .visa-approval-touch,
+.visa-compact-mobile .visa-compact-readonly-status {
+  align-self: end;
+}
+.visa-compact-mobile .visa-compact-badge {
+  font-size: 11px;
+  min-height: 25px;
+  padding: 3px 7px;
+}
+.visa-compact-mobile .visa-compact-approval {
+  min-height: 44px;
+  width: max-content;
+  min-width: 96px;
+  border: 0;
+  background: transparent;
+  padding: 0 25px 0 8px;
+  font-size: 11px;
+}
+.visa-compact-mobile .visa-approval-touch {
+  --approval-bg: rgb(var(--color-amber-100));
+  --approval-border: rgb(var(--color-amber-200));
+}
+.visa-compact-mobile .visa-approval-touch[data-approval="Approved"] {
+  --approval-bg: rgb(var(--color-emerald-100));
+  --approval-border: rgb(var(--color-emerald-200));
+}
+.visa-compact-mobile .visa-approval-touch[data-dark="true"] {
+  --approval-bg: rgb(var(--color-secondary) / 0.16);
+  --approval-border: rgb(var(--color-secondary) / 0.35);
+}
+.visa-compact-mobile .visa-approval-touch[data-dark="true"][data-approval="Approved"] {
+  --approval-bg: rgb(var(--color-primary) / 0.14);
+  --approval-border: rgb(var(--color-primary) / 0.3);
+}
+.visa-compact-mobile .visa-compact-approval::before {
+  content: "";
+  position: absolute;
+  inset: 8px 0;
+  border: 1px solid var(--approval-border);
+  border-radius: var(--visa-compact-control-radius);
+  background: var(--approval-bg);
+  pointer-events: none;
+}
+.visa-compact-mobile .visa-compact-approval > .block {
+  position: relative;
+}
+.visa-compact-mobile .visa-compact-footer {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 94px;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid rgb(var(--color-outline-variant) / 0.25);
+  padding-top: 10px;
+}
+.visa-compact-footer > div {
+  min-width: 0;
+}
+.visa-compact-mobile .visa-compact-detail {
+  position: static;
+  min-height: 44px;
+  min-width: 60px;
+  grid-column: auto;
+  grid-row: auto;
+  border: 0;
+  background: rgb(var(--color-surface-container-high));
+}
+.visa-compact-mobile .visa-compact-detail .material-symbols-outlined {
+  font-size: 17px;
+}
+.visa-compact-mobile .visa-compact-toggle {
+  grid-column: 1 / -1;
+  grid-row: 5;
+  min-height: 48px;
+  margin: 0 -16px -16px;
+  padding: 8px 16px;
+  border-top: 1px solid rgb(var(--color-outline-variant) / 0.25);
+  border-radius: 0;
+  background: rgb(var(--color-surface-container-low));
+}
+.visa-compact-mobile .visa-compact-family-total {
+  margin-left: auto;
+}
+.visa-compact-mobile .visa-compact-child {
+  padding-left: 32px;
+}
+.visa-compact-mobile .visa-compact-child::before {
+  left: 16px;
+}
+.visa-compact-mobile .visa-compact-child:last-child::before {
+  bottom: auto;
+  height: 29px;
+}
+.visa-compact-mobile .visa-compact-child .visa-compact-identity {
+  margin: 0;
+  padding-left: 0;
+}
+.visa-compact-mobile .visa-compact-child .visa-compact-identity::before {
+  left: -16px;
+  top: 13px;
+  width: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .visa-compact-toggle .material-symbols-outlined {
+    transition: none;
+  }
+}

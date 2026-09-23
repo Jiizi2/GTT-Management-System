@@ -110,6 +110,7 @@ async function proxyApiRequest(request, response) {
 
 async function startSpaServer() {
   const server = createServer(async (request, response) => {
+    response.setHeader("cache-control", "no-store, max-age=0");
     const normalizedPath = normalizeRequestPath(request.url);
 
     if (isApiRequestPath(normalizedPath)) {

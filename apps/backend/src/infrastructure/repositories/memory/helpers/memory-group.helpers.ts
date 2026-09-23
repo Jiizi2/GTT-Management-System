@@ -130,6 +130,7 @@ export function ensureMemoryVisaSetup(group: MemoryGroupRecord): MemoryVisaSetup
       madinahHotelWaived: false,
       hotelAgreements: [],
       raudhahAppointments: [],
+      flightLegs: [],
     };
   }
 
@@ -256,9 +257,25 @@ export function buildMemoryGroupPayloadFields(payload: CreateGroupDto): MemoryGr
           makkahHotelWaived: payload.visaSetup.makkahHotelWaived ?? false,
           madinahHotelWaived: payload.visaSetup.madinahHotelWaived ?? false,
           arrivalFlightNumber: payload.visaSetup.arrivalFlightNumber?.trim() || undefined,
+          arrivalFlightDate: payload.visaSetup.arrivalFlightDate?.trim() || undefined,
           arrivalTime: payload.visaSetup.arrivalTime?.trim() || undefined,
           departureFlightNumber: payload.visaSetup.departureFlightNumber?.trim() || undefined,
+          departureFlightDate: payload.visaSetup.departureFlightDate?.trim() || undefined,
           departureTime: payload.visaSetup.departureTime?.trim() || undefined,
+          flightLegs: (payload.visaSetup.flightLegs ?? []).map((leg, index) => ({
+            id: randomUUID(),
+            direction: leg.direction,
+            sortOrder: leg.sortOrder ?? index,
+            departureAirportCode: leg.departureAirportCode?.trim().toUpperCase() || undefined,
+            arrivalAirportCode: leg.arrivalAirportCode?.trim().toUpperCase() || undefined,
+            departureDate: leg.departureDate?.trim() || undefined,
+            departureTime: leg.departureTime?.trim() || undefined,
+            arrivalDate: leg.arrivalDate?.trim() || undefined,
+            arrivalTime: leg.arrivalTime?.trim() || undefined,
+            carrierCode: leg.carrierCode?.trim().toUpperCase() || undefined,
+            flightNumber: leg.flightNumber?.trim().toUpperCase() || undefined,
+            remarks: leg.remarks?.trim() || undefined,
+          })),
           hotelAgreements: (payload.visaSetup.hotelAgreements ?? []).map((hotel) => ({
             id: randomUUID(),
             city: hotel.city ?? AgreementCity.MAKKAH,
@@ -544,6 +561,7 @@ export function createDefaultMemoryGroups(): MemoryGroupRecord[] {
             tasrehPrinted: false,
           },
         ],
+        flightLegs: [],
       },
       checklistAssignments: [
         {

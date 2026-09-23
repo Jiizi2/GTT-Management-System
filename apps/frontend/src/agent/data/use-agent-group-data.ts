@@ -4,7 +4,7 @@ import type { HotelAgreement, VisaFacet } from "./contracts";
 import { getAllAgentGroups } from "./all-groups-query";
 import { portalGet } from "./portal-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { mapAgentGroup } from "../pages/dashboard-page";
+import { mapAgentGroup } from "./map-agent-group";
 
 export function useAgentGroupData({
   principalId,

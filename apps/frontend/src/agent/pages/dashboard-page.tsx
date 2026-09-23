@@ -1,255 +1,334 @@
-import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { OverviewScreen } from "../../pages/overview-page";
-import type { GroupData, ItineraryItem, TimelineItem } from "../../shared/app-domain";
+import { Link } from "react-router-dom";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
 import type { Dashboard, GroupSummary } from "../data/contracts";
-import { agentQueryKeys } from "../query/agent-query-boundary";
+import { formatDate } from "../data/format";
 import { portalGet } from "../data/portal-query";
-import { getAllAgentGroups } from "../data/all-groups-query";
-import { normalizeDateOnly } from "../data/format";
+import { agentQueryKeys } from "../query/agent-query-boundary";
 import { ErrorState, LoadingState } from "../components/data-state";
 
-const iconByCategory: Record<string, string> = {
-  FLIGHT: "flight_takeoff",
-  ARRIVAL: "flight_land",
-  DEPARTURE: "flight_takeoff",
-  HOTEL: "hotel",
-  TRANSFER: "airport_shuttle",
-  TRAIN: "train",
-  "CITY TOUR": "tour",
-};
+const number = new Intl.NumberFormat("id-ID");
 
-function mapItinerary(group: GroupSummary): ItineraryItem[] {
-  return group.itinerary.map((item) => ({
-    date: item.dateLabel,
-    year: item.yearLabel,
-    category: item.category,
-    title: item.title,
-    meta: [item.time, item.fromLocation && item.toLocation ? `${item.fromLocation} → ${item.toLocation}` : null]
-      .filter(Boolean)
-      .join(" | "),
-    icon: iconByCategory[item.category.toUpperCase()] ?? "route",
-    isoDate: item.isoDate ?? undefined,
-    time: item.time ?? undefined,
-    flightNumber: item.flightNumber ?? undefined,
-    hotelName: item.hotelName ?? undefined,
-    fromHotelName: item.fromHotelName ?? undefined,
-    from: item.fromLocation ?? undefined,
-    to: item.toLocation ?? undefined,
-    cityTourCity: item.cityTourCity ?? undefined,
-    requiresBus: item.requiresBus,
-    transferByTrain: item.transferByTrain,
-    trainDepartureTime: item.trainDepartureTime ?? undefined,
-    destinationPickupTime: item.destinationPickupTime ?? undefined,
-    hotelPickupRequestTime: item.hotelPickupRequestTime ?? undefined,
-  }));
-}
-
-function mapTimeline(group: GroupSummary): [TimelineItem, TimelineItem] {
-  const rows = group.itinerary.slice(0, 2).map<TimelineItem>((item, index) => ({
-    date: item.dateLabel,
-    title: item.title,
-    isCurrent: index === 0,
-  }));
-  while (rows.length < 2) {
-    rows.push({ date: "-", title: rows.length === 0 ? "Belum ada itinerary" : "Menunggu jadwal berikutnya" });
-  }
-  return [rows[0], rows[1]];
-}
-
-export function mapAgentGroup(
-  group: GroupSummary,
-  agentId: string,
-  agentName: string,
-  visa?: {
-    facet: import("../data/contracts").VisaFacet;
-    hotels: import("../data/contracts").HotelAgreement[];
-  },
-): GroupData {
-  const itinerary = mapItinerary(group);
-  const next = itinerary[0];
-  const durationDays = Math.max(
-    1,
-    Math.round((Date.parse(group.returnDate) - Date.parse(group.arrivalDate)) / 86_400_000) + 1,
-  );
-  return {
-    id: group.id,
-    agentId,
-    agent: {
-      id: agentId,
-      code: agentName,
-      name: agentName,
-      type: "PARTNER",
-      status: "ACTIVE",
-    },
-    code: group.code,
-    name: group.name,
-    status: group.lifecycleStatus.replaceAll("_", " "),
-    lifecycleStatus: group.lifecycleStatus,
-    tone: group.lifecycleStatus === "ACTIVE" ? "active" : "inactive",
-    pax: group.pax,
-    totalBuses: group.totalBuses ?? 0,
-    packageName: group.packageName,
-    durationDays,
-    arrivalDate: group.arrivalDate.slice(0, 10),
-    returnDate: group.returnDate.slice(0, 10),
-    timeline: mapTimeline(group),
-    nextActivity: {
-      title: next?.title ?? "Belum ada aktivitas",
-      date: next?.date ?? "-",
-      time: next?.time ?? "-",
-      icon: next?.icon ?? "schedule",
-    },
-    itinerary,
-    notes: group.notes.map((note) => note.text),
-    musyrif: group.musyrif ?? { name: "Belum ditentukan", phone: "-", avatar: "" },
-    visaSetup: visa
-      ? {
-          visaStatus: visa.facet.status === "ISSUED" ? "Issued" : visa.facet.status === "PENDING" ? "Pending" : "Draft",
-          issuedDate: normalizeDateOnly(visa.facet.issuedDate),
-          syarikah: visa.facet.syarikah ?? "",
-          busStatus: visa.facet.busStatus === "VISA_PLUS" ? "Visa+" : "Visa Only",
-          paymentStatus:
-            visa.facet.paymentStatus === "PAID"
-              ? "Paid"
-              : visa.facet.paymentStatus === "PARTIAL"
-                ? "Partial"
-                : "Unpaid",
-          makkahHotels: visa.hotels
-            .filter((hotel) => hotel.city === "MAKKAH")
-            .map((hotel) => ({
-              id: hotel.id,
-              hotelName: hotel.hotelName,
-              agreementNumber: hotel.agreementNumber,
-              pax: hotel.pax,
-              status:
-                hotel.status === "APPROVED"
-                  ? "Approved"
-                  : hotel.status === "REJECTED"
-                    ? "Rejected"
-                    : "Waiting for Approval",
-              stayStartIso: hotel.stayStart?.slice(0, 10) ?? "",
-              stayEndIso: hotel.stayEnd?.slice(0, 10) ?? "",
-              ownerGroupCode: group.code,
-            })),
-          madinahHotels: visa.hotels
-            .filter((hotel) => hotel.city === "MADINAH")
-            .map((hotel) => ({
-              id: hotel.id,
-              hotelName: hotel.hotelName,
-              agreementNumber: hotel.agreementNumber,
-              pax: hotel.pax,
-              status:
-                hotel.status === "APPROVED"
-                  ? "Approved"
-                  : hotel.status === "REJECTED"
-                    ? "Rejected"
-                    : "Waiting for Approval",
-              stayStartIso: hotel.stayStart?.slice(0, 10) ?? "",
-              stayEndIso: hotel.stayEnd?.slice(0, 10) ?? "",
-              ownerGroupCode: group.code,
-            })),
-          raudhahAppointments: [],
-        }
-      : undefined,
-  };
-}
-
-function monthLabel(value: string): string {
-  const parsed = new Date(`${value}-01T00:00:00`);
-  return Number.isNaN(parsed.getTime())
-    ? value
-    : new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(parsed);
-}
-
-export function DashboardPage({
-  principalId,
-  agentId,
-  agentName,
-}: {
-  principalId: string;
-  agentId: string;
-  agentName: string;
-}) {
+export function DashboardPage({ principalId, agentName }: { principalId: string; agentName: string }) {
   const client = useQueryClient();
-  const navigate = useNavigate();
   const query = useQuery({
     queryKey: agentQueryKeys.dashboard(principalId),
-    queryFn: async () => ({
-      dashboard: await portalGet<Dashboard>(client, "/dashboard"),
-      groups: await getAllAgentGroups(client, "asc"),
-    }),
+    queryFn: () => portalGet<Dashboard>(client, "/dashboard"),
     staleTime: 30_000,
   });
-  const [search, setSearch] = useState("");
-  const [activeOnly, setActiveOnly] = useState(false);
-  const [month, setMonth] = useState("all");
 
-  const groups = useMemo(
-    () => (query.data?.groups ?? []).map((group) => mapAgentGroup(group, agentId, agentName)),
-    [agentId, agentName, query.data?.groups],
-  );
-  const filteredGroups = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return groups.filter(
-      (group) =>
-        (!term || `${group.code} ${group.name}`.toLowerCase().includes(term)) &&
-        (!activeOnly || group.lifecycleStatus === "ACTIVE") &&
-        (month === "all" || group.arrivalDate?.slice(0, 7) === month),
-    );
-  }, [activeOnly, groups, month, search]);
-  const monthOptions = useMemo(
-    () => [
-      { value: "all", label: "All Months" },
-      ...[...new Set(groups.map((group) => group.arrivalDate?.slice(0, 7)).filter(Boolean) as string[])]
-        .sort()
-        .map((value) => ({ value, label: monthLabel(value) })),
-    ],
-    [groups],
-  );
-
-  if (query.isPending) return <LoadingState label="Memuat overview..." />;
+  if (query.isPending) return <LoadingState label="Memuat dashboard..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
 
-  const dashboard = query.data.dashboard;
+  const dashboard = query.data;
+  const attentionCount = dashboard.attention.visaGroups + dashboard.attention.hotelGroups;
   return (
-    <OverviewScreen
-      query={search}
-      filteredGroups={filteredGroups}
-      isActiveOnly={activeOnly}
-      overviewMonthFilter={month}
-      overviewMonthOptions={monthOptions}
-      statCards={[
-        {
-          label: "Active Groups",
-          value: String(dashboard.groups.active),
-          subtitle: "Currently managed",
-          icon: "travel_explore",
-          tone: "primary",
-        },
-        {
-          label: "Total Jamaah",
-          value: String(dashboard.groups.totalPax),
-          subtitle: "Across your groups",
-          icon: "groups",
-          tone: "secondary",
-        },
-        {
-          label: "Need Attention",
-          value: String(dashboard.attention.visaGroups + dashboard.attention.hotelGroups),
-          subtitle: "Visa or agreement",
-          icon: "notifications_active",
-          tone: "tertiary",
-        },
-      ]}
-      onQueryChange={setSearch}
-      onToggleActiveOnly={setActiveOnly}
-      onOverviewMonthFilterChange={setMonth}
-      onOpenDetail={(groupCode) => navigate(`/agent/groups/${encodeURIComponent(groupCode)}`)}
-      groups={groups}
-      fixedAgentName={agentName}
-      showThemeToggle={false}
-    />
+    <PageLayout>
+      <PageHeader
+        title="Dashboard"
+        description={
+          <>
+            Ringkasan statistik group yang ditangani oleh <strong className="text-on-surface">{agentName}</strong>.
+          </>
+        }
+        actions={<DashboardJourneyOrnament />}
+        className="relative overflow-hidden xl:pr-20"
+      />
+
+      <section className="serene-section overflow-hidden" aria-labelledby="group-summary-title">
+        <div className="grid lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,2.2fr)]">
+          <div className="relative flex min-h-48 flex-col justify-between overflow-hidden bg-primary px-5 py-6 text-on-primary sm:px-7">
+            <span
+              className="material-symbols-outlined pointer-events-none absolute -bottom-6 -right-3 rotate-[-10deg] text-[8rem] leading-none text-on-primary/20"
+              aria-hidden="true"
+            >
+              luggage
+            </span>
+            <div>
+              <h2 id="group-summary-title" className="text-sm font-bold text-on-primary/80">
+                Total group ditangani
+              </h2>
+              <strong className="mt-3 block text-5xl font-extrabold leading-none tabular-nums">
+                {number.format(dashboard.groups.total)}
+              </strong>
+            </div>
+            <Link
+              to="/agent/groups"
+              className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl bg-on-primary px-4 py-2 text-sm font-bold text-primary transition hover:bg-on-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary"
+            >
+              Buka Perjalanan
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                arrow_forward
+              </span>
+            </Link>
+          </div>
+
+          <dl className="grid grid-cols-2 sm:grid-cols-4">
+            <DashboardValue label="Aktif" value={dashboard.groups.active} icon="travel_explore" />
+            <DashboardValue label="Akan datang" value={dashboard.groups.upcoming} icon="event_upcoming" />
+            <DashboardValue label="Selesai" value={dashboard.groups.completed} icon="task_alt" />
+            <DashboardValue label="Diarsipkan" value={dashboard.groups.archived} icon="inventory_2" />
+          </dl>
+        </div>
+      </section>
+
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="serene-section min-w-0 overflow-hidden p-0" aria-labelledby="operational-summary-title">
+          <div className="bg-surface-container-high px-5 py-5 sm:px-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h2 id="operational-summary-title" className="text-xl font-extrabold text-on-surface">
+                  {attentionCount > 0 ? `${number.format(attentionCount)} catatan perhatian` : "Operasional terkendali"}
+                </h2>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {attentionCount > 0
+                    ? "Prioritas yang perlu dipantau dari data operasional terkini."
+                    : "Belum ada perhatian visa atau hotel pada data saat ini."}
+                </p>
+              </div>
+              <span className="material-symbols-outlined text-3xl text-primary" aria-hidden="true">
+                route
+              </span>
+            </div>
+          </div>
+
+          <div className="divide-y divide-outline-variant/30 px-5 sm:px-6">
+            <OperationalValue
+              label="Perhatian visa"
+              description="Periksa progres dan kelengkapan dokumen."
+              value={dashboard.attention.visaGroups}
+              icon="description"
+              to="/agent/visa"
+            />
+            <OperationalValue
+              label="Perhatian hotel"
+              description="Tinjau kesiapan agreement perjalanan."
+              value={dashboard.attention.hotelGroups}
+              icon="hotel"
+              to="/agent/groups"
+            />
+            <OperationalValue
+              label="Jamaah dipantau"
+              description="Total jamaah di seluruh group Anda."
+              value={dashboard.groups.totalPax}
+              icon="groups"
+            />
+          </div>
+
+          <div className="px-5 pb-5 pt-2 sm:px-6 sm:pb-6">
+            <Link to="/agent/visa" className="serene-btn-secondary min-h-11 w-full justify-center">
+              Lihat Visa Tracking
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                arrow_forward
+              </span>
+            </Link>
+          </div>
+        </section>
+
+        <section className="serene-section flex min-w-0 flex-col p-5 sm:p-6" aria-labelledby="upcoming-groups-title">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 id="upcoming-groups-title" className="text-xl font-extrabold text-on-surface">
+                Group mendatang
+              </h2>
+              <p className="mt-1 text-sm text-on-surface-variant">Jadwal terdekat dari ringkasan Dashboard.</p>
+            </div>
+            {dashboard.upcomingGroups.length > 0 ? (
+              <Link
+                className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline-offset-4 hover:underline"
+                to="/agent/groups"
+              >
+                Lihat semua
+              </Link>
+            ) : null}
+          </div>
+
+          {dashboard.upcomingGroups.length > 0 ? (
+            <ul className="mt-5 divide-y divide-outline-variant/30">
+              {dashboard.upcomingGroups.slice(0, 4).map((group) => (
+                <UpcomingGroup key={group.id} group={group} />
+              ))}
+            </ul>
+          ) : (
+            <DashboardEmptyState
+              icon="event_upcoming"
+              title="Jadwal berikutnya belum tersedia"
+              description="Perjalanan yang memiliki tanggal keberangkatan mendatang akan muncul di area ini."
+            />
+          )}
+        </section>
+      </div>
+
+      <section className="serene-section p-5 sm:p-6" aria-labelledby="recent-activity-title">
+        <h2 id="recent-activity-title" className="text-xl font-extrabold text-on-surface">
+          Aktivitas terbaru
+        </h2>
+        <p className="mt-1 text-sm text-on-surface-variant">Aktivitas itinerary yang tercatat untuk group Anda.</p>
+
+        {dashboard.recentTimeline.length > 0 ? (
+          <ol className="mt-5 grid gap-x-8 gap-y-1 md:grid-cols-2">
+            {dashboard.recentTimeline.slice(0, 6).map((item, index) => (
+              <li
+                key={`${item.group.id}-${item.dateLabel}-${index}`}
+                className="flex gap-3 border-b border-outline-variant/25 py-4"
+              >
+                <span
+                  className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.isCurrent ? "bg-primary" : "bg-outline"}`}
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-primary">
+                    {item.group.code} · {item.dateLabel}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{item.title}</p>
+                  <p className="mt-1 truncate text-xs text-on-surface-variant">{item.group.name}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <DashboardEmptyState
+            icon="route"
+            title="Belum ada aktivitas itinerary"
+            description="Perubahan itinerary terbaru akan dirangkum di sini agar mudah dipantau."
+          />
+        )}
+      </section>
+    </PageLayout>
+  );
+}
+
+function DashboardValue({ label, value, icon }: { label: string; value: number; icon: string }) {
+  return (
+    <div className="flex min-h-32 flex-col justify-between border-b border-outline-variant/30 p-4 even:border-l sm:min-h-40 sm:p-5 lg:border-b-0 lg:border-l lg:first:border-l-0">
+      <span className="material-symbols-outlined text-2xl text-primary" aria-hidden="true">
+        {icon}
+      </span>
+      <div>
+        <dd className="text-3xl font-extrabold leading-none text-on-surface tabular-nums">{number.format(value)}</dd>
+        <dt className="mt-2 text-xs font-bold text-on-surface-variant">{label}</dt>
+      </div>
+    </div>
+  );
+}
+
+function DashboardJourneyOrnament() {
+  return (
+    <div className="hidden min-w-64 items-center self-stretch xl:flex" aria-hidden="true">
+      <div className="relative flex w-full items-center justify-between px-2">
+        <span className="absolute left-8 right-8 top-1/2 border-t-2 border-dashed border-primary/20" />
+        {[
+          ["description", "bg-primary text-on-primary"],
+          ["hotel", "bg-surface-container-high text-primary"],
+          ["flight_takeoff", "bg-primary-container text-on-primary-container"],
+        ].map(([icon, tone]) => (
+          <span
+            key={icon}
+            className={`relative flex h-12 w-12 items-center justify-center rounded-full shadow-sm ${tone}`}
+          >
+            <span className="material-symbols-outlined text-[1.35rem] leading-none">{icon}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OperationalValue({
+  label,
+  description,
+  value,
+  icon,
+  to,
+}: {
+  label: string;
+  description: string;
+  value: number;
+  icon: string;
+  to?: string;
+}) {
+  const content = (
+    <>
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-primary">
+        <span className="material-symbols-outlined text-xl" aria-hidden="true">
+          {icon}
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-on-surface">{label}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{description}</span>
+      </span>
+      <strong className="text-2xl font-extrabold text-on-surface tabular-nums">{number.format(value)}</strong>
+      {to ? (
+        <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">
+          arrow_forward
+        </span>
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className="py-1">
+      {to ? (
+        <Link
+          to={to}
+          className="flex min-h-20 items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          {content}
+        </Link>
+      ) : (
+        <div className="flex min-h-20 items-center gap-3 px-2 py-3">{content}</div>
+      )}
+    </div>
+  );
+}
+
+function UpcomingGroup({ group }: { group: GroupSummary }) {
+  return (
+    <li className="flex items-center justify-between gap-4 py-4">
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-primary">{group.code}</p>
+        <p className="mt-1 truncate text-sm font-bold text-on-surface">{group.name}</p>
+        <p className="mt-1 text-xs text-on-surface-variant">
+          {formatDate(group.arrivalDate)} – {formatDate(group.returnDate)}
+        </p>
+        <p className="mt-1 truncate text-xs font-semibold text-on-surface-variant">
+          {group.packageName} · {number.format(group.pax)} jamaah
+        </p>
+      </div>
+      <Link
+        to={`/agent/groups/${encodeURIComponent(group.code)}`}
+        state={{ from: "/agent/overview" }}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary transition hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        aria-label={`Buka itinerary ${group.code}`}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          arrow_forward
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function DashboardEmptyState({ icon, title, description }: { icon: string; title: string; description: string }) {
+  return (
+    <div className="mt-5 flex min-h-40 flex-1 flex-col justify-between gap-5 rounded-2xl bg-surface-container-low p-5 sm:flex-row sm:items-end">
+      <div className="max-w-lg">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container-high text-primary">
+          <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+            {icon}
+          </span>
+        </span>
+        <h3 className="mt-4 text-base font-extrabold text-on-surface">{title}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">{description}</p>
+      </div>
+      <Link to="/agent/groups" className="serene-btn-secondary min-h-11 shrink-0 justify-center">
+        Lihat Perjalanan
+        <span className="material-symbols-outlined text-lg" aria-hidden="true">
+          arrow_forward
+        </span>
+      </Link>
+    </div>
   );
 }

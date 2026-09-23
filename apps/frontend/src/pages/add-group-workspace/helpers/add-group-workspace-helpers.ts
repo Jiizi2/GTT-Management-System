@@ -15,7 +15,6 @@ import {
   getMinimumBusCountForPax,
   hasIncompleteTransferTrainFields,
   isCityTourActivityType,
-  isFlightActivityType,
   isTransferActivityType,
   normalizeAgreementCityKey,
   resolveFormTransportMode,
@@ -91,7 +90,7 @@ export const BASE_TRIP_BLUEPRINTS = [
     from: "Jeddah",
     to: "Makkah",
     cityTourCity: "",
-    flightNumber: "SV-827",
+    flightNumber: "",
   },
   {
     id: "base-city-tour-first",
@@ -135,7 +134,7 @@ export const BASE_TRIP_BLUEPRINTS = [
     from: "Madinah",
     to: "Madinah Airport",
     cityTourCity: "",
-    flightNumber: "SV-828",
+    flightNumber: "",
   },
 ] as const;
 
@@ -400,12 +399,11 @@ export function buildInputItineraryValidationState({
   const requestedTransportMode =
     form.transportMode ?? (isTransferActivityType(form.category) && form.transferByTrain ? "train" : undefined);
   const transportMode = resolveFormTransportMode(form.category, requestedTransportMode);
-  const showFlightNumberField = isFlightActivityType(form.category) && transportMode === "flight";
+  const showFlightNumberField = false;
   const showHotelNameField = form.category === "arrival" || form.category === "departure";
   const showTransferTrainFields = isTransferActivityType(form.category) && transportMode === "train";
   const showDeparturePickupField = form.category === "departure";
   const showCityTourCityField = isCityTourActivityType(form.category);
-  const isFlightNumberMissing = showFlightNumberField && !form.flightNumber.trim();
   const isHotelNameMissing = showHotelNameField && !(form.hotelName?.trim() ?? "");
   const isDepartureFlightTimeMissing = form.category === "departure" && !form.time.trim();
   const isDeparturePickupTimeMissing = showDeparturePickupField && !form.hotelPickupRequestTime.trim();
@@ -416,7 +414,6 @@ export function buildInputItineraryValidationState({
     !form.date ||
     !form.from.trim() ||
     !form.to.trim() ||
-    isFlightNumberMissing ||
     isHotelNameMissing ||
     isDepartureFlightTimeMissing ||
     isDeparturePickupTimeMissing ||
@@ -458,7 +455,6 @@ export function isBaseTripDraftInvalid(item: BaseTripDraft): boolean {
     return false;
   }
 
-  const isFlightNumberRequired = isFlightActivityType(item.category) && !item.flightNumber.trim();
   const isHotelNameRequired = item.category === "arrival" || item.category === "departure";
   const isHotelNameMissing = isHotelNameRequired && !(item.hotelName?.trim() ?? "");
   const isDepartureFlightTimeRequired = item.category === "departure" && !item.time.trim();
@@ -469,7 +465,6 @@ export function isBaseTripDraftInvalid(item: BaseTripDraft): boolean {
     !item.date ||
     !item.from.trim() ||
     !item.to.trim() ||
-    isFlightNumberRequired ||
     isHotelNameMissing ||
     isDepartureFlightTimeRequired ||
     isDeparturePickupTimeRequired ||

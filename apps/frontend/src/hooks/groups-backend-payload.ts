@@ -92,9 +92,24 @@ type BackendCreateGroupPayload = {
     makkahHotelWaived?: boolean;
     madinahHotelWaived?: boolean;
     arrivalFlightNumber?: string;
+    arrivalFlightDate?: string;
     arrivalTime?: string;
     departureFlightNumber?: string;
+    departureFlightDate?: string;
     departureTime?: string;
+    flightLegs?: Array<{
+      direction: "ONWARD" | "RETURN";
+      sortOrder: number;
+      departureAirportCode?: string;
+      arrivalAirportCode?: string;
+      departureDate?: string;
+      departureTime?: string;
+      arrivalDate?: string;
+      arrivalTime?: string;
+      carrierCode?: string;
+      flightNumber?: string;
+      remarks?: string;
+    }>;
     outstandingAmount?: number;
     hotelAgreements?: Array<{
       city: "MAKKAH" | "MADINAH";
@@ -415,9 +430,24 @@ export function mapGroupToBackendPayload(group: GroupData): BackendCreateGroupPa
       makkahHotelWaived: group.visaSetup.makkahHotelWaived ?? false,
       madinahHotelWaived: group.visaSetup.madinahHotelWaived ?? false,
       arrivalFlightNumber: group.visaSetup.arrivalFlightNumber?.trim() || undefined,
+      arrivalFlightDate: group.visaSetup.arrivalFlightDate?.trim() || undefined,
       arrivalTime: group.visaSetup.arrivalTime?.trim() || undefined,
       departureFlightNumber: group.visaSetup.departureFlightNumber?.trim() || undefined,
+      departureFlightDate: group.visaSetup.departureFlightDate?.trim() || undefined,
       departureTime: group.visaSetup.departureTime?.trim() || undefined,
+      flightLegs: (group.visaSetup.flightLegs ?? []).map((leg, index) => ({
+        direction: leg.direction,
+        sortOrder: leg.sortOrder ?? index,
+        departureAirportCode: leg.departureAirportCode.trim().toUpperCase() || undefined,
+        arrivalAirportCode: leg.arrivalAirportCode.trim().toUpperCase() || undefined,
+        departureDate: leg.departureDate.trim() || undefined,
+        departureTime: leg.departureTime.trim() || undefined,
+        arrivalDate: leg.arrivalDate.trim() || undefined,
+        arrivalTime: leg.arrivalTime.trim() || undefined,
+        carrierCode: leg.carrierCode.trim().toUpperCase() || undefined,
+        flightNumber: leg.flightNumber.trim().toUpperCase() || undefined,
+        remarks: leg.remarks.trim() || undefined,
+      })),
       hotelAgreements: [
         ...group.visaSetup.makkahHotels.map((hotel) => ({
           city: "MAKKAH" as const,

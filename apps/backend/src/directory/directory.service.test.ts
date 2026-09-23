@@ -28,6 +28,9 @@ describe("DirectoryService (memory)", () => {
     const scoped = await service.listDrivers(undefined, m.id);
     expect(scoped).toHaveLength(1);
     expect((await service.listMuassasah()).find((x) => x.id === m.id)?.driverCount).toBe(1);
+    await expect(() => service.createDriver({ name: "yusuf" })).rejects.toThrow(/already exists/);
+    const secondDriver = await service.createDriver({ name: "Ahmad" });
+    await expect(() => service.updateDriver(secondDriver.id, { name: "  YUSUF  " })).rejects.toThrow(/already exists/);
   });
 
   it("creates a vehicle with a problematic flag and counts it under its muassasah", async () => {
@@ -39,6 +42,9 @@ describe("DirectoryService (memory)", () => {
 
     expect(await service.listVehicles(undefined, m.id)).toHaveLength(1);
     expect((await service.listMuassasah()).find((x) => x.id === m.id)?.vehicleCount).toBe(1);
+    await expect(() => service.createVehicle({ plateNumber: "b 1 xyz" })).rejects.toThrow(/already exists/);
+    const secondVehicle = await service.createVehicle({ plateNumber: "B 2 XYZ" });
+    await expect(() => service.updateVehicle(secondVehicle.id, { plateNumber: " B   1 XYZ " })).rejects.toThrow(/already exists/);
   });
 
   it("upserts a driver from checkin without duplicating; updates phone", async () => {
@@ -52,7 +58,7 @@ describe("DirectoryService (memory)", () => {
     expect(await service.listDrivers(undefined, m.id)).toHaveLength(1);
   });
 
-  it("upserts a vehicle from checkin without duplicating by plate within a muassasah", async () => {
+  it("upserts a vehicle from checkin without duplicating by plate", async () => {
     const service = makeService();
     const m = await service.createMuassasah({ name: "Daleel" });
 

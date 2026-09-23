@@ -217,8 +217,16 @@ export class DirectoryService {
 
   async createDriver(payload: CreateDriverDto): Promise<DriverRecord> {
     const muassasahId = await this.assertMuassasahExists(payload.muassasahId);
+    const normalizedName = payload.name.trim().replace(/\s+/g, " ");
+    const duplicate = this.dataSource === "memory"
+      ? this.memoryDrivers.some((driver) => driver.name.toLowerCase() === normalizedName.toLowerCase())
+      : Boolean(await this.prisma.driver.findFirst({
+          where: { name: { equals: normalizedName, mode: "insensitive" } },
+          select: { id: true },
+        }));
+    if (duplicate) throw new ConflictException(`Driver '${normalizedName}' already exists.`);
     const data = {
-      name: payload.name.trim(),
+      name: normalizedName,
       phone: trimOrNull(payload.phone),
       note: trimOrNull(payload.note),
       isProblematic: payload.isProblematic ?? false,
@@ -239,13 +247,23 @@ export class DirectoryService {
     const muassasahId =
       payload.muassasahId !== undefined ? await this.assertMuassasahExists(payload.muassasahId) : undefined;
     const data = {
-      ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
+      ...(payload.name !== undefined ? { name: payload.name.trim().replace(/\s+/g, " ") } : {}),
       ...(payload.phone !== undefined ? { phone: trimOrNull(payload.phone) } : {}),
       ...(payload.note !== undefined ? { note: trimOrNull(payload.note) } : {}),
       ...(payload.isProblematic !== undefined ? { isProblematic: payload.isProblematic } : {}),
       ...(muassasahId !== undefined ? { muassasahId } : {}),
       ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
     };
+    if (payload.name !== undefined) {
+      const normalizedName = payload.name.trim().replace(/\s+/g, " ");
+      const duplicate = this.dataSource === "memory"
+        ? this.memoryDrivers.some((driver) => driver.id !== id && driver.name.toLowerCase() === normalizedName.toLowerCase())
+        : Boolean(await this.prisma.driver.findFirst({
+            where: { id: { not: id }, name: { equals: normalizedName, mode: "insensitive" } },
+            select: { id: true },
+          }));
+      if (duplicate) throw new ConflictException(`Driver '${normalizedName}' already exists.`);
+    }
     if (this.dataSource === "memory") {
       const existing = this.memoryDrivers.find((driver) => driver.id === id);
       if (!existing) throw new NotFoundException(`Driver '${id}' not found.`);
@@ -274,22 +292,20 @@ export class DirectoryService {
     return { deleted: true, id };
   }
 
-  /** Records a driver typed on the H-1 checklist; de-dupes by name within muassasah. */
+  /** Records a driver typed on the H-1 checklist; de-dupes by name globally. */
   async upsertDriverFromCheckin(input: {
     name: string;
     phone?: string | null;
     muassasahId?: string | null;
   }): Promise<DriverRecord | null> {
-    const name = input.name?.trim();
+    const name = input.name?.trim().replace(/\s+/g, " ");
     if (!name) return null;
     const muassasahId = input.muassasahId?.trim() || null;
     const phone = trimOrNull(input.phone);
 
     if (this.dataSource === "memory") {
       if (muassasahId && !this.memoryMuassasah.some((item) => item.id === muassasahId)) return null;
-      const existing = this.memoryDrivers.find(
-        (driver) => driver.muassasahId === muassasahId && driver.name.toLowerCase() === name.toLowerCase(),
-      );
+      const existing = this.memoryDrivers.find((driver) => driver.name.toLowerCase() === name.toLowerCase());
       if (existing) {
         if (phone) existing.phone = phone;
         existing.updatedAt = new Date().toISOString();
@@ -303,7 +319,7 @@ export class DirectoryService {
       if (!exists) return null;
     }
     const existing = await this.prisma.driver.findFirst({
-      where: { muassasahId: muassasahId ?? null, name: { equals: name, mode: "insensitive" } },
+      where: { name: { equals: name, mode: "insensitive" } },
       select: { id: true },
     });
     if (existing) {
@@ -343,8 +359,16 @@ export class DirectoryService {
 
   async createVehicle(payload: CreateVehicleDto): Promise<VehicleRecord> {
     const muassasahId = await this.assertMuassasahExists(payload.muassasahId);
+    const normalizedPlateNumber = payload.plateNumber.trim().replace(/\s+/g, " ");
+    const duplicate = this.dataSource === "memory"
+      ? this.memoryVehicles.some((vehicle) => vehicle.plateNumber.toLowerCase() === normalizedPlateNumber.toLowerCase())
+      : Boolean(await this.prisma.vehicle.findFirst({
+          where: { plateNumber: { equals: normalizedPlateNumber, mode: "insensitive" } },
+          select: { id: true },
+        }));
+    if (duplicate) throw new ConflictException(`Vehicle '${normalizedPlateNumber}' already exists.`);
     const data = {
-      plateNumber: payload.plateNumber.trim(),
+      plateNumber: normalizedPlateNumber,
       note: trimOrNull(payload.note),
       isProblematic: payload.isProblematic ?? false,
       muassasahId,
@@ -364,12 +388,22 @@ export class DirectoryService {
     const muassasahId =
       payload.muassasahId !== undefined ? await this.assertMuassasahExists(payload.muassasahId) : undefined;
     const data = {
-      ...(payload.plateNumber !== undefined ? { plateNumber: payload.plateNumber.trim() } : {}),
+      ...(payload.plateNumber !== undefined ? { plateNumber: payload.plateNumber.trim().replace(/\s+/g, " ") } : {}),
       ...(payload.note !== undefined ? { note: trimOrNull(payload.note) } : {}),
       ...(payload.isProblematic !== undefined ? { isProblematic: payload.isProblematic } : {}),
       ...(muassasahId !== undefined ? { muassasahId } : {}),
       ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
     };
+    if (payload.plateNumber !== undefined) {
+      const normalizedPlateNumber = payload.plateNumber.trim().replace(/\s+/g, " ");
+      const duplicate = this.dataSource === "memory"
+        ? this.memoryVehicles.some((vehicle) => vehicle.id !== id && vehicle.plateNumber.toLowerCase() === normalizedPlateNumber.toLowerCase())
+        : Boolean(await this.prisma.vehicle.findFirst({
+            where: { id: { not: id }, plateNumber: { equals: normalizedPlateNumber, mode: "insensitive" } },
+            select: { id: true },
+          }));
+      if (duplicate) throw new ConflictException(`Vehicle '${normalizedPlateNumber}' already exists.`);
+    }
     if (this.dataSource === "memory") {
       const existing = this.memoryVehicles.find((vehicle) => vehicle.id === id);
       if (!existing) throw new NotFoundException(`Vehicle '${id}' not found.`);
@@ -398,20 +432,18 @@ export class DirectoryService {
     return { deleted: true, id };
   }
 
-  /** Records a bus plate typed on the H-1 checklist; de-dupes by plate within muassasah. */
+  /** Records a bus plate typed on the H-1 checklist; de-dupes by plate globally. */
   async upsertVehicleFromCheckin(input: {
     plateNumber: string;
     muassasahId?: string | null;
   }): Promise<VehicleRecord | null> {
-    const plateNumber = input.plateNumber?.trim();
+    const plateNumber = input.plateNumber?.trim().replace(/\s+/g, " ");
     if (!plateNumber) return null;
     const muassasahId = input.muassasahId?.trim() || null;
 
     if (this.dataSource === "memory") {
       if (muassasahId && !this.memoryMuassasah.some((item) => item.id === muassasahId)) return null;
-      const existing = this.memoryVehicles.find(
-        (vehicle) => vehicle.muassasahId === muassasahId && vehicle.plateNumber.toLowerCase() === plateNumber.toLowerCase(),
-      );
+      const existing = this.memoryVehicles.find((vehicle) => vehicle.plateNumber.toLowerCase() === plateNumber.toLowerCase());
       if (existing) return { ...existing, muassasahName: this.muassasahNameFromMemory(muassasahId) };
       return this.createVehicle({ plateNumber, muassasahId: muassasahId ?? undefined });
     }
@@ -421,7 +453,7 @@ export class DirectoryService {
       if (!exists) return null;
     }
     const existing = await this.prisma.vehicle.findFirst({
-      where: { muassasahId: muassasahId ?? null, plateNumber: { equals: plateNumber, mode: "insensitive" } },
+      where: { plateNumber: { equals: plateNumber, mode: "insensitive" } },
       include: { muassasah: { select: { name: true } } },
     });
     if (existing) {

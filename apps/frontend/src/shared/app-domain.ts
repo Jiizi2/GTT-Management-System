@@ -126,6 +126,8 @@ export type {
   BusStatus,
   GroupAgreementHotel,
   GroupRaudhahAppointment,
+  FlightDirection,
+  GroupFlightLeg,
   GroupVisaSetup,
   GroupData,
   GroupCompletenessIssueKey,

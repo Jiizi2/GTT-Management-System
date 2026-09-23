@@ -116,9 +116,19 @@ export function VisaDetailHeader() {
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 self-start md:w-auto">
+          <Link
+            to={`/groups/${encodeURIComponent(activeGroupCode)}`}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-brand-primary/30 bg-brand-primary/10 px-3 text-sm font-bold text-brand-primary transition hover:border-brand-primary hover:bg-brand-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary sm:flex-none"
+            aria-label={`Buka Group Detail ${activeGroupCode}`}
+          >
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">
+              travel_explore
+            </span>
+            <span>Group Detail</span>
+          </Link>
           <button
             type="button"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-surface-container-lowest px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-surface-container-lowest px-3 text-sm font-semibold text-slate-700 transition hover:border-brand-primary hover:text-brand-primary disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
             onClick={openGroupEditModal}
             disabled={!group}
             aria-label={`Edit group info for ${row.groupCode}`}
@@ -130,7 +140,7 @@ export function VisaDetailHeader() {
           </button>
           <button
             type="button"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3 py-2 text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/15 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-brand-tertiary/40 bg-brand-tertiary/10 px-3 text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/15 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
             onClick={openDeleteGroupModal}
             disabled={!group}
             aria-label={`Delete group ${row.groupCode}`}
@@ -142,7 +152,7 @@ export function VisaDetailHeader() {
           </button>
           <button
             type="button"
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition sm:flex-none ${
+            className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition sm:flex-none ${
               isWhatsappCopied
                 ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600"
                 : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-brand-primary hover:text-brand-primary"

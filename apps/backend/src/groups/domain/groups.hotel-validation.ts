@@ -28,6 +28,53 @@ function parseIsoDateToUtcMiddayMs(isoDate: string): number | null {
   return parsedDate.getTime();
 }
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function validateFlightDatesAgainstAgreements(payload: CreateGroupDto): void {
+  const visaSetup = payload.visaSetup;
+  const agreements = visaSetup?.hotelAgreements ?? [];
+  if (!visaSetup || agreements.length === 0) {
+    return;
+  }
+
+  const agreementStarts = agreements
+    .map((agreement) => parseIsoDateToUtcMiddayMs(agreement.stayStart))
+    .filter((value): value is number => value !== null);
+  const agreementEnds = agreements
+    .map((agreement) => parseIsoDateToUtcMiddayMs(agreement.stayEnd))
+    .filter((value): value is number => value !== null);
+  if (agreementStarts.length === 0 || agreementEnds.length === 0) {
+    return;
+  }
+
+  const firstAgreementStart = Math.min(...agreementStarts);
+  const lastAgreementEnd = Math.max(...agreementEnds);
+  const arrivalFlightDate = visaSetup.arrivalFlightDate
+    ? parseIsoDateToUtcMiddayMs(visaSetup.arrivalFlightDate)
+    : null;
+  const departureFlightDate = visaSetup.departureFlightDate
+    ? parseIsoDateToUtcMiddayMs(visaSetup.departureFlightDate)
+    : null;
+
+  if (
+    arrivalFlightDate !== null &&
+    (arrivalFlightDate < firstAgreementStart - ONE_DAY_MS || arrivalFlightDate > firstAgreementStart + ONE_DAY_MS)
+  ) {
+    throw new BadRequestException(
+      "Tanggal kedatangan harus berada antara 1 hari sebelum dan 1 hari sesudah awal agreement pertama.",
+    );
+  }
+
+  if (
+    departureFlightDate !== null &&
+    (departureFlightDate < lastAgreementEnd || departureFlightDate > lastAgreementEnd + ONE_DAY_MS)
+  ) {
+    throw new BadRequestException(
+      "Tanggal kepulangan harus sama dengan akhir agreement terakhir atau maksimal 1 hari sesudahnya.",
+    );
+  }
+}
+
 function toAgreementCityLabel(city: AgreementCity): "Makkah" | "Madinah" {
   return city === AgreementCity.MAKKAH ? "Makkah" : "Madinah";
 }
@@ -191,4 +238,5 @@ export function validateCreateOrReplaceHotelAgreementRules(
       stayEnd: agreement.stayEnd,
     })),
   );
+  validateFlightDatesAgainstAgreements(payload);
 }

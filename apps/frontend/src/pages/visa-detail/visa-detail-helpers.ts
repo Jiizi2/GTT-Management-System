@@ -1,9 +1,10 @@
 import * as Domain from "../../shared/app-domain";
 import type { GroupAgreementHotel, GroupData, HotelAgreementDraft, VisaFlightDetailsInput } from "../../shared/app-domain";
+import { createEmptyFlightLeg, createLegacyFlightLegs, getFlightLegsByDirection } from "../../shared/flight-plan";
 
 export type Tone = "success" | "warning" | "muted" | "info" | "error";
 
-const { formatVisaDateWithYear, isIsoDateValue, inferCategoryKey } = Domain;
+const { formatVisaDateWithYear, isIsoDateValue } = Domain;
 
 /**
  * Resolve the flight details to show/seed in Visa Detail. Prefers the explicit
@@ -14,15 +15,17 @@ const { formatVisaDateWithYear, isIsoDateValue, inferCategoryKey } = Domain;
  */
 export function resolveGroupFlightDetails(group: GroupData | null | undefined): VisaFlightDetailsInput {
   const visaSetup = group?.visaSetup;
-  const itinerary = group?.itinerary ?? [];
-  const arrivalItem = itinerary.find((item) => inferCategoryKey(item) === "arrival");
-  const departureItem = itinerary.find((item) => inferCategoryKey(item) === "departure");
+  const storedLegs = visaSetup?.flightLegs ?? [];
+  const legacyLegs = storedLegs.length > 0 ? [] : createLegacyFlightLegs(visaSetup);
+  const sourceLegs = storedLegs.length > 0 ? storedLegs : legacyLegs;
+  const onward = getFlightLegsByDirection(sourceLegs, "ONWARD");
+  const returning = getFlightLegsByDirection(sourceLegs, "RETURN");
 
   return {
-    arrivalFlightNumber: visaSetup?.arrivalFlightNumber?.trim() || arrivalItem?.flightNumber?.trim() || "",
-    arrivalTime: visaSetup?.arrivalTime?.trim() || arrivalItem?.time?.trim() || "",
-    departureFlightNumber: visaSetup?.departureFlightNumber?.trim() || departureItem?.flightNumber?.trim() || "",
-    departureTime: visaSetup?.departureTime?.trim() || departureItem?.time?.trim() || "",
+    flightLegs: [
+      ...(onward.length > 0 ? onward : [createEmptyFlightLeg("ONWARD")]),
+      ...(returning.length > 0 ? returning : [createEmptyFlightLeg("RETURN")]),
+    ],
   };
 }
 

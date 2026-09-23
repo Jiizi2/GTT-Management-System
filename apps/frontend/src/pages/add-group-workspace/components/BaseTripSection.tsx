@@ -236,7 +236,7 @@ export function BaseTripSection({
           const allowedTransportModes = getAllowedTransportModes(item.category);
           const showTransportModeInput = allowedTransportModes.length > 0;
           const showRequiresBusInput = allowedTransportModes.length === 0;
-          const showFlightNumberInput = isFlightActivityType(item.category) && transportMode === "flight";
+          const showFlightNumberInput = false;
           const showHotelNameInput = item.category === "arrival" || item.category === "departure";
           const showDeparturePickupRequestInput = item.category === "departure";
           const showTransferTrainInputs = isTransferActivityType(item.category) && transportMode === "train";
@@ -315,9 +315,7 @@ export function BaseTripSection({
                   {!showTransferTrainInputs ? (
                     <label className={fieldClassName}>
                       <span>
-                        {item.category === "departure" && transportMode === "flight"
-                          ? "Flight Return Time"
-                          : "Time (Optional)"}
+                        {item.category === "departure" ? "Departure Activity Time" : "Time (Optional)"}
                       </span>
                       <TimePickerInput
                         inputClassName={inputClassName}
@@ -344,6 +342,12 @@ export function BaseTripSection({
                         disabled={!isGroupReadyForItinerary || !item.isEnabled}
                       />
                     </label>
+                  ) : null}
+
+                  {isFlightActivityType(item.category) ? (
+                    <div className={routeHintClassName}>
+                      Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.
+                    </div>
                   ) : null}
 
                   {showHotelNameInput ? (

@@ -26,6 +26,7 @@ type SereneSelectProps = {
   id?: string;
   name?: string;
   showCaret?: boolean;
+  menuMaxHeight?: number;
   "aria-label"?: string;
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
@@ -74,7 +75,7 @@ function parseSelectOptions(children: ReactNode): SelectOption[] {
   });
 }
 
-function computeDropdownStyle(triggerElement: HTMLElement, optionCount: number): CSSProperties {
+function computeDropdownStyle(triggerElement: HTMLElement, optionCount: number, menuMaxHeight: number): CSSProperties {
   const rect = triggerElement.getBoundingClientRect();
   const viewportPadding = 8;
   const gap = 6;
@@ -86,7 +87,7 @@ function computeDropdownStyle(triggerElement: HTMLElement, optionCount: number):
   const maxLeft = Math.max(viewportPadding, viewportWidth - width - viewportPadding);
   const left = Math.min(Math.max(viewportPadding, rect.left), maxLeft);
 
-  const estimatedHeight = Math.min(320, Math.max(168, optionCount * 38 + 10));
+  const estimatedHeight = Math.min(menuMaxHeight, Math.max(168, optionCount * 38 + 10));
   const availableBelow = Math.max(0, viewportHeight - rect.bottom - viewportPadding - gap);
   const availableAbove = Math.max(0, rect.top - viewportPadding - gap);
   const openBelow = availableBelow >= estimatedHeight || availableBelow >= availableAbove;
@@ -120,6 +121,7 @@ export function SereneSelect({
   id,
   name,
   showCaret = true,
+  menuMaxHeight = 320,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
   "aria-describedby": ariaDescribedBy,
@@ -150,8 +152,8 @@ export function SereneSelect({
       return;
     }
 
-    setMenuStyle(computeDropdownStyle(triggerRef.current, options.length));
-  }, [options.length]);
+    setMenuStyle(computeDropdownStyle(triggerRef.current, options.length, menuMaxHeight));
+  }, [menuMaxHeight, options.length]);
 
   const openMenu = useCallback(() => {
     if (disabled || options.length === 0) {
