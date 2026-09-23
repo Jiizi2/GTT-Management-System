@@ -62,7 +62,25 @@ async function testProtectedUnauthorizedStillClearsSession(): Promise<void> {
   });
 }
 
+async function testRelativeAuthProbeDoesNotThrow(): Promise<void> {
+  await withApiBaseOverride(undefined, async () => {
+    await withAuthWindow(async ({ authEvents, hasSession }) => {
+      await withMockFetch(
+        async () => new Response(null, { status: 401 }),
+        async (calls) => {
+          await fetchBackend("/auth/login", { method: "POST" });
+          assert.equal(calls.length, 1);
+          assert.equal(calls[0]?.input, "/api/auth/login");
+          assert.equal(authEvents(), 0);
+          assert.equal(hasSession(), true);
+        },
+      );
+    });
+  });
+}
+
 describe("api client unauthorized handling", () => {
   runCase("auth probes stay silent", testAuthProbeUnauthorizedDoesNotBroadcastSessionChanges);
+  runCase("relative auth probes stay silent", testRelativeAuthProbeDoesNotThrow);
   runCase("protected request clears session", testProtectedUnauthorizedStillClearsSession);
 });
