@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { VisaTrackingRow, GroupData, AgreementApprovalStatus } from "../../../shared/app-domain";
 import { SereneSelect } from "../../../components/serene-select";
 import { Badge } from "../../../components/badge";
@@ -43,332 +44,173 @@ export function VisaTrackingRowGroup({
   onUpdateAgreementStatus: (groupCode: string, city: "makkah" | "madinah", status: AgreementApprovalStatus) => void;
   readOnly?: boolean;
 }) {
+  const linkedId = useId();
   const rowGroupKey = getVisaRowGroupKey(rowGroup);
   const hasFollowers = rowGroup.followerRows.length > 0;
-  const agreementDateTextClassName = isDarkMode ? "text-white" : "text-slate-500";
+  const childPax = rowGroup.followerRows.reduce((sum, row) => sum + row.pax, 0);
+  const isMobile = view === "mobile";
 
-  const renderAgreementCell = (
-    row: VisaTrackingRow,
-    city: "makkah" | "madinah",
-    cellView: "mobile" | "desktop" = "desktop",
-  ) => {
+  const renderAgreementCell = (row: VisaTrackingRow, city: "makkah" | "madinah") => {
     const group = groupByCode.get(row.groupCode);
-    const agreements = getGroupAgreementHotelsByCity(group, city);
-    const hasAgreement = agreements.length > 0;
-    const agreementNumber = resolveVisaAgreementNumber(row, group, city);
+    const hasAgreement = getGroupAgreementHotelsByCity(group, city).length > 0;
     const agreementStatus = resolveCityAgreementApprovalStatus(row, group, city);
-    const agreementDateRange = resolveVisaAgreementDateRange(row, durationByGroupCode.get(row.groupCode) ?? 8, group);
-
-    const isMobile = cellView === "mobile";
-    const selectWidth = isMobile ? "w-[110px]" : "w-[96px]";
-    const selectTextSize = isMobile ? "text-[10px]" : "text-[11px]";
-    const agreementNumberTextSize = isMobile ? "text-xs" : "text-[13px]";
-    const badgeTextSize = isMobile ? "text-[10px]" : "text-[11px]";
+    const dates = resolveVisaAgreementDateRange(row, durationByGroupCode.get(row.groupCode) ?? 8, group);
+    const start = city === "makkah" ? dates.makkahStartIso : dates.madinahStartIso;
+    const end = city === "makkah" ? dates.makkahEndIso : dates.madinahEndIso;
 
     return (
-      <div key={row.groupCode} className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <strong className={`break-all ${agreementNumberTextSize} font-semibold leading-tight text-slate-800`}>
-            {agreementNumber}
-          </strong>
-        </div>
-        <small className={`block text-[11px] leading-tight ${agreementDateTextClassName}`}>
-          {hasAgreement
-            ? `${formatVisaShortDate(agreementDateRange.makkahStartIso || agreementDateRange.madinahStartIso)} - ${formatVisaShortDate(
-                agreementDateRange.makkahEndIso || agreementDateRange.madinahEndIso,
-              )}`
-            : "Stay dates pending"}
+      <div className={`visa-compact-agreement visa-compact-${city}`}>
+        <span className="visa-compact-label">{city === "makkah" ? "Makkah agreement" : "Madinah agreement"}</span>
+        <strong className="visa-compact-agreement-number">{resolveVisaAgreementNumber(row, group, city)}</strong>
+        <small className="visa-compact-date">
+          {hasAgreement ? `${formatVisaShortDate(start)} – ${formatVisaShortDate(end)}` : "Stay dates pending"}
         </small>
         {hasAgreement && !readOnly ? (
-          <SereneSelect
-            value={toAgreementStatusSelectValue(agreementStatus)}
-            className={`serene-select-pill mt-1 ${selectWidth} ${selectTextSize} font-bold ${getAgreementApprovalClasses(
-              agreementStatus,
-              isDarkMode,
-            )}`}
-            onChange={(event) =>
-              onUpdateAgreementStatus(row.groupCode, city, fromAgreementStatusSelectValue(event.target.value))
-            }
-            aria-label={`Update ${city} agreement status for ${row.groupCode}`}
-          >
-            <option value="approved">Approved</option>
-            <option value="waiting">Waiting</option>
-          </SereneSelect>
-        ) : hasAgreement ? (
-          <span
-            className={`mt-1 inline-flex rounded-md border px-2.5 py-1 ${badgeTextSize} font-bold leading-none ${getAgreementApprovalClasses(
-              agreementStatus,
-              isDarkMode,
-            )}`}
-          >
-            {agreementStatus}
-          </span>
+          <div className="visa-approval-touch" data-approval={agreementStatus} data-dark={isDarkMode}>
+            <SereneSelect
+              value={toAgreementStatusSelectValue(agreementStatus)}
+              className={`visa-compact-approval serene-focus-ring ${getAgreementApprovalClasses(agreementStatus, isDarkMode)}`}
+              onChange={(event) =>
+                onUpdateAgreementStatus(row.groupCode, city, fromAgreementStatusSelectValue(event.target.value))
+              }
+              aria-label={`Update ${city} agreement status for ${row.groupCode}`}
+            >
+              <option value="approved">Approved</option>
+              <option value="waiting">Waiting</option>
+            </SereneSelect>
+          </div>
         ) : (
           <span
-            className={`mt-1 inline-flex rounded-md border border-tertiary-fixed/70 bg-tertiary-fixed px-2.5 py-1 ${badgeTextSize} font-bold leading-none text-on-tertiary-fixed-variant`}
+            className={`visa-compact-readonly-status ${
+              hasAgreement
+                ? getAgreementApprovalClasses(agreementStatus, isDarkMode)
+                : "border-tertiary-fixed/70 bg-tertiary-fixed text-on-tertiary-fixed-variant"
+            }`}
           >
-            Not linked
+            {hasAgreement ? agreementStatus : "Not linked"}
           </span>
         )}
       </div>
     );
   };
 
-  const renderMobileCardSingle = (
-    row: VisaTrackingRow,
-    options: {
-      hasFollowers?: boolean;
-      followerCount?: number;
-      isExpanded?: boolean;
-      onToggle?: () => void;
-    } = {},
-  ) => {
+  const renderRow = (row: VisaTrackingRow, isFollower = false) => {
     const group = groupByCode.get(row.groupCode);
-    const visaTypeLabel = resolveVisaTypeLabel(group);
-    const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
-
-    return (
-      <article
-        key={row.id}
-        className="overflow-hidden rounded-2xl border border-slate-200 bg-surface-container-lowest p-3.5 shadow-sm transition-all sm:p-4"
+    const isParent = !isFollower && hasFollowers;
+    const role = isParent ? "Parent" : isFollower || group?.parentGroupId ? "Child" : null;
+    const familyToggle = isParent ? (
+      <button
+        type="button"
+        className="visa-compact-toggle serene-focus-ring"
+        aria-expanded={expanded}
+        aria-controls={linkedId}
+        aria-label={`${expanded ? "Hide" : "Show"} ${rowGroup.followerRows.length} child groups for ${row.groupCode}`}
+        onClick={() => onToggleExpand(rowGroupKey)}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {hasFollowers ? (
-                <button
-                  type="button"
-                  className={`group inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1 text-left text-sm font-bold text-primary transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${isExpanded ? "border-primary/45 bg-primary/20 shadow-sm ring-1 ring-primary/15" : "border-primary/25 bg-primary/10 hover:border-primary/40 hover:bg-primary/15"}`}
-                  onClick={onToggle}
-                  aria-expanded={isExpanded}
-                  aria-controls={`visa-mobile-linked-${row.id}`}
-                  title={`${isExpanded ? "Hide" : "Show"} ${followerCount} child group${followerCount === 1 ? "" : "s"}`}
-                >
-                  <span className="min-w-0 break-words text-slate-900">{row.groupCode}</span>
-                </button>
-              ) : (
-                <p className="break-words text-sm font-semibold text-slate-900">{row.groupCode}</p>
-              )}
-            </div>
-            <p className="mt-1 break-words text-sm font-medium leading-snug text-slate-700">{row.groupName}</p>
-          </div>
-
-          <div className="flex shrink-0 items-baseline gap-1">
-            <span className="text-base font-bold tabular-nums text-slate-800">{row.pax}</span>
-            <span className="text-[11px] font-medium text-slate-500">Pax</span>
-          </div>
+        <span className="material-symbols-outlined" aria-hidden="true">
+          expand_more
+        </span>
+        <span>
+          {rowGroup.followerRows.length} child {rowGroup.followerRows.length === 1 ? "group" : "groups"}
+        </span>
+        <span className="visa-compact-family-total">
+          · {childPax} Pax · Total {row.pax + childPax} Pax
+        </span>
+      </button>
+    ) : null;
+    const packageFields = (
+      <>
+        {" "}
+        <div className="visa-compact-type" role="group" aria-label="Visa type summary">
+          <span className="visa-compact-label">Visa type</span>
+          <span className="max-w-full whitespace-normal break-words">{resolveVisaTypeLabel(group)}</span>
         </div>
-
-        <div className="mt-3 divide-y divide-outline-variant/40 border-y border-outline-variant/40 sm:grid sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <div className="min-w-0 py-3 sm:pr-3">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Makkah Agreement</p>
-            {renderAgreementCell(row, "makkah", "mobile")}
-          </div>
-
-          <div className="min-w-0 py-3 sm:pl-3">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Madinah Agreement</p>
-            {renderAgreementCell(row, "madinah", "mobile")}
-          </div>
+        <div className="visa-compact-syarikah min-w-0" role="group" aria-label="Syarikah summary">
+          <span className="visa-compact-label">Syarikah</span>
+          <span title={group?.visaSetup?.syarikah || "-"}>{formatSyarikahName(group?.visaSetup?.syarikah)}</span>
         </div>
-
-        <section className="grid grid-cols-2 border-b border-outline-variant/40" aria-label="Visa information">
-          <div className="min-w-0 py-3 pr-2" role="group" aria-label="Visa status summary">
-            <div className="flex min-w-0 items-start gap-2.5">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  fact_check
-                </span>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">Visa</p>
-                <strong className="mt-1 block max-w-full whitespace-normal break-words text-sm font-extrabold leading-tight text-on-surface">
-                  {row.visaStatus}
-                </strong>
-                <small className="mt-1 block text-[10px] font-medium text-on-surface-variant/70">Current status</small>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="min-w-0 border-l border-outline-variant/40 py-3 pl-3"
-            role="group"
-            aria-label="Visa type summary"
-          >
-            <div className="flex min-w-0 items-start gap-2.5">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  directions_bus
-                </span>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
-                  Visa Type
-                </p>
-                <strong className="mt-1 block max-w-full whitespace-normal break-words text-sm font-extrabold leading-tight text-on-surface">
-                  {visaTypeLabel}
-                </strong>
-                <small className="mt-1 block text-[10px] font-medium text-on-surface-variant/70">Package setup</small>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="col-span-2 min-w-0 border-t border-outline-variant/40 py-3"
-            role="group"
-            aria-label="Syarikah summary"
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fixed text-on-primary-fixed-variant">
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  business
-                </span>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-on-surface-variant">
-                  Syarikah
-                </p>
-                <strong
-                  className="mt-1 block truncate text-sm font-extrabold leading-tight text-on-surface"
-                  title={group?.visaSetup?.syarikah || "-"}
-                >
-                  {formatSyarikahName(group?.visaSetup?.syarikah)}
-                </strong>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-3 flex flex-col gap-2">
-          <Button className="w-full" onClick={() => onOpenDetail(row)}>
-            View Details
-          </Button>
-        </div>
-      </article>
+      </>
     );
-  };
-
-  const renderDesktopRowSingle = (
-    row: VisaTrackingRow,
-    isFollower = false,
-    options: {
-      hasFollowers?: boolean;
-      followerCount?: number;
-      isExpanded?: boolean;
-      onToggle?: () => void;
-    } = {},
-  ) => {
-    const group = groupByCode.get(row.groupCode);
-    const visaTypeLabel = resolveVisaTypeLabel(group);
-    const { hasFollowers = false, followerCount = 0, isExpanded = false, onToggle } = options;
-
-    return (
-      <article
-        key={row.id}
-        className={`grid items-center gap-2.5 px-5 py-4 text-sm transition-colors hover:bg-surface-container-low/40 ${
-          isFollower ? "bg-sky-50/20" : ""
-        }`}
-        style={{ gridTemplateColumns: desktopTableGridTemplate }}
+    const detailButton = (
+      <Button
+        variant="secondary"
+        size="sm"
+        className="visa-compact-detail"
+        onClick={() => onOpenDetail(row)}
+        aria-label={`View details for group ${row.groupCode}`}
       >
-        <div className="flex min-w-0 items-center gap-1.5 py-1 font-semibold text-slate-800">
-          {hasFollowers ? (
-            <button
-              type="button"
-              className={`group inline-flex w-full min-w-0 flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1 text-left font-bold text-primary transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${isExpanded ? "border-primary/45 bg-primary/20 shadow-sm ring-1 ring-primary/15" : "border-primary/25 bg-primary/10 hover:border-primary/40 hover:bg-primary/15"}`}
-              onClick={onToggle}
-              aria-expanded={isExpanded}
-              aria-controls={`visa-desktop-linked-${row.id}`}
-              title={`${isExpanded ? "Hide" : "Show"} ${followerCount} child group${followerCount === 1 ? "" : "s"}`}
-            >
-              <span className="min-w-0 break-words text-slate-800">{row.groupCode}</span>
-            </button>
-          ) : (
-            <span className="min-w-0 break-words">{row.groupCode}</span>
-          )}
-        </div>
-
-        <div className="min-w-0 break-words py-1 font-medium leading-snug text-slate-700">{row.groupName}</div>
-
-        <div className="flex min-w-0 items-baseline justify-center gap-1 justify-self-center py-1">
-          <span className="text-sm font-bold tabular-nums text-slate-800">{row.pax}</span>
-          <span className="text-[11px] font-medium text-slate-500">Pax</span>
-        </div>
-
-        <div className="min-w-0 space-y-0.5 py-1">{renderAgreementCell(row, "makkah", "desktop")}</div>
-
-        <div className="min-w-0 space-y-0.5 py-1">{renderAgreementCell(row, "madinah", "desktop")}</div>
-
-        <div className="flex min-w-0 flex-col gap-1 justify-self-center py-1">
-          <Badge
-            status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
-            className={`px-3 py-1.5 text-xs font-bold w-fit ${
-              row.visaStatus !== "Issued" && row.visaStatus !== "Pending"
-                ? "!border-[#cbd5e1] !bg-[#f2f5f3] !text-[#334155]"
-                : "border-transparent"
-            }`}
-          >
-            {row.visaStatus}
-          </Badge>
-        </div>
-
-        <div className="flex min-w-0 items-center justify-center justify-self-center py-1">
-          <span className="text-sm font-semibold text-slate-700">{visaTypeLabel}</span>
-        </div>
-
-        <div className="flex min-w-0 items-center justify-center justify-self-center py-1">
-          <span
-            className="max-w-[120px] truncate text-sm font-medium text-slate-600"
-            title={group?.visaSetup?.syarikah || "-"}
-          >
-            {formatSyarikahName(group?.visaSetup?.syarikah)}
+        Detail
+        {isMobile ? (
+          <span className="material-symbols-outlined" aria-hidden="true">
+            chevron_right
           </span>
+        ) : null}
+      </Button>
+    );
+    const makkahAgreement = renderAgreementCell(row, "makkah");
+    const madinahAgreement = renderAgreementCell(row, "madinah");
+    return (
+      <article
+        key={row.id}
+        aria-label={`Group ${row.groupCode}`}
+        className={`visa-compact-row ${isFollower ? "visa-compact-child" : ""}`}
+        style={isMobile ? undefined : { gridTemplateColumns: desktopTableGridTemplate }}
+      >
+        <div className="visa-compact-identity">
+          <div className="visa-compact-number-line">
+            <strong className="visa-compact-number">{row.groupCode}</strong>
+            {role ? <span className="visa-compact-role">{role}</span> : null}
+          </div>
+          <p className="visa-compact-name">{row.groupName}</p>
+          {!isMobile ? familyToggle : null}
         </div>
-
-        <div className="flex min-w-0 justify-self-center py-1">
-          <Button
-            size="sm"
-            onClick={() => onOpenDetail(row)}
-            title="View Details"
-            aria-label={`View details for group ${row.groupCode}`}
-          >
-            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">
-              search
-            </span>
-            <span>View</span>
-          </Button>
-        </div>
+        <section className="visa-compact-summary" aria-label="Visa information">
+          <div className="visa-compact-pax">
+            <span className="visa-compact-label">{isParent ? "Parent pax" : "Pax"}</span>
+            <strong className="tabular-nums">{row.pax}</strong>
+          </div>
+          <div className="visa-compact-status" role="group" aria-label="Visa status summary">
+            <span className="visa-compact-label">Visa status</span>
+            <Badge
+              status={row.visaStatus === "Issued" ? "success" : row.visaStatus === "Pending" ? "warning" : "neutral"}
+              className="visa-compact-badge"
+              data-visa-status={row.visaStatus}
+            >
+              {row.visaStatus}
+            </Badge>
+          </div>
+          {!isMobile ? packageFields : null}
+        </section>
+        {isMobile ? (
+          <div className="visa-compact-agreements">
+            {makkahAgreement}
+            {madinahAgreement}
+          </div>
+        ) : (
+          <>
+            {makkahAgreement}
+            {madinahAgreement}
+          </>
+        )}
+        {isMobile ? (
+          <div className="visa-compact-footer">
+            {packageFields}
+            {detailButton}
+          </div>
+        ) : (
+          detailButton
+        )}
+        {isMobile ? familyToggle : null}
       </article>
     );
   };
-
-  if (view === "desktop") {
-    return (
-      <div className="divide-y divide-slate-100/50">
-        {renderDesktopRowSingle(rowGroup.mainRow, false, {
-          hasFollowers,
-          followerCount: rowGroup.followerRows.length,
-          isExpanded: expanded,
-          onToggle: hasFollowers ? () => onToggleExpand(rowGroupKey) : undefined,
-        })}
-        {hasFollowers && expanded ? (
-          <div id={`visa-desktop-linked-${rowGroup.mainRow.id}`} className="divide-y divide-slate-100/50">
-            {rowGroup.followerRows.map((followerRow) => renderDesktopRowSingle(followerRow, true))}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-3">
-      {renderMobileCardSingle(rowGroup.mainRow, {
-        hasFollowers,
-        followerCount: rowGroup.followerRows.length,
-        isExpanded: expanded,
-        onToggle: hasFollowers ? () => onToggleExpand(rowGroupKey) : undefined,
-      })}
-      {hasFollowers && expanded ? (
-        <div id={`visa-mobile-linked-${rowGroup.mainRow.id}`} className="space-y-3">
-          {rowGroup.followerRows.map((followerRow) => renderMobileCardSingle(followerRow))}
+    <div className={`visa-compact-family visa-compact-${view}`}>
+      {renderRow(rowGroup.mainRow)}
+      {hasFollowers ? (
+        <div id={linkedId} className="visa-compact-children" hidden={!expanded}>
+          {expanded ? rowGroup.followerRows.map((row) => renderRow(row, true)) : null}
         </div>
       ) : null}
     </div>

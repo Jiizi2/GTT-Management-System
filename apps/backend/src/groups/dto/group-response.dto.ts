@@ -3,6 +3,7 @@ import {
   AgreementApprovalStatus,
   AgreementCity,
   ChecklistAssignmentStatus,
+  FlightDirection,
   GroupRaudhahStatus,
   GroupLifecycleStatus,
   GroupTone,
@@ -10,6 +11,44 @@ import {
   VisaPaymentStatus,
   VisaStatus,
 } from "@prisma/client";
+
+export class GroupFlightLegResponseDto {
+  @ApiProperty({ example: "flight-leg-id" })
+  id!: string;
+
+  @ApiProperty({ enum: FlightDirection, example: FlightDirection.ONWARD })
+  direction!: FlightDirection;
+
+  @ApiProperty({ example: 0 })
+  sortOrder!: number;
+
+  @ApiPropertyOptional({ example: "CGK", nullable: true })
+  departureAirportCode?: string | null;
+
+  @ApiPropertyOptional({ example: "DOH", nullable: true })
+  arrivalAirportCode?: string | null;
+
+  @ApiPropertyOptional({ example: "2026-09-21", nullable: true })
+  departureDate?: Date | string | null;
+
+  @ApiPropertyOptional({ example: "07:40", nullable: true })
+  departureTime?: string | null;
+
+  @ApiPropertyOptional({ example: "2026-09-21", nullable: true })
+  arrivalDate?: Date | string | null;
+
+  @ApiPropertyOptional({ example: "12:10", nullable: true })
+  arrivalTime?: string | null;
+
+  @ApiPropertyOptional({ example: "QR", nullable: true })
+  carrierCode?: string | null;
+
+  @ApiPropertyOptional({ example: "QR-955", nullable: true })
+  flightNumber?: string | null;
+
+  @ApiPropertyOptional({ example: "Transit in Doha", nullable: true })
+  remarks?: string | null;
+}
 
 export class GroupMusyrifResponseDto {
   @ApiProperty({ example: "Ust. Ahmad Hidayat" })
@@ -222,14 +261,23 @@ export class GroupVisaSetupResponseDto {
   @ApiPropertyOptional({ description: "Arrival flight number for MOFA visa.", example: "JT-104", nullable: true })
   arrivalFlightNumber?: string | null;
 
+  @ApiPropertyOptional({ description: "Arrival flight date.", example: "2026-09-21", nullable: true })
+  arrivalFlightDate?: Date | string | null;
+
   @ApiPropertyOptional({ description: "Arrival flight local time (HH:mm).", example: "19:30", nullable: true })
   arrivalTime?: string | null;
 
   @ApiPropertyOptional({ description: "Departure flight number for MOFA visa.", example: "JT-105", nullable: true })
   departureFlightNumber?: string | null;
 
+  @ApiPropertyOptional({ description: "Departure flight date.", example: "2026-09-30", nullable: true })
+  departureFlightDate?: Date | string | null;
+
   @ApiPropertyOptional({ description: "Departure flight local time (HH:mm).", example: "21:00", nullable: true })
   departureTime?: string | null;
+
+  @ApiProperty({ type: () => GroupFlightLegResponseDto, isArray: true })
+  flightLegs!: GroupFlightLegResponseDto[];
 
   @ApiProperty({ type: () => GroupVisaHotelAgreementResponseDto, isArray: true })
   hotelAgreements!: GroupVisaHotelAgreementResponseDto[];

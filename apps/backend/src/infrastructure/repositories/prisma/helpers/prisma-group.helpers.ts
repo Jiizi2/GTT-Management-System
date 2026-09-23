@@ -98,10 +98,29 @@ export const groupSummarySelection = {
       makkahHotelWaived: true,
       madinahHotelWaived: true,
       arrivalFlightNumber: true,
+      arrivalFlightDate: true,
       arrivalTime: true,
       departureFlightNumber: true,
+      departureFlightDate: true,
       departureTime: true,
       createdAt: true,
+      flightLegs: {
+        orderBy: [{ direction: "asc" }, { sortOrder: "asc" }],
+        select: {
+          id: true,
+          direction: true,
+          sortOrder: true,
+          departureAirportCode: true,
+          arrivalAirportCode: true,
+          departureDate: true,
+          departureTime: true,
+          arrivalDate: true,
+          arrivalTime: true,
+          carrierCode: true,
+          flightNumber: true,
+          remarks: true,
+        },
+      },
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
@@ -175,10 +194,29 @@ export const groupDetailSelection = {
       makkahHotelWaived: true,
       madinahHotelWaived: true,
       arrivalFlightNumber: true,
+      arrivalFlightDate: true,
       arrivalTime: true,
       departureFlightNumber: true,
+      departureFlightDate: true,
       departureTime: true,
       createdAt: true,
+      flightLegs: {
+        orderBy: [{ direction: "asc" }, { sortOrder: "asc" }],
+        select: {
+          id: true,
+          direction: true,
+          sortOrder: true,
+          departureAirportCode: true,
+          arrivalAirportCode: true,
+          departureDate: true,
+          departureTime: true,
+          arrivalDate: true,
+          arrivalTime: true,
+          carrierCode: true,
+          flightNumber: true,
+          remarks: true,
+        },
+      },
       hotelAgreements: {
         orderBy: [{ city: "asc" }, { stayStart: "asc" }],
         select: {
@@ -485,9 +523,29 @@ function buildVisaSetupCreate(visaSetup: CreateGroupDto["visaSetup"]) {
       makkahHotelWaived: visaSetup.makkahHotelWaived ?? false,
       madinahHotelWaived: visaSetup.madinahHotelWaived ?? false,
       arrivalFlightNumber: visaSetup.arrivalFlightNumber?.trim() || null,
+      arrivalFlightDate: visaSetup.arrivalFlightDate ? toUtcMidnight(visaSetup.arrivalFlightDate) : null,
       arrivalTime: visaSetup.arrivalTime?.trim() || null,
       departureFlightNumber: visaSetup.departureFlightNumber?.trim() || null,
+      departureFlightDate: visaSetup.departureFlightDate ? toUtcMidnight(visaSetup.departureFlightDate) : null,
       departureTime: visaSetup.departureTime?.trim() || null,
+      flightLegs:
+        visaSetup.flightLegs && visaSetup.flightLegs.length > 0
+          ? {
+              create: visaSetup.flightLegs.map((leg, index) => ({
+                direction: leg.direction,
+                sortOrder: leg.sortOrder ?? index,
+                departureAirportCode: leg.departureAirportCode?.trim().toUpperCase() || null,
+                arrivalAirportCode: leg.arrivalAirportCode?.trim().toUpperCase() || null,
+                departureDate: leg.departureDate ? toUtcMidnight(leg.departureDate) : null,
+                departureTime: leg.departureTime?.trim() || null,
+                arrivalDate: leg.arrivalDate ? toUtcMidnight(leg.arrivalDate) : null,
+                arrivalTime: leg.arrivalTime?.trim() || null,
+                carrierCode: leg.carrierCode?.trim().toUpperCase() || null,
+                flightNumber: leg.flightNumber?.trim().toUpperCase() || null,
+                remarks: leg.remarks?.trim() || null,
+              })),
+            }
+          : undefined,
       hotelAgreements:
         visaSetup.hotelAgreements && visaSetup.hotelAgreements.length > 0
           ? {

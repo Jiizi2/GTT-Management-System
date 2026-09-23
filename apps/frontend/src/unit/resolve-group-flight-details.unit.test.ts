@@ -1,83 +1,69 @@
 import { describe, expect, it } from "vitest";
-import type { GroupData, ItineraryItem } from "../shared/app-domain";
+import type { GroupData } from "../shared/app-domain";
 import { resolveGroupFlightDetails } from "../pages/visa-detail/visa-detail-helpers";
-
-function itineraryItem(overrides: Partial<ItineraryItem>): ItineraryItem {
-  return {
-    date: "30 Aug",
-    year: "2026",
-    category: "Arrival",
-    title: "Arrival",
-    meta: "",
-    icon: "flight_land",
-    ...overrides,
-  } as ItineraryItem;
-}
 
 function group(overrides: Partial<GroupData>): GroupData {
   return { itinerary: [], ...overrides } as GroupData;
 }
 
 describe("resolveGroupFlightDetails", () => {
-  it("prefers explicit VisaSetup flight columns", () => {
-    const result = resolveGroupFlightDetails(
-      group({
-        visaSetup: {
-          arrivalFlightNumber: "JT-104",
-          arrivalTime: "19:30",
-          departureFlightNumber: "JT-105",
-          departureTime: "21:00",
-        } as GroupData["visaSetup"],
-        itinerary: [itineraryItem({ categoryKey: "arrival", flightNumber: "SV-999", time: "01:00" })],
-      }),
-    );
-
-    expect(result).toEqual({
-      arrivalFlightNumber: "JT-104",
-      arrivalTime: "19:30",
-      departureFlightNumber: "JT-105",
-      departureTime: "21:00",
-    });
-  });
-
-  it("falls back to the itinerary arrival/departure legs when VisaSetup is empty", () => {
-    const result = resolveGroupFlightDetails(
-      group({
-        visaSetup: undefined,
-        itinerary: [
-          itineraryItem({ categoryKey: "arrival", flightNumber: "GA-980", time: "08:15" }),
-          itineraryItem({ categoryKey: "departure", flightNumber: "GA-981", time: "22:40", category: "Departure" }),
+  it("prefers canonical ordered flight legs", () => {
+    const result = resolveGroupFlightDetails(group({
+      visaSetup: {
+        flightLegs: [
+          {
+            id: "onward-1", direction: "ONWARD", sortOrder: 0,
+            departureAirportCode: "CGK", arrivalAirportCode: "DOH",
+            departureDate: "2026-08-30", departureTime: "08:15",
+            arrivalDate: "2026-08-30", arrivalTime: "12:20",
+            carrierCode: "QR", flightNumber: "QR-955", remarks: "",
+          },
+          {
+            id: "onward-2", direction: "ONWARD", sortOrder: 1,
+            departureAirportCode: "DOH", arrivalAirportCode: "JED",
+            departureDate: "2026-08-30", departureTime: "14:00",
+            arrivalDate: "2026-08-30", arrivalTime: "16:30",
+            carrierCode: "QR", flightNumber: "QR-1188", remarks: "Transit",
+          },
         ],
-      }),
-    );
+      } as GroupData["visaSetup"],
+    }));
 
-    expect(result).toEqual({
-      arrivalFlightNumber: "GA-980",
-      arrivalTime: "08:15",
-      departureFlightNumber: "GA-981",
-      departureTime: "22:40",
+    expect(result.flightLegs).toHaveLength(3);
+    expect(result.flightLegs[0]).toMatchObject({ departureAirportCode: "CGK", arrivalAirportCode: "DOH" });
+    expect(result.flightLegs[1]).toMatchObject({ departureAirportCode: "DOH", arrivalAirportCode: "JED" });
+    expect(result.flightLegs[2]).toMatchObject({ direction: "RETURN", flightNumber: "" });
+  });
+
+  it("turns legacy summaries into incomplete editable legs without guessing airports", () => {
+    const result = resolveGroupFlightDetails(group({
+      visaSetup: {
+        arrivalFlightNumber: "JT-104", arrivalFlightDate: "2026-08-30", arrivalTime: "19:30",
+        departureFlightNumber: "JT-105", departureFlightDate: "2026-09-09", departureTime: "21:00",
+      } as GroupData["visaSetup"],
+    }));
+
+    expect(result.flightLegs[0]).toMatchObject({
+      direction: "ONWARD", departureAirportCode: "", arrivalAirportCode: "",
+      flightNumber: "JT-104", arrivalDate: "2026-08-30", arrivalTime: "19:30",
+    });
+    expect(result.flightLegs[1]).toMatchObject({
+      direction: "RETURN", departureAirportCode: "", arrivalAirportCode: "",
+      flightNumber: "JT-105", departureDate: "2026-09-09", departureTime: "21:00",
     });
   });
 
-  it("mixes sources per field, preferring VisaSetup where present", () => {
-    const result = resolveGroupFlightDetails(
-      group({
-        visaSetup: { arrivalFlightNumber: "JT-104", arrivalTime: "19:30" } as GroupData["visaSetup"],
-        itinerary: [itineraryItem({ categoryKey: "departure", flightNumber: "GA-981", time: "22:40" })],
-      }),
-    );
+  it("does not infer international routes from Saudi itinerary items", () => {
+    const result = resolveGroupFlightDetails(group({
+      itinerary: [{
+        date: "30 Aug", year: "2026", category: "Arrival", categoryKey: "arrival",
+        title: "Arrival", meta: "", icon: "flight_land", from: "Jeddah", to: "Makkah", flightNumber: "GA-980",
+      }],
+    }));
 
-    expect(result.arrivalFlightNumber).toBe("JT-104");
-    expect(result.departureFlightNumber).toBe("GA-981");
-    expect(result.departureTime).toBe("22:40");
-  });
-
-  it("returns empty strings when nothing is available", () => {
-    expect(resolveGroupFlightDetails(null)).toEqual({
-      arrivalFlightNumber: "",
-      arrivalTime: "",
-      departureFlightNumber: "",
-      departureTime: "",
-    });
+    expect(result.flightLegs).toEqual([
+      expect.objectContaining({ direction: "ONWARD", departureAirportCode: "", arrivalAirportCode: "" }),
+      expect.objectContaining({ direction: "RETURN", departureAirportCode: "", arrivalAirportCode: "" }),
+    ]);
   });
 });

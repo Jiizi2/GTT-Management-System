@@ -37,6 +37,12 @@ export type MemoryRaudhahAppointment = Omit<
   tasrehPrinted: boolean;
 };
 
+export type MemoryFlightLeg = NonNullable<
+  NonNullable<NonNullable<CreateGroupDto["visaSetup"]>["flightLegs"]>[number]
+> & {
+  id: string;
+};
+
 export type MemoryChecklistDriver = Omit<
   NonNullable<NonNullable<CreateGroupDto["checklistAssignments"]>[number]["drivers"]>[number],
   "slotNumber"
@@ -54,10 +60,11 @@ export type MemoryChecklistAssignment = Omit<
 
 export type MemoryVisaSetup = Omit<
   NonNullable<CreateGroupDto["visaSetup"]>,
-  "hotelAgreements" | "raudhahAppointments"
+  "hotelAgreements" | "raudhahAppointments" | "flightLegs"
 > & {
   hotelAgreements: MemoryVisaHotelAgreement[];
   raudhahAppointments: MemoryRaudhahAppointment[];
+  flightLegs?: MemoryFlightLeg[];
 };
 
 export type MemoryGroupRecord = Omit<

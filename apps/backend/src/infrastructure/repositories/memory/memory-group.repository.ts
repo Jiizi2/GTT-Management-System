@@ -43,6 +43,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { parseIsoDateOnly, validateTravelDateRangeOrThrow } from "../../../groups/domain/groups.shared";
 import { validateCreateOrReplaceHotelAgreementRules } from "../../../groups/domain/groups.hotel-validation";
+import { validateFlightLegRules } from "../../../groups/domain/groups.flight-leg-validation";
 
 @Injectable()
 export class MemoryGroupRepository implements GroupRepository {
@@ -118,6 +119,7 @@ export class MemoryGroupRepository implements GroupRepository {
   async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
+    validateFlightLegRules(payload);
     this.assertParentAgentMatch(payload);
     return createInMemory(this.memoryStore.groups, payload);
   }
@@ -125,6 +127,7 @@ export class MemoryGroupRepository implements GroupRepository {
   async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
+    validateFlightLegRules(payload);
     this.assertParentAgentMatch(payload);
     return replaceInMemory(this.memoryStore.groups, idOrCode, payload);
   }

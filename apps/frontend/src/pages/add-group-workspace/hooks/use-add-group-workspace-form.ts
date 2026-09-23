@@ -37,7 +37,6 @@ const {
   getTransportModeIcon,
   hasIncompleteTransferTrainFields,
   isCityTourActivityType,
-  isFlightActivityType,
   isIsoDateValue,
   isTransferActivityType,
   musyrifAvatar,
@@ -147,14 +146,6 @@ type ManualScheduleValidationValues = {
 
 function validateManualSchedule(values: ManualScheduleValidationValues, context: z.RefinementCtx): void {
   const transportMode = resolveFormTransportMode(values.category, values.transportMode);
-
-  if (isFlightActivityType(values.category) && transportMode === "flight" && !values.flightNumber.trim()) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["flightNumber"],
-      message: "Nomor penerbangan wajib diisi.",
-    });
-  }
 
   const isHotelNameRequired = values.category === "arrival" || values.category === "departure";
   if (isHotelNameRequired && !(values.hotelName?.trim() ?? "")) {
@@ -353,7 +344,7 @@ export function useAddGroupWorkspaceForm({
     form,
   });
 
-  const { isGroupReadyForItinerary, showFlightNumberField, showCityTourCityField, isFormDisabled } = validationState;
+  const { isGroupReadyForItinerary, showCityTourCityField, isFormDisabled } = validationState;
 
   const enabledBaseTripCount = baseTripDrafts.filter((item) => item.isEnabled).length;
   const isBaseTripSaveDisabled =
@@ -745,8 +736,7 @@ export function useAddGroupWorkspaceForm({
 
     const typeOption = getScheduleTypeOption(values.category);
     const transportMode = resolveFormTransportMode(values.category, values.transportMode);
-    const nextFlightNumber =
-      transportMode === "flight" && isFlightActivityType(values.category) ? values.flightNumber.trim() : "";
+    const nextFlightNumber = "";
     const isHotelNameRequired = values.category === "arrival" || values.category === "departure";
     const nextHotelName = isHotelNameRequired ? values.hotelName?.trim() || resolveSuggestedHotelName(values) : "";
     const nextHotelPickupRequestTime = values.category === "departure" ? values.hotelPickupRequestTime.trim() : "";
@@ -819,7 +809,7 @@ export function useAddGroupWorkspaceForm({
         from: item.from.trim(),
         to: item.to.trim(),
         cityTourCity: isCityTourActivityType(item.category) ? item.cityTourCity.trim() : "",
-        flightNumber: transportMode === "flight" && isFlightActivityType(item.category) ? item.flightNumber.trim() : "",
+        flightNumber: "",
         requiresBus: nextRequiresBus,
         notes: item.notes.trim(),
         icon: nextIcon,

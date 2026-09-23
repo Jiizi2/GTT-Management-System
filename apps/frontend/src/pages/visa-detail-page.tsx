@@ -80,8 +80,8 @@ export function VisaTrackingDetailScreen({
       <div className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
         <VisaDetailHeader />
         <VisaStatusSection />
-        <HotelAgreementSection />
         <FlightDetailsSection />
+        <HotelAgreementSection />
         <RaudhahStatusSection />
         <VisaDetailModals />
       </div>

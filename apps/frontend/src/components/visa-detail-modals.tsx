@@ -15,6 +15,8 @@ import type {
   VisaRaudhahEditFormState,
   VisaStatus,
 } from "../shared/app-domain";
+import { validateFlightDatesAgainstAgreement } from "../shared/visa-flight-date-validation";
+import { createEmptyFlightLeg, getFlightLegsByDirection, normalizeFlightLegs } from "../shared/flight-plan";
 
 const modalOverlayClassName = "serene-modal-overlay z-[120]";
 const modalFieldClassName = "serene-field";
@@ -27,7 +29,6 @@ const modalCloseButtonClassName = "serene-dialog-close-shell hover:border-primar
 const modalHeaderBarClassName = "serene-dialog-header shrink-0 bg-surface-container-low px-5 py-4";
 const modalBodyClassName = "serene-dialog-body overflow-y-auto px-5 py-4";
 const modalFooterBarClassName = "serene-dialog-footer-bar shrink-0 bg-surface-container-low";
-const modalInfoCardClassName = "serene-dialog-section text-sm text-on-surface-variant";
 const modalDashedCardClassName =
   "rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600";
 const modalItemCardClassName = "rounded-2xl border border-slate-200 bg-surface-container-lowest p-3";
@@ -41,12 +42,109 @@ const flightTimeSchema = z
   .trim()
   .refine((value) => value.length === 0 || /^([01]\d|2[0-3]):[0-5]\d$/.test(value), "Format jam harus HH:mm.");
 
-const flightDetailsModalSchema = z.object({
-  arrivalFlightNumber: z.string().trim(),
-  arrivalTime: flightTimeSchema,
-  departureFlightNumber: z.string().trim(),
-  departureTime: flightTimeSchema,
-});
+const flightDateSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.length === 0 || /^\d{4}-\d{2}-\d{2}$/.test(value), "Format tanggal tidak valid.");
+
+function createFlightDetailsModalSchema(agreementStartDate?: string, agreementEndDate?: string) {
+  return z
+  .object({
+    flightLegs: z.array(
+      z.object({
+        id: z.string().optional(),
+        direction: z.enum(["ONWARD", "RETURN"]),
+        sortOrder: z.number().int().min(0),
+        departureAirportCode: z
+          .string()
+          .trim()
+          .refine((value) => value.length === 0 || /^[A-Za-z]{3}$/.test(value), "Gunakan 3 huruf kode IATA."),
+        arrivalAirportCode: z
+          .string()
+          .trim()
+          .refine((value) => value.length === 0 || /^[A-Za-z]{3}$/.test(value), "Gunakan 3 huruf kode IATA."),
+        departureDate: flightDateSchema,
+        departureTime: flightTimeSchema,
+        arrivalDate: flightDateSchema,
+        arrivalTime: flightTimeSchema,
+        carrierCode: z.string().trim(),
+        flightNumber: z.string().trim(),
+        remarks: z.string().trim(),
+      }),
+    ),
+  })
+  .superRefine((values, context) => {
+    values.flightLegs.forEach((leg, index) => {
+      const from = leg.departureAirportCode.trim().toUpperCase();
+      const to = leg.arrivalAirportCode.trim().toUpperCase();
+      if (from && to && from === to) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["flightLegs", index, "arrivalAirportCode"],
+          message: "Bandara tujuan harus berbeda.",
+        });
+      }
+      if (leg.departureDate && leg.arrivalDate) {
+        const departureKey = `${leg.departureDate}T${leg.departureTime || "00:00"}`;
+        const arrivalKey = `${leg.arrivalDate}T${leg.arrivalTime || "23:59"}`;
+        if (arrivalKey < departureKey) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["flightLegs", index, "arrivalDate"],
+            message: "Waktu tiba tidak boleh sebelum keberangkatan.",
+          });
+        }
+      }
+    });
+
+    (["ONWARD", "RETURN"] as const).forEach((direction) => {
+      const indexedLegs = values.flightLegs
+        .map((leg, index) => ({ leg, index }))
+        .filter(({ leg }) => leg.direction === direction)
+        .sort((left, right) => left.leg.sortOrder - right.leg.sortOrder);
+      indexedLegs.forEach(({ leg }, position) => {
+        const next = indexedLegs[position + 1];
+        const destination = leg.arrivalAirportCode.trim().toUpperCase();
+        const nextOrigin = next?.leg.departureAirportCode.trim().toUpperCase() ?? "";
+        if (next && destination && nextOrigin && destination !== nextOrigin) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["flightLegs", next.index, "departureAirportCode"],
+            message: `Harus melanjutkan dari ${destination}.`,
+          });
+        }
+      });
+    });
+
+    const onward = getFlightLegsByDirection(values.flightLegs, "ONWARD");
+    const returning = getFlightLegsByDirection(values.flightLegs, "RETURN");
+    const arrivalDate = onward.at(-1)?.arrivalDate || onward.at(-1)?.departureDate || "";
+    const departureDate = returning[0]?.departureDate || returning[0]?.arrivalDate || "";
+
+    const agreementErrors = validateFlightDatesAgainstAgreement({
+      arrivalFlightDate: arrivalDate,
+      departureFlightDate: departureDate,
+      agreementStartDate,
+      agreementEndDate,
+    });
+    if (agreementErrors.arrival) {
+      const arrivalIndex = values.flightLegs.lastIndexOf(onward.at(-1)!);
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["flightLegs", Math.max(0, arrivalIndex), "arrivalDate"],
+        message: agreementErrors.arrival,
+      });
+    }
+    if (agreementErrors.departure) {
+      const departureIndex = values.flightLegs.indexOf(returning[0]!);
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["flightLegs", Math.max(0, departureIndex), "departureDate"],
+        message: agreementErrors.departure,
+      });
+    }
+  });
+}
 
 const visaStatusModalSchema = z
   .object({
@@ -443,112 +541,245 @@ export function SyarikahModal({
 
 export function FlightDetailsModal({
   initialValue,
+  agreementStartDate,
+  agreementEndDate,
   onClose,
   onSave,
 }: {
   initialValue: VisaFlightDetailsInput;
+  agreementStartDate?: string;
+  agreementEndDate?: string;
   onClose: () => void;
   onSave: (flight: VisaFlightDetailsInput) => void | Promise<void>;
 }) {
   const {
     register,
     control,
+    watch,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<VisaFlightDetailsInput>({
-    resolver: zodResolver(flightDetailsModalSchema),
+    resolver: zodResolver(createFlightDetailsModalSchema(agreementStartDate, agreementEndDate)),
     defaultValues: initialValue,
   });
+  const { fields, append, remove } = useFieldArray({ control, name: "flightLegs" });
+  const watchedLegs = watch("flightLegs");
 
-  const arrivalTimeError = errors.arrivalTime?.message;
-  const departureTimeError = errors.departureTime?.message;
+  const addLeg = (direction: "ONWARD" | "RETURN") => {
+    const directionLegs = getFlightLegsByDirection(watchedLegs, direction);
+    const previous = directionLegs.at(-1);
+    append({
+      ...createEmptyFlightLeg(direction, directionLegs.length),
+      departureAirportCode: previous?.arrivalAirportCode ?? "",
+      departureDate: previous?.arrivalDate ?? "",
+    });
+  };
+
+  const renderDirection = (direction: "ONWARD" | "RETURN", title: string, description: string) => {
+    const indexes = fields.flatMap((field, index) => (field.direction === direction ? [index] : []));
+    const isTransit = indexes.length > 1;
+    return (
+      <fieldset className={direction === "RETURN" ? "border-t border-slate-200 pt-5" : ""}>
+        <legend className="sr-only">{title}</legend>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-xl text-brand-primary" aria-hidden="true">
+                {direction === "ONWARD" ? "flight_takeoff" : "flight_land"}
+              </span>
+              <h3 className="text-base font-extrabold text-slate-900">{title}</h3>
+              {indexes.length > 0 ? (
+                <span className="rounded-full bg-brand-primary/10 px-2 py-1 text-[11px] font-extrabold text-brand-primary">
+                  {isTransit ? `${indexes.length} segmen · Transit` : "1 segmen"}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs font-medium text-slate-600">{description}</p>
+          </div>
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-extrabold text-brand-primary transition hover:bg-brand-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+            onClick={() => addLeg(direction)}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
+            {indexes.length === 0 ? "Tambah penerbangan" : "Tambah transit"}
+          </button>
+        </div>
+
+        <div className="divide-y divide-slate-200 border-y border-slate-200">
+          {indexes.length === 0 ? (
+            <div className="py-5 text-center text-sm font-medium text-slate-500">
+              Belum ada segmen penerbangan.
+            </div>
+          ) : null}
+          {indexes.map((index, position) => {
+            const legErrors = errors.flightLegs?.[index];
+            const field = fields[index];
+            return (
+              <div key={field.id} className="py-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-primary/10 text-xs font-black text-brand-primary">
+                      {position + 1}
+                    </span>
+                    <span className="truncate text-sm font-extrabold text-slate-800">
+                      {watchedLegs[index]?.departureAirportCode?.toUpperCase() || "FROM"}
+                      <span className="mx-2 text-slate-400">→</span>
+                      {watchedLegs[index]?.arrivalAirportCode?.toUpperCase() || "TO"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex size-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                    onClick={() => remove(index)}
+                    aria-label={`Hapus segmen ${position + 1} ${title}`}
+                  >
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">delete</span>
+                  </button>
+                </div>
+
+                <input type="hidden" {...register(`flightLegs.${index}.direction`)} />
+                <input type="hidden" value={position} {...register(`flightLegs.${index}.sortOrder`, { valueAsNumber: true })} />
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
+                  <label className={`${modalFieldClassName} lg:col-span-3`}>
+                    <span>Tanggal berangkat</span>
+                    <Controller
+                      control={control}
+                      name={`flightLegs.${index}.departureDate`}
+                      render={({ field: pickerField }) => (
+                        <DatePickerInput
+                          id={`flight-leg-${index}-departure-date`}
+                          inputClassName={modalInputClassName}
+                          value={pickerField.value}
+                          onChange={pickerField.onChange}
+                          ariaInvalid={getFieldAriaInvalid(legErrors?.departureDate?.message)}
+                          ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-departure-date`, {
+                            errorMessage: legErrors?.departureDate?.message,
+                          })}
+                        />
+                      )}
+                    />
+                    <FieldErrorMessage fieldId={`flight-leg-${index}-departure-date`} message={legErrors?.departureDate?.message} className={modalErrorClassName} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-2`}>
+                    <span>From</span>
+                    <input className={`${modalInputClassName} uppercase`} maxLength={3} placeholder="CGK" {...register(`flightLegs.${index}.departureAirportCode`)} />
+                    <FieldErrorMessage fieldId={`flight-leg-${index}-from`} message={legErrors?.departureAirportCode?.message} className={modalErrorClassName} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-2`}>
+                    <span>ETD</span>
+                    <Controller
+                      control={control}
+                      name={`flightLegs.${index}.departureTime`}
+                      render={({ field: pickerField }) => (
+                        <TimePickerInput
+                          id={`flight-leg-${index}-etd`}
+                          inputClassName={modalInputClassName}
+                          value={pickerField.value}
+                          onChange={pickerField.onChange}
+                          ariaInvalid={getFieldAriaInvalid(legErrors?.departureTime?.message)}
+                          ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-etd`, {
+                            errorMessage: legErrors?.departureTime?.message,
+                          })}
+                        />
+                      )}
+                    />
+                    <FieldErrorMessage fieldId={`flight-leg-${index}-etd`} message={legErrors?.departureTime?.message} className={modalErrorClassName} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-3`}>
+                    <span>Tanggal tiba</span>
+                    <Controller
+                      control={control}
+                      name={`flightLegs.${index}.arrivalDate`}
+                      render={({ field: pickerField }) => (
+                        <DatePickerInput
+                          id={`flight-leg-${index}-arrival-date`}
+                          inputClassName={modalInputClassName}
+                          value={pickerField.value}
+                          onChange={pickerField.onChange}
+                          ariaInvalid={getFieldAriaInvalid(legErrors?.arrivalDate?.message)}
+                          ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-arrival-date`, {
+                            errorMessage: legErrors?.arrivalDate?.message,
+                          })}
+                        />
+                      )}
+                    />
+                    <FieldErrorMessage fieldId={`flight-leg-${index}-arrival-date`} message={legErrors?.arrivalDate?.message} className={modalErrorClassName} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-2`}>
+                    <span>To</span>
+                    <input className={`${modalInputClassName} uppercase`} maxLength={3} placeholder="JED" {...register(`flightLegs.${index}.arrivalAirportCode`)} />
+                    <FieldErrorMessage fieldId={`flight-leg-${index}-to`} message={legErrors?.arrivalAirportCode?.message} className={modalErrorClassName} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-2`}>
+                    <span>ETA</span>
+                    <Controller
+                      control={control}
+                      name={`flightLegs.${index}.arrivalTime`}
+                      render={({ field: pickerField }) => (
+                        <TimePickerInput
+                          id={`flight-leg-${index}-eta`}
+                          inputClassName={modalInputClassName}
+                          value={pickerField.value}
+                          onChange={pickerField.onChange}
+                          ariaInvalid={getFieldAriaInvalid(legErrors?.arrivalTime?.message)}
+                          ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-eta`, {
+                            errorMessage: legErrors?.arrivalTime?.message,
+                          })}
+                        />
+                      )}
+                    />
+                    <FieldErrorMessage fieldId={`flight-leg-${index}-eta`} message={legErrors?.arrivalTime?.message} className={modalErrorClassName} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-2`}>
+                    <span>Carrier</span>
+                    <input className={`${modalInputClassName} uppercase`} maxLength={3} placeholder="GA" {...register(`flightLegs.${index}.carrierCode`)} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-3`}>
+                    <span>Flight no.</span>
+                    <input className={`${modalInputClassName} uppercase`} placeholder="GA-980" {...register(`flightLegs.${index}.flightNumber`)} />
+                  </label>
+                  <label className={`${modalFieldClassName} lg:col-span-5`}>
+                    <span>Remarks</span>
+                    <input className={modalInputClassName} placeholder="Opsional" {...register(`flightLegs.${index}.remarks`)} />
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </fieldset>
+    );
+  };
 
   return (
     <ModalShell
       title="Detail Penerbangan"
-      description="Nomor penerbangan kedatangan & kepulangan untuk pengajuan MOFA visa. Dipakai untuk auto-build itinerary."
+      description="Susun rute penerbangan internasional direct atau transit per segmen."
       icon="flight"
-      widthClassName="max-w-lg"
+      widthClassName="max-w-6xl"
       onClose={onClose}
       footer={
         <SaveFooter
           onClose={onClose}
           onSave={() =>
-            void handleSubmit((values) =>
-              void onSave({
-                arrivalFlightNumber: values.arrivalFlightNumber.trim(),
-                arrivalTime: values.arrivalTime.trim(),
-                departureFlightNumber: values.departureFlightNumber.trim(),
-                departureTime: values.departureTime.trim(),
-              }),
-            )()
+            void handleSubmit((values) => void onSave({ flightLegs: normalizeFlightLegs(values.flightLegs) }))()
           }
           saveLabel="Save Changes"
           isSaving={isSubmitting}
         />
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className={modalFieldClassName}>
-          <span>Flight Kedatangan</span>
-          <input
-            id="flight-arrival-number"
-            className={modalInputClassName}
-            type="text"
-            placeholder="e.g. JT-104"
-            {...register("arrivalFlightNumber")}
-          />
-        </label>
-        <label className={modalFieldClassName}>
-          <span>Jam Kedatangan (LT)</span>
-          <Controller
-            control={control}
-            name="arrivalTime"
-            render={({ field }) => (
-              <TimePickerInput
-                id="flight-arrival-time"
-                inputClassName={modalInputClassName}
-                value={field.value}
-                onChange={field.onChange}
-                ariaInvalid={getFieldAriaInvalid(arrivalTimeError)}
-                ariaDescribedBy={getFieldDescribedBy("flight-arrival-time", { errorMessage: arrivalTimeError })}
-              />
-            )}
-          />
-          <FieldErrorMessage fieldId="flight-arrival-time" message={arrivalTimeError} className={modalErrorClassName} />
-        </label>
-        <label className={modalFieldClassName}>
-          <span>Flight Kepulangan</span>
-          <input
-            id="flight-departure-number"
-            className={modalInputClassName}
-            type="text"
-            placeholder="e.g. JT-105"
-            {...register("departureFlightNumber")}
-          />
-        </label>
-        <label className={modalFieldClassName}>
-          <span>Jam Kepulangan (LT)</span>
-          <Controller
-            control={control}
-            name="departureTime"
-            render={({ field }) => (
-              <TimePickerInput
-                id="flight-departure-time"
-                inputClassName={modalInputClassName}
-                value={field.value}
-                onChange={field.onChange}
-                ariaInvalid={getFieldAriaInvalid(departureTimeError)}
-                ariaDescribedBy={getFieldDescribedBy("flight-departure-time", { errorMessage: departureTimeError })}
-              />
-            )}
-          />
-          <FieldErrorMessage
-            fieldId="flight-departure-time"
-            message={departureTimeError}
-            className={modalErrorClassName}
-          />
-        </label>
+      <div className="space-y-5">
+        <p className="flex items-start gap-2 text-sm font-medium leading-relaxed text-slate-600">
+          <span className="material-symbols-outlined mt-0.5 text-base text-brand-primary" aria-hidden="true">info</span>
+          <span>
+            Gunakan kode bandara IATA, misalnya <strong>CGK → JED</strong>. Untuk transit, tambahkan satu segmen untuk setiap penerbangan.
+          </span>
+        </p>
+        {renderDirection("ONWARD", "Onward", "Penerbangan dari Indonesia menuju Arab Saudi.")}
+        {renderDirection("RETURN", "Return", "Penerbangan dari Arab Saudi kembali ke Indonesia.")}
       </div>
     </ModalShell>
   );

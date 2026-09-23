@@ -27,9 +27,7 @@ const {
   getStayPeriods,
   getScheduleTypeOption,
   hasIncompleteTransferTrainFields,
-  inferCategoryKey,
   isCityTourActivityType,
-  isFlightActivityType,
   isIsoDateValue,
   isTransferActivityType,
   normalizeAgreementCityKey,
@@ -376,8 +374,6 @@ export function useGroupDetailDashboard({
     [],
   );
 
-  const isScheduleFlightNumberMissing =
-    isFlightActivityType(scheduleForm.category) && !scheduleForm.flightNumber.trim();
   const isScheduleHotelNameMissing =
     (scheduleForm.category === "arrival" || scheduleForm.category === "departure") && !scheduleForm.hotelName.trim();
   const isScheduleFromHotelNameMissing = false;
@@ -395,7 +391,6 @@ export function useGroupDetailDashboard({
     isSchedulePrimaryTimeMissing ||
     !scheduleForm.from.trim() ||
     !scheduleForm.to.trim() ||
-    isScheduleFlightNumberMissing ||
     isScheduleHotelNameMissing ||
     isScheduleFromHotelNameMissing ||
     isScheduleDeparturePickupTimeMissing ||
@@ -427,7 +422,6 @@ export function useGroupDetailDashboard({
     isEditCityTourCityMissing ||
     isEditHotelNameMissing ||
     isEditFromHotelNameMissing ||
-    !!(editScheduleForm && isFlightActivityType(editScheduleForm.category) && !editScheduleForm.flightNumber.trim()) ||
     isEditDepartureFlightTimeMissing ||
     isEditDeparturePickupTimeMissing ||
     hasEditTransferTrainFieldsMissing;
@@ -657,8 +651,7 @@ export function useGroupDetailDashboard({
     const typeOption = getScheduleTypeOption(form.category);
     const formattedDate = formatScheduleDate(form.date);
     const transportMode = resolveFormTransportMode(form.category, form.transportMode);
-    const nextFlightNumber =
-      transportMode === "flight" && isFlightActivityType(form.category) ? form.flightNumber.trim() : "";
+    const nextFlightNumber = "";
     const shouldPersistHotelName =
       form.category === "arrival" || form.category === "city-tour" || form.category === "departure";
     const nextHotelName = shouldPersistHotelName ? form.hotelName.trim() || resolveSuggestedHotelName(form) : "";
@@ -904,35 +897,11 @@ export function useGroupDetailDashboard({
   };
 
   const handleExportPdf = () => {
-    const printableWindow = window.open("", "_blank", "width=1120,height=760");
-    if (!printableWindow) {
-      return;
-    }
-
     void import("../../group-detail-export")
-      .then(({ exportGroupDetailPdf }) => {
-        const exported = exportGroupDetailPdf(
-          {
-            group,
-            itineraryItems,
-            noteItems,
-            musyrifProfile,
-            familyGroups,
-          },
-          {
-            printWindow: printableWindow,
-          },
-        );
-
-        if (!exported && !printableWindow.closed) {
-          printableWindow.close();
-        }
-      })
-      .catch(() => {
-        if (!printableWindow.closed) {
-          printableWindow.close();
-        }
-      });
+      .then(({ exportGroupDetailPdf }) =>
+        exportGroupDetailPdf({ group, itineraryItems, noteItems, musyrifProfile, familyGroups }),
+      )
+      .catch(() => undefined);
   };
 
   const handleCloseDeleteGroupModal = () => {

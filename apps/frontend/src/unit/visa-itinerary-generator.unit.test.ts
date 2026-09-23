@@ -109,6 +109,22 @@ describe("buildItineraryFromVisaData", () => {
     expect(items[items.length - 1].date).toBe("2026-09-09");
   });
 
+  it("uses the selected flight dates for arrival and departure itinerary legs", () => {
+    const items = buildItineraryFromVisaData({
+      arrivalDateIso: "2026-08-30",
+      returnDateIso: "2026-09-09",
+      makkahAgreements: [agreement()],
+      madinahAgreements: [],
+      flight: {
+        arrivalFlightDate: "2026-08-29",
+        departureFlightDate: "2026-09-10",
+      },
+    });
+
+    expect(items[0].date).toBe("2026-08-29");
+    expect(items[items.length - 1].date).toBe("2026-09-10");
+  });
+
   it("returns nothing when there is no usable data", () => {
     expect(
       buildItineraryFromVisaData({ makkahAgreements: [], madinahAgreements: [] }),

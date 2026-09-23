@@ -1,3 +1,5 @@
+@import "./pages/visa-tracking/components/visa-tracking-rows.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -456,6 +458,11 @@ img {
 
   .serene-page-search-input {
     @apply w-full border-none bg-transparent text-sm font-medium text-on-surface-variant outline-none placeholder:text-on-surface-variant/50;
+  }
+
+  .agreement-inbox-screen input::placeholder,
+  .agreement-inbox-screen textarea::placeholder {
+    color: rgb(var(--color-on-surface-variant) / 0.82);
   }
 
   .serene-theme-toggle-shell {

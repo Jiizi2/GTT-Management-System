@@ -109,6 +109,23 @@ export type GroupRaudhahAppointment = {
   tasrehPrinted?: boolean;
 };
 
+export type FlightDirection = "ONWARD" | "RETURN";
+
+export type GroupFlightLeg = {
+  id?: string;
+  direction: FlightDirection;
+  sortOrder: number;
+  departureAirportCode: string;
+  arrivalAirportCode: string;
+  departureDate: string;
+  departureTime: string;
+  arrivalDate: string;
+  arrivalTime: string;
+  carrierCode: string;
+  flightNumber: string;
+  remarks: string;
+};
+
 export type GroupVisaSetup = {
   visaStatus: "Draft" | "Pending" | "Issued";
   issuedDate?: string;
@@ -118,9 +135,12 @@ export type GroupVisaSetup = {
   makkahHotelWaived?: boolean;
   madinahHotelWaived?: boolean;
   arrivalFlightNumber?: string;
+  arrivalFlightDate?: string;
   arrivalTime?: string;
   departureFlightNumber?: string;
+  departureFlightDate?: string;
   departureTime?: string;
+  flightLegs?: GroupFlightLeg[];
   makkahHotels: GroupAgreementHotel[];
   madinahHotels: GroupAgreementHotel[];
   raudhahAppointments: GroupRaudhahAppointment[];
@@ -468,12 +488,9 @@ export type VisaRaudhahEditFormState = {
   }>;
 };
 
-/** Arrival/departure flight fields edited in Visa Detail and stored on VisaSetup. */
+/** Ordered international flight legs edited in Visa Detail and stored on VisaSetup. */
 export type VisaFlightDetailsInput = {
-  arrivalFlightNumber: string;
-  arrivalTime: string;
-  departureFlightNumber: string;
-  departureTime: string;
+  flightLegs: GroupFlightLeg[];
 };
 
 export type TransferTrainFields = {

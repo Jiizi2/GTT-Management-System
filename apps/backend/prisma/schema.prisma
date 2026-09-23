@@ -111,6 +111,11 @@ enum VisaPaymentStatus {
   PARTIAL
 }
 
+enum FlightDirection {
+  ONWARD
+  RETURN
+}
+
 enum VisaBusStatus {
   VISA_ONLY
   VISA_PLUS
@@ -601,14 +606,39 @@ model VisaSetup {
   makkahHotelWaived   Boolean              @default(false)
   madinahHotelWaived  Boolean              @default(false)
   arrivalFlightNumber String?
+  arrivalFlightDate   DateTime?
   arrivalTime         String?
   departureFlightNumber String?
+  departureFlightDate DateTime?
   departureTime       String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   group               Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
   hotelAgreements     VisaHotelAgreement[]
   raudhahAppointments RaudhahAppointment[]
+  flightLegs          FlightLeg[]
+}
+
+model FlightLeg {
+  id                   String          @id @default(cuid())
+  visaSetupId          String
+  direction            FlightDirection
+  sortOrder            Int
+  departureAirportCode String?
+  arrivalAirportCode   String?
+  departureDate        DateTime?
+  departureTime        String?
+  arrivalDate          DateTime?
+  arrivalTime          String?
+  carrierCode          String?
+  flightNumber         String?
+  remarks              String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  visaSetup            VisaSetup       @relation(fields: [visaSetupId], references: [id], onDelete: Cascade)
+
+  @@unique([visaSetupId, direction, sortOrder])
+  @@index([visaSetupId, direction, sortOrder])
 }
 
 model VisaHotelAgreement {

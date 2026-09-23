@@ -10,6 +10,7 @@ import {
   resolveVisaAgreementNumber,
   sortInputItineraryItems,
 } from "../../shared/app-domain";
+import { deriveLegacyFlightSummary, normalizeFlightLegs } from "../../shared/flight-plan";
 import {
   buildItineraryFromInputItems,
   buildTimelineAndNextActivity,
@@ -72,8 +73,10 @@ export function buildVisaItineraryPatch(group: GroupData, visaSetup: GroupVisaSe
     madinahAgreements: visaSetup.madinahHotels,
     flight: {
       arrivalFlightNumber: visaSetup.arrivalFlightNumber,
+      arrivalFlightDate: visaSetup.arrivalFlightDate,
       arrivalTime: visaSetup.arrivalTime,
       departureFlightNumber: visaSetup.departureFlightNumber,
+      departureFlightDate: visaSetup.departureFlightDate,
       departureTime: visaSetup.departureTime,
     },
   });
@@ -327,12 +330,12 @@ export function useVisaMutations({
       }
 
       const currentVisaSetup = currentGroup.visaSetup ?? createDefaultVisaSetup(currentGroup, currentRow);
+      const normalizedFlightLegs = normalizeFlightLegs(flight.flightLegs);
+      const legacySummary = deriveLegacyFlightSummary(normalizedFlightLegs);
       const nextVisaSetup: GroupVisaSetup = {
         ...currentVisaSetup,
-        arrivalFlightNumber: flight.arrivalFlightNumber.trim(),
-        arrivalTime: flight.arrivalTime.trim(),
-        departureFlightNumber: flight.departureFlightNumber.trim(),
-        departureTime: flight.departureTime.trim(),
+        ...legacySummary,
+        flightLegs: normalizedFlightLegs,
       };
 
       // Regenerate the base trip structure from the same visa data (agreements +

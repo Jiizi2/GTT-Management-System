@@ -4,6 +4,7 @@ import {
   AgreementApprovalStatus,
   AgreementCity,
   ChecklistAssignmentStatus,
+  FlightDirection,
   GroupRaudhahStatus,
   GroupTone,
   VisaPaymentStatus,
@@ -99,9 +100,26 @@ function createPayload(overrides: Partial<CreateGroupDto> = {}): CreateGroupDto 
       syarikah: " Provider Test ",
       paymentStatus: VisaPaymentStatus.PARTIAL,
       arrivalFlightNumber: " JT-104 ",
+      arrivalFlightDate: " 2026-04-10 ",
       arrivalTime: " 19:30 ",
       departureFlightNumber: " JT-105 ",
+      departureFlightDate: " 2026-04-20 ",
       departureTime: " 21:00 ",
+      flightLegs: [
+        {
+          direction: FlightDirection.ONWARD,
+          sortOrder: 0,
+          departureAirportCode: " cgk ",
+          arrivalAirportCode: " doh ",
+          departureDate: " 2026-04-09 ",
+          departureTime: " 18:00 ",
+          arrivalDate: " 2026-04-10 ",
+          arrivalTime: " 00:30 ",
+          carrierCode: " qr ",
+          flightNumber: " qr-955 ",
+          remarks: " Transit ",
+        },
+      ],
       hotelAgreements: [
         {
           city: AgreementCity.MAKKAH,
@@ -232,9 +250,20 @@ describe("GroupsMemoryGroupPayload", () => {
     expect(fields.visaSetup?.syarikah).toBe("Provider Test");
     expect(fields.visaSetup?.paymentStatus).toBe(VisaPaymentStatus.PARTIAL);
     expect(fields.visaSetup?.arrivalFlightNumber).toBe("JT-104");
+    expect(fields.visaSetup?.arrivalFlightDate).toBe("2026-04-10");
     expect(fields.visaSetup?.arrivalTime).toBe("19:30");
     expect(fields.visaSetup?.departureFlightNumber).toBe("JT-105");
+    expect(fields.visaSetup?.departureFlightDate).toBe("2026-04-20");
     expect(fields.visaSetup?.departureTime).toBe("21:00");
+    expect(fields.visaSetup?.flightLegs?.[0]).toMatchObject({
+      direction: FlightDirection.ONWARD,
+      sortOrder: 0,
+      departureAirportCode: "CGK",
+      arrivalAirportCode: "DOH",
+      carrierCode: "QR",
+      flightNumber: "QR-955",
+      remarks: "Transit",
+    });
     expect(fields.visaSetup?.hotelAgreements.length).toBe(1);
     expect(fields.visaSetup?.hotelAgreements[0].hotelName).toBe("Swissotel");
     expect(fields.visaSetup?.raudhahAppointments[0].status).toBe(GroupRaudhahStatus.AFTER);

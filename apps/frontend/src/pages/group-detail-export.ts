@@ -1,190 +1,200 @@
+import { jsPDF } from "jspdf";
+import autoTable, { type RowInput, type UserOptions } from "jspdf-autotable";
 import * as Domain from "../shared/app-domain";
 import type { GroupData, ItineraryItem, Musyrif, NoteItem } from "../shared/app-domain";
 
 const {
-  escapeHtml,
-  formatScheduleTime,
   inferCategoryKey,
   inferCityTourCity,
-  normalizeAgreementCityKey,
   parseDisplayDateToIso,
   parseTimeForInput,
   resolveTotalBusCount,
   resolveTransportMode,
-  TRANSPORT_MODE_META,
 } = Domain;
 
-function formatItineraryActivityHeading(item: ItineraryItem, categoryKey: string, fallbackLabel: string): string {
-  if (categoryKey !== "transfer") {
-    return fallbackLabel;
-  }
+const PAGE_WIDTH = 210;
+const PAGE_HEIGHT = 297;
+const PAGE_MARGIN = 12;
+const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
+const PRIMARY: [number, number, number] = [35, 116, 49];
+const PRIMARY_DARK: [number, number, number] = [37, 89, 54];
+const PRIMARY_SOFT: [number, number, number] = [234, 243, 236];
+const SURFACE_SOFT: [number, number, number] = [245, 248, 246];
+const INK: [number, number, number] = [21, 24, 20];
+const MUTED: [number, number, number] = [74, 84, 77];
+const OUTLINE: [number, number, number] = [211, 220, 213];
 
-  const normalizedCategory = item.category.toLowerCase();
-  if (normalizedCategory.includes("train departure")) {
-    return "Transfer (Train Departure)";
-  }
+type PdfWithLastTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
-  if (normalizedCategory.includes("station pickup")) {
-    return "Transfer (Station Pickup)";
-  }
+type ExportOptions = {
+  /** Passing null skips the logo, which is useful for deterministic tests. */
+  logoDataUrl?: string | null;
+  save?: (document: jsPDF, fileName: string) => void;
+};
 
-  return fallbackLabel;
+function resolveItemIsoDate(item: ItineraryItem): string {
+  return item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
 }
 
-function formatItineraryCompactSummary(item: ItineraryItem, categoryKey: string): string {
-  const trimmedFrom = item.from?.trim() ?? "";
-  const trimmedTo = item.to?.trim() ?? "";
-
-  if (categoryKey === "city-tour") {
-    const cityTourCity = inferCityTourCity(item).trim();
-    if (cityTourCity) {
-      return `City Tour ${cityTourCity}`;
-    }
-  }
-
-  if (trimmedFrom && trimmedTo) {
-    return `${trimmedFrom} -> ${trimmedTo}`;
-  }
-
-  if (trimmedFrom || trimmedTo) {
-    return [trimmedFrom, trimmedTo].filter(Boolean).join(" -> ");
-  }
-
-  const trimmedTitle = item.title.trim();
-  return trimmedTitle || "Activity detail pending";
+function formatDocumentDate(isoDate: string): string {
+  if (!isoDate) return "";
+  const date = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function formatItinerarySupportDetail(
-  item: ItineraryItem,
-  categoryKey: string,
-  options?: {
-    fallbackHotelName?: string;
-    fallbackFromHotelName?: string;
-  },
-): string {
-  const detailSegments: string[] = [];
-  const flightNumber = item.flightNumber?.trim() ?? "";
-  const trimmedFrom = item.from?.trim() ?? "";
-  const trimmedTo = item.to?.trim() ?? "";
-  const inferredFromHotelName = /hotel/i.test(trimmedFrom) ? trimmedFrom : "";
-  const inferredToHotelName = /hotel/i.test(trimmedTo) ? trimmedTo : "";
-  const fallbackHotelName = options?.fallbackHotelName?.trim() ?? "";
-  const fallbackFromHotelName = options?.fallbackFromHotelName?.trim() ?? "";
-  const fromHotelName = item.fromHotelName?.trim() || inferredFromHotelName || fallbackFromHotelName;
-  const hotelName =
-    item.hotelName?.trim() ||
-    (categoryKey === "transfer"
-      ? inferredToHotelName
-      : inferredFromHotelName || inferredToHotelName || fallbackHotelName);
-  const stationPickupTime = item.destinationPickupTime?.trim() ?? "";
-  const hotelPickupRequestTime = item.hotelPickupRequestTime?.trim() ?? "";
-  const notes = item.notes?.trim() ?? "";
-
-  const transportMode = resolveTransportMode(item);
-
-  if (categoryKey === "arrival" || categoryKey === "departure") {
-    if (transportMode === "flight" && flightNumber) {
-      detailSegments.push(`Flight ${flightNumber}`);
-    } else if (transportMode !== "flight") {
-      detailSegments.push(TRANSPORT_MODE_META[transportMode].label);
-    }
-  } else if (categoryKey === "transfer") {
-    detailSegments.push(transportMode === "train" ? "Train" : "Bus");
-  }
-
-  if (categoryKey === "transfer" && (fromHotelName || hotelName)) {
-    if (fromHotelName && hotelName) {
-      detailSegments.push(`Hotel ${fromHotelName} -> ${hotelName}`);
-    } else {
-      detailSegments.push(`Hotel ${fromHotelName || hotelName}`);
-    }
-  } else if (hotelName) {
-    detailSegments.push(`Hotel ${hotelName}`);
-  }
-
-  if (item.transferByTrain && stationPickupTime) {
-    detailSegments.push(`Pickup ${formatScheduleTime(stationPickupTime)}`);
-  }
-
-  if (categoryKey === "departure" && hotelPickupRequestTime) {
-    detailSegments.push(`Hotel pickup ${formatScheduleTime(hotelPickupRequestTime)}`);
-  }
-
-  if (categoryKey === "city-tour" && item.requiresBus) {
-    detailSegments.push("Requires Bus");
-  }
-
-  if (notes) {
-    detailSegments.push(notes.length > 72 ? `${notes.slice(0, 69).trimEnd()}...` : notes);
-  }
-
-  if (detailSegments.length > 0) {
-    return detailSegments.join(" | ");
-  }
-
-  const fallbackSegments = item.meta
-    .split("|")
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  if (fallbackSegments.length === 0) {
-    return "";
-  }
-
-  if (parseTimeForInput(fallbackSegments[0])) {
-    fallbackSegments.shift();
-  }
-
-  return fallbackSegments.join(" | ");
+function formatDocumentTime(value?: string): string {
+  const trimmedValue = value?.trim() ?? "";
+  if (!trimmedValue) return "";
+  if (/^\d{2}:\d{2}$/.test(trimmedValue)) return trimmedValue;
+  return parseTimeForInput(trimmedValue) ?? trimmedValue;
 }
 
-function schedulePrint(printableWindow: Window): void {
-  let printTriggered = false;
-  const triggerPrint = () => {
-    if (printTriggered || printableWindow.closed) {
-      return;
-    }
+function inferCarrierCode(flightNumber?: string): string {
+  return flightNumber?.trim().match(/^([A-Za-z]{2,3})(?=[\s-]*\d)/)?.[1]?.toUpperCase() ?? "";
+}
 
-    printTriggered = true;
-    printableWindow.focus();
-    printableWindow.print();
-  };
+function formatActivityLabel(item: ItineraryItem, categoryKey: string): string {
+  if (categoryKey === "arrival") return "Arrival";
+  if (categoryKey === "city-tour") return "City Tour";
+  if (categoryKey === "transfer") return "Transfer";
+  if (categoryKey === "departure") return "Departure";
+  return item.category.trim();
+}
 
+function cleanFileName(value: string): string {
+  const cleaned = value.trim().replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-");
+  return cleaned || "group";
+}
+
+async function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read logo."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function loadLogoDataUrl(): Promise<string | null> {
   try {
-    printableWindow.addEventListener(
-      "load",
-      () => {
-        window.setTimeout(triggerPrint, 180);
-      },
-      { once: true },
-    );
+    const response = await fetch("/logo-ghaniya-travel-polos.png");
+    if (!response.ok) return null;
+    return await readBlobAsDataUrl(await response.blob());
   } catch {
-    // Some popup handles expose a restricted event API.
+    return null;
   }
-
-  try {
-    const fontReady = printableWindow.document.fonts?.ready;
-    if (fontReady) {
-      void fontReady
-        .then(() => {
-          window.setTimeout(triggerPrint, 120);
-        })
-        .catch(() => {
-          // Ignore font-loading failures and fall back to the timeout below.
-        });
-    }
-  } catch {
-    // Some popup handles expose a restricted document.fonts API.
-  }
-
-  window.setTimeout(triggerPrint, 1800);
 }
 
-export function exportGroupDetailPdf(
+function drawDocumentHeader(
+  document: jsPDF,
+  groupNumbers: string,
+  generatedTimestamp: string,
+  logoDataUrl: string | null,
+): number {
+  if (logoDataUrl) {
+    try {
+      document.addImage(logoDataUrl, "PNG", PAGE_MARGIN, 9, 18, 18, undefined, "FAST");
+    } catch {
+      // The brand text remains available if an installation serves an invalid logo.
+    }
+  }
+
+  const brandX = logoDataUrl ? PAGE_MARGIN + 22 : PAGE_MARGIN;
+  document.setFont("helvetica", "bold");
+  document.setFontSize(13);
+  document.setTextColor(...INK);
+  document.text("Ghaniya Tour & Travel", brandX, 16);
+  document.setFontSize(6.5);
+  document.setTextColor(...PRIMARY);
+  document.text("OPERATIONS & GROUND SERVICES", brandX, 21);
+
+  document.setFontSize(18);
+  document.setTextColor(...PRIMARY_DARK);
+  document.text("Package Information", PAGE_WIDTH - PAGE_MARGIN, 15, { align: "right" });
+  document.setFontSize(8);
+  document.text(groupNumbers, PAGE_WIDTH - PAGE_MARGIN, 21, { align: "right", maxWidth: 78 });
+  document.setFont("helvetica", "normal");
+  document.setFontSize(6.5);
+  document.setTextColor(...MUTED);
+  document.text(`Generated ${generatedTimestamp} WIB`, PAGE_WIDTH - PAGE_MARGIN, 26, { align: "right" });
+
+  document.setDrawColor(...PRIMARY);
+  document.setLineWidth(0.7);
+  document.line(PAGE_MARGIN, 31, PAGE_WIDTH - PAGE_MARGIN, 31);
+  return 37;
+}
+
+function ensureSectionSpace(document: jsPDF, y: number, requiredHeight = 25): number {
+  if (y + requiredHeight <= PAGE_HEIGHT - 15) return y;
+  document.addPage();
+  return PAGE_MARGIN;
+}
+
+function drawSectionTitle(document: jsPDF, title: string, y: number): number {
+  const nextY = ensureSectionSpace(document, y);
+  document.setFillColor(...PRIMARY);
+  document.roundedRect(PAGE_MARGIN, nextY, CONTENT_WIDTH, 8, 2.5, 2.5, "F");
+  document.rect(PAGE_MARGIN, nextY + 4, CONTENT_WIDTH, 4, "F");
+  document.setFont("helvetica", "bold");
+  document.setFontSize(8);
+  document.setTextColor(255, 255, 255);
+  document.text(title.toUpperCase(), PAGE_MARGIN + 3, nextY + 5.2);
+  return nextY + 8;
+}
+
+function drawTable(document: jsPDF, y: number, options: UserOptions): number {
+  autoTable(document, {
+    startY: y,
+    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 17 },
+    theme: "grid",
+    tableWidth: CONTENT_WIDTH,
+    showHead: "everyPage",
+    rowPageBreak: "avoid",
+    styles: {
+      font: "helvetica",
+      fontSize: 7.2,
+      textColor: INK,
+      lineColor: OUTLINE,
+      lineWidth: 0.12,
+      cellPadding: { top: 2.2, right: 2, bottom: 2.2, left: 2 },
+      valign: "middle",
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: PRIMARY_SOFT,
+      textColor: PRIMARY_DARK,
+      fontStyle: "bold",
+      fontSize: 6.3,
+      minCellHeight: 7,
+    },
+    alternateRowStyles: { fillColor: SURFACE_SOFT },
+    ...options,
+  });
+  return ((document as PdfWithLastTable).lastAutoTable?.finalY ?? y) + 7;
+}
+
+function addFooters(document: jsPDF, groupNumbers: string): void {
+  const pageCount = document.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page += 1) {
+    document.setPage(page);
+    document.setDrawColor(...OUTLINE);
+    document.setLineWidth(0.2);
+    document.line(PAGE_MARGIN, PAGE_HEIGHT - 12, PAGE_WIDTH - PAGE_MARGIN, PAGE_HEIGHT - 12);
+    document.setFont("helvetica", "normal");
+    document.setFontSize(6.2);
+    document.setTextColor(...MUTED);
+    document.text("Ghaniya Tour & Travel · Package Information", PAGE_MARGIN, PAGE_HEIGHT - 7.5);
+    document.setFont("helvetica", "bold");
+    document.setTextColor(...PRIMARY_DARK);
+    document.text(`${groupNumbers} · ${page}/${pageCount}`, PAGE_WIDTH - PAGE_MARGIN, PAGE_HEIGHT - 7.5, { align: "right" });
+  }
+}
+
+export async function exportGroupDetailPdf(
   {
     group,
     itineraryItems,
-    noteItems,
     musyrifProfile,
     familyGroups = [],
   }: {
@@ -194,571 +204,110 @@ export function exportGroupDetailPdf(
     musyrifProfile: Musyrif;
     familyGroups?: GroupData[];
   },
-  options: { printWindow?: Window | null } = {},
-): boolean {
-  const reusableWindow = options.printWindow;
-  const printableWindow =
-    reusableWindow && !reusableWindow.closed ? reusableWindow : window.open("", "_blank", "width=1120,height=760");
-  if (!printableWindow) {
+  options: ExportOptions = {},
+): Promise<boolean> {
+  try {
+    const document = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: false });
+    document.setProperties({ title: `Package Information - ${group.code}`, author: "Ghaniya Tour & Travel" });
+
+    const relatedGroups = familyGroups.length > 0 ? familyGroups : [group];
+    const groupNumbers = relatedGroups.map((item) => item.code.trim()).filter(Boolean).join(" · ");
+    const totalPaxCount = relatedGroups.reduce((total, item) => total + item.pax, 0);
+    const totalBusCount = resolveTotalBusCount(totalPaxCount, group.totalBuses);
+    const busLabel = `${totalBusCount} ${totalBusCount === 1 ? "BUS" : "BUSES"}`;
+    const generatedTimestamp = new Date().toLocaleString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+    const logoDataUrl = options.logoDataUrl === undefined ? await loadLogoDataUrl() : options.logoDataUrl;
+
+    let y = drawDocumentHeader(document, groupNumbers, generatedTimestamp, logoDataUrl);
+    y = drawSectionTitle(document, "Group Detail", y);
+    y = drawTable(document, y, {
+      head: [["Group Code", "Group Name", "Total Pax", "Tour Leader Indonesia", "Mutawwif Saudi"]],
+      body: [[groupNumbers, group.name, String(totalPaxCount), musyrifProfile.name.trim(), ""]],
+      columnStyles: {
+        0: { cellWidth: 26 }, 1: { cellWidth: 47 }, 2: { cellWidth: 21, halign: "center" },
+        3: { cellWidth: 46 }, 4: { cellWidth: 46 },
+      },
+    });
+
+    const flightBody: RowInput[] = [];
+    for (const direction of ["ONWARD", "RETURN"] as const) {
+      flightBody.push([{ content: direction, colSpan: 8, styles: {
+        fillColor: SURFACE_SOFT, textColor: PRIMARY_DARK, fontStyle: "bold", fontSize: 6.5,
+      } }]);
+      const legs = (group.visaSetup?.flightLegs ?? [])
+        .filter((leg) => leg.direction === direction)
+        .sort((left, right) => left.sortOrder - right.sortOrder);
+      if (legs.length === 0) flightBody.push(["", "", "", "", "", "", "", ""]);
+      legs.forEach((leg) => {
+        const flightNumber = leg.flightNumber.trim();
+        flightBody.push([
+          formatDocumentDate(leg.departureDate), leg.departureAirportCode.trim().toUpperCase(),
+          leg.arrivalAirportCode.trim().toUpperCase(), formatDocumentTime(leg.departureTime),
+          formatDocumentTime(leg.arrivalTime), leg.carrierCode.trim().toUpperCase() || inferCarrierCode(flightNumber),
+          flightNumber, leg.remarks.trim(),
+        ]);
+      });
+    }
+    y = drawSectionTitle(document, "Flight Detail", y);
+    y = drawTable(document, y, {
+      head: [["Date", "From", "To", "ETD", "ETA", "Carrier", "Flight No.", "Remarks"]],
+      body: flightBody,
+      columnStyles: {
+        0: { cellWidth: 22 }, 1: { cellWidth: 15 }, 2: { cellWidth: 15 }, 3: { cellWidth: 16, halign: "center" },
+        4: { cellWidth: 16, halign: "center" }, 5: { cellWidth: 20 }, 6: { cellWidth: 23 }, 7: { cellWidth: 59 },
+      },
+    });
+
+    const hotelBody: RowInput[] = [
+      ...(group.visaSetup?.makkahHotels ?? []).map((hotel) => ["MAKKAH", hotel.hotelName.trim(), formatDocumentDate(hotel.stayStartIso.trim()), formatDocumentDate(hotel.stayEndIso.trim()), hotel.agreementNumber.trim()]),
+      ...(group.visaSetup?.madinahHotels ?? []).map((hotel) => ["MADINAH", hotel.hotelName.trim(), formatDocumentDate(hotel.stayStartIso.trim()), formatDocumentDate(hotel.stayEndIso.trim()), hotel.agreementNumber.trim()]),
+    ];
+    y = drawSectionTitle(document, "Hotel", y);
+    y = drawTable(document, y, {
+      head: [["City", "Hotel", "Check-in", "Check-out", "Agreement No."]],
+      body: hotelBody.length > 0 ? hotelBody : [["", "", "", "", ""]],
+      columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 54 }, 2: { cellWidth: 28 }, 3: { cellWidth: 28 }, 4: { cellWidth: 52 } },
+    });
+
+    const itineraryBody: RowInput[] = [...itineraryItems]
+      .sort((left, right) => `${resolveItemIsoDate(left)}T${left.time ?? "00:00"}`.localeCompare(`${resolveItemIsoDate(right)}T${right.time ?? "00:00"}`))
+      .map((item) => {
+        const categoryKey = inferCategoryKey(item);
+        const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item).trim() : "";
+        const requiresBus = item.requiresBus === true || resolveTransportMode(item) === "bus";
+        return [
+          formatDocumentDate(resolveItemIsoDate(item)), item.from?.trim() ?? "", item.to?.trim() || cityTourCity,
+          formatActivityLabel(item, categoryKey), formatDocumentTime(item.time), requiresBus ? busLabel : "",
+        ];
+      });
+    y = drawSectionTitle(document, "Itinerary", y);
+    y = drawTable(document, y, {
+      head: [["Date", "From", "To", "Activity", "Time", "Bus"]],
+      body: itineraryBody.length > 0 ? itineraryBody : [["", "", "", "", "", ""]],
+      columnStyles: {
+        0: { cellWidth: 26 }, 1: { cellWidth: 37 }, 2: { cellWidth: 39 }, 3: { cellWidth: 34 },
+        4: { cellWidth: 22, halign: "center" },
+        5: { cellWidth: 28, halign: "center", fillColor: PRIMARY_SOFT, textColor: PRIMARY_DARK, fontStyle: "bold" },
+      },
+    });
+
+    const raudhahBody: RowInput[] = (group.visaSetup?.raudhahAppointments ?? []).map((appointment) => [
+      "", formatDocumentDate(appointment.dateIso.trim()), "",
+    ]);
+    y = drawSectionTitle(document, "Praying at Raudhah", y);
+    drawTable(document, y, {
+      head: [["Group", "Date", "Time"]],
+      body: raudhahBody.length > 0 ? raudhahBody : [["", "", ""]],
+      columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 63 }, 2: { cellWidth: 63, halign: "center" } },
+    });
+
+    addFooters(document, groupNumbers);
+    const fileName = `Package Information - ${cleanFileName(group.code)}.pdf`;
+    (options.save ?? ((pdf, name) => pdf.save(name)))(document, fileName);
+    return true;
+  } catch {
     return false;
   }
-
-  const generatedTimestamp = new Date()
-    .toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })
-    .toUpperCase();
-
-  const logoUrl = new URL("/logo-ghaniya-travel-polos.png", window.location.origin).toString();
-  const appCssUrl = new URL("/index.css", window.location.origin).toString();
-  const fontsCssUrl = new URL("/fonts.css", window.location.origin).toString();
-
-  const sortedItinerary = [...itineraryItems].sort((left, right) => {
-    const leftIso = left.isoDate ?? parseDisplayDateToIso(left.date, left.year);
-    const rightIso = right.isoDate ?? parseDisplayDateToIso(right.date, right.year);
-    const leftKey = `${leftIso}T${left.time ?? "00:00"}`;
-    const rightKey = `${rightIso}T${right.time ?? "00:00"}`;
-    return leftKey.localeCompare(rightKey);
-  });
-
-  const formatLongDate = (isoDate: string): string => {
-    if (!isoDate) {
-      return "-";
-    }
-
-    const date = new Date(`${isoDate}T12:00:00`);
-    if (Number.isNaN(date.getTime())) {
-      return isoDate.toUpperCase();
-    }
-
-    return date
-      .toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-      .toUpperCase();
-  };
-
-  const formatTimelineDate = (isoDate: string): { dateLabel: string; dayLabel: string } => {
-    if (!isoDate) {
-      return { dateLabel: "-", dayLabel: "-" };
-    }
-
-    const date = new Date(`${isoDate}T12:00:00`);
-    if (Number.isNaN(date.getTime())) {
-      return { dateLabel: isoDate.toUpperCase(), dayLabel: "-" };
-    }
-
-    return {
-      dateLabel: date
-        .toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-        })
-        .toUpperCase(),
-      dayLabel: date.toLocaleDateString("en-US", { weekday: "long" }),
-    };
-  };
-
-  const formatTime24 = (value: string): string => {
-    if (!value) {
-      return "TBD";
-    }
-
-    if (/^\d{2}:\d{2}$/.test(value)) {
-      return value;
-    }
-
-    const parsed = parseTimeForInput(value);
-    if (parsed) {
-      return parsed;
-    }
-
-    return value;
-  };
-
-  const fallbackStartIso =
-    sortedItinerary[0]?.isoDate ??
-    (sortedItinerary[0] ? parseDisplayDateToIso(sortedItinerary[0].date, sortedItinerary[0].year) : "");
-  const fallbackEndIso =
-    sortedItinerary.length > 0
-      ? (sortedItinerary[sortedItinerary.length - 1]?.isoDate ??
-        parseDisplayDateToIso(
-          sortedItinerary[sortedItinerary.length - 1].date,
-          sortedItinerary[sortedItinerary.length - 1].year,
-        ))
-      : "";
-  const arrivalItem = sortedItinerary.find((item) => inferCategoryKey(item) === "arrival");
-  const returnItem = [...sortedItinerary].reverse().find((item) => inferCategoryKey(item) === "departure");
-  const returnIso =
-    returnItem?.isoDate ?? (returnItem ? parseDisplayDateToIso(returnItem.date, returnItem.year) : fallbackEndIso);
-  const arrivalFlightNumber = arrivalItem?.flightNumber?.trim() || "-";
-  const returnFlightNumber = returnItem?.flightNumber?.trim() || "-";
-  const cityHotelNames = {
-    makkah: group.visaSetup?.makkahHotels[0]?.hotelName?.trim() ?? "",
-    madinah: group.visaSetup?.madinahHotels[0]?.hotelName?.trim() ?? "",
-  };
-  const resolveHotelNameByCity = (cityInput: string): string => {
-    const cityKey = normalizeAgreementCityKey(cityInput);
-    if (!cityKey) {
-      return "";
-    }
-
-    return cityHotelNames[cityKey]?.trim() ?? "";
-  };
-  const resolvePdfFallbackHotels = (
-    item: ItineraryItem,
-    categoryKey: string,
-  ): { fallbackHotelName: string; fallbackFromHotelName: string } => {
-    const fallbackFromHotelName = categoryKey === "transfer" ? resolveHotelNameByCity(item.from ?? "") : "";
-
-    if (categoryKey === "departure") {
-      return {
-        fallbackHotelName: resolveHotelNameByCity(item.from ?? ""),
-        fallbackFromHotelName,
-      };
-    }
-
-    if (categoryKey === "arrival" || categoryKey === "transfer") {
-      return {
-        fallbackHotelName: resolveHotelNameByCity(item.to ?? ""),
-        fallbackFromHotelName,
-      };
-    }
-
-    if (categoryKey === "city-tour") {
-      return {
-        fallbackHotelName:
-          resolveHotelNameByCity(item.cityTourCity ?? "") ||
-          resolveHotelNameByCity(item.from ?? "") ||
-          resolveHotelNameByCity(item.to ?? ""),
-        fallbackFromHotelName,
-      };
-    }
-
-    return {
-      fallbackHotelName: "",
-      fallbackFromHotelName,
-    };
-  };
-  const raudhahDateLabels = Array.from(
-    new Set(
-      (group.visaSetup?.raudhahAppointments ?? [])
-        .map((appointment) => formatLongDate(appointment.dateIso?.trim() ?? ""))
-        .filter((value) => value && value !== "-"),
-    ),
-  );
-  const raudhahDateSummary = raudhahDateLabels.length > 0 ? raudhahDateLabels.join(" | ") : "NOT SET";
-
-  const itineraryTimelineRows = sortedItinerary
-    .map((item, index) => {
-      const itemIso = item.isoDate ?? parseDisplayDateToIso(item.date, item.year);
-      const { dateLabel } = formatTimelineDate(itemIso);
-      const categoryKey = inferCategoryKey(item);
-      const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item) : "";
-      const badgeLabel = categoryKey === "city-tour" && cityTourCity ? `City Tour / ${cityTourCity}` : item.category;
-      const activityHeading = formatItineraryActivityHeading(item, categoryKey, item.category);
-      const compactSummary = formatItineraryCompactSummary(item, categoryKey);
-      const detailText = formatItinerarySupportDetail(item, categoryKey, resolvePdfFallbackHotels(item, categoryKey));
-      const timeSource = item.transferByTrain ? item.trainDepartureTime || item.time || "" : item.time || "";
-      const timelineTime = formatTime24(timeSource);
-
-      return `
-          <tr>
-            <td class="cell-center">${index + 1}</td>
-            <td>${escapeHtml(dateLabel)}</td>
-            <td class="cell-center">${escapeHtml(timelineTime)}</td>
-            <td>${escapeHtml(badgeLabel)}</td>
-            <td>${escapeHtml(activityHeading)}</td>
-            <td>${escapeHtml(compactSummary)}</td>
-            <td>${escapeHtml(detailText || "-")}</td>
-          </tr>
-        `;
-    })
-    .join("");
-  const departDateLabel = formatLongDate(fallbackStartIso);
-  const returnDateLabel = formatLongDate(returnIso);
-
-  const defaultGuidelines = [
-    "Gather in lobby 30 mins before every scheduled activity.",
-    "Nusuk permits are required for Raudhah. Monitor your app daily.",
-    "Keep Visa and Passport in hand luggage during all transit points.",
-  ];
-  const noteHighlightItems =
-    noteItems.length > 0
-      ? noteItems.slice(0, 3).map((note) => `${note.text}${note.pinned ? " (Pinned)" : ""}`)
-      : defaultGuidelines;
-  const noteRows = noteHighlightItems.map((text) => `<li>${escapeHtml(text)}</li>`).join("");
-
-  const allGroupCodes = familyGroups.length > 0
-    ? familyGroups.map((g) => g.code).join(" - ")
-    : group.code;
-
-  const totalPaxCount = familyGroups.length > 0
-    ? familyGroups.reduce((acc, g) => acc + g.pax, 0)
-    : group.pax;
-
-  const printableHtml = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ghaniya Tour And Travel - ${escapeHtml(group.code)}</title>
-    <link rel="preload" as="style" href="${escapeHtml(fontsCssUrl)}" />
-    <link rel="preload" as="style" href="${escapeHtml(appCssUrl)}" />
-    <link rel="preload" as="image" href="${escapeHtml(logoUrl)}" />
-    <link rel="stylesheet" href="${escapeHtml(fontsCssUrl)}" />
-    <link rel="stylesheet" href="${escapeHtml(appCssUrl)}" />
-    <style>
-      :root {
-        --ghaniya-gold: #b8860b;
-        --ghaniya-gold-light: #faf8f2;
-        --ghaniya-gold-soft: rgba(184, 134, 11, 0.15);
-        --ink: #1f2937;
-        --ink-dark: #111111;
-        --muted: #6b7280;
-        --line: #e2e8f0;
-        --surface: #ffffff;
-        --soft: #f8fafc;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      @page {
-        size: A4 portrait;
-        margin: 12mm;
-      }
-      body {
-        margin: 0;
-        padding: 10px;
-        background: var(--surface);
-        color: var(--ink);
-        font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .doc {
-        margin: 0;
-        width: 100%;
-      }
-      .doc-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-bottom: 16px;
-        border-bottom: 2px solid var(--ghaniya-gold);
-        margin-bottom: 20px;
-      }
-      .header-left {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-      }
-      .header-logo {
-        height: 52px;
-        width: auto;
-        object-fit: contain;
-      }
-      .brand-info {
-        display: flex;
-        flex-direction: column;
-      }
-      .brand-name {
-        font-family: 'Outfit', 'Inter', sans-serif;
-        font-size: 16px;
-        font-weight: 800;
-        color: var(--ink-dark);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        line-height: 1.2;
-      }
-      .brand-tagline {
-        font-family: 'Manrope', 'Inter', sans-serif;
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--ghaniya-gold);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-top: 2px;
-      }
-      .header-right {
-        text-align: right;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-      }
-      .doc-title {
-        font-family: 'Outfit', 'Inter', sans-serif;
-        font-size: 18px;
-        font-weight: 800;
-        color: var(--ghaniya-gold);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        line-height: 1.2;
-      }
-      .group-code-badge {
-        display: inline-block;
-        margin-top: 4px;
-        padding: 4px 10px;
-        font-size: 11px;
-        font-weight: 700;
-        background: var(--ghaniya-gold-light);
-        border: 1px solid var(--ghaniya-gold-soft);
-        color: var(--ink-dark);
-        border-radius: 4px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        line-height: 1;
-      }
-      .meta-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px 10px;
-        margin-bottom: 20px;
-      }
-      .meta-item {
-        padding: 8px 10px;
-        border: 1px solid var(--line);
-        border-left: 3px solid var(--ghaniya-gold);
-        background: var(--soft);
-        border-radius: 4px;
-      }
-      .meta-label {
-        display: block;
-        margin-bottom: 4px;
-        font-size: 9px;
-        font-weight: 700;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .meta-value {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--ink-dark);
-        overflow-wrap: anywhere;
-        line-height: 1.25;
-      }
-      .section {
-        margin-top: 20px;
-      }
-      .section-header {
-        border-bottom: 1px solid var(--line);
-        padding-bottom: 6px;
-        margin-bottom: 12px;
-      }
-      .section-header h2 {
-        margin: 0;
-        font-family: 'Outfit', 'Inter', sans-serif;
-        font-size: 14px;
-        font-weight: 800;
-        color: var(--ink-dark);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        position: relative;
-        display: inline-block;
-      }
-      .section-header h2::after {
-        content: '';
-        position: absolute;
-        bottom: -7px;
-        left: 0;
-        width: 100%;
-        height: 3px;
-        background: var(--ghaniya-gold);
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        table-layout: fixed;
-        margin-bottom: 8px;
-      }
-      th,
-      td {
-        border: 1px solid var(--line);
-        padding: 8px 10px;
-        font-size: 11.5px;
-        line-height: 1.4;
-        vertical-align: top;
-        word-break: break-word;
-      }
-      th {
-        background-color: var(--ghaniya-gold-light) !important;
-        color: var(--ink-dark) !important;
-        font-weight: 700;
-        font-size: 10px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        border-bottom: 2px solid var(--ghaniya-gold);
-        text-align: left;
-      }
-      tr:nth-child(even) {
-        background-color: var(--soft);
-      }
-      .cell-center {
-        text-align: center;
-      }
-      .notes-card {
-        background: var(--ghaniya-gold-light);
-        border: 1px solid var(--ghaniya-gold-soft);
-        border-radius: 6px;
-        padding: 14px 18px;
-      }
-      .notes-list {
-        margin: 0;
-        padding-left: 18px;
-      }
-      .notes-list li {
-        margin: 0 0 6px;
-        font-size: 11.5px;
-        line-height: 1.5;
-        color: var(--ink);
-      }
-      .notes-list li:last-child {
-        margin-bottom: 0;
-      }
-      .footer {
-        margin-top: 24px;
-        padding-top: 10px;
-        border-top: 1px solid var(--line);
-        display: flex;
-        justify-content: space-between;
-        font-size: 9.5px;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .empty {
-        text-align: center;
-        color: var(--muted);
-      }
-      @media print {
-        body {
-          padding: 0;
-        }
-      }
-      @media screen and (max-width: 900px) {
-        .meta-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="doc">
-      <header class="doc-header">
-        <div class="header-left">
-          <img src="${escapeHtml(logoUrl)}" alt="Ghaniya Tour & Travel" class="header-logo" decoding="sync" fetchpriority="high" />
-          <div class="brand-info">
-            <div class="brand-name">Ghaniya Tour & Travel</div>
-            <div class="brand-tagline">Spiritual Pilgrimage & Services</div>
-          </div>
-        </div>
-        <div class="header-right">
-          <div class="doc-title">Group Detail Overview</div>
-          <div class="group-code-badge">${escapeHtml(group.code)}</div>
-        </div>
-      </header>
-
-      <section class="meta-grid" aria-label="Group summary details">
-        <div class="meta-item">
-          <span class="meta-label">Group Code(s)</span>
-          <div class="meta-value">${escapeHtml(allGroupCodes)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Group Name</span>
-          <div class="meta-value">${escapeHtml(group.name)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Pax Count</span>
-          <div class="meta-value">${totalPaxCount}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Musyrif</span>
-          <div class="meta-value">${escapeHtml(musyrifProfile.name)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Musyrif Phone</span>
-          <div class="meta-value">${escapeHtml(musyrifProfile.phone)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Depart</span>
-          <div class="meta-value">${escapeHtml(departDateLabel)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Flight In</span>
-          <div class="meta-value">${escapeHtml(arrivalFlightNumber)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Return</span>
-          <div class="meta-value">${escapeHtml(returnDateLabel)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Flight Out</span>
-          <div class="meta-value">${escapeHtml(returnFlightNumber)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Raudhah Dates</span>
-          <div class="meta-value">${escapeHtml(raudhahDateSummary)}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Generated</span>
-          <div class="meta-value">${escapeHtml(generatedTimestamp)}</div>
-        </div>
-      </section>
-
-      <section class="section itinerary-section">
-        <div class="section-header">
-          <h2>Full Itinerary</h2>
-        </div>
-        <table aria-label="Full itinerary table">
-          <thead>
-            <tr>
-              <th style="width: 34px;">No</th>
-              <th style="width: 80px;">Date</th>
-              <th style="width: 60px;">Time</th>
-              <th style="width: 100px;">Category</th>
-              <th style="width: 140px;">Activity</th>
-              <th style="width: 160px;">Route / Summary</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itineraryTimelineRows || '<tr><td class="empty" colspan="7">No itinerary data available.</td></tr>'}
-          </tbody>
-        </table>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <h2>Operational Notes</h2>
-        </div>
-        <div class="notes-card">
-          <ol class="notes-list">
-            ${noteRows}
-          </ol>
-        </div>
-      </section>
-
-      <footer class="footer">
-        <span>Generated: ${escapeHtml(generatedTimestamp)}</span>
-        <span>Ghaniya Tour & Travel</span>
-      </footer>
-    </main>
-  </body>
-</html>`;
-
-  printableWindow.document.open();
-  printableWindow.document.write(printableHtml);
-  printableWindow.document.close();
-
-  schedulePrint(printableWindow);
-
-  return true;
 }

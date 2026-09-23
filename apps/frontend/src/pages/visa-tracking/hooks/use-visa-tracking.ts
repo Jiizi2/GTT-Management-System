@@ -160,7 +160,7 @@ export type VisaRowGroup = {
   followerRows: VisaTrackingRow[];
 };
 
-export const desktopTableGridTemplate = "minmax(0, 0.9fr) minmax(0, 1.12fr) minmax(0, 0.64fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.72fr) minmax(0, 0.62fr) minmax(0, 0.8fr) minmax(0, 0.66fr)";
+export const desktopTableGridTemplate = "minmax(0, 2.2fr) minmax(48px, 0.45fr) minmax(86px, 0.8fr) minmax(144px, 1.35fr) minmax(144px, 1.35fr) minmax(80px, 0.75fr) minmax(84px, 0.8fr) minmax(76px, 0.7fr)";
 
 export function getVisaRowGroupKey(rowGroup: VisaRowGroup): string {
   return rowGroup.mainRow.id || rowGroup.mainRow.groupCode;

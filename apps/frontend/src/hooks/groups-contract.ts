@@ -82,6 +82,23 @@ const backendRaudhahAppointmentSchema = z
   })
   .passthrough();
 
+const backendFlightLegSchema = z
+  .object({
+    id: z.string().optional(),
+    direction: z.enum(["ONWARD", "RETURN"]),
+    sortOrder: z.number().optional(),
+    departureAirportCode: z.string().nullable().optional(),
+    arrivalAirportCode: z.string().nullable().optional(),
+    departureDate: backendDateValueSchema.nullable().optional(),
+    departureTime: z.string().nullable().optional(),
+    arrivalDate: backendDateValueSchema.nullable().optional(),
+    arrivalTime: z.string().nullable().optional(),
+    carrierCode: z.string().nullable().optional(),
+    flightNumber: z.string().nullable().optional(),
+    remarks: z.string().nullable().optional(),
+  })
+  .passthrough();
+
 const backendVisaSetupSchema = z
   .object({
     visaStatus: z.string().optional(),
@@ -92,9 +109,12 @@ const backendVisaSetupSchema = z
     makkahHotelWaived: z.boolean().optional(),
     madinahHotelWaived: z.boolean().optional(),
     arrivalFlightNumber: z.string().nullable().optional(),
+    arrivalFlightDate: backendDateValueSchema.nullable().optional(),
     arrivalTime: z.string().nullable().optional(),
     departureFlightNumber: z.string().nullable().optional(),
+    departureFlightDate: backendDateValueSchema.nullable().optional(),
     departureTime: z.string().nullable().optional(),
+    flightLegs: z.array(backendFlightLegSchema).nullable().optional(),
     hotelAgreements: z.array(backendHotelAgreementSchema).nullable().optional(),
     raudhahAppointments: z.array(backendRaudhahAppointmentSchema).nullable().optional(),
   })

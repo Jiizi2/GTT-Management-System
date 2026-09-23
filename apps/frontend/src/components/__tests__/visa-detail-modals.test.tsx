@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import {
   AgentAssignmentModal,
+  FlightDetailsModal,
   VisaStatusModal,
   PaymentStatusModal,
   SyarikahModal,
@@ -12,6 +13,79 @@ import {
 vi.mock('../use-modal-focus-trap', () => ({
   useModalFocusTrap: () => ({ current: null }),
 }));
+
+describe('FlightDetailsModal', () => {
+  it('prefills and saves direct onward and return legs', async () => {
+    const onSave = vi.fn();
+    render(
+      <FlightDetailsModal
+        initialValue={{
+          flightLegs: [
+            {
+              direction: 'ONWARD', sortOrder: 0, departureAirportCode: 'CGK', arrivalAirportCode: 'JED',
+              departureDate: '2026-09-20', departureTime: '18:00', arrivalDate: '2026-09-21', arrivalTime: '01:50',
+              carrierCode: 'GA', flightNumber: 'GA-980', remarks: '',
+            },
+            {
+              direction: 'RETURN', sortOrder: 0, departureAirportCode: 'JED', arrivalAirportCode: 'CGK',
+              departureDate: '2026-09-30', departureTime: '07:50', arrivalDate: '2026-09-30', arrivalTime: '21:00',
+              carrierCode: 'GA', flightNumber: 'GA-981', remarks: '',
+            },
+          ],
+        }}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    expect(document.querySelector('#flight-leg-0-departure-date')).toHaveValue('20/09/2026');
+    expect(document.querySelector('#flight-leg-1-departure-date')).toHaveValue('30/09/2026');
+    expect(document.querySelectorAll('input[type="date"]')).toHaveLength(0);
+
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith({
+        flightLegs: expect.arrayContaining([
+          expect.objectContaining({ direction: 'ONWARD', departureAirportCode: 'CGK', arrivalAirportCode: 'JED', flightNumber: 'GA-980' }),
+          expect.objectContaining({ direction: 'RETURN', departureAirportCode: 'JED', arrivalAirportCode: 'CGK', flightNumber: 'GA-981' }),
+        ]),
+      });
+    });
+  });
+
+  it('blocks flight dates outside the agreement tolerance', async () => {
+    const onSave = vi.fn();
+    render(
+      <FlightDetailsModal
+        initialValue={{
+          flightLegs: [
+            {
+              direction: 'ONWARD', sortOrder: 0, departureAirportCode: 'CGK', arrivalAirportCode: 'JED',
+              departureDate: '2026-09-19', departureTime: '18:00', arrivalDate: '2026-09-19', arrivalTime: '23:00',
+              carrierCode: 'GA', flightNumber: 'GA-980', remarks: '',
+            },
+            {
+              direction: 'RETURN', sortOrder: 0, departureAirportCode: 'JED', arrivalAirportCode: 'CGK',
+              departureDate: '2026-10-01', departureTime: '07:50', arrivalDate: '2026-10-01', arrivalTime: '21:00',
+              carrierCode: 'GA', flightNumber: 'GA-981', remarks: '',
+            },
+          ],
+        }}
+        agreementStartDate="2026-09-21"
+        agreementEndDate="2026-09-29"
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    expect(await screen.findByText('Tanggal kedatangan harus antara 20 Sept 2026 dan 22 Sept 2026.')).toBeInTheDocument();
+    expect(screen.getByText('Tanggal kepulangan harus 29 Sept 2026 atau 30 Sept 2026.')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
 
 describe('VisaStatusModal', () => {
   const defaultProps = {

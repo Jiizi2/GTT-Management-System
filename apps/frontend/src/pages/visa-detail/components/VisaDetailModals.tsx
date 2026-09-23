@@ -4,6 +4,7 @@ import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 import { formatLocalIsoDate } from "../../../shared/app-domain";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
 import { resolveGroupFlightDetails } from "../visa-detail-helpers";
+import { resolveFlightAgreementDateBounds } from "../../../shared/visa-flight-date-validation";
 
 const LazyDeleteGroupModal = lazy(async () => ({
   default: (await import("../../../components/group-detail-modals")).DeleteGroupModal,
@@ -90,6 +91,8 @@ export function VisaDetailModals() {
     saveFlightDetails,
     saveHotel,
     saveRaudhah,
+    makkahAgreements,
+    madinahAgreements,
     buildHotelDraft,
     buildRaudhahDraft,
     handleCloseUnlinkModal,
@@ -109,6 +112,7 @@ export function VisaDetailModals() {
       : activeAgents;
 
   const syarikahValue = group?.visaSetup?.syarikah?.trim() ?? "";
+  const flightAgreementBounds = resolveFlightAgreementDateBounds([...makkahAgreements, ...madinahAgreements]);
 
   const deleteAgreementCityLabel = deleteAgreementDraft?.city === "makkah" ? "Makkah" : "Madinah";
   const isUnassigningAgreement =
@@ -176,6 +180,8 @@ export function VisaDetailModals() {
           {activeModal === "flight" ? (
             <LazyFlightDetailsModal
               initialValue={resolveGroupFlightDetails(group)}
+              agreementStartDate={flightAgreementBounds.agreementStartDate}
+              agreementEndDate={flightAgreementBounds.agreementEndDate}
               onClose={closeModal}
               onSave={saveFlightDetails}
             />

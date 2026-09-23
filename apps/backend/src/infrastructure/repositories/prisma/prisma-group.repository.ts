@@ -39,6 +39,7 @@ import {
   validateCreateOrReplaceHotelAgreementRules,
   validateHotelAgreementRules,
 } from "../../../groups/domain/groups.hotel-validation";
+import { validateFlightLegRules } from "../../../groups/domain/groups.flight-leg-validation";
 import { resolveItineraryTitle } from "../../../groups/domain/groups-itinerary-title";
 import { resolveAgreementDrivenVisaStatus } from "../../../groups/domain/visa-status-transition";
 import { buildGroupSearchDocument } from "../../../groups/domain/groups.search-document";
@@ -221,6 +222,7 @@ export class PrismaGroupRepository implements GroupRepository {
   async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
+    validateFlightLegRules(payload);
 
     const normalizedCode = payload.code.trim().toUpperCase();
     const parentGroupId = await this.validateParentGroupLinkWithPrisma({
@@ -254,6 +256,7 @@ export class PrismaGroupRepository implements GroupRepository {
   async replace(idOrCode: string, payload: CreateGroupDto): Promise<GroupDetailRecord> {
     this.validateCreateOrReplaceTravelDates(payload);
     validateCreateOrReplaceHotelAgreementRules(payload);
+    validateFlightLegRules(payload);
 
     const current = await this.prisma.group.findFirst({
       where: {

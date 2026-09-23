@@ -7,8 +7,10 @@ import { getScheduleTypeOption, getTransportModeIcon, sortInputItineraryItems } 
  */
 export type VisaFlightInput = {
   arrivalFlightNumber?: string;
+  arrivalFlightDate?: string;
   arrivalTime?: string;
   departureFlightNumber?: string;
+  departureFlightDate?: string;
   departureTime?: string;
 };
 
@@ -146,15 +148,19 @@ export function buildItineraryFromVisaData(input: VisaItineraryInput): InputItin
     ]),
   );
 
-  const arrivalDate = isValidIsoDate(input.arrivalDateIso)
-    ? normalizeIso(input.arrivalDateIso)
+  const arrivalDate = isValidIsoDate(input.flight?.arrivalFlightDate)
+    ? normalizeIso(input.flight?.arrivalFlightDate)
+    : isValidIsoDate(input.arrivalDateIso)
+      ? normalizeIso(input.arrivalDateIso)
     : (stays[0]?.startIso ?? "");
   if (!arrivalDate) {
     return [];
   }
 
-  const returnDate = isValidIsoDate(input.returnDateIso)
-    ? normalizeIso(input.returnDateIso)
+  const returnDate = isValidIsoDate(input.flight?.departureFlightDate)
+    ? normalizeIso(input.flight?.departureFlightDate)
+    : isValidIsoDate(input.returnDateIso)
+      ? normalizeIso(input.returnDateIso)
     : (stays[stays.length - 1]?.endIso ?? arrivalDate);
 
   const firstStay = stays[0];

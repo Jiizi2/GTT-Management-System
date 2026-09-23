@@ -8,6 +8,8 @@ type AgentFilterSelectProps = {
   className?: string;
   variant?: "toolbar" | "field" | "pill" | "inline";
   compact?: boolean;
+  leadingIcon?: string;
+  menuMaxHeight?: number;
 };
 
 export function AgentFilterSelect({
@@ -17,6 +19,8 @@ export function AgentFilterSelect({
   className = "",
   variant = "toolbar",
   compact = false,
+  leadingIcon,
+  menuMaxHeight,
 }: AgentFilterSelectProps) {
   const query = useAgentsQuery();
   const activeAgents = (query.data ?? []).filter((agent) => agent.status === "ACTIVE");
@@ -78,12 +82,21 @@ export function AgentFilterSelect({
 
   if (variant === "inline") {
     return (
-      <div className={`min-w-0 ${className}`.trim()}>
+      <div className={`relative min-w-0 ${className}`.trim()}>
+        {leadingIcon ? (
+          <span
+            className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-lg text-on-surface-variant"
+            aria-hidden="true"
+          >
+            {leadingIcon}
+          </span>
+        ) : null}
         <SereneSelect
-          className="h-8 w-full bg-transparent px-3 pr-8 text-left text-xs font-semibold text-on-surface-variant outline-none transition hover:text-on-surface"
+          className={`h-11 w-full bg-transparent pr-9 text-left text-sm font-semibold text-on-surface-variant outline-none transition hover:text-on-surface sm:h-8 sm:text-xs ${leadingIcon ? "pl-10" : "pl-3"}`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           aria-label="Filter by Agent"
+          menuMaxHeight={menuMaxHeight}
         >
           {options}
         </SereneSelect>
