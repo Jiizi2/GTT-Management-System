@@ -25,7 +25,7 @@ export async function fetchBackend(pathOrUrl: string, init?: RequestInit): Promi
     headers: new Headers(init?.headers),
   });
 
-  const endpointPath = new URL(endpoint).pathname.replace(/\/+$/, "");
+  const endpointPath = new URL(endpoint, "http://localhost").pathname.replace(/\/+$/, "");
   const isAuthProbe = AUTH_PROBE_PATHS.some((path) => endpointPath.endsWith(path));
   if (response.status === 401 && !isAuthProbe) {
     clearAuthSession();
