@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { SereneSelect } from "../../../components/serene-select";
 import {
@@ -9,273 +9,239 @@ import {
   deleteMuassasah,
   deleteVehicle,
   updateDriver,
+  updateMuassasah,
   updateVehicle,
   useDriversQuery,
   useMuassasahQuery,
   useVehiclesQuery,
+  type DriverOption,
   type MuassasahOption,
+  type VehicleOption,
 } from "../../../hooks/use-directory-backend";
+import { MasterDataDeleteConfirmModal, MasterDataFormDrawer } from "./MasterDataComponents";
 
-const CARD = "min-w-0 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest shadow-ambient";
-const INPUT = "h-9 w-full rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 text-sm text-on-surface outline-none focus:border-brand-primary";
-const BTN = "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold leading-none text-on-primary transition hover:brightness-95 disabled:opacity-50";
-const ICON_BTN = "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-high";
-const PROBLEM_BADGE = "inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700";
+type DirectorySection = "muassasah" | "drivers" | "vehicles";
+type DirectoryMode = "list" | "create";
+type DriverDraft = { name: string; phone: string; note: string; muassasahId: string };
+type VehicleDraft = { plateNumber: string; note: string; muassasahId: string };
 
-function MuassasahSelect({
-  value,
-  onChange,
-  list,
-  ariaLabel,
-  includeAll,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  list: MuassasahOption[];
-  ariaLabel: string;
-  includeAll?: boolean;
-}) {
+const EMPTY_DRIVER: DriverDraft = { name: "", phone: "", note: "", muassasahId: "" };
+const EMPTY_VEHICLE: VehicleDraft = { plateNumber: "", note: "", muassasahId: "" };
+const INPUT = "serene-input serene-input-md w-full";
+
+function normalizeUniqueValue(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+}
+
+function MuassasahSelect({ value, onChange, list }: { value: string; onChange: (value: string) => void; list: MuassasahOption[] }) {
   return (
-    <SereneSelect className="serene-select h-9" value={value} onChange={(event) => onChange(event.target.value)} aria-label={ariaLabel}>
-      <option value={includeAll ? "all" : ""}>{includeAll ? "Semua muassasah" : "Tanpa muassasah"}</option>
-      {list.map((item) => (
-        <option key={item.id} value={item.id}>
-          {item.name}
-        </option>
-      ))}
+    <SereneSelect className="serene-select min-h-11 w-full" value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Tanpa muassasah</option>
+      {list.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
     </SereneSelect>
   );
 }
 
-export function DirectoryManager() {
+function FieldError({ children }: { children?: string }) {
+  return children ? <p className="mt-1 text-xs font-semibold text-error" role="alert">{children}</p> : null;
+}
+
+function FormActions({ busy, disabled, onCancel }: { busy: boolean; disabled: boolean; onCancel: () => void }) {
+  return (
+    <div className="serene-form-actions flex flex-row gap-3 border-t border-outline-variant/30 pt-4">
+      <button type="button" className="serene-btn-secondary min-h-11 flex-1" onClick={onCancel} disabled={busy}>Batal</button>
+      <button type="submit" className="serene-btn-primary min-h-11 flex-1" disabled={busy || disabled}>
+        <span className="material-symbols-outlined text-lg">save</span>{busy ? "Menyimpan..." : "Simpan data"}
+      </button>
+    </div>
+  );
+}
+
+export function DirectoryManager({ section, mode, onModeChange }: { section: DirectorySection; mode: DirectoryMode; onModeChange: (mode: DirectoryMode) => void }) {
   const queryClient = useQueryClient();
   const muassasahQuery = useMuassasahQuery();
-  const muassasahList = muassasahQuery.data ?? [];
-
-  const [driverFilter, setDriverFilter] = useState("all");
-  const [vehicleFilter, setVehicleFilter] = useState("all");
-  const driversQuery = useDriversQuery(driverFilter === "all" ? undefined : driverFilter);
-  const vehiclesQuery = useVehiclesQuery(vehicleFilter === "all" ? undefined : vehicleFilter);
-
-  const [newMuassasah, setNewMuassasah] = useState("");
-  const [driverForm, setDriverForm] = useState({ name: "", phone: "", note: "", muassasahId: "" });
-  const [vehicleForm, setVehicleForm] = useState({ plateNumber: "", note: "", muassasahId: "" });
+  const driversQuery = useDriversQuery();
+  const vehiclesQuery = useVehiclesQuery();
+  const muassasah = useMemo(() => muassasahQuery.data ?? [], [muassasahQuery.data]);
+  const drivers = useMemo(() => driversQuery.data ?? [], [driversQuery.data]);
+  const vehicles = useMemo(() => vehiclesQuery.data ?? [], [vehiclesQuery.data]);
+  const [muassasahName, setMuassasahName] = useState("");
+  const [driverDraft, setDriverDraft] = useState<DriverDraft>(EMPTY_DRIVER);
+  const [vehicleDraft, setVehicleDraft] = useState<VehicleDraft>(EMPTY_VEHICLE);
+  const [editing, setEditing] = useState<MuassasahOption | DriverOption | VehicleOption | null>(null);
+  const [editMuassasahName, setEditMuassasahName] = useState("");
+  const [editDriverDraft, setEditDriverDraft] = useState<DriverDraft>(EMPTY_DRIVER);
+  const [editVehicleDraft, setEditVehicleDraft] = useState<VehicleDraft>(EMPTY_VEHICLE);
+  const [deleting, setDeleting] = useState<MuassasahOption | DriverOption | VehicleOption | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["directory"] });
-
-  const run = async (action: () => Promise<void>) => {
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["directory"] });
+  const run = async (action: () => Promise<void>, after?: () => void) => {
     setBusy(true);
     setError(null);
     try {
       await action();
-      await invalidate();
+      await refresh();
+      after?.();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Terjadi kesalahan.");
+      setError(caught instanceof Error ? caught.message : "Perubahan tidak dapat disimpan.");
     } finally {
       setBusy(false);
     }
   };
 
-  const drivers = driversQuery.data ?? [];
-  const vehicles = vehiclesQuery.data ?? [];
+  const isDriverDuplicate = (name: string, exceptId?: string) => {
+    const normalized = normalizeUniqueValue(name);
+    return Boolean(normalized) && drivers.some((item) => item.id !== exceptId && normalizeUniqueValue(item.name) === normalized);
+  };
+  const isVehicleDuplicate = (plateNumber: string, exceptId?: string) => {
+    const normalized = normalizeUniqueValue(plateNumber);
+    return Boolean(normalized) && vehicles.some((item) => item.id !== exceptId && normalizeUniqueValue(item.plateNumber) === normalized);
+  };
+  const isMuassasahDuplicate = (name: string, exceptId?: string) => {
+    const normalized = normalizeUniqueValue(name);
+    return Boolean(normalized) && muassasah.some((item) => item.id !== exceptId && normalizeUniqueValue(item.name) === normalized);
+  };
+
+  const sectionTitle = section === "muassasah" ? "Muassasah" : section === "drivers" ? "Supir" : "Kendaraan";
+  const items = section === "muassasah" ? muassasah : section === "drivers" ? drivers : vehicles;
+  const loading = section === "muassasah" ? muassasahQuery.isLoading : section === "drivers" ? driversQuery.isLoading : vehiclesQuery.isLoading;
+  const closeCreate = () => { setError(null); onModeChange("list"); };
+
+  const renderCreateForm = () => {
+    if (section === "muassasah") {
+      const duplicate = isMuassasahDuplicate(muassasahName);
+      return (
+        <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (!duplicate) void run(() => createMuassasah(muassasahName), () => { setMuassasahName(""); closeCreate(); }); }}>
+          <label className="grid gap-2 text-sm font-bold text-on-surface">Nama muassasah
+            <input className={INPUT} value={muassasahName} onChange={(event) => setMuassasahName(event.target.value)} placeholder="contoh: Daleel Maalem" autoFocus />
+            <FieldError>{duplicate ? "Nama muassasah sudah terdaftar." : undefined}</FieldError>
+          </label>
+          <FormActions busy={busy} disabled={!muassasahName.trim() || duplicate} onCancel={closeCreate} />
+        </form>
+      );
+    }
+    if (section === "drivers") {
+      const duplicate = isDriverDuplicate(driverDraft.name);
+      return (
+        <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (!duplicate) void run(() => createDriver({ ...driverDraft, muassasahId: driverDraft.muassasahId || undefined }), () => { setDriverDraft(EMPTY_DRIVER); closeCreate(); }); }}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-bold text-on-surface">Nama supir
+              <input className={INPUT} value={driverDraft.name} onChange={(event) => setDriverDraft((value) => ({ ...value, name: event.target.value }))} placeholder="contoh: Ahmad Yusuf" autoFocus />
+              <FieldError>{duplicate ? "Nama supir sudah terdaftar. Gunakan data yang sudah ada." : undefined}</FieldError>
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-on-surface">Nomor telepon
+              <input className={INPUT} value={driverDraft.phone} onChange={(event) => setDriverDraft((value) => ({ ...value, phone: event.target.value }))} placeholder="opsional" />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-on-surface">Muassasah
+              <MuassasahSelect value={driverDraft.muassasahId} onChange={(muassasahId) => setDriverDraft((value) => ({ ...value, muassasahId }))} list={muassasah} />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-on-surface">Catatan
+              <input className={INPUT} value={driverDraft.note} onChange={(event) => setDriverDraft((value) => ({ ...value, note: event.target.value }))} placeholder="opsional" />
+            </label>
+          </div>
+          <FormActions busy={busy} disabled={!driverDraft.name.trim() || duplicate} onCancel={closeCreate} />
+        </form>
+      );
+    }
+    const duplicate = isVehicleDuplicate(vehicleDraft.plateNumber);
+    return (
+      <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); if (!duplicate) void run(() => createVehicle({ ...vehicleDraft, muassasahId: vehicleDraft.muassasahId || undefined }), () => { setVehicleDraft(EMPTY_VEHICLE); closeCreate(); }); }}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-bold text-on-surface">Nomor kendaraan / plat
+            <input className={INPUT} value={vehicleDraft.plateNumber} onChange={(event) => setVehicleDraft((value) => ({ ...value, plateNumber: event.target.value }))} placeholder="contoh: B 1234 ABC" autoFocus />
+            <FieldError>{duplicate ? "Kendaraan dengan nomor tersebut sudah terdaftar." : undefined}</FieldError>
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-on-surface">Muassasah
+            <MuassasahSelect value={vehicleDraft.muassasahId} onChange={(muassasahId) => setVehicleDraft((value) => ({ ...value, muassasahId }))} list={muassasah} />
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-on-surface sm:col-span-2">Catatan
+            <input className={INPUT} value={vehicleDraft.note} onChange={(event) => setVehicleDraft((value) => ({ ...value, note: event.target.value }))} placeholder="opsional" />
+          </label>
+        </div>
+        <FormActions busy={busy} disabled={!vehicleDraft.plateNumber.trim() || duplicate} onCancel={closeCreate} />
+      </form>
+    );
+  };
+
+  const beginEdit = (item: MuassasahOption | DriverOption | VehicleOption) => {
+    setEditing(item);
+    setError(null);
+    if ("plateNumber" in item) setEditVehicleDraft({ plateNumber: item.plateNumber, note: item.note ?? "", muassasahId: item.muassasahId ?? "" });
+    else if ("phone" in item) setEditDriverDraft({ name: item.name, phone: item.phone ?? "", note: item.note ?? "", muassasahId: item.muassasahId ?? "" });
+    else setEditMuassasahName(item.name);
+  };
+
+  const submitEdit = () => {
+    if (!editing) return;
+    if (section === "muassasah" && "name" in editing && !("phone" in editing)) {
+      if (isMuassasahDuplicate(editMuassasahName, editing.id)) return;
+      void run(() => updateMuassasah(editing.id, { name: editMuassasahName }), () => setEditing(null));
+    } else if (section === "drivers" && "phone" in editing) {
+      if (isDriverDuplicate(editDriverDraft.name, editing.id)) return;
+      void run(() => updateDriver(editing.id, { ...editDriverDraft, muassasahId: editDriverDraft.muassasahId || null }), () => setEditing(null));
+    } else if (section === "vehicles" && "plateNumber" in editing) {
+      if (isVehicleDuplicate(editVehicleDraft.plateNumber, editing.id)) return;
+      void run(() => updateVehicle(editing.id, { ...editVehicleDraft, muassasahId: editVehicleDraft.muassasahId || null }), () => setEditing(null));
+    }
+  };
+
+  const editDuplicate = editing && section === "muassasah"
+    ? isMuassasahDuplicate(editMuassasahName, editing.id)
+    : editing && section === "drivers"
+      ? isDriverDuplicate(editDriverDraft.name, editing.id)
+      : editing ? isVehicleDuplicate(editVehicleDraft.plateNumber, editing.id) : false;
 
   return (
-    <div className="grid min-w-0 gap-4">
-      {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</div>
-      ) : null}
-
-      {/* Muassasah */}
-      <article className={CARD}>
-        <div className="border-b border-outline-variant/30 px-4 py-3">
-          <h2 className="text-base font-bold text-on-surface">Muassasah</h2>
-          <p className="mt-0.5 text-xs text-on-surface-variant">Perusahaan tempat supir & bis bernaung.</p>
-        </div>
-        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row">
-          <input
-            className={INPUT}
-            placeholder="Nama muassasah (mis. Daleel Maalem)"
-            value={newMuassasah}
-            onChange={(event) => setNewMuassasah(event.target.value)}
-            onKeyDown={(event) => event.key === "Enter" && newMuassasah.trim() && void run(async () => {
-              await createMuassasah(newMuassasah);
-              setNewMuassasah("");
-            })}
-          />
-          <button
-            type="button"
-            className={`${BTN} sm:w-auto`}
-            disabled={busy || !newMuassasah.trim()}
-            onClick={() => void run(async () => {
-              await createMuassasah(newMuassasah);
-              setNewMuassasah("");
-            })}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
-            Tambah
-          </button>
-        </div>
-        <div className="px-4 pb-3">
-          {muassasahList.length === 0 ? (
-            <p className="py-2 text-xs text-on-surface-variant">Belum ada muassasah.</p>
-          ) : (
-            <ul className="divide-y divide-outline-variant/30">
-              {muassasahList.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-on-surface">{item.name}</span>
-                    <span className="text-[11px] text-on-surface-variant">{item.driverCount} supir · {item.vehicleCount} bis</span>
-                  </div>
-                  <button type="button" className={`${ICON_BTN} hover:text-rose-600`} title="Hapus muassasah" disabled={busy} onClick={() => void run(() => deleteMuassasah(item.id))}>
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
-                  </button>
-                </li>
-              ))}
+    <div className="min-w-0">
+      {error ? <div className="mx-4 mt-4 rounded-xl border border-error/25 bg-error-container/60 px-4 py-3 text-sm font-semibold text-on-error-container sm:mx-6" role="alert">{error}</div> : null}
+      {mode === "create" ? (
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.18fr)_minmax(20rem,0.82fr)]">
+          <section className="px-4 py-5 sm:px-6 lg:border-r lg:border-outline-variant/30">
+            <h2 className="text-xl font-bold text-on-surface">Tambah {sectionTitle.toLocaleLowerCase("id-ID")}</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Isi informasi utama. Sistem akan memeriksa duplikasi sebelum data disimpan.</p>
+            <div className="mt-6">{renderCreateForm()}</div>
+          </section>
+          <aside className="bg-surface-container-low px-4 py-5 sm:px-6">
+            <h3 className="text-base font-bold text-on-surface">Pemeriksaan data</h3>
+            <ul className="mt-4 space-y-3 text-sm text-on-surface-variant">
+              <li className="flex gap-2"><span className="material-symbols-outlined text-lg text-primary">check_circle</span>Nama diperiksa tanpa membedakan huruf besar dan kecil.</li>
+              <li className="flex gap-2"><span className="material-symbols-outlined text-lg text-primary">check_circle</span>Spasi berulang dianggap sebagai nama yang sama.</li>
+              <li className="flex gap-2"><span className="material-symbols-outlined text-lg text-primary">check_circle</span>Relasi muassasah dapat diperbarui kemudian.</li>
             </ul>
-          )}
+          </aside>
         </div>
-      </article>
-
-      {/* Drivers */}
-      <article className={CARD}>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/30 px-4 py-3">
-          <div>
-            <h2 className="text-base font-bold text-on-surface">Supir</h2>
-            <p className="mt-0.5 text-xs text-on-surface-variant">Direktori supir, terikat ke muassasah.</p>
+      ) : (
+        <section className="px-4 py-5 sm:px-6">
+          <div className="flex items-start justify-between gap-4">
+            <div><h2 className="text-xl font-bold text-on-surface">Daftar {sectionTitle.toLocaleLowerCase("id-ID")}</h2><p className="mt-1 text-sm text-on-surface-variant">Menampilkan {items.length} data.</p></div>
+            <button type="button" className="serene-btn-primary serene-focus-ring inline-flex min-h-11 items-center gap-2 px-4 text-xs" onClick={() => onModeChange("create")}><span className="material-symbols-outlined text-lg">add</span>Tambah data</button>
           </div>
-          <MuassasahSelect value={driverFilter} onChange={setDriverFilter} list={muassasahList} ariaLabel="Filter supir per muassasah" includeAll />
-        </div>
-        <div className="grid gap-2 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
-          <input className={INPUT} placeholder="Nama supir" value={driverForm.name} onChange={(e) => setDriverForm((s) => ({ ...s, name: e.target.value }))} />
-          <input className={INPUT} placeholder="No. HP (opsional)" value={driverForm.phone} onChange={(e) => setDriverForm((s) => ({ ...s, phone: e.target.value }))} />
-          <input className={INPUT} placeholder="Catatan (opsional)" value={driverForm.note} onChange={(e) => setDriverForm((s) => ({ ...s, note: e.target.value }))} />
-          <MuassasahSelect value={driverForm.muassasahId} onChange={(v) => setDriverForm((s) => ({ ...s, muassasahId: v }))} list={muassasahList} ariaLabel="Muassasah supir" />
-        </div>
-        <div className="px-4 pb-3">
-          <button
-            type="button"
-            className={BTN}
-            disabled={busy || !driverForm.name.trim()}
-            onClick={() => void run(async () => {
-              await createDriver({ name: driverForm.name, phone: driverForm.phone, note: driverForm.note, muassasahId: driverForm.muassasahId || undefined });
-              setDriverForm({ name: "", phone: "", note: "", muassasahId: driverForm.muassasahId });
-            })}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
-            Tambah supir
-          </button>
-        </div>
-        <div className="px-4 pb-4">
-          {drivers.length === 0 ? (
-            <p className="py-2 text-xs text-on-surface-variant">Belum ada supir.</p>
-          ) : (
-            <ul className="divide-y divide-outline-variant/30">
-              {drivers.map((driver) => (
-                <li key={driver.id} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-on-surface">
-                      <span className="truncate">{driver.name}</span>
-                      {driver.isProblematic ? (
-                        <span className={PROBLEM_BADGE}>
-                          <span className="material-symbols-outlined text-[12px]" aria-hidden="true">warning</span>Bermasalah
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="block truncate text-[11px] text-on-surface-variant">
-                      {[driver.muassasahName ?? "Tanpa muassasah", driver.phone, driver.note].filter(Boolean).join(" · ")}
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      className={`${ICON_BTN} ${driver.isProblematic ? "text-rose-600" : "hover:text-rose-600"}`}
-                      title={driver.isProblematic ? "Hapus penanda bermasalah" : "Tandai bermasalah"}
-                      disabled={busy}
-                      onClick={() => void run(() => updateDriver(driver.id, { isProblematic: !driver.isProblematic }))}
-                    >
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">{driver.isProblematic ? "flag" : "outlined_flag"}</span>
-                    </button>
-                    <button type="button" className={`${ICON_BTN} hover:text-rose-600`} title="Hapus supir" disabled={busy} onClick={() => void run(() => deleteDriver(driver.id))}>
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </article>
-
-      {/* Vehicles */}
-      <article className={CARD}>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/30 px-4 py-3">
-          <div>
-            <h2 className="text-base font-bold text-on-surface">Kendaraan / Bis</h2>
-            <p className="mt-0.5 text-xs text-on-surface-variant">Direktori plat kendaraan, terikat ke muassasah.</p>
+          <div className="mt-5 overflow-hidden rounded-xl border border-outline-variant/35">
+            {loading ? <p className="p-8 text-center text-sm text-on-surface-variant">Memuat data...</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-on-surface-variant">Belum ada data {sectionTitle.toLocaleLowerCase("id-ID")}.</p> : (
+              <ul className="divide-y divide-outline-variant/25">
+                {items.map((item) => {
+                  const title = "plateNumber" in item ? item.plateNumber : item.name;
+                  const detail = "driverCount" in item ? `${item.driverCount} supir · ${item.vehicleCount} kendaraan` : [item.muassasahName ?? "Tanpa muassasah", "phone" in item ? item.phone : null, item.note].filter(Boolean).join(" · ");
+                  return <li key={item.id} className="flex items-center gap-3 px-3 py-3 sm:px-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary"><span className="material-symbols-outlined">{section === "muassasah" ? "apartment" : section === "drivers" ? "person_pin" : "directions_bus"}</span></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-on-surface">{title}</p><p className="mt-0.5 truncate text-xs text-on-surface-variant">{detail || "Belum ada detail."}</p></div><button type="button" className="serene-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-high" onClick={() => beginEdit(item)} aria-label={`Edit ${title}`}><span className="material-symbols-outlined">edit</span></button><button type="button" className="serene-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg text-error hover:bg-error-container/40" onClick={() => setDeleting(item)} aria-label={`Hapus ${title}`}><span className="material-symbols-outlined">delete</span></button></li>;
+                })}
+              </ul>
+            )}
           </div>
-          <MuassasahSelect value={vehicleFilter} onChange={setVehicleFilter} list={muassasahList} ariaLabel="Filter kendaraan per muassasah" includeAll />
-        </div>
-        <div className="grid gap-2 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
-          <input className={INPUT} placeholder="Plat nomor (mis. B 1234 ABC)" value={vehicleForm.plateNumber} onChange={(e) => setVehicleForm((s) => ({ ...s, plateNumber: e.target.value }))} />
-          <input className={INPUT} placeholder="Catatan (opsional)" value={vehicleForm.note} onChange={(e) => setVehicleForm((s) => ({ ...s, note: e.target.value }))} />
-          <MuassasahSelect value={vehicleForm.muassasahId} onChange={(v) => setVehicleForm((s) => ({ ...s, muassasahId: v }))} list={muassasahList} ariaLabel="Muassasah kendaraan" />
-        </div>
-        <div className="px-4 pb-3">
-          <button
-            type="button"
-            className={BTN}
-            disabled={busy || !vehicleForm.plateNumber.trim()}
-            onClick={() => void run(async () => {
-              await createVehicle({ plateNumber: vehicleForm.plateNumber, note: vehicleForm.note, muassasahId: vehicleForm.muassasahId || undefined });
-              setVehicleForm({ plateNumber: "", note: "", muassasahId: vehicleForm.muassasahId });
-            })}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
-            Tambah kendaraan
-          </button>
-        </div>
-        <div className="px-4 pb-4">
-          {vehicles.length === 0 ? (
-            <p className="py-2 text-xs text-on-surface-variant">Belum ada kendaraan.</p>
-          ) : (
-            <ul className="divide-y divide-outline-variant/30">
-              {vehicles.map((vehicle) => (
-                <li key={vehicle.id} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-on-surface">
-                      <span className="truncate">{vehicle.plateNumber}</span>
-                      {vehicle.isProblematic ? (
-                        <span className={PROBLEM_BADGE}>
-                          <span className="material-symbols-outlined text-[12px]" aria-hidden="true">warning</span>Bermasalah
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="block truncate text-[11px] text-on-surface-variant">
-                      {[vehicle.muassasahName ?? "Tanpa muassasah", vehicle.note].filter(Boolean).join(" · ")}
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      className={`${ICON_BTN} ${vehicle.isProblematic ? "text-rose-600" : "hover:text-rose-600"}`}
-                      title={vehicle.isProblematic ? "Hapus penanda bermasalah" : "Tandai bermasalah (mis. kotor)"}
-                      disabled={busy}
-                      onClick={() => void run(() => updateVehicle(vehicle.id, { isProblematic: !vehicle.isProblematic }))}
-                    >
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">{vehicle.isProblematic ? "flag" : "outlined_flag"}</span>
-                    </button>
-                    <button type="button" className={`${ICON_BTN} hover:text-rose-600`} title="Hapus kendaraan" disabled={busy} onClick={() => void run(() => deleteVehicle(vehicle.id))}>
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </article>
+        </section>
+      )}
+
+      <MasterDataFormDrawer isOpen={Boolean(editing)} title={`Edit ${sectionTitle.toLocaleLowerCase("id-ID")}`} description="Perbarui data tanpa meninggalkan daftar." onClose={() => setEditing(null)}>
+        {editing ? <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); submitEdit(); }}>
+          {section === "muassasah" ? <label className="grid gap-2 text-sm font-bold">Nama muassasah<input className={INPUT} value={editMuassasahName} onChange={(event) => setEditMuassasahName(event.target.value)} /><FieldError>{editDuplicate ? "Nama muassasah sudah terdaftar." : undefined}</FieldError></label> : null}
+          {section === "drivers" ? <><label className="grid gap-2 text-sm font-bold">Nama supir<input className={INPUT} value={editDriverDraft.name} onChange={(event) => setEditDriverDraft((value) => ({ ...value, name: event.target.value }))} /><FieldError>{editDuplicate ? "Nama supir sudah terdaftar." : undefined}</FieldError></label><label className="grid gap-2 text-sm font-bold">Nomor telepon<input className={INPUT} value={editDriverDraft.phone} onChange={(event) => setEditDriverDraft((value) => ({ ...value, phone: event.target.value }))} /></label><label className="grid gap-2 text-sm font-bold">Muassasah<MuassasahSelect value={editDriverDraft.muassasahId} onChange={(muassasahId) => setEditDriverDraft((value) => ({ ...value, muassasahId }))} list={muassasah} /></label><label className="grid gap-2 text-sm font-bold">Catatan<input className={INPUT} value={editDriverDraft.note} onChange={(event) => setEditDriverDraft((value) => ({ ...value, note: event.target.value }))} /></label></> : null}
+          {section === "vehicles" ? <><label className="grid gap-2 text-sm font-bold">Nomor kendaraan / plat<input className={INPUT} value={editVehicleDraft.plateNumber} onChange={(event) => setEditVehicleDraft((value) => ({ ...value, plateNumber: event.target.value }))} /><FieldError>{editDuplicate ? "Kendaraan tersebut sudah terdaftar." : undefined}</FieldError></label><label className="grid gap-2 text-sm font-bold">Muassasah<MuassasahSelect value={editVehicleDraft.muassasahId} onChange={(muassasahId) => setEditVehicleDraft((value) => ({ ...value, muassasahId }))} list={muassasah} /></label><label className="grid gap-2 text-sm font-bold">Catatan<input className={INPUT} value={editVehicleDraft.note} onChange={(event) => setEditVehicleDraft((value) => ({ ...value, note: event.target.value }))} /></label></> : null}
+          <FormActions busy={busy} disabled={Boolean(editDuplicate)} onCancel={() => setEditing(null)} />
+        </form> : null}
+      </MasterDataFormDrawer>
+
+      <MasterDataDeleteConfirmModal isOpen={Boolean(deleting)} itemLabel={deleting ? ("plateNumber" in deleting ? deleting.plateNumber : deleting.name) : "data"} itemType={sectionTitle.toLocaleLowerCase("id-ID")} isDeleting={busy} onClose={() => setDeleting(null)} onConfirm={() => { if (!deleting) return; const action = section === "muassasah" ? () => deleteMuassasah(deleting.id) : section === "drivers" ? () => deleteDriver(deleting.id) : () => deleteVehicle(deleting.id); void run(action, () => setDeleting(null)); }} />
     </div>
   );
 }

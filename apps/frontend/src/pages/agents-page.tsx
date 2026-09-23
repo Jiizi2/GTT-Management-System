@@ -46,19 +46,21 @@ function AgentForm({
   isSubmitting,
   onSubmit,
   onCancel,
+  variant = "default",
 }: {
   initialValues: AgentFormValues;
   submitLabel: string;
   isSubmitting: boolean;
   onSubmit: (values: AgentFormValues) => void;
   onCancel?: () => void;
+  variant?: "default" | "composer";
 }) {
   const [form, setForm] = useState(initialValues);
   const update = (key: keyof AgentFormValues, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
     <form
-      className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-4"
+      className={variant === "composer" ? "grid gap-5" : "rounded-xl border border-outline-variant/40 bg-surface-container-low p-4"}
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(form);
@@ -67,10 +69,10 @@ function AgentForm({
       <div className="grid gap-3 md:grid-cols-2">
         {(
           [
-            ["code", "Agent Code", "AL-FALAH"],
-            ["name", "Agent Name", "PT Al Falah Travel"],
-            ["picName", "PIC", "Nama PIC"],
-            ["phone", "Phone", "+62..."],
+            ["code", "Kode agen", "AL-FALAH"],
+            ["name", "Nama agen", "PT Al Falah Travel"],
+            ["picName", "Nama PIC", "Nama penanggung jawab"],
+            ["phone", "Nomor telepon", "+62..."],
             ["email", "Email", "ops@agent.com"],
           ] as const
         ).map(([key, label, placeholder]) => (
@@ -87,15 +89,15 @@ function AgentForm({
           </label>
         ))}
       </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
+      <div className={variant === "composer" ? "serene-form-actions flex flex-row gap-3 border-t border-outline-variant/30 pt-4" : "mt-4 flex flex-wrap justify-end gap-2"}>
         {onCancel ? (
-          <button type="button" className="serene-btn-secondary" onClick={onCancel} disabled={isSubmitting}>
+          <button type="button" className={variant === "composer" ? "serene-btn-secondary min-h-11 flex-1" : "serene-btn-secondary"} onClick={onCancel} disabled={isSubmitting}>
             Batal
           </button>
         ) : null}
         <button
           type="submit"
-          className="serene-btn-primary"
+          className={variant === "composer" ? "serene-btn-primary min-h-11 flex-1" : "serene-btn-primary"}
           disabled={!form.code.trim() || !form.name.trim() || isSubmitting}
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
@@ -168,11 +170,25 @@ function AgentActionGroup({
   );
 }
 
-export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
+export function AgentsScreen({
+  embedded = false,
+  mode,
+  onModeChange,
+}: {
+  embedded?: boolean;
+  mode?: "list" | "create";
+  onModeChange?: (mode: "list" | "create") => void;
+}) {
   const queryClient = useQueryClient();
   const agentsQuery = useAgentsQuery();
   const [includeInactive, setIncludeInactive] = useState(true);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [internalCreateOpen, setInternalCreateOpen] = useState(false);
+  const isCreateOpen = mode ? mode === "create" : internalCreateOpen;
+  const setIsCreateOpen = (next: boolean | ((current: boolean) => boolean)) => {
+    const resolved = typeof next === "function" ? next(isCreateOpen) : next;
+    setInternalCreateOpen(resolved);
+    onModeChange?.(resolved ? "create" : "list");
+  };
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
   const [deletingAgent, setDeletingAgent] = useState<AgentOption | null>(null);
 
@@ -222,19 +238,20 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <article
-      className={`overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5 ${embedded ? "" : "mx-auto max-w-7xl"}`}
+      className={embedded ? "min-w-0 bg-surface-container-lowest" : "mx-auto max-w-7xl overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest pb-4 shadow-ambient sm:pb-5"}
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/30 px-4 py-3 sm:px-5">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Daftar agen</p>
-          <h2 className="mt-1 text-xl font-bold text-on-surface">Agen</h2>
-          <p className="mt-0.5 text-xs text-on-surface-variant">Kelola agen pemilik grup dan transaksi operasional.</p>
-          <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
-            Menampilkan {agents.length} agen{includeInactive ? " termasuk yang nonaktif." : "."}
+          <h2 className="text-xl font-bold text-on-surface">{isCreateOpen ? "Tambah agen" : "Daftar agen"}</h2>
+          <p className="mt-1 text-xs text-on-surface-variant">
+            {isCreateOpen ? "Lengkapi identitas agen baru sebelum menyimpan." : "Kelola agen pemilik grup dan transaksi operasional."}
           </p>
+          {!isCreateOpen ? <p className="mt-1 text-[11px] font-semibold text-on-surface-variant">
+            Menampilkan {agents.length} agen{includeInactive ? " termasuk yang nonaktif." : "."}
+          </p> : null}
         </div>
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-          <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+          {!isCreateOpen ? <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-outline-variant/55"
@@ -242,8 +259,8 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
               onChange={(event) => setIncludeInactive(event.target.checked)}
             />
             Tampilkan nonaktif
-          </label>
-          <button
+          </label> : null}
+          {mode === undefined ? <button
             type="button"
             className="serene-btn-primary min-h-[38px] w-full px-3 py-1.5 text-xs sm:w-auto sm:px-4"
             onClick={() => {
@@ -253,7 +270,7 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
             }}
           >
             {isCreateOpen ? "Tutup formulir" : "Tambah agen"}
-          </button>
+          </button> : null}
         </div>
       </div>
 
@@ -264,18 +281,30 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
       ) : null}
 
       {isCreateOpen ? (
-        <div className="mx-4 mt-4 sm:mx-5">
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.18fr)_minmax(20rem,0.82fr)]">
+          <div className="px-4 py-5 sm:px-6 lg:border-r lg:border-outline-variant/30">
           <AgentForm
             key="create-agent"
             initialValues={EMPTY_AGENT_FORM}
             submitLabel="Simpan agen"
             isSubmitting={createMutation.isPending}
             onSubmit={(values) => createMutation.mutate(normalizeAgentForm(values))}
+            onCancel={() => setIsCreateOpen(false)}
+            variant="composer"
           />
+          </div>
+          <aside className="bg-surface-container-low px-4 py-5 sm:px-6">
+            <h3 className="text-base font-bold text-on-surface">Pemeriksaan data</h3>
+            <ul className="mt-4 space-y-3 text-sm text-on-surface-variant">
+              <li className="flex gap-2"><span className="material-symbols-outlined text-lg text-primary">check_circle</span>Kode agen harus unik.</li>
+              <li className="flex gap-2"><span className="material-symbols-outlined text-lg text-primary">check_circle</span>Nama dan kontak dapat diperbarui kemudian.</li>
+              <li className="flex gap-2"><span className="material-symbols-outlined text-lg text-primary">check_circle</span>Agen baru langsung tersedia untuk data operasional.</li>
+            </ul>
+          </aside>
         </div>
       ) : null}
 
-      <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
+      {!isCreateOpen ? <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
         {agentsQuery.isLoading ? (
           <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">Memuat Agent...</div>
         ) : agentsQuery.isError ? (
@@ -413,7 +442,7 @@ export function AgentsScreen({ embedded = false }: { embedded?: boolean }) {
             </div>
           </>
         )}
-      </div>
+      </div> : null}
 
       <MasterDataFormDrawer
         isOpen={Boolean(editingAgent)}

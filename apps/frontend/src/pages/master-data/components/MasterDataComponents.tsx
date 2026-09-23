@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import * as z from "zod/v4";
 import { SereneSelect } from "../../../components/serene-select";
 import { DialogShell } from "../../../components/dialog-shell";
@@ -227,6 +227,8 @@ export function MasterDataOptionForm({
   isSubmitting,
   onSubmit,
   onCancel,
+  onValuesChange,
+  variant = "default",
 }: {
   categoryKey: string;
   config: CategoryFormConfig;
@@ -236,12 +238,15 @@ export function MasterDataOptionForm({
   isSubmitting: boolean;
   onSubmit: (values: MasterDataOptionFormValues) => void | Promise<void>;
   onCancel?: () => void;
+  onValuesChange?: (values: MasterDataOptionFormValues) => void;
+  variant?: "default" | "composer";
 }) {
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    control,
     formState: { errors },
   } = useForm<MasterDataOptionFormValues>({
     resolver: zodResolver(masterDataOptionFormSchema),
@@ -251,6 +256,24 @@ export function MasterDataOptionForm({
   const [bankName, setBankName] = useState("");
   const [bankAccountNum, setBankAccountNum] = useState("");
   const [bankBeneficiary, setBankBeneficiary] = useState("");
+  const liveValues = useWatch({ control });
+
+  useEffect(() => {
+    onValuesChange?.({
+      value: liveValues.value ?? "",
+      label: liveValues.label ?? "",
+      description: liveValues.description ?? "",
+      isActive: liveValues.isActive ?? true,
+      metadataJson: liveValues.metadataJson ?? "",
+    });
+  }, [
+    liveValues.description,
+    liveValues.isActive,
+    liveValues.label,
+    liveValues.metadataJson,
+    liveValues.value,
+    onValuesChange,
+  ]);
 
   useEffect(() => {
     if (categoryKey === "bank-disbursement") {
@@ -295,8 +318,19 @@ export function MasterDataOptionForm({
   }, [initialValues, reset, resetToken]);
 
   return (
-    <form className="serene-form-section grid gap-3" onSubmit={handleSubmit((values) => void onSubmit(values))}>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <form
+      className={`grid gap-5 ${variant === "composer" ? "master-data-composer-form" : "serene-form-section"}`}
+      onSubmit={handleSubmit((values) => void onSubmit(values))}
+    >
+      {variant === "composer" ? (
+        <header className="border-b border-outline-variant/25 pb-4">
+          <h2 className="font-display text-lg font-extrabold text-on-surface">Identitas data</h2>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+            Isi informasi dasar yang akan digunakan di seluruh operasional.
+          </p>
+        </header>
+      ) : null}
+      <div className="master-data-primary-fields grid gap-3 sm:grid-cols-2">
         <label className={`grid gap-1 ${categoryKey === "bank-disbursement" ? "sm:col-span-2" : ""}`}>
           <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
             {config.valueLabel}
@@ -316,7 +350,7 @@ export function MasterDataOptionForm({
       </div>
 
       {categoryKey === "bank-disbursement" && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className={`master-data-bank-fields grid gap-3 sm:grid-cols-2 ${variant === "composer" ? "" : ""}`}>
           <label className="grid gap-1">
             <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">Nama Bank</span>
             <input
@@ -341,7 +375,7 @@ export function MasterDataOptionForm({
             />
           </label>
 
-          <label className="grid gap-1 sm:col-span-2">
+          <label className={`grid gap-1 ${variant === "composer" ? "" : "sm:col-span-2"}`}>
             <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
               Atas Nama Pemilik Rekening
             </span>
@@ -362,7 +396,7 @@ export function MasterDataOptionForm({
         </p>
       ) : null}
 
-      <label className="grid gap-1">
+      <label className="master-data-description-field grid gap-1">
         <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
           {config.descriptionLabel}
         </span>
@@ -389,23 +423,58 @@ export function MasterDataOptionForm({
         </label>
       ) : null}
 
-      <div className="serene-form-actions-split">
-        <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
-          <input type="checkbox" className="h-4 w-4 rounded border-outline-variant/55" {...register("isActive")} />
-          Aktif
-        </label>
+      {variant === "composer" ? (
+        <header className="mt-2 border-t border-outline-variant/25 pt-5">
+          <h2 className="font-display text-lg font-extrabold text-on-surface">Pengaturan</h2>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+            Atur ketersediaan data pada pilihan sistem.
+          </p>
+        </header>
+      ) : null}
 
-        <div className="serene-form-actions">
-          {onCancel ? (
-            <button type="button" className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs" onClick={onCancel}>
-              Batal
+      {variant === "composer" ? (
+        <>
+          <div className="master-data-composer-status">
+            <span className="text-xs font-bold text-on-surface">Status</span>
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+              <input type="checkbox" className="h-4 w-4 rounded border-outline-variant/55" {...register("isActive")} />
+              Aktif
+            </label>
+            <p className="text-xs text-on-surface-variant">Data akan tersedia untuk dipilih di sistem.</p>
+          </div>
+          <div className="master-data-composer-actions">
+            <div className="serene-form-actions">
+              {onCancel ? (
+                <button type="button" className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs" onClick={onCancel}>
+                  Batal
+                </button>
+              ) : null}
+              <button type="submit" className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs" disabled={isSubmitting}>
+                <span className="material-symbols-outlined text-base" aria-hidden="true">save</span>
+                {isSubmitting ? "Menyimpan..." : submitLabel}
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="serene-form-actions-split">
+          <label className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+            <input type="checkbox" className="h-4 w-4 rounded border-outline-variant/55" {...register("isActive")} />
+            Aktif
+          </label>
+          <div className="serene-form-actions">
+            {onCancel ? (
+              <button type="button" className="serene-btn-secondary min-h-[38px] px-4 py-2 text-xs" onClick={onCancel}>
+                Batal
+              </button>
+            ) : null}
+            <button type="submit" className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs" disabled={isSubmitting}>
+              <span className="material-symbols-outlined text-base" aria-hidden="true">save</span>
+              {isSubmitting ? "Menyimpan..." : submitLabel}
             </button>
-          ) : null}
-          <button type="submit" className="serene-btn-primary min-h-[38px] px-4 py-2 text-xs" disabled={isSubmitting}>
-            {isSubmitting ? "Menyimpan..." : submitLabel}
-          </button>
+          </div>
         </div>
-      </div>
+      )}
     </form>
   );
 }
@@ -414,7 +483,7 @@ export function MasterDataOptionForm({
 // 2. MASTER DATA CATEGORY TABS
 // ==========================================
 
-export type MasterDataCategoryTabKey = MasterDataCategoryKey | "agents" | "directory";
+export type MasterDataCategoryTabKey = MasterDataCategoryKey | "agents" | "muassasah" | "drivers" | "vehicles";
 
 export function MasterDataCategoryTabs({
   categories,
@@ -442,8 +511,9 @@ export function MasterDataCategoryTabs({
 
     return categories.filter((category) => category.label.toLocaleLowerCase("id-ID").includes(normalizedSearch));
   }, [categories, categorySearch]);
-  const optionCategories = visibleCategories.filter((category) => category.key !== "agents");
-  const operationalCategories = visibleCategories.filter((category) => category.key === "agents");
+  const operationalKeys: MasterDataCategoryTabKey[] = ["agents", "muassasah", "drivers", "vehicles"];
+  const optionCategories = visibleCategories.filter((category) => !operationalKeys.includes(category.key));
+  const operationalCategories = visibleCategories.filter((category) => operationalKeys.includes(category.key));
   const activeCategory = categories.find((category) => category.key === activeCategoryKey) ?? null;
 
   const renderCategoryButton = (category: (typeof categories)[number]) => {
@@ -461,7 +531,15 @@ export function MasterDataCategoryTabs({
         aria-current={isSelected ? "page" : undefined}
       >
         <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
-          {category.key === "agents" ? "person" : "dataset"}
+          {category.key === "agents"
+            ? "person"
+            : category.key === "muassasah"
+              ? "apartment"
+              : category.key === "drivers"
+                ? "person_pin"
+                : category.key === "vehicles"
+                  ? "directions_bus"
+                  : "dataset"}
         </span>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{category.label}</span>
         <span className="shrink-0 rounded-full border border-outline-variant/35 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
