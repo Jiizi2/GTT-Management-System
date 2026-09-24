@@ -193,7 +193,7 @@ export function GroupChecklistTab() {
 
           <div className="flex items-start justify-between gap-3 sm:border-l sm:border-outline-variant/35 sm:pl-4">
             <div>
-              <span className={detailKickerClassName}>Required Bus</span>
+              <span className={detailKickerClassName}>Total Bus Grup</span>
               <p className="mt-2 text-[1.7rem] font-bold leading-none text-on-surface">{requiredBusCount} Bus</p>
             </div>
             <span className="material-symbols-outlined text-xl text-on-surface-variant/70" aria-hidden="true">

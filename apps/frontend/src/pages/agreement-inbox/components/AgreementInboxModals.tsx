@@ -1,12 +1,13 @@
-import { type ReactNode, useId } from "react";
+import { type FormEventHandler, type ReactNode, useId } from "react";
 import { createPortal } from "react-dom";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../../../components/button";
 import { DialogShell } from "../../../components/dialog-shell";
 import { useModalFocusTrap } from "../../../components/use-modal-focus-trap";
 import type { HotelAgreementDraft, HotelAgreementDraftFormState } from "../../../shared/app-domain";
 import { draftSchema } from "../hooks/use-agreement-inbox";
+import { AgreementTextImport } from "./AgreementTextImport";
 import { AgreementDraftFields } from "./AgreementDraftFields";
 
 function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormState {
@@ -30,6 +31,111 @@ function ModalPortal({ children }: { children: ReactNode }) {
   }
 
   return createPortal(children, document.body);
+}
+
+export function AgreementDraftComposerModal({
+  isSaving,
+  form,
+  errorMessage,
+  onClose,
+  onSubmit,
+  onSaveDraft,
+}: {
+  isSaving: boolean;
+  form: UseFormReturn<HotelAgreementDraftFormState>;
+  errorMessage?: string;
+  onClose: () => void;
+  onSubmit: FormEventHandler<HTMLFormElement>;
+  onSaveDraft: (values: HotelAgreementDraftFormState) => Promise<boolean>;
+}) {
+  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
+  const titleId = useId();
+  const descriptionId = useId();
+
+  return (
+    <ModalPortal>
+      <div
+        className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
+        onClick={onClose}
+      >
+        <section
+          ref={dialogRef}
+          className="serene-modal-shell flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col sm:max-h-[calc(100dvh-2rem)]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          tabIndex={-1}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="serene-dialog-header shrink-0 bg-surface-container-low px-5 py-4">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  add
+                </span>
+              </span>
+              <div className="min-w-0">
+                <h2 id={titleId} className="font-display text-2xl font-bold tracking-tight text-on-surface">
+                  New Agreement Draft
+                </h2>
+                <p id={descriptionId} className="mt-1 text-sm text-on-surface-variant">
+                  Paste the usual message, then complete only the missing data.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="serene-dialog-close-shell hover:border-primary"
+              onClick={onClose}
+              aria-label="Close new agreement draft popup"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                close
+              </span>
+            </button>
+          </div>
+
+          <div className="serene-dialog-body min-h-0 space-y-5 overflow-y-auto px-5 py-4">
+            {errorMessage ? (
+              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-700" role="alert">
+                {errorMessage}
+              </p>
+            ) : null}
+            <AgreementTextImport isSaving={isSaving} onSaveDraft={onSaveDraft} onComplete={onClose} />
+            <details className="group border-t border-outline-variant/25 pt-4">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 text-sm font-bold text-on-surface transition hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 [&::-webkit-details-marker]:hidden">
+                <span>Or fill the form manually</span>
+                <span className="material-symbols-outlined text-xl text-on-surface-variant transition-transform group-open:rotate-180" aria-hidden="true">
+                  expand_more
+                </span>
+              </summary>
+              <form className="mt-4 space-y-5" onSubmit={onSubmit}>
+                <AgreementDraftFields
+                  control={form.control}
+                  register={form.register}
+                  errors={form.formState.errors}
+                  idPrefix="agreement-draft"
+                />
+                <div className="flex flex-col-reverse gap-2 border-t border-outline-variant/25 pt-4 sm:flex-row sm:justify-end">
+                  <Button variant="secondary" type="button" onClick={onClose} disabled={isSaving}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" type="submit" className="inline-flex items-center gap-1.5" disabled={isSaving}>
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      save
+                    </span>
+                    <span>{isSaving ? "Saving..." : "Save Draft"}</span>
+                  </Button>
+                </div>
+              </form>
+            </details>
+          </div>
+        </section>
+      </div>
+    </ModalPortal>
+  );
 }
 
 export function AgreementDraftEditModal({

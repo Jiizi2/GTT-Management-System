@@ -1,4 +1,4 @@
-import { formatRouteSummary, formatScheduleDate, formatScheduleTime } from "../../../shared/app-domain";
+import { formatRouteSummary, formatScheduleDate, formatScheduleTime, resolveItineraryBusCount } from "../../../shared/app-domain";
 import type { InputItineraryItem } from "../../../shared/app-domain";
 
 interface ItineraryTimelineViewProps {
@@ -60,7 +60,7 @@ export function ItineraryTimelineView({
           item.hotelPickupRequestTime
             ? ` | Hotel Pickup Request ${formatScheduleTime(item.hotelPickupRequestTime)}`
             : ""
-        }${item.requiresBus ? " | Requires Bus" : ""}`;
+        } | Bus: ${resolveItineraryBusCount(item) || "no bus needed"}`;
 
         return (
           <div key={item.id} className="grid grid-cols-[44px_1fr] gap-3">

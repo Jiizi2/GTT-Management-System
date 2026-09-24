@@ -567,6 +567,7 @@ model ItineraryItem {
   fromLocation          String?
   toLocation            String?
   cityTourCity          String?
+  busCount              Int      @default(0)
   requiresBus           Boolean  @default(false)
   notes                 String?
   transferByTrain       Boolean  @default(false)

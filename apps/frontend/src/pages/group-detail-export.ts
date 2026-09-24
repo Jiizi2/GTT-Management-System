@@ -8,8 +8,7 @@ const {
   inferCityTourCity,
   parseDisplayDateToIso,
   parseTimeForInput,
-  resolveTotalBusCount,
-  resolveTransportMode,
+  resolveItineraryBusCount,
 } = Domain;
 
 const PAGE_WIDTH = 210;
@@ -48,6 +47,14 @@ function formatDocumentTime(value?: string): string {
   if (!trimmedValue) return "";
   if (/^\d{2}:\d{2}$/.test(trimmedValue)) return trimmedValue;
   return parseTimeForInput(trimmedValue) ?? trimmedValue;
+}
+
+function resolveItineraryTime(item: ItineraryItem): string {
+  if (inferCategoryKey(item) === "departure") {
+    return item.hotelPickupRequestTime?.trim() || item.time?.trim() || "";
+  }
+
+  return item.time?.trim() || "";
 }
 
 function inferCarrierCode(flightNumber?: string): string {
@@ -213,8 +220,6 @@ export async function exportGroupDetailPdf(
     const relatedGroups = familyGroups.length > 0 ? familyGroups : [group];
     const groupNumbers = relatedGroups.map((item) => item.code.trim()).filter(Boolean).join(" · ");
     const totalPaxCount = relatedGroups.reduce((total, item) => total + item.pax, 0);
-    const totalBusCount = resolveTotalBusCount(totalPaxCount, group.totalBuses);
-    const busLabel = `${totalBusCount} ${totalBusCount === 1 ? "BUS" : "BUSES"}`;
     const generatedTimestamp = new Date().toLocaleString("en-GB", {
       day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
     });
@@ -272,14 +277,15 @@ export async function exportGroupDetailPdf(
     });
 
     const itineraryBody: RowInput[] = [...itineraryItems]
-      .sort((left, right) => `${resolveItemIsoDate(left)}T${left.time ?? "00:00"}`.localeCompare(`${resolveItemIsoDate(right)}T${right.time ?? "00:00"}`))
+      .sort((left, right) => `${resolveItemIsoDate(left)}T${resolveItineraryTime(left) || "00:00"}`.localeCompare(`${resolveItemIsoDate(right)}T${resolveItineraryTime(right) || "00:00"}`))
       .map((item) => {
         const categoryKey = inferCategoryKey(item);
         const cityTourCity = categoryKey === "city-tour" ? inferCityTourCity(item).trim() : "";
-        const requiresBus = item.requiresBus === true || resolveTransportMode(item) === "bus";
+        const busCount = resolveItineraryBusCount(item);
         return [
           formatDocumentDate(resolveItemIsoDate(item)), item.from?.trim() ?? "", item.to?.trim() || cityTourCity,
-          formatActivityLabel(item, categoryKey), formatDocumentTime(item.time), requiresBus ? busLabel : "",
+          formatActivityLabel(item, categoryKey), formatDocumentTime(resolveItineraryTime(item)),
+          busCount > 0 ? `${busCount} ${busCount === 1 ? "BUS" : "BUSES"}` : "NO BUS",
         ];
       });
     y = drawSectionTitle(document, "Itinerary", y);

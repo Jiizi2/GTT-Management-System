@@ -294,7 +294,7 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
         const fallbackDate = isoDate ? formatScheduleDate(isoDate) : { date: "-", year: "2026" };
         const rawTransportMode = readString(item.transportMode ?? "", "");
         const transportMode: TransportMode | undefined =
-          rawTransportMode === "flight" || rawTransportMode === "bus" || rawTransportMode === "train"
+          rawTransportMode === "flight" || rawTransportMode === "bus" || rawTransportMode === "train" || rawTransportMode === "none"
             ? (rawTransportMode as TransportMode)
             : undefined;
 
@@ -316,7 +316,9 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
           from: readString(item.fromLocation ?? "", ""),
           to: readString(item.toLocation ?? "", ""),
           cityTourCity: readString(item.cityTourCity ?? "", ""),
-          requiresBus: Boolean(item.requiresBus),
+          busCount: typeof item.busCount === "number" ? Math.max(0, Math.floor(item.busCount)) : item.requiresBus ? 1 : 0,
+          requiresBus:
+            (typeof item.busCount === "number" ? Math.max(0, Math.floor(item.busCount)) : item.requiresBus ? 1 : 0) > 0,
           notes: readString(item.notes ?? "", ""),
           transferByTrain: Boolean(item.transferByTrain),
           trainDepartureTime: normalizeStoredTimeLabel(readString(item.trainDepartureTime ?? "", "")),

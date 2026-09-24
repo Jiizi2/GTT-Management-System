@@ -71,6 +71,7 @@ type BackendCreateGroupPayload = {
     fromLocation?: string;
     toLocation?: string;
     cityTourCity?: string;
+    busCount?: number;
     requiresBus?: boolean;
     notes?: string;
     transferByTrain?: boolean;
@@ -353,7 +354,8 @@ export function mapGroupItineraryToBackendPayload(group: GroupData) {
       fromLocation: item.from?.trim(),
       toLocation: item.to?.trim(),
       cityTourCity: item.cityTourCity?.trim(),
-      requiresBus: item.requiresBus,
+      busCount: Math.max(0, Math.floor(item.busCount ?? (item.requiresBus ? 1 : 0))),
+      requiresBus: Math.max(0, Math.floor(item.busCount ?? (item.requiresBus ? 1 : 0))) > 0,
       notes: item.notes?.trim(),
       transferByTrain: item.transferByTrain,
       trainDepartureTime: normalizeStoredTimeLabel(item.trainDepartureTime?.trim() ?? "") || undefined,

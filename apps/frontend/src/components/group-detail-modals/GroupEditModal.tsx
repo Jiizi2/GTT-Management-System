@@ -296,7 +296,7 @@ export function GroupEditModal({
             </div>
 
             <label className={modalFieldClassName}>
-              <span>Required Bus</span>
+              <span>Total Bus Grup</span>
               <input
                 id="group-edit-total-buses"
                 className={modalInputClassName}

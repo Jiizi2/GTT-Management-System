@@ -1,7 +1,79 @@
+import type { ReactNode } from "react";
 import type { ItineraryItem } from "../../../shared/app-domain";
 import { getScheduleTypeOption, inferCategoryKey, resolveItineraryIcon } from "../../../shared/app-domain";
 import { useGroupDetailContext } from "../context/GroupDetailContext";
 import { buildItineraryFacts, buildItinerarySummary } from "./group-itinerary-display";
+
+function TimelineGlyph({ name }: { name: string }) {
+  let glyph: ReactNode;
+
+  switch (name) {
+    case "flight":
+    case "flight_land":
+    case "flight_takeoff":
+      glyph = (
+        <path d="m17.8 19.2-1.8-8.2 3.5-3.5a2.1 2.1 0 0 0-3-3L13 8l-8.2-1.8a.5.5 0 0 0-.6.6L6 15l-3.3 3.4a2.1 2.1 0 0 0 3 3L9 18l8.2 1.8a.5.5 0 0 0 .6-.6Z" />
+      );
+      break;
+    case "directions_bus":
+    case "airport_shuttle":
+      glyph = (
+        <>
+          <rect x="4" y="3" width="16" height="17" rx="3" />
+          <path d="M4 11h16M8 3v8m8-8v8M7 15h.01M17 15h.01M7 20v2m10-2v2" />
+        </>
+      );
+      break;
+    case "train":
+      glyph = (
+        <>
+          <rect x="5" y="2.5" width="14" height="17" rx="5" />
+          <path d="M8 7h8M8 11h8M8 15h.01M16 15h.01M8 19l-2.5 2.5M16 19l2.5 2.5" />
+        </>
+      );
+      break;
+    case "tour":
+      glyph = (
+        <>
+          <path d="M19 10.2c0 5-7 10.8-7 10.8S5 15.2 5 10.2a7 7 0 1 1 14 0Z" />
+          <circle cx="12" cy="10" r="2.2" />
+        </>
+      );
+      break;
+    case "block":
+      glyph = (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="m5.6 5.6 12.8 12.8" />
+        </>
+      );
+      break;
+    default:
+      glyph = (
+        <>
+          <circle cx="5" cy="6" r="2" />
+          <circle cx="19" cy="18" r="2" />
+          <path d="M7 6h5a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4" />
+        </>
+      );
+  }
+
+  return (
+    <svg
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {glyph}
+    </svg>
+  );
+}
 
 function formatItineraryActivityHeading(item: ItineraryItem, categoryKey: string, fallbackLabel: string): string {
   if (categoryKey !== "transfer") {
@@ -108,10 +180,8 @@ export function GroupItineraryTab() {
                     aria-hidden="true"
                   />
                 ) : null}
-                <span className="relative z-10 mt-2 inline-flex h-9 w-9 items-center justify-center rounded-full border-4 border-surface-container-lowest bg-brand-primary text-on-primary shadow-sm md:h-10 md:w-10">
-                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                    {itineraryIcon}
-                  </span>
+                <span className="relative z-10 mt-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/15 bg-primary-fixed text-primary shadow-sm shadow-primary/10">
+                  <TimelineGlyph name={itineraryIcon} />
                 </span>
               </div>
 

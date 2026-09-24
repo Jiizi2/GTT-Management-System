@@ -41,10 +41,10 @@ export type NextActivity = {
 /**
  * Explicit transportation mode for an itinerary segment. Orthogonal to the
  * activity category: an arrival/departure may be a flight or a land bus, and an
- * intercity transfer may be a bus or a high-speed train. Legacy items without
- * this field fall back to inference via `resolveTransportMode`.
+ * intercity transfer may be a bus, a high-speed train, or no vehicle. Legacy
+ * items without this field fall back to inference via `resolveTransportMode`.
  */
-export type TransportMode = "flight" | "bus" | "train";
+export type TransportMode = "flight" | "bus" | "train" | "none";
 
 export type ItineraryItem = {
   date: string;
@@ -58,6 +58,7 @@ export type ItineraryItem = {
   isoDate?: string;
   time?: string;
   transportMode?: TransportMode;
+  busCount?: number;
   flightNumber?: string;
   hotelName?: string;
   fromHotelName?: string;
@@ -217,6 +218,7 @@ export type ScheduleFormState = {
   from: string;
   to: string;
   cityTourCity: string;
+  busCount?: number;
   note: string;
   highlighted: boolean;
   transferByTrain: boolean;
@@ -236,7 +238,7 @@ export type EditScheduleFormState = {
   from: string;
   to: string;
   cityTourCity: string;
-  requiresBus: boolean;
+  busCount?: number;
   notes: string;
   transferByTrain: boolean;
   trainDepartureTime: string;
@@ -378,6 +380,7 @@ export type InputItineraryItem = {
   category: string;
   categoryKey: string;
   transportMode?: TransportMode;
+  busCount?: number;
   hotelName?: string;
   fromHotelName?: string;
   from: string;
@@ -398,13 +401,15 @@ export type InputItineraryFormState = {
   time: string;
   category: string;
   transportMode?: TransportMode;
+  busCount?: number;
+  /** Legacy form compatibility; saved bus needs use `busCount`. */
+  requiresBus?: boolean;
   hotelName?: string;
   fromHotelName?: string;
   from: string;
   to: string;
   cityTourCity: string;
   flightNumber: string;
-  requiresBus: boolean;
   notes: string;
   transferByTrain: boolean;
   trainDepartureTime: string;

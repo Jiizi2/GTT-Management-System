@@ -45,6 +45,7 @@ export type ItineraryItem = {
   fromLocation: string | null;
   toLocation: string | null;
   cityTourCity: string | null;
+  busCount?: number;
   requiresBus: boolean;
   transferByTrain: boolean;
   trainDepartureTime: string | null;

@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Controller, UseFormReturn } from "react-hook-form";
 import { DatePickerInput, TimePickerInput } from "../../../components/date-time-pickers";
+import { ItineraryBusCountField } from "../../../components/itinerary-bus-count-field";
 import { SereneSelect } from "../../../components/serene-select";
 import {
   getAllowedTransportModes,
@@ -136,8 +137,6 @@ export function ManualScheduleModal({
   const manualScheduleInfoClassName = `md:col-span-2 flex items-start gap-2 rounded-xl border p-3 text-sm ${
     activityTypeBannerClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-high text-on-surface"
   }`;
-  const manualScheduleCheckClassName =
-    "md:col-span-2 inline-flex min-h-11 items-center gap-3 rounded-xl bg-surface-container-low px-3 py-2.5 text-sm font-medium text-on-surface";
   const manualScheduleRouteHintClassName = `md:col-span-2 rounded-xl border px-3 py-2 text-xs font-medium leading-relaxed ${
     activityTypeCardClassMap[form.category] ?? "border-outline-variant/45 bg-surface-container-lowest"
   } text-on-surface-variant`;
@@ -147,7 +146,6 @@ export function ManualScheduleModal({
   const routeFieldConfig = getRouteFieldConfigByCategory(form.category);
   const allowedTransportModes = getAllowedTransportModes(form.category);
   const showTransportModeField = allowedTransportModes.length > 0;
-  const showRequiresBusField = allowedTransportModes.length === 0;
   const manualScheduleModeChipBaseClassName =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition";
 
@@ -624,26 +622,18 @@ export function ManualScheduleModal({
                 </div>
               ) : null}
 
-              {showRequiresBusField ? (
-                <label className={manualScheduleCheckClassName}>
-                  <Controller
-                    name="requiresBus"
-                    control={scheduleMethods.control}
-                    render={({ field }) => (
-                      <input
-                        className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                        type="checkbox"
-                        checked={field.value}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          handleFormChange("requiresBus", event.target.checked)
-                        }
-                        disabled={!isGroupReadyForItinerary}
-                      />
-                    )}
+              <Controller
+                name="busCount"
+                control={scheduleMethods.control}
+                render={({ field }) => (
+                  <ItineraryBusCountField
+                    id="manual-schedule-bus"
+                    busCount={field.value ?? 0}
+                    onChange={(nextCount) => handleFormChange("busCount", nextCount)}
+                    disabled={!isGroupReadyForItinerary}
                   />
-                  <span>Requires Bus</span>
-                </label>
-              ) : null}
+                )}
+              />
             </OperationalFormSection>
 
             <OperationalFormSection

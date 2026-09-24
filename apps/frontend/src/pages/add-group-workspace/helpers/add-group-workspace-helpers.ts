@@ -18,10 +18,12 @@ import {
   isTransferActivityType,
   normalizeAgreementCityKey,
   resolveFormTransportMode,
+  resolveItineraryBusCount,
   shiftIsoDate,
 } from "../../../shared/app-domain.js";
 
-export type BaseTripDraft = InputItineraryFormState & {
+export type BaseTripDraft = Omit<InputItineraryFormState, "busCount"> & {
+  busCount: number;
   id: string;
   title: string;
   description: string;
@@ -273,7 +275,7 @@ export function createBaseTripDrafts(
       to: nextTo,
       cityTourCity: nextCityTourCity,
       flightNumber: prefillTrip?.flightNumber?.trim() || blueprint.flightNumber,
-      requiresBus: true,
+      busCount: blueprint.category === "transfer" ? 1 : 0,
       notes: "",
       transferByTrain: false,
       trainDepartureTime: "",
@@ -476,6 +478,7 @@ export function isBaseTripDraftInvalid(item: BaseTripDraft): boolean {
 export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]): ItineraryItem[] {
   return sortedItems.map((item, index) => {
     const formattedDate = formatScheduleDate(item.date);
+    const busCount = resolveItineraryBusCount(item);
     const transferTrainSummary = buildTransferTrainSummary(item);
     const normalizedHotelName = item.hotelName?.trim() ?? "";
     const metaSegments = [
@@ -484,7 +487,7 @@ export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]):
       normalizedHotelName ? `Hotel ${normalizedHotelName}` : "",
       item.hotelPickupRequestTime ? `Hotel pickup request ${formatScheduleTime(item.hotelPickupRequestTime)}` : "",
       transferTrainSummary,
-      item.requiresBus ? "Requires Bus" : "",
+      busCount > 0 ? `Bus: ${busCount}` : "Bus: no bus needed",
       item.notes ? item.notes : "",
     ].filter(Boolean);
 
@@ -504,7 +507,8 @@ export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]):
       from: item.from,
       to: item.to,
       cityTourCity: item.cityTourCity,
-      requiresBus: item.requiresBus,
+      busCount,
+      requiresBus: busCount > 0,
       notes: item.notes,
       transferByTrain: item.transferByTrain,
       trainDepartureTime: item.trainDepartureTime,
@@ -548,7 +552,9 @@ export function buildTimelineAndNextActivity(
           secondItem.cityTourCity,
         )}`,
         isCurrent: true,
-        nextActivity: `${formatScheduleTime(secondItem.time)}${secondItem.requiresBus ? " | Requires Bus" : ""}`,
+        nextActivity: `${formatScheduleTime(secondItem.time)} | Bus: ${
+          resolveItineraryBusCount(secondItem) || "no bus needed"
+        }`,
       }
     : {
         date: secondDate.date,

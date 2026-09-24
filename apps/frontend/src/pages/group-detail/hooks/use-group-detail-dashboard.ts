@@ -24,6 +24,7 @@ const {
   formatScheduleDate,
   generateWhatsappCopyText,
   getGroupAgreementHotelsByCity,
+  getAllowedTransportModes,
   getStayPeriods,
   getScheduleTypeOption,
   hasIncompleteTransferTrainFields,
@@ -614,11 +615,64 @@ export function useGroupDetailDashboard({
   };
 
   const handleScheduleFieldChange = (field: keyof ScheduleFormState, value: any) => {
-    setScheduleForm((current) => applyScheduleHotelAutofill({ ...current, [field]: value }));
+    setScheduleForm((current) => {
+      const nextBusCount =
+        field === "busCount"
+          ? Math.max(0, Math.floor(Number(value) || 0))
+          : Math.max(0, Math.floor(current.busCount ?? 0));
+      const nextMode =
+        field === "busCount" && nextBusCount === 0 && current.transportMode === "bus"
+          ? getAllowedTransportModes(current.category).find((mode) => mode === "none") ??
+            getAllowedTransportModes(current.category).find((mode) => mode === "flight") ??
+            current.transportMode
+          : field === "busCount" && nextBusCount > 0 && current.transportMode === "none"
+            ? "bus"
+            : current.transportMode;
+      const modeChanged = nextMode !== current.transportMode;
+      return applyScheduleHotelAutofill({
+        ...current,
+        [field]: field === "busCount" ? nextBusCount : value,
+        ...(field === "busCount" && modeChanged
+          ? {
+              transportMode: nextMode,
+              transferByTrain: nextMode === "train",
+              trainDepartureTime: nextMode === "train" ? current.trainDepartureTime : "",
+              destinationPickupTime: nextMode === "train" ? current.destinationPickupTime : "",
+            }
+          : {}),
+      });
+    });
   };
 
   const handleEditFieldChange = (field: keyof EditScheduleFormState, value: any) => {
-    setEditScheduleForm((current) => (current ? applyEditHotelAutofill({ ...current, [field]: value }) : current));
+    setEditScheduleForm((current) => {
+      if (!current) return current;
+      const nextBusCount =
+        field === "busCount"
+          ? Math.max(0, Math.floor(Number(value) || 0))
+          : Math.max(0, Math.floor(current.busCount ?? 0));
+      const nextMode =
+        field === "busCount" && nextBusCount === 0 && current.transportMode === "bus"
+          ? getAllowedTransportModes(current.category).find((mode) => mode === "none") ??
+            getAllowedTransportModes(current.category).find((mode) => mode === "flight") ??
+            current.transportMode
+          : field === "busCount" && nextBusCount > 0 && current.transportMode === "none"
+            ? "bus"
+            : current.transportMode;
+      const modeChanged = nextMode !== current.transportMode;
+      return applyEditHotelAutofill({
+        ...current,
+        [field]: field === "busCount" ? nextBusCount : value,
+        ...(field === "busCount" && modeChanged
+          ? {
+              transportMode: nextMode,
+              transferByTrain: nextMode === "train",
+              trainDepartureTime: nextMode === "train" ? current.trainDepartureTime : "",
+              destinationPickupTime: nextMode === "train" ? current.destinationPickupTime : "",
+            }
+          : {}),
+      });
+    });
   };
 
   const handleOpenScheduleModal = useCallback(() => {
@@ -662,7 +716,7 @@ export function useGroupDetailDashboard({
     const transferTrainSummary = buildTransferTrainSummary({ ...form, transportMode });
     const nextCityTourCity = isCityTourActivityType(form.category) ? form.cityTourCity.trim() : "";
     const nextTitle = formatRouteSummary(form.category, form.from, form.to, nextCityTourCity);
-    const nextRequiresBus = isCityTourActivityType(form.category) ? false : transportMode === "bus";
+    const busCount = Math.max(0, Math.floor(form.busCount ?? 0));
     const nextIcon = form.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, form.category);
     return {
       date: formattedDate.date,
@@ -694,8 +748,9 @@ export function useGroupDetailDashboard({
       from: form.from.trim(),
       to: form.to.trim(),
       cityTourCity: nextCityTourCity,
+      busCount,
       notes: form.note.trim(),
-      requiresBus: nextRequiresBus,
+      requiresBus: busCount > 0,
       transferByTrain: isTransferByTrain,
       trainDepartureTime: isTransferByTrain ? form.trainDepartureTime.trim() : "",
       destinationPickupTime: isTransferByTrain ? form.destinationPickupTime.trim() : "",

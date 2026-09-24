@@ -19,6 +19,7 @@ export const TRANSPORT_MODE_META: Record<TransportMode, { label: string; icon: s
   flight: { label: "Flight", icon: "flight" },
   bus: { label: "Bus", icon: "directions_bus" },
   train: { label: "Train", icon: "train" },
+  none: { label: "Tidak ada kendaraan", icon: "block" },
 };
 
 /**
@@ -31,7 +32,7 @@ export function getAllowedTransportModes(category: string): TransportMode[] {
     return ["flight", "bus"];
   }
   if (normalizedCategory === "transfer") {
-    return ["bus", "train"];
+    return ["bus", "train", "none"];
   }
   return [];
 }
@@ -74,6 +75,29 @@ export function resolveTransportMode(item: ItineraryItem): TransportMode {
   }
 
   return "bus";
+}
+
+/** Resolves the per-trip bus quantity, including legacy boolean-only records. */
+export function resolveItineraryBusCount(item: {
+  busCount?: number | null;
+  requiresBus?: boolean | null;
+  meta?: string | null;
+}): number {
+  if (typeof item.busCount === "number" && Number.isFinite(item.busCount)) {
+    return Math.max(0, Math.floor(item.busCount));
+  }
+
+  const meta = item.meta ?? "";
+  if (/\bno\s+bus\b|\bbus:\s*(?:no|none|0)\b/i.test(meta)) {
+    return 0;
+  }
+
+  const declaredCount = meta.match(/\bbus:\s*(\d+)\b/i)?.[1];
+  if (declaredCount !== undefined) {
+    return Math.max(0, Number.parseInt(declaredCount, 10));
+  }
+
+  return item.requiresBus || /bus/i.test(meta) ? 1 : 0;
 }
 
 /** Material Symbol icon for a transport mode within a category context. */
@@ -526,7 +550,7 @@ export function createEditScheduleForm(item: ItineraryItem): EditScheduleFormSta
     from: fromValue,
     to: toValue,
     cityTourCity: category === "city-tour" ? inferCityTourCity(item) : "",
-    requiresBus: item.requiresBus ?? /bus/i.test(item.meta),
+    busCount: resolveItineraryBusCount(item),
     notes: item.notes ?? "",
     transferByTrain: isTransferByTrain,
     trainDepartureTime: item.trainDepartureTime ?? (isTransferByTrain ? parsedTime : ""),
@@ -557,7 +581,8 @@ export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form:
   const isTransferByTrain = isTransferActivityType(form.category) && transportMode === "train";
   const scheduleTime = isTransferByTrain ? form.trainDepartureTime : form.time;
   const transferTrainSummary = buildTransferTrainSummary({ ...form, transportMode });
-  const nextRequiresBus = isCityTourActivityType(form.category) ? form.requiresBus : transportMode === "bus";
+  const busCount = Math.max(0, Math.floor(form.busCount ?? 0));
+  const nextRequiresBus = busCount > 0;
   const nextIcon = form.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, form.category);
 
   return {
@@ -590,6 +615,7 @@ export function buildItineraryItemFromEditForm(currentItem: ItineraryItem, form:
     from: form.from.trim(),
     to: form.to.trim(),
     cityTourCity: nextCityTourCity,
+    busCount,
     requiresBus: nextRequiresBus,
     notes: form.notes.trim(),
     transferByTrain: isTransferByTrain,
@@ -727,6 +753,7 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
     if (!isTransferByTrain) {
       return [item];
     }
+    const busCount = resolveItineraryBusCount(item);
 
     const transferCategoryKey = "transfer";
     const transferIcon = TRANSPORT_MODE_META.train.icon;
@@ -752,7 +779,8 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
         to: trimmedTo,
         cityTourCity: "",
         flightNumber: "",
-        requiresBus: false,
+        busCount,
+        requiresBus: busCount > 0,
         notes: trimmedNotes,
         icon: transferIcon,
         transferByTrain: false,
@@ -773,7 +801,8 @@ export function expandInputTransferTrainItems(items: InputItineraryItem[]): Inpu
         to: trimmedTo,
         cityTourCity: "",
         flightNumber: "",
-        requiresBus: false,
+        busCount,
+        requiresBus: busCount > 0,
         notes: "",
         icon: transferIcon,
         transferByTrain: false,
@@ -809,6 +838,7 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
       trimmedFrom && trimmedTo
         ? formatRouteSummary("transfer", trimmedFrom, trimmedTo, item.cityTourCity ?? "")
         : item.title;
+    const busCount = resolveItineraryBusCount(item);
 
     return [
       {
@@ -837,7 +867,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
-        requiresBus: false,
+        busCount,
+        requiresBus: busCount > 0,
         notes: trimmedNotes,
         transferByTrain: false,
         trainDepartureTime: "",
@@ -870,7 +901,8 @@ export function expandTransferTrainItineraryItems(items: ItineraryItem[]): Itine
         from: trimmedFrom,
         to: trimmedTo,
         cityTourCity: "",
-        requiresBus: false,
+        busCount,
+        requiresBus: busCount > 0,
         notes: "",
         transferByTrain: false,
         trainDepartureTime: "",

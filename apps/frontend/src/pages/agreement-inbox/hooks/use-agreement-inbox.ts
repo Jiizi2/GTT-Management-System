@@ -84,7 +84,7 @@ export function useAgreementInbox() {
   const [assignmentGroupCodes, setAssignmentGroupCodes] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
-  const hasBlockingModal = editingDraft !== null || deleteDraftTarget !== null;
+  const hasBlockingModal = isDraftComposerOpen || editingDraft !== null || deleteDraftTarget !== null;
   const normalizedSearchQuery = query.trim();
   const isSearchingAcrossStatuses = normalizedSearchQuery.length > 0;
 

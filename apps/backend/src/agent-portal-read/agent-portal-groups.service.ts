@@ -48,6 +48,7 @@ type ItinerarySource = {
   toLocation?: string | null;
   cityTourCity?: string | null;
   requiresBus?: boolean | null;
+  busCount?: number | null;
   transferByTrain?: boolean | null;
   trainDepartureTime?: string | null;
   destinationPickupTime?: string | null;
@@ -107,7 +108,7 @@ export class AgentPortalGroupsService {
         itinerary: { orderBy: { sortOrder: "asc" }, select: {
           id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
           isoDate: true, time: true, flightNumber: true, hotelName: true, fromHotelName: true,
-          fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true,
+          fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
           transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true,
           hotelPickupRequestTime: true,
         } },
@@ -128,7 +129,7 @@ export class AgentPortalGroupsService {
       select: { itinerary: { orderBy: { sortOrder: "asc" }, select: {
         id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
         isoDate: true, time: true, flightNumber: true, hotelName: true, fromHotelName: true,
-        fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true,
+        fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
         transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true,
         hotelPickupRequestTime: true,
       } } },
@@ -229,7 +230,7 @@ export class AgentPortalGroupsService {
           itinerary: { orderBy: { sortOrder: "asc" }, select: {
             id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
             isoDate: true, time: true, flightNumber: true, hotelName: true, fromHotelName: true,
-            fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true,
+            fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
             transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true,
             hotelPickupRequestTime: true,
           } },
@@ -296,7 +297,9 @@ export class AgentPortalGroupsService {
       flightNumber: item.flightNumber ?? null, hotelName: item.hotelName ?? null,
       fromHotelName: item.fromHotelName ?? null, fromLocation: item.fromLocation ?? null,
       toLocation: item.toLocation ?? null, cityTourCity: item.cityTourCity ?? null,
-      requiresBus: item.requiresBus, transferByTrain: item.transferByTrain,
+      busCount: Math.max(0, Math.floor(item.busCount ?? (item.requiresBus ? 1 : 0))),
+      requiresBus: Math.max(0, Math.floor(item.busCount ?? (item.requiresBus ? 1 : 0))) > 0,
+      transferByTrain: item.transferByTrain,
       trainDepartureTime: item.trainDepartureTime ?? null,
       destinationPickupTime: item.destinationPickupTime ?? null,
       hotelPickupRequestTime: item.hotelPickupRequestTime ?? null,

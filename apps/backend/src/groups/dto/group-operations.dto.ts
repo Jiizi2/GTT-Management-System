@@ -100,6 +100,12 @@ export class UpsertGroupItineraryItemDto {
   @IsBoolean()
   requiresBus?: boolean;
 
+  @ApiPropertyOptional({ example: 2, minimum: 0, default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  busCount?: number;
+
   @ApiPropertyOptional({ example: "Driver standby di gate 4." })
   @IsOptional()
   @IsString()
