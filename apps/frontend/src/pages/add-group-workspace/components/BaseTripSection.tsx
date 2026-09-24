@@ -1,5 +1,6 @@
 import React from "react";
 import { DatePickerInput, TimePickerInput } from "../../../components/date-time-pickers";
+import { ItineraryBusCountField } from "../../../components/itinerary-bus-count-field";
 import { SereneSelect } from "../../../components/serene-select";
 import {
   getAllowedTransportModes,
@@ -127,8 +128,6 @@ export function BaseTripSection({
     "md:col-span-2 rounded-xl border border-outline-variant/35 bg-surface-container-low px-3 py-2 text-xs font-medium leading-relaxed text-on-surface-variant";
   const warningClassName =
     "md:col-span-2 flex items-start gap-2 rounded-md bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant";
-  const checkClassName =
-    "md:col-span-2 inline-flex min-h-11 items-center gap-3 rounded-xl bg-surface-container-low px-3 py-2.5 text-sm font-medium text-on-surface-variant";
   const transferTrainCardClassName = "md:col-span-2 border-l-2 border-primary/35 py-1 pl-4";
   const transferTrainGridClassName = "mt-3 grid gap-x-5 gap-y-4 md:grid-cols-2";
 
@@ -235,7 +234,6 @@ export function BaseTripSection({
           const transportMode = resolveFormTransportMode(item.category, item.transportMode);
           const allowedTransportModes = getAllowedTransportModes(item.category);
           const showTransportModeInput = allowedTransportModes.length > 0;
-          const showRequiresBusInput = allowedTransportModes.length === 0;
           const showFlightNumberInput = false;
           const showHotelNameInput = item.category === "arrival" || item.category === "departure";
           const showDeparturePickupRequestInput = item.category === "departure";
@@ -245,11 +243,33 @@ export function BaseTripSection({
             updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => ({
               ...trip,
               transportMode: mode,
+              busCount: mode === "bus" ? Math.max(1, trip.busCount ?? 0) : 0,
               flightNumber: mode === "flight" ? trip.flightNumber : "",
               transferByTrain: mode === "train",
               trainDepartureTime: mode === "train" ? trip.trainDepartureTime : "",
               destinationPickupTime: mode === "train" ? trip.destinationPickupTime : "",
             }));
+          const handleBaseTripBusCountChange = (busCount: number) => {
+            const nextMode =
+              busCount === 0 && transportMode === "bus"
+                ? allowedTransportModes.find((mode) => mode === "none") ??
+                  allowedTransportModes.find((mode) => mode === "flight") ??
+                  transportMode
+                : busCount > 0 && transportMode === "none" && allowedTransportModes.includes("bus")
+                  ? "bus"
+                  : transportMode;
+            updateBaseTripDraftAtIndex(currentBaseTripStepIndex, (trip) => {
+              return {
+                ...trip,
+                busCount,
+                transportMode: nextMode,
+                flightNumber: nextMode === "flight" ? trip.flightNumber : "",
+                transferByTrain: nextMode === "train",
+                trainDepartureTime: nextMode === "train" ? trip.trainDepartureTime : "",
+                destinationPickupTime: nextMode === "train" ? trip.destinationPickupTime : "",
+              };
+            });
+          };
           const activityCardToneClass =
             activityTypeCardClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-lowest";
           const routeFieldConfigForItem = getRouteFieldConfigByCategory(item.category);
@@ -575,20 +595,12 @@ export function BaseTripSection({
                     </div>
                   ) : null}
 
-                  {showRequiresBusInput ? (
-                    <label className={checkClassName}>
-                      <input
-                        className="h-4 w-4 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
-                        type="checkbox"
-                        checked={item.requiresBus}
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                          handleBaseTripChange(currentBaseTripStepIndex, "requiresBus", event.target.checked)
-                        }
-                        disabled={!isGroupReadyForItinerary || !item.isEnabled}
-                      />
-                      <span>Requires Bus</span>
-                    </label>
-                  ) : null}
+                  <ItineraryBusCountField
+                    id={`base-trip-${item.id}-bus`}
+                    busCount={item.busCount ?? 0}
+                    onChange={handleBaseTripBusCountChange}
+                    disabled={!isGroupReadyForItinerary || !item.isEnabled}
+                  />
                 </OperationalFormSection>
 
                 <OperationalFormSection

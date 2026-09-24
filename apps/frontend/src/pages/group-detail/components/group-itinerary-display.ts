@@ -2,6 +2,7 @@ import type { ItineraryItem } from "../../../shared/app-domain";
 import {
   formatScheduleTime,
   getTransportModeIcon,
+  resolveItineraryBusCount,
   resolveTransportMode,
   TRANSPORT_MODE_META,
 } from "../../../shared/app-domain";
@@ -141,9 +142,12 @@ export function buildItineraryFacts(item: ItineraryItem, categoryKey: string): I
     facts.push({ icon: "hotel", label: "Pickup Hotel", value: item.hotelName.trim() });
   }
 
-  if (item.requiresBus) {
-    facts.push({ icon: "directions_bus", label: "Transportation", value: "Bus" });
-  }
+  const busCount = resolveItineraryBusCount(item);
+  facts.push({
+    icon: "directions_bus",
+    label: "Bus for this trip",
+    value: busCount > 0 ? `${busCount} bus${busCount === 1 ? "" : "es"}` : "No bus needed",
+  });
 
   return facts;
 }

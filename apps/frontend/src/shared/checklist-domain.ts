@@ -133,6 +133,15 @@ export function buildChecklistItemsFromGroups(
 
       const categoryKey = dependencies.inferCategoryKey(item);
       const transportMode = dependencies.resolveTransportMode(item);
+      const requiredBusCount =
+        typeof item.busCount === "number" && Number.isFinite(item.busCount)
+          ? Math.max(0, Math.floor(item.busCount))
+          : item.requiresBus
+            ? 1
+            : 0;
+      if (requiredBusCount === 0) {
+        return;
+      }
       const activityIcon = dependencies.resolveItineraryIcon(item);
       const parsedTime = item.time ?? dependencies.parseTimeForInput(item.meta.split(" | ")[0] ?? "");
       const normalizedTime = parsedTime ? dependencies.formatScheduleTime(parsedTime) : "TBD";
@@ -141,7 +150,6 @@ export function buildChecklistItemsFromGroups(
       // `transferByTrain` is cleared, so each carries its own plain `time`.
       const transferByTrain = categoryKey === "transfer" && (item.transferByTrain ?? false);
       const isDepartureActivity = categoryKey === "departure";
-      const requiredBusCount = dependencies.resolveTotalBusCount(group.pax, group.totalBuses);
       const trainDepartureSource = item.trainDepartureTime ?? (transferByTrain ? parsedTime : "");
       const stationPickupSource = item.destinationPickupTime ?? "";
       const hotelPickupRequestSource = isDepartureActivity ? (item.hotelPickupRequestTime ?? "") : "";
@@ -196,10 +204,8 @@ export function buildChecklistItemsFromGroups(
     const rootGroup = groupRecord ? getRootGroup(groupRecord) : groupRecord;
     const parentCode = rootGroup ? rootGroup.code : firstItem.groupCode;
     const parentName = rootGroup ? rootGroup.name : firstItem.groupName;
-    const parentTotalBuses = rootGroup?.totalBuses;
-
     const totalPax = items.reduce((sum, item) => sum + item.groupPax, 0);
-    const requiredBusCount = dependencies.resolveTotalBusCount(totalPax, parentTotalBuses);
+    const requiredBusCount = items.reduce((sum, item) => sum + item.requiredBusCount, 0);
 
     const uniqueCodes = Array.from(new Set(items.map((item) => item.groupCode)));
     const otherCodes = uniqueCodes.filter((code) => code !== parentCode).sort();

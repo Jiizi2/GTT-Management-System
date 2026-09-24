@@ -120,6 +120,7 @@ function makeItem(params: {
     to: params.to,
     cityTourCity: "",
     flightNumber: params.flightNumber,
+    busCount: params.transportMode === "bus" ? 1 : 0,
     requiresBus: params.transportMode === "bus",
     notes: "",
     icon: getTransportModeIcon(params.transportMode, params.categoryKey),

@@ -1,4 +1,5 @@
 import { DatePickerInput, TimePickerInput } from "../date-time-pickers";
+import { ItineraryBusCountField } from "../itinerary-bus-count-field";
 import { SereneSelect } from "../serene-select";
 import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { useSaudiCityOptions } from "../../hooks/use-saudi-city-options";
@@ -150,6 +151,10 @@ export function ScheduleModal({
                         const nextMode = getDefaultTransportMode(nextCategory);
                         onChange("category", nextCategory);
                         onChange("transportMode", nextMode);
+                        onChange(
+                          "busCount",
+                          nextCategory !== "city-tour" && nextMode === "bus" ? Math.max(1, form.busCount ?? 0) : 0,
+                        );
 
                         if (shouldUseSaudiCityDropdown(nextCategory, "from")) {
                           onChange("from", normalizeSaudiCityValue(form.from));
@@ -206,6 +211,7 @@ export function ScheduleModal({
                         }`}
                         onClick={() => {
                           onChange("transportMode", mode);
+                          onChange("busCount", mode === "bus" ? Math.max(1, form.busCount ?? 0) : 0);
 
                           if (mode !== "flight") {
                             onChange("flightNumber", "");
@@ -459,6 +465,12 @@ export function ScheduleModal({
                 </div>
               ) : null}
             </div>
+
+            <ItineraryBusCountField
+              id="group-schedule-bus"
+              busCount={form.busCount ?? 0}
+              onChange={(nextCount) => onChange("busCount", nextCount)}
+            />
 
             {showFridayCityTourWarning ? (
               <div className={modalWarnClassName}>

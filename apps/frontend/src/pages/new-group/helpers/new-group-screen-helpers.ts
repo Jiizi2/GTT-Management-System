@@ -321,12 +321,13 @@ export function buildNewGroupPayload({
     categoryKey,
     title,
     meta,
-    icon,
-    hotelName,
-    from,
-    to,
-    highlighted,
-    requiresBus,
+      icon,
+      hotelName,
+      from,
+      to,
+      highlighted,
+      busCount,
+      requiresBus,
     hotelPickupRequestTime,
   }: {
     isoDate: string;
@@ -339,6 +340,7 @@ export function buildNewGroupPayload({
     from: string;
     to: string;
     highlighted?: boolean;
+    busCount?: number;
     requiresBus?: boolean;
     hotelName?: string;
     hotelPickupRequestTime?: string;
@@ -359,7 +361,8 @@ export function buildNewGroupPayload({
       hotelName,
       from,
       to,
-      requiresBus,
+      busCount: Math.max(0, Math.floor(busCount ?? (requiresBus ? 1 : 0))),
+      requiresBus: Math.max(0, Math.floor(busCount ?? (requiresBus ? 1 : 0))) > 0,
       hotelPickupRequestTime,
     };
   };

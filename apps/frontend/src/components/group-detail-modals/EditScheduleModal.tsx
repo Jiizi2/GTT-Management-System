@@ -1,4 +1,5 @@
 import { DatePickerInput, TimePickerInput } from "../date-time-pickers";
+import { ItineraryBusCountField } from "../itinerary-bus-count-field";
 import { SereneSelect } from "../serene-select";
 import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { useSaudiCityOptions } from "../../hooks/use-saudi-city-options";
@@ -31,8 +32,6 @@ const modalInfoClassName =
   "flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800";
 const modalWarnClassName =
   "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
-const modalCheckClassName =
-  "inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2 text-sm font-medium text-slate-700";
 const modalTransferCardClassName = "rounded-2xl border border-sky-200 bg-sky-50 p-3";
 const modalToggleChipClassName =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -90,7 +89,6 @@ export function EditScheduleModal({
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const allowedTransportModes = getAllowedTransportModes(form.category);
   const showTransportModeField = allowedTransportModes.length > 0;
-  const showRequiresBusField = allowedTransportModes.length === 0;
   const showFlightNumberField = false;
   const showFlightPlanHint = isFlightActivityType(form.category);
   const showPrimaryHotelNameField = form.category === "arrival" || form.category === "departure";
@@ -133,6 +131,10 @@ export function EditScheduleModal({
                       const nextMode = getDefaultTransportMode(option.value);
                       onChange("category", option.value);
                       onChange("transportMode", nextMode);
+                      onChange(
+                        "busCount",
+                        option.value !== "city-tour" && nextMode === "bus" ? Math.max(1, form.busCount ?? 0) : 0,
+                      );
 
                       if (shouldUseSaudiCityDropdown(option.value, "from")) {
                         onChange("from", normalizeSaudiCityValue(form.from));
@@ -189,6 +191,7 @@ export function EditScheduleModal({
                       }`}
                       onClick={() => {
                         onChange("transportMode", mode);
+                        onChange("busCount", mode === "bus" ? Math.max(1, form.busCount ?? 0) : 0);
 
                         if (mode !== "flight") {
                           onChange("flightNumber", "");
@@ -457,19 +460,13 @@ export function EditScheduleModal({
               </div>
             ) : null}
 
-            <div className="space-y-3">
-              {showRequiresBusField ? (
-                <label className={modalCheckClassName}>
-                  <input
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/25"
-                    type="checkbox"
-                    checked={form.requiresBus}
-                    onChange={(event) => onChange("requiresBus", event.target.checked)}
-                  />
-                  <span>Requires Bus</span>
-                </label>
-              ) : null}
+            <ItineraryBusCountField
+              id="edit-schedule-bus"
+              busCount={form.busCount ?? 0}
+              onChange={(nextCount) => onChange("busCount", nextCount)}
+            />
 
+            <div className="space-y-3">
               <label className={modalFieldClassName}>
                 <span>Notes</span>
                 <textarea

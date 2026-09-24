@@ -153,6 +153,9 @@ export class GroupItineraryItemResponseDto {
   @ApiProperty({ example: true })
   requiresBus!: boolean;
 
+  @ApiProperty({ example: 2, minimum: 0 })
+  busCount!: number;
+
   @ApiPropertyOptional({ example: "Driver standby di gate 4." })
   notes?: string;
 

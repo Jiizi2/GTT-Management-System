@@ -73,11 +73,11 @@ function Capacity({ draft }: { draft: HotelAgreementDraft }) {
   );
 }
 
-function ExpandedGroups({ draft, linkedGroupCode, assignmentGroupCode, onAssignmentGroupCodeChange, onAssignToGroup, onUnassignFromGroup, assignPending, unassignPending }: { draft: HotelAgreementDraft; linkedGroupCode: string; assignmentGroupCode: string; onAssignmentGroupCodeChange: (draftId: string, groupCode: string) => void; onAssignToGroup: (draft: HotelAgreementDraft) => void; onUnassignFromGroup: (draft: HotelAgreementDraft, groupCode?: string) => void; assignPending: boolean; unassignPending: boolean }) {
+function ExpandedGroups({ draft, linkedGroupCode, assignmentGroupCode, onAssignmentGroupCodeChange, onAssignToGroup, onUnassignFromGroup, assignPending, unassignPending, isLastDraft }: { draft: HotelAgreementDraft; linkedGroupCode: string; assignmentGroupCode: string; onAssignmentGroupCodeChange: (draftId: string, groupCode: string) => void; onAssignToGroup: (draft: HotelAgreementDraft) => void; onUnassignFromGroup: (draft: HotelAgreementDraft, groupCode?: string) => void; assignPending: boolean; unassignPending: boolean; isLastDraft: boolean }) {
   const links = draft.assignedGroups ?? [];
   const canAssign = draft.status !== "Rejected" && availablePax(draft) > 0;
   return (
-    <div className="rounded-b-2xl border-t border-outline-variant/25 bg-surface-container-low/65 px-4 py-3 sm:px-5 lg:rounded-none">
+    <div className={`rounded-b-2xl border-t border-outline-variant/25 bg-surface-container-low/65 px-4 py-3 sm:px-5 lg:rounded-none ${isLastDraft ? "lg:rounded-br-[15px] lg:rounded-bl-[15px]" : ""}`}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-sm font-extrabold text-on-surface"><span className="material-symbols-outlined text-lg" aria-hidden="true">groups</span>Linked Groups ({links.length})</p>
@@ -119,12 +119,14 @@ export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCo
   }
 
   return (
-    <div className="grid gap-3 lg:block">
-      {drafts.map((draft) => {
+    <div className="grid gap-3 rounded-2xl lg:block lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm">
+      {drafts.map((draft, index) => {
         const expanded = expandedDraftId === draft.id;
+        const isFirstDraft = index === 0;
+        const isLastDraft = index === drafts.length - 1;
         return (
-          <article key={draft.id} className="rounded-2xl border border-outline-variant/35 bg-surface-container-lowest shadow-sm lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b-outline-variant/25 lg:shadow-none lg:last:border-b-0">
-            <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-4 py-4 transition-colors sm:px-5 xl:grid-cols-[minmax(190px,1.45fr)_minmax(125px,.85fr)_minmax(150px,1fr)_minmax(120px,.78fr)_minmax(145px,1fr)_minmax(110px,.78fr)_112px] xl:items-center ${expanded ? "bg-primary/[0.035]" : "hover:bg-primary/[0.025]"}`}>
+          <article key={draft.id} className={`rounded-2xl border border-outline-variant/35 bg-surface-container-lowest shadow-sm lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b-outline-variant/25 lg:shadow-none lg:last:border-b-0 ${isFirstDraft ? "lg:rounded-tl-2xl lg:rounded-tr-2xl" : ""} ${isLastDraft && !expanded ? "lg:rounded-br-2xl lg:rounded-bl-2xl" : ""}`}>
+            <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-4 py-4 transition-colors sm:px-5 xl:grid-cols-[minmax(190px,1.45fr)_minmax(125px,.85fr)_minmax(150px,1fr)_minmax(120px,.78fr)_minmax(145px,1fr)_minmax(110px,.78fr)_112px] xl:items-center ${expanded ? "bg-primary/[0.035]" : "hover:bg-primary/[0.025]"} ${isFirstDraft ? "lg:rounded-tl-[15px] lg:rounded-tr-[15px]" : ""} ${isLastDraft && !expanded ? "lg:rounded-br-[15px] lg:rounded-bl-[15px]" : ""}`}>
               <div className="col-span-2 flex min-w-0 items-center gap-3 xl:col-span-1">
                 <span className="material-symbols-outlined grid h-8 w-8 shrink-0 place-items-center text-xl leading-none text-primary" aria-hidden="true">{cityIcon(draft.city)}</span>
                 <div className="min-w-0"><p className="text-sm font-extrabold text-on-surface">{cityLabel(draft.city)}</p><p className="truncate text-sm font-medium text-on-surface-variant">{draft.hotelName}</p></div>
@@ -136,7 +138,7 @@ export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCo
               <div><p className="mb-1 text-[11px] font-semibold text-on-surface-variant">Assignment</p><Badge status={assignmentBadgeStatus(draft)}>{draft.assignmentStatus}</Badge></div>
               <div className="col-span-2 mt-1 border-t border-outline-variant/25 pt-2 xl:col-span-1 xl:col-start-7 xl:row-start-1 xl:mt-0 xl:border-0 xl:pt-0"><RowActions draft={draft} expanded={expanded} onToggle={() => setExpandedDraftId(expanded ? null : draft.id)} onEdit={onStartEdit} onDelete={onDeleteRequest} deletePending={deleteDraftMutationPending} /></div>
             </div>
-            {expanded ? <ExpandedGroups draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? ""} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} /> : null}
+            {expanded ? <ExpandedGroups draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? ""} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} isLastDraft={isLastDraft} /> : null}
           </article>
         );
       })}

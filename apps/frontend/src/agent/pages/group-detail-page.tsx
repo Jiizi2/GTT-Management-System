@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/page-header";
 import { PageLayout } from "../../components/page-layout";
 import { ReadOnlyIndicator } from "../../components/read-only-indicator";
 import { StatusBadge } from "../../components/status-badge";
+import { resolveItineraryBusCount } from "../../shared/app-domain";
 import type { GroupAgreementHotel, GroupData, ItineraryItem } from "../../shared/app-domain";
 import { LoadingState, ResourceErrorState } from "../components/data-state";
 import type { TransportationItem } from "../data/contracts";
@@ -106,7 +107,7 @@ function TripIdentity({ group }: { group: GroupData }) {
           <DetailValue label="Jamaah" value={`${group.pax} jamaah`} icon="groups" />
           <DetailValue label="Paket" value={group.packageName || "Belum dicatat"} icon="luggage" />
           <DetailValue label="Durasi" value={`${group.durationDays} hari`} icon="calendar_month" />
-          <DetailValue label="Kebutuhan bus" value={group.totalBuses ? `${group.totalBuses} bus` : "Belum dicatat"} icon="directions_bus" />
+          <DetailValue label="Total bus grup" value={group.totalBuses ? `${group.totalBuses} bus` : "Belum dicatat"} icon="directions_bus" />
         </dl>
 
         <div className="mt-6 flex flex-col gap-3 border-t border-outline-variant/30 pt-5 sm:flex-row sm:items-center sm:justify-between">
@@ -196,6 +197,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
 }
 
 function ItineraryRow({ item, index, isLast, focus, transportation }: { item: ItineraryItem; index: number; isLast: boolean; focus: ItineraryFocus; transportation: TransportationItem | null }) {
+  const busCount = resolveItineraryBusCount(item);
   const facts = [item.time, item.flightNumber, item.from && item.to ? `${item.from} → ${item.to}` : null, item.hotelName, item.transferByTrain ? "Menggunakan kereta" : null].filter(Boolean);
   const focusLabel = focus === "today" ? "Hari ini" : focus === "next" ? "Agenda berikutnya" : null;
   const compactFacts = [item.time, item.flightNumber].filter(Boolean);
@@ -226,11 +228,13 @@ function ItineraryRow({ item, index, isLast, focus, transportation }: { item: It
             {facts.length > 0 ? <p className="mt-1 hidden break-words text-sm text-on-surface-variant sm:block">{facts.join(" · ")}</p> : item.meta ? <p className="mt-1 hidden break-words text-sm text-on-surface-variant sm:block">{item.meta}</p> : null}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-primary">{item.category || "Aktivitas"}</span>
-              {item.requiresBus ? <span className="hidden sm:inline-flex"><StatusBadge tone="waiting">Perlu bus</StatusBadge></span> : null}
+              <StatusBadge tone={busCount > 0 ? "waiting" : "neutral"}>
+                {busCount > 0 ? `Perlu ${busCount} bus` : "Tidak perlu bus"}
+              </StatusBadge>
             </div>
           </div>
         </div>
-        {item.requiresBus || transportation ? <DriverColumns row={transportation} /> : null}
+        {busCount > 0 || transportation ? <DriverColumns row={transportation} /> : null}
       </div>
     </li>
   );

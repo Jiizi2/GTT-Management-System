@@ -177,9 +177,7 @@ const syncChecklistDriverToBackend = async ({
         tripDate: checklistItem.tripDate,
         activity: checklistItem.activity,
         tripLabel: checklistItem.trip,
-        requiredBusCount: checklistItem.transferByTrain
-          ? Math.max(2, checklistItem.requiredBusCount)
-          : checklistItem.requiredBusCount,
+        requiredBusCount: checklistItem.requiredBusCount,
         scheduledTime: checklistItem.scheduledTime,
         transferByTrain: checklistItem.transferByTrain,
         trainDepartureTime: checklistItem.trainDepartureTime || undefined,
@@ -260,8 +258,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   const normalizedGroupCodeQuery = groupCodeQuery.trim().toLowerCase();
   const hasGroupCodeQuery = normalizedGroupCodeQuery.length > 0;
   
-  const getRequiredDriverCount = (item: ChecklistItem): number =>
-    Math.max(1, item.transferByTrain ? Math.max(2, item.requiredBusCount) : item.requiredBusCount);
+  const getRequiredDriverCount = (item: ChecklistItem): number => Math.max(1, item.requiredBusCount);
   
   const isChecklistItemCompleted = (item: ChecklistItem): boolean => {
     const assignedCount = confirmedDrivers[item.id]?.drivers.length ?? 0;

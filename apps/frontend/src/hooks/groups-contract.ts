@@ -42,6 +42,7 @@ const backendItineraryItemSchema = z
     fromLocation: z.string().nullable().optional(),
     toLocation: z.string().nullable().optional(),
     cityTourCity: z.string().nullable().optional(),
+    busCount: z.number().int().nonnegative().optional(),
     requiresBus: z.boolean().optional(),
     notes: z.string().nullable().optional(),
     transferByTrain: z.boolean().optional(),

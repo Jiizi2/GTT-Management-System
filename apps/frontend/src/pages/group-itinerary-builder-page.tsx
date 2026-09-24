@@ -145,7 +145,7 @@ export function GroupItineraryBuilderPage({
                 {group.pax} Pax
               </span>
               <span className="rounded-lg bg-surface-container-high px-2.5 py-1 text-xs font-bold text-on-surface-variant">
-                {resolveTotalBusCount(group.pax, group.totalBuses)} Bus
+                {resolveTotalBusCount(group.pax, group.totalBuses)} Bus Grup
               </span>
               <span className="rounded-lg bg-surface-container-high px-2.5 py-1 text-xs font-bold text-on-surface-variant">
                 {group.arrivalDate} to {group.returnDate}

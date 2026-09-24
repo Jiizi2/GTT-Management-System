@@ -1,7 +1,7 @@
 import * as Domain from "../shared/app-domain";
 import type { GroupData, ItineraryItem } from "../shared/app-domain";
 
-const { escapeHtml, formatScheduleTime, parseDisplayDateToIso, parseTimeForInput } = Domain;
+const { escapeHtml, formatScheduleTime, parseDisplayDateToIso, parseTimeForInput, resolveItineraryBusCount } = Domain;
 
 type OverviewTripRow = {
   groupCode: string;
@@ -14,7 +14,7 @@ type OverviewTripRow = {
   timeLabel: string;
   routeLabel: string;
   flightNumber: string;
-  requiresBus: boolean;
+  busCount: number;
   sortKey: string;
 };
 
@@ -65,7 +65,7 @@ function buildOverviewTripRows(groups: GroupData[]): OverviewTripRow[] {
           timeLabel,
           routeLabel: resolveRouteLabel(item),
           flightNumber: item.flightNumber?.trim() || "—",
-          requiresBus: Boolean(item.requiresBus),
+          busCount: resolveItineraryBusCount(item),
           sortKey: `${safeIsoDate}T${timeKey}|${group.code}`,
         };
       }),
@@ -143,7 +143,7 @@ export function exportOverviewReportPdf(
   const totalPilgrims = exportableGroups
     .filter((group) => scheduledGroupCodes.has(group.code))
     .reduce((total, group) => total + group.pax, 0);
-  const busMovementCount = rows.filter((row) => row.requiresBus).length;
+  const busMovementCount = rows.reduce((total, row) => total + row.busCount, 0);
   const activeDays = new Set(rows.map((row) => row.isoDate).filter(Boolean)).size;
   const scheduledGroupCount = scheduledGroupCodes.size;
   const tripsByDate = new Map<string, number>();
@@ -181,7 +181,7 @@ export function exportOverviewReportPdf(
           </td>
           <td class="route">${escapeHtml(row.routeLabel)}</td>
           <td class="center"><strong>${escapeHtml(row.flightNumber)}</strong></td>
-          <td class="center"><span class="transport ${row.requiresBus ? "bus" : "none"}">${row.requiresBus ? "Bus required" : "No bus"}</span></td>
+          <td class="center"><span class="transport ${row.busCount > 0 ? "bus" : "none"}">${row.busCount > 0 ? `${row.busCount} ${row.busCount === 1 ? "bus" : "buses"}` : "No bus"}</span></td>
         </tr>`,
     )
     .join("");

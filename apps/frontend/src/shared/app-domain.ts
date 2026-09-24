@@ -65,6 +65,7 @@ import {
   parseTimeForInput,
   registerSaudiCityOptions,
   resolveFormTransportMode,
+  resolveItineraryBusCount,
   resolveItineraryIcon,
   resolveTransportMode,
   saudiCityOptions,
@@ -216,6 +217,7 @@ export {
   parseTimeForInput,
   registerSaudiCityOptions,
   resolveFormTransportMode,
+  resolveItineraryBusCount,
   resolveItineraryIcon,
   resolveTransportMode,
   saudiCityOptions,
@@ -378,9 +380,10 @@ function buildOverviewSnapshotFromItinerary(
         const secondDateLabel = resolveItineraryOverviewDate(secondItem);
         const secondSummary = resolveItineraryOverviewSummary(secondItem);
         const secondTime = resolveItineraryOverviewTime(secondItem);
+        const secondBusCount = resolveItineraryBusCount(secondItem);
         const secondTimelineActivity =
           secondTime && secondTime.length > 0
-            ? `${secondTime}${secondItem.requiresBus ? " | Requires Bus" : ""}`
+            ? `${secondTime} | Bus: ${secondBusCount > 0 ? secondBusCount : "no bus needed"}`
             : "Awaiting operator update";
 
         return {
@@ -571,8 +574,8 @@ export function createInitialInputItineraryForm(): InputItineraryFormState {
     from: "",
     to: "",
     cityTourCity: "",
+    busCount: 0,
     flightNumber: "",
-    requiresBus: true,
     notes: "",
     transferByTrain: false,
     trainDepartureTime: "",
@@ -614,6 +617,7 @@ export function createInitialScheduleForm(): ScheduleFormState {
     from: "",
     to: "",
     cityTourCity: "",
+    busCount: 0,
     note: "",
     highlighted: false,
     transferByTrain: false,

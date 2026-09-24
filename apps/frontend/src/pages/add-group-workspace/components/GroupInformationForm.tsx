@@ -148,7 +148,7 @@ export function GroupInformationForm({
           </label>
 
           <label className={fieldClassName}>
-            <span>Total Bus Required</span>
+            <span>Total Bus Grup</span>
             <input
               className={inputClassName}
               type="number"
@@ -166,8 +166,8 @@ export function GroupInformationForm({
               Min {minimumBusCount} bus for {safePaxForBusRule} pax.
             </span>
             <span className="hidden sm:inline">
-              Minimum {minimumBusCount} bus for {safePaxForBusRule} pax (maximum 50 pax per bus). You can enter a
-              higher number for additional requests.
+              Minimum {minimumBusCount} bus for {safePaxForBusRule} pax (maximum 50 pax per bus). Trip bus needs are
+              configured separately.
             </span>
           </p>
 

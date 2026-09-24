@@ -254,7 +254,7 @@ function getRequiredBusBadgeLabel(group: GroupData): string | null {
     return null;
   }
 
-  return `${resolveTotalBusCount(group.pax, group.totalBuses)} bus`;
+  return `${resolveTotalBusCount(group.pax, group.totalBuses)} bus grup`;
 }
 
 export function GroupCard({
