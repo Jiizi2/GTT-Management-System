@@ -60,9 +60,9 @@ export class UpsertGroupItineraryItemDto {
   @IsString()
   time?: string;
 
-  @ApiPropertyOptional({ example: "flight", enum: ["flight", "bus", "train"] })
+  @ApiPropertyOptional({ example: "flight", enum: ["flight", "bus", "train", "none"] })
   @IsOptional()
-  @IsIn(["flight", "bus", "train"])
+  @IsIn(["flight", "bus", "train", "none"])
   transportMode?: string;
 
   @ApiPropertyOptional({ example: "SV-827" })
