@@ -51,14 +51,14 @@ export function ChecklistNeedAttentionCard({
 
   return (
     <article
-      className="overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-surface-container-lowest shadow-sm"
+      className="w-full min-w-0 max-w-full overflow-hidden rounded-3xl border-[0.5px] border-black/20 bg-surface-container-lowest shadow-sm"
     >
-      <div className="grid gap-0 lg:grid-cols-[0.78fr_1.22fr]">
+      <div className="grid min-w-0 gap-0 lg:grid-cols-[0.78fr_1.22fr]">
         <div className="min-w-0 border-b border-dashed border-black/45 bg-surface-container-lowest p-4 sm:p-5 lg:border-b-0 lg:border-r">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Group No</p>
-              <p className={`mt-2 break-words font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
+              <p className={`mt-2 min-w-0 max-w-full break-all font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
                 {codesText}
               </p>
             </div>
@@ -103,7 +103,7 @@ export function ChecklistNeedAttentionCard({
           </div>
         </div>
 
-        <div className="checklist-need-attention-body space-y-4 p-4 sm:p-5">
+        <div className="checklist-need-attention-body min-w-0 space-y-4 p-4 sm:p-5">
           {isExternalTransport ? (
             <div className="checklist-need-attention-warning flex items-start gap-2 rounded-xl px-3 py-2 text-xs">
               <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -127,8 +127,8 @@ export function ChecklistNeedAttentionCard({
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="space-y-1.5">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="min-w-0 space-y-1.5">
               <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                 Driver Name
               </span>
@@ -141,7 +141,7 @@ export function ChecklistNeedAttentionCard({
               />
             </label>
 
-            <label className="space-y-1.5">
+            <label className="min-w-0 space-y-1.5">
               <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                 Phone
               </span>
@@ -154,7 +154,7 @@ export function ChecklistNeedAttentionCard({
               />
             </label>
 
-            <label className="space-y-1.5">
+            <label className="min-w-0 space-y-1.5">
               <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                 Plate
               </span>
@@ -167,12 +167,12 @@ export function ChecklistNeedAttentionCard({
               />
             </label>
 
-            <label className="space-y-1.5">
+            <label className="min-w-0 space-y-1.5">
               <span className="checklist-need-panel-label text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/90">
                 Muassasah
               </span>
               <SereneSelect
-                className="serene-select"
+                className="serene-select min-w-0 max-w-full"
                 value={draft.muassasahId ?? ""}
                 onChange={(event) => onDraftChange(item.id, "muassasahId", event.target.value)}
                 aria-label="Muassasah supir"
