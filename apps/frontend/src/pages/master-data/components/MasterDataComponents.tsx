@@ -135,7 +135,7 @@ const masterDataOptionFormSchema = z.object({
 });
 
 export function getStatusButtonClassName(isActive: boolean, isDarkMode: boolean): string {
-  return `inline-flex min-w-[88px] justify-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition ${
+  return `inline-flex min-h-11 min-w-[88px] justify-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition xl:min-h-9 ${
     isActive
       ? isDarkMode
         ? "border-emerald-400/45 bg-emerald-500/18 text-emerald-100 hover:border-emerald-300/60 hover:bg-emerald-500/24"
@@ -680,7 +680,7 @@ export function MasterDataOptionTable({
             <div className="mt-3 flex justify-end gap-2">
               <button
                 type="button"
-                className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
+                className="serene-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
                 onClick={() => onEditOption(option.id)}
                 aria-label={`Edit ${option.label}`}
                 title="Edit data"
@@ -691,7 +691,7 @@ export function MasterDataOptionTable({
               </button>
               <button
                 type="button"
-                className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-error/30 bg-surface-container-lowest text-error transition hover:bg-error-container/45 disabled:cursor-not-allowed disabled:opacity-45"
+                className="serene-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-error/30 bg-surface-container-lowest text-error transition hover:bg-error-container/45 disabled:cursor-not-allowed disabled:opacity-45"
                 onClick={() => onDeleteOption(option)}
                 disabled={deletePending}
                 aria-label={`Hapus ${option.label}`}
@@ -762,7 +762,7 @@ export function MasterDataOptionTable({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary"
+                      className="serene-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/45 hover:text-primary xl:h-9 xl:w-9"
                       onClick={() => onEditOption(option.id)}
                       aria-label={`Edit ${option.label}`}
                     >
@@ -772,7 +772,7 @@ export function MasterDataOptionTable({
                     </button>
                     <button
                       type="button"
-                      className="serene-focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-error/30 bg-surface-container-lowest text-error transition hover:bg-error-container/45 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="serene-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-error/30 bg-surface-container-lowest text-error transition hover:bg-error-container/45 disabled:cursor-not-allowed disabled:opacity-45 xl:h-9 xl:w-9"
                       onClick={() => onDeleteOption(option)}
                       disabled={deletePending}
                       aria-label={`Hapus ${option.label}`}

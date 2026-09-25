@@ -51,9 +51,9 @@ export function getToneTextClass(tone: Tone): string {
 
 export function getIconButtonClasses(isDanger = false): string {
   if (isDanger) {
-    return "inline-flex h-9 w-9 items-center justify-center rounded-xl bg-error/10 text-error transition hover:bg-error hover:text-on-error disabled:cursor-not-allowed disabled:opacity-45";
+    return "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-error/10 text-error transition hover:bg-error hover:text-on-error disabled:cursor-not-allowed disabled:opacity-45 xl:h-9 xl:w-9";
   }
-  return "inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary transition hover:bg-brand-primary hover:text-brand-neutral disabled:cursor-not-allowed disabled:opacity-45";
+  return "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary transition hover:bg-brand-primary hover:text-brand-neutral disabled:cursor-not-allowed disabled:opacity-45 xl:h-9 xl:w-9";
 }
 
 export function getCitySummaryClasses(hasMissing: boolean): string {

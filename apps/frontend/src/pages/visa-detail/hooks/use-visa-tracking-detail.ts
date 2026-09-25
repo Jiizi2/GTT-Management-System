@@ -31,6 +31,7 @@ import {
 const {
   formatVisaDateWithYear,
   generateWhatsappCopyText,
+  generateMuassasahHijaziWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   resolveGroupCompleteness,
   resolveTotalBusCount,
@@ -699,8 +700,11 @@ export function useVisaTrackingDetail({
     }, 1600);
   };
 
-  const handleCopyWhatsapp = async () => {
-    const text = generateWhatsappCopyText(operationalGroup ?? group ?? undefined, familyGroups);
+  const handleCopyWhatsapp = async (format: "general" | "muassasah-hijazi") => {
+    const copyGroup = operationalGroup ?? group ?? undefined;
+    const text = format === "general"
+      ? generateWhatsappCopyText(copyGroup, familyGroups)
+      : generateMuassasahHijaziWhatsappCopyText(copyGroup, familyGroups);
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);

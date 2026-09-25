@@ -50,7 +50,7 @@ export function MobileNav({
           </span>
         </span>
         <span
-          className={`min-h-[0.7rem] text-[0.61rem] font-semibold leading-none transition ${
+          className={`min-h-[0.7rem] text-[0.6875rem] font-semibold leading-none transition ${
             isActive ? "text-primary" : "text-on-surface-variant"
           }`}
         >
@@ -94,7 +94,7 @@ export function MobileNav({
               </span>
             </span>
             <span
-              className={`min-h-[0.7rem] text-[0.61rem] font-semibold leading-none transition ${
+              className={`min-h-[0.7rem] text-[0.6875rem] font-semibold leading-none transition ${
                 isQuickActionActive ? "text-primary" : "text-on-surface-variant"
               }`}
             >

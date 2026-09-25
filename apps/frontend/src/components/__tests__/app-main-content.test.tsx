@@ -95,6 +95,7 @@ const createMockController = (overrides: Partial<AppController> = {}): AppContro
   selectedVisaGroupCode: null,
   selectedVisaRow: null,
   activeNav: 'overview',
+  isItineraryBuilder: false,
   sessionAccessTier: 'admin',
   isSidebarCollapsed: false,
   toggleSidebarCollapse: vi.fn(),

@@ -191,7 +191,15 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
         ) : agents.isError ? (
           <StatePanel icon="error" message="Gagal memuat performa agent." />
         ) : agents.data && agents.data.agents.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto"
+            role="region"
+            aria-label="Tabel performa agent"
+            tabIndex={0}
+          >
+            <p className="mb-2 text-xs font-medium text-on-surface-variant sm:hidden">
+              Geser tabel ke samping untuk melihat semua kolom.
+            </p>
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/40 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">

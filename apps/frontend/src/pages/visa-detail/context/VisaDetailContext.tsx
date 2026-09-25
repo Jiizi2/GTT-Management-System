@@ -156,7 +156,7 @@ export interface VisaDetailContextType {
   clearRaudhah: () => void;
   deleteAgreement: () => Promise<void>;
   handleCopyRaudhahReminder: () => Promise<void>;
-  handleCopyWhatsapp: () => Promise<void>;
+  handleCopyWhatsapp: (format: "general" | "muassasah-hijazi") => Promise<void>;
   buildHotelDraft: (city: "makkah" | "madinah", mode: "add" | "edit", hotelId?: string) => VisaHotelEditFormState;
   buildRaudhahDraft: () => VisaRaudhahEditFormState;
 }

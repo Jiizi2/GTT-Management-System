@@ -202,7 +202,7 @@ export function GroupItineraryTab() {
                     <div className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary xl:h-8 xl:w-8"
                         aria-label={`Edit ${item.title}`}
                         onClick={() => handleOpenEditModal(index)}
                       >
@@ -212,7 +212,7 @@ export function GroupItineraryTab() {
                       </button>
                       <button
                         type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary xl:h-8 xl:w-8"
                         aria-label={`Delete ${item.title}`}
                         onClick={() => handleOpenDeleteModal(index)}
                       >

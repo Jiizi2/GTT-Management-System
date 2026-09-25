@@ -7,6 +7,7 @@ import { useAppController } from '../../hooks/use-app-controller';
 
 const mockController = {
   activeNav: 'overview' as const,
+  isItineraryBuilder: false,
   sessionAccessTier: 'admin' as const,
   isSidebarCollapsed: false,
   selectedVisaRow: null,
