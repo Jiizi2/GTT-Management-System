@@ -450,6 +450,125 @@ export function generateWhatsappCopyText(
   return lines.join("\n");
 }
 
+function formatHijaziDate(isoDate?: string, date?: string, year?: string): string {
+  const trimmedIso = isoDate?.trim() ?? "";
+  const isoMatch = trimmedIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+
+  const fallback = [date?.trim(), year?.trim()].filter(Boolean).join(" ");
+  const namedMonthMatch = fallback.match(/^(\d{1,2})\s+([a-z]{3,})\s+(\d{4})$/i);
+  if (namedMonthMatch) {
+    const months: Record<string, string> = {
+      jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+      jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+    };
+    const month = months[namedMonthMatch[2].slice(0, 3).toLowerCase()];
+    if (month) return `${namedMonthMatch[1].padStart(2, "0")}/${month}/${namedMonthMatch[3]}`;
+  }
+
+  const direct = fallback || trimmedIso;
+  return direct || "[DATE]";
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string {
+  return values.find((value) => Boolean(value?.trim()))?.trim() ?? "";
+}
+
+function formatHijaziTime(time?: string): string {
+  return time?.trim().replace(/:/g, ".") || "[TIME]";
+}
+
+/** Builds the Muassasah Hijazi WhatsApp manifest from the selected group's data. */
+export function generateMuassasahHijaziWhatsappCopyText(
+  group: GroupData | undefined,
+  familyGroups?: GroupData[],
+): string {
+  if (!group) return "";
+
+  const allGroups = familyGroups && familyGroups.length > 0 ? familyGroups : [group];
+  const groupNumbers = allGroups.map((item) => item.code.trim()).filter(Boolean);
+  const combinedPax = allGroups.reduce((total, item) => total + (item.pax || 0), 0);
+  const lines = [
+    `GROUP NUMBER : ${groupNumbers.join(", ") || "[GROUP NUMBER]"}`,
+    `NO OF PAX : ${combinedPax}`,
+    "NATIONALITY : INDONESIA",
+    "",
+  ];
+
+  const printHotels = (label: string, hotelsByGroup: GroupAgreementHotel[][]) => {
+    const hotels = hotelsByGroup.flat();
+    const entries = hotels.length > 0 ? hotels : [undefined];
+    entries.forEach((hotel, index) => {
+      if (index > 0) lines.push("");
+      lines.push(`HOTEL NAME ${label} : ${hotel?.hotelName?.trim() || "[HOTEL NAME]"}`);
+      lines.push(`Check in : ${formatHijaziDate(hotel?.stayStartIso)}`);
+      lines.push(`Check out: ${formatHijaziDate(hotel?.stayEndIso)}`);
+      lines.push(`agreements number: ${hotel?.agreementNumber?.trim() || "[AGREEMENT NUMBER]"}`);
+    });
+  };
+
+  printHotels("MAKKAH", allGroups.map((item) => item.visaSetup?.makkahHotels ?? []));
+  lines.push("");
+  printHotels("MADEENA", allGroups.map((item) => item.visaSetup?.madinahHotels ?? []));
+  lines.push("");
+
+  const arrivalItinerary = allGroups
+    .flatMap((item) => item.itinerary ?? [])
+    .find((item) => item.category?.toLowerCase() === "arrival" && (!item.transportMode || item.transportMode === "flight"));
+  const departureItinerary = allGroups
+    .flatMap((item) => item.itinerary ?? [])
+    .find((item) => item.category?.toLowerCase() === "departure" && (!item.transportMode || item.transportMode === "flight"));
+
+  const onwardLeg = allGroups
+    .flatMap((item) => item.visaSetup?.flightLegs ?? [])
+    .find((leg) => leg.direction === "ONWARD");
+  const returnLeg = allGroups
+    .flatMap((item) => item.visaSetup?.flightLegs ?? [])
+    .find((leg) => leg.direction === "RETURN");
+
+  const visaSetups = allGroups.map((item) => item.visaSetup);
+  const arrivalNumber = firstNonEmpty(
+    ...visaSetups.map((setup) => setup?.arrivalFlightNumber),
+    onwardLeg?.flightNumber,
+    arrivalItinerary?.flightNumber,
+  );
+  const departureNumber = firstNonEmpty(
+    ...visaSetups.map((setup) => setup?.departureFlightNumber),
+    returnLeg?.flightNumber,
+    departureItinerary?.flightNumber,
+  );
+  const arrivalDate = formatHijaziDate(
+    firstNonEmpty(...visaSetups.map((setup) => setup?.arrivalFlightDate), onwardLeg?.arrivalDate, onwardLeg?.departureDate, arrivalItinerary?.isoDate, group.arrivalDate),
+    arrivalItinerary?.date,
+    arrivalItinerary?.year,
+  );
+  const departureDate = formatHijaziDate(
+    firstNonEmpty(...visaSetups.map((setup) => setup?.departureFlightDate), returnLeg?.departureDate, returnLeg?.arrivalDate, departureItinerary?.isoDate, group.returnDate),
+    departureItinerary?.date,
+    departureItinerary?.year,
+  );
+  const arrivalTime = firstNonEmpty(
+    ...visaSetups.map((setup) => setup?.arrivalTime),
+    onwardLeg?.arrivalTime,
+    onwardLeg?.departureTime,
+    arrivalItinerary?.time,
+  );
+  const departureTime = firstNonEmpty(
+    ...visaSetups.map((setup) => setup?.departureTime),
+    returnLeg?.departureTime,
+    returnLeg?.arrivalTime,
+    departureItinerary?.time,
+  );
+
+  lines.push(`ENTRY DATE WITH FLIGHT NO : ${arrivalNumber || "[FLIGHT NO]"}`);
+  lines.push(`Date: ${arrivalDate} (${formatHijaziTime(arrivalTime)})`);
+  lines.push("");
+  lines.push(`EXIT DATE WITH FLIGHT NO : ${departureNumber || "[FLIGHT NO]"}`);
+  lines.push(`Date: ${departureDate} (${formatHijaziTime(departureTime)})`);
+
+  return lines.join("\n");
+}
+
 export function filterAgreementDrafts(
   drafts: HotelAgreementDraft[],
   params: {

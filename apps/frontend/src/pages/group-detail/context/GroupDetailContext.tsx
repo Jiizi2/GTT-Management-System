@@ -64,7 +64,7 @@ export interface GroupDetailContextType {
   handleOpenMusyrifModal: () => void;
   handleCloseMusyrifModal: () => void;
   handleCopyMusyrif: () => void;
-  handleCopyWhatsapp: () => void;
+  handleCopyWhatsapp: (format: "general" | "muassasah-hijazi") => void;
   handleExportPdf: () => void;
   handleDeleteGroupBtn: () => void;
   handleCloseDeleteGroupModal: () => void;

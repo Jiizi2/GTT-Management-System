@@ -40,6 +40,7 @@ export type AppController = {
   isGroupRecordsLoading: boolean;
   sessionAccessTier: SessionAccessTier;
   activeNav: NavId;
+  isItineraryBuilder: boolean;
   query: string;
   isActiveOnly: boolean;
   overviewMonthFilter: string;

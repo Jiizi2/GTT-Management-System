@@ -28,7 +28,8 @@ export function DashboardWorkspaceShell({
     (controller.activeNav === "user-management" && controller.sessionAccessTier === "super-admin") ||
     (controller.activeNav === "master-data" && controller.sessionAccessTier === "super-admin")
   );
-  const shouldShowMobileNav = controller.activeNav !== "new-group" && controller.activeNav !== "input";
+  const shouldShowMobileNav =
+    controller.activeNav !== "new-group" && controller.activeNav !== "input" && !controller.isItineraryBuilder;
   const syncFeedback = controller.syncFeedback;
   const syncFeedbackToneClassMap = {
     success: "bg-primary text-on-primary",

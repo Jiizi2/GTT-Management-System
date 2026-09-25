@@ -110,6 +110,7 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
     isGroupRecordsLoading: groupRecordsState.isGroupRecordsLoading,
     sessionAccessTier,
     activeNav: routeState.activeNav,
+    isItineraryBuilder: routeState.isItineraryBuilder,
     query,
     isActiveOnly,
     overviewMonthFilter,

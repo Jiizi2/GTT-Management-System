@@ -33,7 +33,7 @@ function availablePax(draft: HotelAgreementDraft): number {
 
 function StatusSelect({ draft, onChange, disabled }: { draft: HotelAgreementDraft; onChange: (draft: HotelAgreementDraft, next: AgreementApprovalStatus) => void; disabled: boolean }) {
   return (
-    <SereneSelect className={`serene-select-pill w-full min-w-0 max-w-[140px] xl:min-w-[140px] ${approvalPillClasses(draft.status)}`} value={draft.status} disabled={disabled} onChange={(event) => onChange(draft, event.target.value as AgreementApprovalStatus)} aria-label={`Ubah status agreement ${draft.agreementNumber}`}>
+    <SereneSelect className={`serene-select-pill min-h-11 w-full min-w-0 max-w-[140px] xl:min-h-9 xl:min-w-[140px] ${approvalPillClasses(draft.status)}`} value={draft.status} disabled={disabled} onChange={(event) => onChange(draft, event.target.value as AgreementApprovalStatus)} aria-label={`Ubah status agreement ${draft.agreementNumber}`}>
       {APPROVAL_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
     </SereneSelect>
   );
@@ -95,7 +95,7 @@ function ExpandedGroups({ draft, linkedGroupCode, assignmentGroupCode, onAssignm
           {links.map((link) => (
             <div key={link.groupCode} className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5">
               <div className="min-w-0"><p className="truncate text-sm font-extrabold text-on-surface">{link.groupCode}</p><p className="text-xs font-semibold text-on-surface-variant">{link.pax} Pax allocated</p></div>
-              <button type="button" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-amber-50 hover:text-amber-800 disabled:opacity-40" onClick={() => onUnassignFromGroup(draft, link.groupCode)} disabled={unassignPending} aria-label={`Lepas ${draft.agreementNumber} dari group ${link.groupCode}`}><span className="material-symbols-outlined text-lg" aria-hidden="true">link_off</span></button>
+              <button type="button" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-amber-50 hover:text-amber-800 disabled:opacity-40 xl:h-9 xl:w-9" onClick={() => onUnassignFromGroup(draft, link.groupCode)} disabled={unassignPending} aria-label={`Lepas ${draft.agreementNumber} dari group ${link.groupCode}`}><span className="material-symbols-outlined text-lg" aria-hidden="true">link_off</span></button>
             </div>
           ))}
         </div>

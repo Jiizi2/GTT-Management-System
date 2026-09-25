@@ -23,6 +23,7 @@ const {
   formatRouteSummary,
   formatScheduleDate,
   generateWhatsappCopyText,
+  generateMuassasahHijaziWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   getAllowedTransportModes,
   getStayPeriods,
@@ -928,11 +929,14 @@ export function useGroupDetailDashboard({
     }, 1600);
   };
 
-  const handleCopyWhatsapp = async () => {
-    const text = generateWhatsappCopyText({
+  const handleCopyWhatsapp = async (format: "general" | "muassasah-hijazi") => {
+    const groupForCopy = {
       ...group,
       itinerary: itineraryItems,
-    }, familyGroups);
+    };
+    const text = format === "general"
+      ? generateWhatsappCopyText(groupForCopy, familyGroups)
+      : generateMuassasahHijaziWhatsappCopyText(groupForCopy, familyGroups);
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);

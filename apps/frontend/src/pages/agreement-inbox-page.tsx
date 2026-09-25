@@ -48,8 +48,8 @@ export function AgreementInboxScreen() {
         actions={
           <Button
             variant="primary"
-            size="sm"
-            className="shrink-0"
+            size="lg"
+            className="min-h-[52px] shrink-0"
             onClick={() => {
               setFeedback(null);
               setIsDraftComposerOpen(true);

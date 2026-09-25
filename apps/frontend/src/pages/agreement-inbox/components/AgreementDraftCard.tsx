@@ -123,7 +123,7 @@ export function AgreementDraftCard({
             {!readOnly ? (
               <button
                 type="button"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest/90 text-slate-900 transition hover:bg-surface-container-high"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-container-lowest/90 text-slate-900 transition hover:bg-surface-container-high xl:h-9 xl:w-9"
                 aria-label={`Edit agreement draft ${draft.agreementNumber}`}
                 onClick={() => onStartEdit(draft)}
               >
@@ -229,7 +229,7 @@ export function AgreementDraftCard({
               <Button
                 variant="danger"
                 size="sm"
-                className="h-9 w-9 p-0 rounded-full inline-flex items-center justify-center shrink-0"
+                className="h-11 w-11 p-0 rounded-full inline-flex items-center justify-center shrink-0 xl:h-9 xl:w-9"
                 aria-label={`Delete agreement draft ${draft.agreementNumber}`}
                 title={isAssigned ? "Unassign agreement before deleting it." : undefined}
                 onClick={() => onDeleteRequest(draft)}

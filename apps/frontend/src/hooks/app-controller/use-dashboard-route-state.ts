@@ -128,6 +128,7 @@ export function useDashboardRouteState(sessionAccessTier: SessionAccessTier) {
 
   return {
     activeNav: routeState.activeNav,
+    isItineraryBuilder: routeState.canonicalPath.startsWith("/itinerary-builder/"),
     selectedGroupCode: routeState.selectedGroupCode,
     selectedVisaGroupCode: routeState.selectedVisaGroupCode,
     handleNavigate,

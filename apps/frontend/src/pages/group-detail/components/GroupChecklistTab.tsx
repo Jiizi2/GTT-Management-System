@@ -117,7 +117,7 @@ export function GroupChecklistTab() {
                           <button
                             type="button"
                             onClick={() => handleOpenUnlinkModal(g)}
-                            className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition xl:h-5 xl:w-5"
                             title="Pisahkan grup ini"
                           >
                             <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
