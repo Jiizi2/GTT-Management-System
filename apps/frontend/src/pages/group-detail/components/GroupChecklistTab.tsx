@@ -62,10 +62,10 @@ export function GroupChecklistTab() {
   };
 
   return (
-    <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient xl:h-full flex flex-col justify-between">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
-        <div className="space-y-2 md:space-y-1">
-          <div className="flex items-start justify-between gap-3 md:hidden">
+    <section className="min-w-0 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient xl:h-full flex flex-col justify-between">
+      <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center">
+        <div className="min-w-0 space-y-2 md:space-y-1">
+          <div className="flex flex-wrap items-start justify-between gap-3 md:hidden">
             <span className={detailKickerClassName}>Group Number</span>
             <div className="flex items-center gap-2">
               <Badge status={group.tone === "active" ? "success" : "neutral"} className="shrink-0 whitespace-nowrap">
@@ -90,13 +90,13 @@ export function GroupChecklistTab() {
               ) : null}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[1.65rem] font-extrabold tracking-tight text-brand-primary sm:text-[2.05rem]">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+            <h2 className="min-w-0 max-w-full break-all text-[1.65rem] font-extrabold tracking-tight text-brand-primary sm:text-[2.05rem]">
               {familyGroups.length > 1 ? familyGroups.map((g) => g.code).join(" - ") : group.code}
             </h2>
             {familyGroups.length > 1 && (
               <div
-                className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 sm:inline-flex ${familyGroups.length > 2 ? "text-[10px]" : "text-xs"}`}
+                className={`flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-600 sm:inline-flex ${familyGroups.length > 2 ? "text-[10px]" : "text-xs"}`}
               >
                 <div className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-sm text-slate-400" aria-hidden="true">
@@ -110,7 +110,7 @@ export function GroupChecklistTab() {
                     .map((g, index) => (
                       <span key={g.code} className="inline-flex items-center gap-0.5">
                         {index > 0 && <span className="mr-1.5 text-slate-300">,</span>}
-                        <Link to={`/groups/${g.code}`} className="font-bold text-slate-900 hover:underline">
+                        <Link to={`/groups/${g.code}`} className="break-all font-bold text-slate-900 hover:underline">
                           {g.code}
                         </Link>
                         {!readOnly ? (
@@ -155,11 +155,11 @@ export function GroupChecklistTab() {
 
         <div className="hidden h-10 w-px bg-outline-variant/35 md:block" aria-hidden="true" />
 
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <span className={detailKickerClassName}>Group Name</span>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-semibold text-on-surface sm:text-2xl">{group.name}</h3>
-            <p className="mt-1 text-sm font-bold text-primary">Agent: {group.agent?.name ?? "GTT Direct"}</p>
+            <h3 className="min-w-0 break-words text-xl font-semibold text-on-surface sm:text-2xl">{group.name}</h3>
+            <p className="mt-1 break-words text-sm font-bold text-primary">Agent: {group.agent?.name ?? "GTT Direct"}</p>
           </div>
         </div>
       </div>

@@ -163,13 +163,13 @@ export function GroupDetail({
 
         <div className="space-y-6">
           {/* Grid atas: Group Info (Kiri) & Musyrif / Hotel Agreement (Kanan) */}
-          <div className="grid items-stretch gap-4 xl:grid-cols-[1.45fr_0.75fr]">
+          <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-[1.45fr_0.75fr]">
             <GroupChecklistTab />
             <GroupVisaTab />
           </div>
 
           {/* Grid bawah: Next Activity & Full Itinerary (Kiri) & Notes (Kanan) */}
-          <div className="grid items-stretch gap-4 xl:grid-cols-[1.45fr_0.75fr]">
+          <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-[1.45fr_0.75fr]">
             <div className="space-y-4">
               <GroupTimelineTab />
               <GroupItineraryTab />
