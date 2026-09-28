@@ -10,16 +10,44 @@ export function AgreementDraftFields({
   register,
   errors,
   idPrefix,
+  layout = "columns",
 }: {
   control: Control<HotelAgreementDraftFormState>;
   register: UseFormRegister<HotelAgreementDraftFormState>;
   errors: FieldErrors<HotelAgreementDraftFormState>;
   idPrefix: string;
+  layout?: "columns" | "stacked";
 }) {
   const agentsQuery = useAgentsQuery();
+  const isStacked = layout === "stacked";
   const fieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-slate-700";
   const inputClassName = "serene-input serene-input-md";
   const textareaClassName = "serene-textarea min-h-24";
+  const fieldLayoutClassNames = isStacked
+    ? {
+        agent: "grid gap-1.5",
+        groupName: "grid gap-1.5",
+        pax: "grid gap-1.5",
+        city: "grid gap-1.5",
+        hotelName: "grid gap-1.5",
+        agreementNumber: "grid gap-1.5",
+        status: "grid gap-1.5",
+        stayStart: "grid gap-1.5",
+        stayEnd: "grid gap-1.5",
+        notes: fieldClassName,
+      }
+    : {
+        agent: "order-1 grid gap-1.5 lg:col-span-4",
+        groupName: "order-2 grid gap-1.5 lg:col-span-6",
+        pax: "order-3 grid gap-1.5 lg:col-span-2",
+        city: "order-4 grid gap-1.5 lg:col-span-2",
+        hotelName: "order-5 grid gap-1.5 lg:col-span-5",
+        agreementNumber: "order-6 grid gap-1.5 lg:col-span-5",
+        status: "order-7 grid gap-1.5 lg:col-span-4",
+        stayStart: "order-8 grid gap-1.5 lg:col-span-4",
+        stayEnd: "order-9 grid gap-1.5 lg:col-span-4",
+        notes: `${fieldClassName} order-10 lg:col-span-12`,
+      };
 
   const cityErrorMessage = errors.city?.message;
   const agentIdErrorMessage = errors.agentId?.message;
@@ -32,34 +60,8 @@ export function AgreementDraftFields({
   const stayEndErrorMessage = errors.stayEndIso?.message;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-12">
-      <div className="order-4 grid gap-1.5 lg:col-span-2">
-        <label className={fieldClassName}>
-          <span>City</span>
-          <Controller
-            control={control}
-            name="city"
-            render={({ field }) => (
-              <SereneSelect
-                id={`${idPrefix}-city`}
-                className="serene-select"
-                value={field.value}
-                onChange={(event) => field.onChange(event.target.value)}
-                aria-invalid={getFieldAriaInvalid(cityErrorMessage)}
-                aria-describedby={getFieldDescribedBy(`${idPrefix}-city`, {
-                  errorMessage: cityErrorMessage,
-                })}
-              >
-                <option value="makkah">Makkah</option>
-                <option value="madinah">Madinah</option>
-              </SereneSelect>
-            )}
-          />
-        </label>
-        <FieldErrorMessage fieldId={`${idPrefix}-city`} message={cityErrorMessage} />
-      </div>
-
-      <div className="order-1 grid gap-1.5 lg:col-span-4">
+    <div className={isStacked ? "grid gap-4" : "grid gap-4 lg:grid-cols-12"}>
+      <div className={fieldLayoutClassNames.agent}>
         <label className={fieldClassName}>
           <span>Agent</span>
           <Controller
@@ -89,7 +91,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-agent`} message={agentIdErrorMessage} />
       </div>
 
-      <div className="order-2 grid gap-1.5 lg:col-span-6">
+      <div className={fieldLayoutClassNames.groupName}>
         <label className={fieldClassName}>
           <span>Group Name</span>
           <input
@@ -107,43 +109,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-group-name`} message={groupNameErrorMessage} />
       </div>
 
-      <div className="order-5 grid gap-1.5 lg:col-span-5">
-        <label className={fieldClassName}>
-          <span>Hotel Name</span>
-          <input
-            id={`${idPrefix}-hotel`}
-            type="text"
-            className={inputClassName}
-            placeholder="Swissotel Al Maqam"
-            {...register("hotelName")}
-            aria-invalid={getFieldAriaInvalid(hotelNameErrorMessage)}
-            aria-describedby={getFieldDescribedBy(`${idPrefix}-hotel`, {
-              errorMessage: hotelNameErrorMessage,
-            })}
-          />
-        </label>
-        <FieldErrorMessage fieldId={`${idPrefix}-hotel`} message={hotelNameErrorMessage} />
-      </div>
-
-      <div className="order-6 grid gap-1.5 lg:col-span-5">
-        <label className={fieldClassName}>
-          <span>Agreement Number</span>
-          <input
-            id={`${idPrefix}-number`}
-            type="text"
-            className={inputClassName}
-            placeholder="2026xxxxxxxxxxxxx"
-            {...register("agreementNumber")}
-            aria-invalid={getFieldAriaInvalid(agreementNumberErrorMessage)}
-            aria-describedby={getFieldDescribedBy(`${idPrefix}-number`, {
-              errorMessage: agreementNumberErrorMessage,
-            })}
-          />
-        </label>
-        <FieldErrorMessage fieldId={`${idPrefix}-number`} message={agreementNumberErrorMessage} />
-      </div>
-
-      <div className="order-3 grid gap-1.5 lg:col-span-2">
+      <div className={fieldLayoutClassNames.pax}>
         <label className={fieldClassName}>
           <span>Pax</span>
           <input
@@ -161,7 +127,69 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-pax`} message={paxErrorMessage} />
       </div>
 
-      <div className="order-7 grid gap-1.5 lg:col-span-4">
+      <div className={fieldLayoutClassNames.city}>
+        <label className={fieldClassName}>
+          <span>City</span>
+          <Controller
+            control={control}
+            name="city"
+            render={({ field }) => (
+              <SereneSelect
+                id={`${idPrefix}-city`}
+                className="serene-select"
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                aria-invalid={getFieldAriaInvalid(cityErrorMessage)}
+                aria-describedby={getFieldDescribedBy(`${idPrefix}-city`, {
+                  errorMessage: cityErrorMessage,
+                })}
+              >
+                <option value="makkah">Makkah</option>
+                <option value="madinah">Madinah</option>
+              </SereneSelect>
+            )}
+          />
+        </label>
+        <FieldErrorMessage fieldId={`${idPrefix}-city`} message={cityErrorMessage} />
+      </div>
+
+      <div className={fieldLayoutClassNames.hotelName}>
+        <label className={fieldClassName}>
+          <span>Hotel Name</span>
+          <input
+            id={`${idPrefix}-hotel`}
+            type="text"
+            className={inputClassName}
+            placeholder="Swissotel Al Maqam"
+            {...register("hotelName")}
+            aria-invalid={getFieldAriaInvalid(hotelNameErrorMessage)}
+            aria-describedby={getFieldDescribedBy(`${idPrefix}-hotel`, {
+              errorMessage: hotelNameErrorMessage,
+            })}
+          />
+        </label>
+        <FieldErrorMessage fieldId={`${idPrefix}-hotel`} message={hotelNameErrorMessage} />
+      </div>
+
+      <div className={fieldLayoutClassNames.agreementNumber}>
+        <label className={fieldClassName}>
+          <span>Agreement Number</span>
+          <input
+            id={`${idPrefix}-number`}
+            type="text"
+            className={inputClassName}
+            placeholder="2026xxxxxxxxxxxxx"
+            {...register("agreementNumber")}
+            aria-invalid={getFieldAriaInvalid(agreementNumberErrorMessage)}
+            aria-describedby={getFieldDescribedBy(`${idPrefix}-number`, {
+              errorMessage: agreementNumberErrorMessage,
+            })}
+          />
+        </label>
+        <FieldErrorMessage fieldId={`${idPrefix}-number`} message={agreementNumberErrorMessage} />
+      </div>
+
+      <div className={fieldLayoutClassNames.status}>
         <label className={fieldClassName}>
           <span>Approval Status</span>
           <Controller
@@ -188,7 +216,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-status`} message={statusErrorMessage} />
       </div>
 
-      <div className="order-8 grid gap-1.5 lg:col-span-4">
+      <div className={fieldLayoutClassNames.stayStart}>
         <label className={fieldClassName}>
           <span>Stay Start</span>
           <Controller
@@ -211,7 +239,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-stay-start`} message={stayStartErrorMessage} />
       </div>
 
-      <div className="order-9 grid gap-1.5 lg:col-span-4">
+      <div className={fieldLayoutClassNames.stayEnd}>
         <label className={fieldClassName}>
           <span>Stay End</span>
           <Controller
@@ -234,7 +262,7 @@ export function AgreementDraftFields({
         <FieldErrorMessage fieldId={`${idPrefix}-stay-end`} message={stayEndErrorMessage} />
       </div>
 
-      <label className={`${fieldClassName} order-10 lg:col-span-12`}>
+      <label className={fieldLayoutClassNames.notes}>
         <span>Notes</span>
         <textarea className={textareaClassName} placeholder="Optional notes" {...register("notes")} />
       </label>
