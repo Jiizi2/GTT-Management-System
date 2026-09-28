@@ -217,7 +217,9 @@ export async function exportGroupDetailPdf(
     const document = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: false });
     document.setProperties({ title: `Package Information - ${group.code}`, author: "Ghaniya Tour & Travel" });
 
-    const relatedGroups = familyGroups.length > 0 ? familyGroups : [group];
+    const relatedGroups = familyGroups.length > 0
+      ? familyGroups.map((relatedGroup) => (relatedGroup.code === group.code ? group : relatedGroup))
+      : [group];
     const groupNumbers = relatedGroups.map((item) => item.code.trim()).filter(Boolean).join(" · ");
     const totalPaxCount = relatedGroups.reduce((total, item) => total + item.pax, 0);
     const generatedTimestamp = new Date().toLocaleString("en-GB", {
@@ -237,23 +239,44 @@ export async function exportGroupDetailPdf(
     });
 
     const flightBody: RowInput[] = [];
-    for (const direction of ["ONWARD", "RETURN"] as const) {
-      flightBody.push([{ content: direction, colSpan: 8, styles: {
-        fillColor: SURFACE_SOFT, textColor: PRIMARY_DARK, fontStyle: "bold", fontSize: 6.5,
+    const parentGroup = relatedGroups.find((relatedGroup) => !relatedGroup.parentGroupId);
+    const parentFlightLegs = parentGroup?.visaSetup?.flightLegs ?? [];
+    for (const relatedGroup of relatedGroups) {
+      const groupRole = relatedGroups.length === 1
+        ? "GROUP"
+        : relatedGroup.parentGroupId
+          ? "CHILD"
+          : "PARENT";
+      const configuredFlightLegs = relatedGroup.visaSetup?.flightLegs ?? [];
+      const inheritsParentFlight = Boolean(
+        relatedGroup.parentGroupId && configuredFlightLegs.length === 0 && parentFlightLegs.length > 0,
+      );
+      const flightLegs = inheritsParentFlight ? parentFlightLegs : configuredFlightLegs;
+      const flightSourceLabel = inheritsParentFlight && parentGroup
+        ? ` | USING PARENT FLIGHT: ${parentGroup.code}`
+        : "";
+      flightBody.push([{ content: `${groupRole} | ${relatedGroup.code} | ${relatedGroup.name}${flightSourceLabel}`, colSpan: 8, styles: {
+        fillColor: PRIMARY_SOFT, textColor: PRIMARY_DARK, fontStyle: "bold", fontSize: 7,
       } }]);
-      const legs = (group.visaSetup?.flightLegs ?? [])
-        .filter((leg) => leg.direction === direction)
-        .sort((left, right) => left.sortOrder - right.sortOrder);
-      if (legs.length === 0) flightBody.push(["", "", "", "", "", "", "", ""]);
-      legs.forEach((leg) => {
-        const flightNumber = leg.flightNumber.trim();
-        flightBody.push([
-          formatDocumentDate(leg.departureDate), leg.departureAirportCode.trim().toUpperCase(),
-          leg.arrivalAirportCode.trim().toUpperCase(), formatDocumentTime(leg.departureTime),
-          formatDocumentTime(leg.arrivalTime), leg.carrierCode.trim().toUpperCase() || inferCarrierCode(flightNumber),
-          flightNumber, leg.remarks.trim(),
-        ]);
-      });
+
+      for (const direction of ["ONWARD", "RETURN"] as const) {
+        flightBody.push([{ content: direction, colSpan: 8, styles: {
+          fillColor: SURFACE_SOFT, textColor: MUTED, fontStyle: "bold", fontSize: 6.3,
+        } }]);
+        const legs = flightLegs
+          .filter((leg) => leg.direction === direction)
+          .sort((left, right) => left.sortOrder - right.sortOrder);
+        if (legs.length === 0) flightBody.push(["", "", "", "", "", "", "", ""]);
+        legs.forEach((leg) => {
+          const flightNumber = leg.flightNumber.trim();
+          flightBody.push([
+            formatDocumentDate(leg.departureDate), leg.departureAirportCode.trim().toUpperCase(),
+            leg.arrivalAirportCode.trim().toUpperCase(), formatDocumentTime(leg.departureTime),
+            formatDocumentTime(leg.arrivalTime), leg.carrierCode.trim().toUpperCase() || inferCarrierCode(flightNumber),
+            flightNumber, leg.remarks.trim(),
+          ]);
+        });
+      }
     }
     y = drawSectionTitle(document, "Flight Detail", y);
     y = drawTable(document, y, {

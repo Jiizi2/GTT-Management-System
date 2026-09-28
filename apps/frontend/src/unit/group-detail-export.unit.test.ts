@@ -107,7 +107,7 @@ describe("exportGroupDetailPdf", () => {
         hotelName: "Company Masyan AlMashaer Hotel",
         requiresBus: false,
       }),
-      createItineraryItem({ time: "13:00", from: "Makkah", to: "Madinah" }),
+      createItineraryItem({ time: "13:00", from: "Makkah", to: "Madinah", busCount: 2 }),
       createItineraryItem({
         isoDate: "2026-10-03",
         category: "City Tour Madinah",
@@ -158,5 +158,156 @@ describe("exportGroupDetailPdf", () => {
     expect(pdfSource).not.toContain("DBL");
     expect(pdfSource).not.toContain("TRP");
     expect(pdfSource).not.toContain("QUAD");
+  });
+
+  it("separates flight details for linked parent and child groups", async () => {
+    const parent = {
+      code: "GRP-PARENT",
+      name: "Parent Group",
+      status: "Active",
+      tone: "active",
+      pax: 40,
+      totalBuses: 1,
+      itinerary: [],
+      notes: [],
+      musyrif: { name: "Ahmad", phone: "", avatar: "" },
+      visaSetup: {
+        visaStatus: "Issued",
+        syarikah: "",
+        paymentStatus: "Paid",
+        flightLegs: [{
+          id: "parent-onward",
+          direction: "ONWARD",
+          sortOrder: 0,
+          departureAirportCode: "CGK",
+          arrivalAirportCode: "JED",
+          departureDate: "2026-10-01",
+          departureTime: "08:00",
+          arrivalDate: "2026-10-01",
+          arrivalTime: "16:00",
+          carrierCode: "GA",
+          flightNumber: "GA-980",
+          remarks: "Parent flight",
+        }],
+        makkahHotels: [],
+        madinahHotels: [],
+        raudhahAppointments: [],
+      },
+    } as GroupData;
+    const child = {
+      ...parent,
+      code: "GRP-CHILD",
+      name: "Child Group",
+      parentGroupId: "GRP-PARENT",
+      pax: 20,
+      visaSetup: {
+        ...parent.visaSetup!,
+        flightLegs: [{
+          id: "child-onward",
+          direction: "ONWARD" as const,
+          sortOrder: 0,
+          departureAirportCode: "SUB",
+          arrivalAirportCode: "MED",
+          departureDate: "2026-10-02",
+          departureTime: "09:00",
+          arrivalDate: "2026-10-02",
+          arrivalTime: "17:00",
+          carrierCode: "SV",
+          flightNumber: "SV-818",
+          remarks: "Child flight",
+        }],
+      },
+    } satisfies GroupData;
+
+    let pdfSource = "";
+    const result = await exportGroupDetailPdf(
+      {
+        group: parent,
+        itineraryItems: [],
+        noteItems: [],
+        musyrifProfile: parent.musyrif,
+        familyGroups: [parent, child],
+      },
+      {
+        logoDataUrl: null,
+        save: (document) => {
+          pdfSource = document.output();
+        },
+      },
+    );
+
+    expect(result).toBe(true);
+    expect(pdfSource).toContain("PARENT | GRP-PARENT | Parent Group");
+    expect(pdfSource).toContain("CHILD | GRP-CHILD | Child Group");
+    expect(pdfSource).toContain("GA-980");
+    expect(pdfSource).toContain("SV-818");
+  });
+
+  it("uses the parent flight when a linked child has no flight details", async () => {
+    const parent = {
+      code: "GRP-PARENT",
+      name: "Parent Group",
+      status: "Active",
+      tone: "active",
+      pax: 40,
+      totalBuses: 1,
+      itinerary: [],
+      notes: [],
+      musyrif: { name: "Ahmad", phone: "", avatar: "" },
+      visaSetup: {
+        visaStatus: "Issued",
+        syarikah: "",
+        paymentStatus: "Paid",
+        flightLegs: [{
+          id: "parent-onward",
+          direction: "ONWARD",
+          sortOrder: 0,
+          departureAirportCode: "CGK",
+          arrivalAirportCode: "JED",
+          departureDate: "2026-10-01",
+          departureTime: "08:00",
+          arrivalDate: "2026-10-01",
+          arrivalTime: "16:00",
+          carrierCode: "GA",
+          flightNumber: "GA-980",
+          remarks: "Parent flight",
+        }],
+        makkahHotels: [],
+        madinahHotels: [],
+        raudhahAppointments: [],
+      },
+    } as GroupData;
+    const child = {
+      ...parent,
+      code: "GRP-CHILD",
+      name: "Child Group",
+      parentGroupId: "GRP-PARENT",
+      pax: 20,
+      visaSetup: {
+        ...parent.visaSetup!,
+        flightLegs: [],
+      },
+    } satisfies GroupData;
+
+    let pdfSource = "";
+    const result = await exportGroupDetailPdf(
+      {
+        group: parent,
+        itineraryItems: [],
+        noteItems: [],
+        musyrifProfile: parent.musyrif,
+        familyGroups: [parent, child],
+      },
+      {
+        logoDataUrl: null,
+        save: (document) => {
+          pdfSource = document.output();
+        },
+      },
+    );
+
+    expect(result).toBe(true);
+    expect(pdfSource).toContain("CHILD | GRP-CHILD | Child Group | USING PARENT FLIGHT: GRP-PARENT");
+    expect(pdfSource.match(/GA-980/g)).toHaveLength(2);
   });
 });
