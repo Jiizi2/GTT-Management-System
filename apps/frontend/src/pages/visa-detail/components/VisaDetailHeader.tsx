@@ -23,6 +23,10 @@ export function VisaDetailHeader() {
     onBack,
   } = useVisaDetailContext();
 
+  const parentGroup = group?.parentGroupId
+    ? groups.find((item) => item.id === group.parentGroupId || item.code === group.parentGroupId)
+    : null;
+
   return (
     <div className="space-y-4">
       <header>
@@ -39,128 +43,168 @@ export function VisaDetailHeader() {
         </button>
       </header>
 
-      {group?.parentGroupId && (
-        <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 flex items-center gap-3 shadow-xs">
-          <span className="material-symbols-outlined text-base text-sky-700" aria-hidden="true">
-            info
-          </span>
-          <div>
-            <strong>Grup Operasional Terhubung</strong>
-            <p className="mt-0.5 text-[11px] text-sky-600 font-medium">
-              Grup ini mengikuti data operasional dari Group (
-              {
-                groups.find((g) => g.id === group.parentGroupId || g.code === group.parentGroupId)
-                  ?.code
-              }
-              ). Itinerary dan Musyrif diwarisi secara otomatis.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <section className="flex flex-col gap-3 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-4 shadow-ambient sm:p-5 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-primary">
-                Visa Detail
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <h1 className="break-words text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-                  {row.groupCode}
-                </h1>
-                {familyGroups.length > 1 && (
-                  <div
-                    className={`flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-2 py-1 font-semibold text-on-surface-variant sm:inline-flex ${
-                      familyGroups.length > 2 ? "text-[10px]" : "text-xs"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm text-on-surface-variant/70" aria-hidden="true">
-                        link
+      <section className="flex flex-col gap-2 rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-3 shadow-ambient sm:p-4 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-x-6 md:gap-y-2">
+        <div className="contents">
+          <div className="order-1 min-w-0 md:col-start-1 md:row-start-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-primary">Visa Detail</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h1 className="break-words text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
+                    {row.groupCode}
+                  </h1>
+                  <DetailOverflowMenu>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={openGroupEditModal}
+                      disabled={!group}
+                      aria-label={`Edit group info for ${row.groupCode}`}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        edit
                       </span>
-                      <span>Terhubung:</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                      {familyGroups
-                        .filter((g) => g.code !== activeGroupCode)
-                        .map((g, index) => (
-                          <span key={g.code} className="inline-flex items-center gap-0.5">
-                            {index > 0 && <span className="mr-1.5 text-outline-variant">,</span>}
-                            <button
-                              type="button"
-                              onClick={() => setActiveGroupCode(g.code)}
-                              className="font-bold text-on-surface hover:underline"
-                            >
-                              {g.code}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenUnlinkModal(g)}
-                              className="inline-flex h-11 w-11 items-center justify-center rounded text-on-surface-variant/70 transition hover:bg-brand-tertiary/10 hover:text-brand-tertiary xl:h-5 xl:w-5"
-                              title="Pisahkan grup ini"
-                            >
-                              <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
-                                link_off
-                              </span>
-                            </button>
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
-                <p className="min-w-0 break-words">{group?.name ?? row.groupName}</p>
-                <span className="inline-flex rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary">
-                  <span className="sm:hidden">{totalPax} Pax</span>
-                  <span className="hidden sm:inline">{totalPax} Pax Total</span>
-                </span>
+                      <span>Edit Group</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={openDeleteGroupModal}
+                      disabled={!group}
+                      aria-label={`Delete group ${row.groupCode}`}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        delete
+                      </span>
+                      <span>Delete Group</span>
+                    </button>
+                  </DetailOverflowMenu>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
+                  <p className="min-w-0 break-words">{group?.name ?? row.groupName}</p>
+                  <span className="inline-flex rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1 text-xs font-bold leading-none text-brand-primary">
+                    <span className="sm:hidden">{totalPax} Pax</span>
+                    <span className="hidden sm:inline">{totalPax} Pax Total</span>
+                  </span>
+                </div>
               </div>
             </div>
+          </div>
 
-            <DetailOverflowMenu>
-              <button
-                type="button"
-                className="inline-flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={openGroupEditModal}
-                disabled={!group}
-                aria-label={`Edit group info for ${row.groupCode}`}
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  edit
-                </span>
-                <span>Edit Group</span>
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-brand-tertiary transition hover:bg-brand-tertiary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={openDeleteGroupModal}
-                disabled={!group}
-                aria-label={`Delete group ${row.groupCode}`}
-              >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
-                  delete
-                </span>
-                <span>Delete Group</span>
-              </button>
-            </DetailOverflowMenu>
+          <div className="order-3 flex w-full flex-col items-stretch gap-1.5 self-start md:col-start-2 md:row-start-1 md:w-auto md:shrink-0">
+            <Link
+              to={`/groups/${encodeURIComponent(activeGroupCode)}`}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 text-sm font-bold text-on-primary transition hover:bg-primary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:w-auto"
+              aria-label={`Buka Group Detail ${activeGroupCode}`}
+            >
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                travel_explore
+              </span>
+              <span>Group Detail</span>
+            </Link>
+            <WhatsappCopyMenu isCopied={isWhatsappCopied} onCopy={handleCopyWhatsapp} className="w-full md:w-auto" />
           </div>
         </div>
 
-        <div className="flex w-full flex-col items-stretch gap-1.5 self-start md:w-auto md:shrink-0">
-          <Link
-            to={`/groups/${encodeURIComponent(activeGroupCode)}`}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 text-sm font-bold text-on-primary transition hover:bg-primary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:w-auto"
-            aria-label={`Buka Group Detail ${activeGroupCode}`}
+        {familyGroups.length > 1 && (
+          <div
+            className="order-2 mt-3 border-t border-outline-variant/35 pt-3 md:col-span-2 md:row-start-2 md:mt-1"
+            aria-label="Group yang berbagi data visa"
           >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">
-              travel_explore
-            </span>
-            <span>Group Detail</span>
-          </Link>
-          <WhatsappCopyMenu isCopied={isWhatsappCopied} onCopy={handleCopyWhatsapp} className="w-full md:w-auto" />
-        </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-on-surface">
+              <span className="material-symbols-outlined text-base text-brand-primary" aria-hidden="true">
+                link
+              </span>
+              <span>{familyGroups.length} group berbagi data visa</span>
+              {parentGroup && (
+                <span className="text-xs font-medium text-on-surface-variant">
+                  · Itinerary &amp; Musyrif mengikuti {parentGroup.code}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-2 flex flex-col divide-y divide-outline-variant/30 border-y border-outline-variant/25 md:flex-row md:items-stretch md:gap-4 md:divide-y-0 md:border-y-0">
+              {familyGroups.map((familyGroup) => {
+                const isActive = familyGroup.code === activeGroupCode;
+
+                return (
+                  <div key={familyGroup.code} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-0 md:py-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveGroupCode(familyGroup.code)}
+                      aria-pressed={isActive}
+                      aria-label={isActive ? `${familyGroup.code}, sedang dibuka` : `Buka group ${familyGroup.code}`}
+                      className={`relative flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2 text-left transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:min-h-16 md:flex-col md:items-start md:justify-center md:rounded-xl md:border md:px-3 md:py-2 ${
+                        isActive
+                          ? "md:border-brand-primary/35 md:bg-brand-primary/5"
+                          : "md:border-outline-variant/35 md:bg-surface-container-lowest"
+                      }`}
+                    >
+                      <span className="min-w-0 truncate font-bold text-on-surface md:pr-8">{familyGroup.code}</span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span
+                          className={`hidden text-xs font-bold md:inline ${
+                            isActive ? "text-brand-primary" : "text-on-surface-variant"
+                          }`}
+                        >
+                          {isActive ? "Sedang dibuka" : "Buka"}
+                        </span>
+                        <span
+                          className={`material-symbols-outlined inline-flex text-lg md:hidden ${
+                            isActive ? "text-brand-primary" : "text-on-surface-variant/60"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {isActive ? "radio_button_checked" : "radio_button_unchecked"}
+                        </span>
+                      </span>
+                      <span
+                        className={`hidden h-5 w-5 shrink-0 items-center justify-center rounded-full md:inline-flex md:absolute md:right-3 md:top-1/2 md:h-6 md:w-6 md:-translate-y-1/2 ${
+                          isActive ? "bg-brand-primary text-on-primary" : "border-2 border-outline-variant/70"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {isActive && <span className="material-symbols-outlined text-sm md:text-base">check</span>}
+                      </span>
+                    </button>
+
+                    {!isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUnlinkModal(familyGroup)}
+                        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-brand-tertiary transition hover:bg-brand-tertiary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:hidden"
+                        aria-label={`Pisahkan group ${familyGroup.code}`}
+                        title={`Pisahkan group ${familyGroup.code}`}
+                      >
+                        <span className="material-symbols-outlined text-base" aria-hidden="true">
+                          link_off
+                        </span>
+                        <span className="sr-only">Pisahkan</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {familyGroups
+                .filter((familyGroup) => familyGroup.code !== activeGroupCode)
+                .map((familyGroup) => (
+                  <button
+                    key={`desktop-unlink-${familyGroup.code}`}
+                    type="button"
+                    onClick={() => handleOpenUnlinkModal(familyGroup)}
+                    className="hidden min-h-16 shrink-0 items-center gap-1.5 border-l border-outline-variant/35 pl-5 pr-1 text-xs font-bold text-brand-tertiary transition hover:text-brand-tertiary/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:inline-flex"
+                    aria-label={`Pisahkan group ${familyGroup.code}`}
+                    title={`Pisahkan group ${familyGroup.code}`}
+                  >
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      link_off
+                    </span>
+                    <span>Pisahkan</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {agreementIssues.length > 0 ? (
@@ -176,15 +220,15 @@ export function VisaDetailHeader() {
               >
                 <span className="material-symbols-outlined text-base">link</span>
               </span>
-              <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                 <h2 className="text-sm font-extrabold leading-tight">Agreement Needs Attention</h2>
-                <span className="hidden sm:inline text-tertiary-fixed/40">|</span>
+                <span className="hidden text-tertiary-fixed/40 sm:inline">|</span>
                 <p className="text-xs font-medium leading-tight">{primaryAgreementMessage}</p>
                 <div className="flex flex-wrap gap-1.5 sm:ml-auto">
                   {agreementIssues.slice(0, 4).map((issue: any) => (
                     <span
                       key={issue.key}
-                      className="rounded bg-surface-container-lowest/80 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide"
+                      className="rounded bg-surface-container-lowest/80 px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide"
                       title={issue.message}
                     >
                       {issue.label}

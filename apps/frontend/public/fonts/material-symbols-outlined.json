@@ -99,6 +99,7 @@
     "print_disabled",
     "push_pin",
     "quick_reference",
+    "radio_button_checked",
     "radio_button_unchecked",
     "receipt_long",
     "request_quote",
