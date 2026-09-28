@@ -1,4 +1,4 @@
-import { type FormEventHandler, type ReactNode, useId } from "react";
+import { type FormEventHandler, type ReactNode, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,6 +51,7 @@ export function AgreementDraftComposerModal({
   const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const titleId = useId();
   const descriptionId = useId();
+  const [activeMode, setActiveMode] = useState<"paste" | "manual">("paste");
 
   return (
     <ModalPortal>
@@ -80,7 +81,7 @@ export function AgreementDraftComposerModal({
                   New Agreement Draft
                 </h2>
                 <p id={descriptionId} className="mt-1 text-sm text-on-surface-variant">
-                  Paste the usual message, then complete only the missing data.
+                  Create a draft by pasting an agreement message or filling the form manually.
                 </p>
               </div>
             </div>
@@ -103,34 +104,54 @@ export function AgreementDraftComposerModal({
                 {errorMessage}
               </p>
             ) : null}
-            <AgreementTextImport isSaving={isSaving} onSaveDraft={onSaveDraft} onComplete={onClose} />
-            <details className="group border-t border-outline-variant/25 pt-4">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 text-sm font-bold text-on-surface transition hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 [&::-webkit-details-marker]:hidden">
-                <span>Or fill the form manually</span>
-                <span className="material-symbols-outlined text-xl text-on-surface-variant transition-transform group-open:rotate-180" aria-hidden="true">
-                  expand_more
-                </span>
-              </summary>
-              <form className="mt-4 space-y-5" onSubmit={onSubmit}>
-                <AgreementDraftFields
-                  control={form.control}
-                  register={form.register}
-                  errors={form.formState.errors}
-                  idPrefix="agreement-draft"
-                />
-                <div className="flex flex-col-reverse gap-2 border-t border-outline-variant/25 pt-4 sm:flex-row sm:justify-end">
-                  <Button variant="secondary" type="button" onClick={onClose} disabled={isSaving}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" type="submit" className="inline-flex items-center gap-1.5" disabled={isSaving}>
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      save
-                    </span>
-                    <span>{isSaving ? "Saving..." : "Save Draft"}</span>
-                  </Button>
-                </div>
-              </form>
-            </details>
+            <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Agreement entry method">
+              <Button
+                variant={activeMode === "paste" ? "primary" : "secondary"}
+                type="button"
+                aria-pressed={activeMode === "paste"}
+                aria-controls="agreement-paste-mode"
+                onClick={() => setActiveMode("paste")}
+              >
+                Paste from template
+              </Button>
+              <Button
+                variant={activeMode === "manual" ? "primary" : "secondary"}
+                type="button"
+                aria-pressed={activeMode === "manual"}
+                aria-controls="agreement-manual-mode"
+                onClick={() => setActiveMode("manual")}
+              >
+                Fill form manually
+              </Button>
+            </div>
+            <div id="agreement-paste-mode" hidden={activeMode !== "paste"}>
+              <AgreementTextImport isSaving={isSaving} onSaveDraft={onSaveDraft} onComplete={onClose} />
+            </div>
+            <form
+              id="agreement-manual-mode"
+              className="space-y-5"
+              hidden={activeMode !== "manual"}
+              onSubmit={onSubmit}
+            >
+              <AgreementDraftFields
+                control={form.control}
+                register={form.register}
+                errors={form.formState.errors}
+                idPrefix="agreement-draft"
+                layout="stacked"
+              />
+              <div className="flex flex-col-reverse gap-2 border-t border-outline-variant/25 pt-4 sm:flex-row sm:justify-end">
+                <Button variant="secondary" type="button" onClick={onClose} disabled={isSaving}>
+                  Cancel
+                </Button>
+                <Button variant="primary" type="submit" className="inline-flex items-center gap-1.5" disabled={isSaving}>
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    save
+                  </span>
+                  <span>{isSaving ? "Saving..." : "Save Draft"}</span>
+                </Button>
+              </div>
+            </form>
           </div>
         </section>
       </div>

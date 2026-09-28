@@ -34,12 +34,14 @@ export function AgreementTextImport({
   const [groupName, setGroupName] = useState("");
   const [pax, setPax] = useState("");
   const [error, setError] = useState<ImportError>(null);
+  const [sourceEditorOpen, setSourceEditorOpen] = useState(true);
 
   const parseText = () => {
     const result = parseAgreementText(sourceText);
     setItems(result.items);
     setWarnings(result.warnings);
     setError(result.items.length === 0 ? { message: "Format belum terbaca. Pastikan nama hotel berada tepat di atas nomor agreement." } : null);
+    setSourceEditorOpen(result.items.length === 0);
   };
 
   const updateItem = <Key extends keyof ParsedAgreementTextItem>(
@@ -99,26 +101,37 @@ export function AgreementTextImport({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl bg-surface-container-low p-3 sm:p-4">
-        <label className="block text-sm font-bold text-on-surface" htmlFor="agreement-source-text">
-          Paste pesan agreement
-        </label>
-        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-          Data yang terbaca akan diisi otomatis. Field yang tidak ada di pesan tetap kosong untuk dilengkapi manual.
-        </p>
-        <textarea
-          id="agreement-source-text"
-          className="serene-textarea mt-3 min-h-40 w-full font-medium"
-          value={sourceText}
-          onChange={(event) => setSourceText(event.target.value)}
-          placeholder={SAMPLE_TEXT}
-        />
-        <div className="mt-3 flex justify-end">
-          <Button variant="secondary" type="button" onClick={parseText} disabled={!sourceText.trim() || isSaving}>
-            Baca & isi otomatis
+      {sourceEditorOpen ? (
+        <div className="rounded-xl bg-surface-container-low p-3 sm:p-4">
+          <label className="block text-sm font-bold text-on-surface" htmlFor="agreement-source-text">
+            Paste pesan agreement
+          </label>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+            Data yang terbaca akan diisi otomatis. Field yang tidak ada di pesan tetap kosong untuk dilengkapi manual.
+          </p>
+          <textarea
+            id="agreement-source-text"
+            className="serene-textarea mt-3 min-h-40 w-full font-medium"
+            value={sourceText}
+            onChange={(event) => setSourceText(event.target.value)}
+            placeholder={SAMPLE_TEXT}
+          />
+          <div className="mt-3 flex justify-end">
+            <Button variant="secondary" type="button" onClick={parseText} disabled={!sourceText.trim() || isSaving}>
+              Baca & isi otomatis
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <p className="text-sm font-semibold text-brand-primary" role="status">
+            Teks agreement berhasil dibaca. Periksa data di bawah sebelum menyimpan.
+          </p>
+          <Button variant="secondary" type="button" onClick={() => setSourceEditorOpen(true)} disabled={isSaving}>
+            Buka area paste agreement
           </Button>
         </div>
-      </div>
+      )}
 
       {warnings.length > 0 && items.length > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold leading-relaxed text-amber-900" role="status">
@@ -132,7 +145,7 @@ export function AgreementTextImport({
             <h3 className="text-sm font-extrabold text-on-surface">Data yang belum ada</h3>
             <p className="mt-1 text-xs text-on-surface-variant">Nilai ini akan dipakai untuk semua agreement di bawah.</p>
           </div>
-          <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(220px,1.4fr)_120px]">
+          <div className="grid gap-3">
             <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
               <span>Agent</span>
               <SereneSelect value={agentId} onChange={(event) => setAgentId(event.target.value)} className="serene-select">
@@ -154,32 +167,32 @@ export function AgreementTextImport({
             {items.map((item, index) => (
               <fieldset key={`${item.agreementNumber}-${index}`} className="rounded-xl border border-outline-variant/35 p-3 sm:p-4">
                 <legend className="px-1 text-sm font-extrabold text-on-surface">Agreement {index + 1}</legend>
-                <div className="grid gap-3 lg:grid-cols-12">
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-2">
+                <div className="grid gap-3">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>City</span>
                     <SereneSelect className="serene-select" value={item.city} onChange={(event) => updateItem(index, "city", event.target.value as ParsedAgreementTextItem["city"])}>
                       <option value="" disabled>Select City</option><option value="makkah">Makkah</option><option value="madinah">Madinah</option>
                     </SereneSelect>
                   </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-5">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>Hotel Name</span>
                     <input className="serene-input serene-input-md" value={item.hotelName} onChange={(event) => updateItem(index, "hotelName", event.target.value)} />
                   </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-5">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>Agreement Number</span>
                     <input className="serene-input serene-input-md tabular-nums" value={item.agreementNumber} onChange={(event) => updateItem(index, "agreementNumber", event.target.value)} />
                   </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-4">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>Approval Status</span>
                     <SereneSelect className="serene-select" value={item.status} onChange={(event) => updateItem(index, "status", event.target.value as AgreementApprovalStatus)}>
                       <option value="" disabled>Select Status</option><option value="Waiting for Approval">Waiting for Approval</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option>
                     </SereneSelect>
                   </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-4">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>Stay Start</span>
                     <DatePickerInput id={`parsed-stay-start-${index}`} inputClassName="serene-input serene-input-md" value={item.stayStartIso} onChange={(value) => updateItem(index, "stayStartIso", value)} />
                   </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700 lg:col-span-4">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>Stay End</span>
                     <DatePickerInput id={`parsed-stay-end-${index}`} inputClassName="serene-input serene-input-md" value={item.stayEndIso} onChange={(value) => updateItem(index, "stayEndIso", value)} />
                   </label>
