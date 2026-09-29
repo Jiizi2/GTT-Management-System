@@ -123,43 +123,46 @@ export function VisaDetailHeader() {
               )}
             </div>
 
-            <div className="mt-2 flex flex-col divide-y divide-outline-variant/30 border-y border-outline-variant/25 md:flex-row md:items-stretch md:gap-4 md:divide-y-0 md:border-y-0">
+            <div className="mt-2 flex flex-col divide-y divide-outline-variant/30 border-y border-outline-variant/25 md:flex-row md:items-stretch md:gap-2 md:divide-y-0 md:border-y-0">
               {familyGroups.map((familyGroup) => {
                 const isActive = familyGroup.code === activeGroupCode;
 
                 return (
-                  <div key={familyGroup.code} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-0 md:py-0">
+                  <div
+                    key={familyGroup.code}
+                    className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 py-0 md:min-h-12 md:gap-0 md:overflow-hidden md:rounded-xl md:border md:py-0 ${
+                      isActive
+                        ? "md:border-brand-primary/35 md:bg-brand-primary/5"
+                        : "md:border-outline-variant/35 md:bg-surface-container-lowest"
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => setActiveGroupCode(familyGroup.code)}
                       aria-pressed={isActive}
                       aria-label={isActive ? `${familyGroup.code}, sedang dibuka` : `Buka group ${familyGroup.code}`}
-                      className={`relative flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2 text-left transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:min-h-16 md:flex-col md:items-start md:justify-center md:rounded-xl md:border md:px-3 md:py-2 ${
-                        isActive
-                          ? "md:border-brand-primary/35 md:bg-brand-primary/5"
-                          : "md:border-outline-variant/35 md:bg-surface-container-lowest"
-                      }`}
+                      className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2 text-left transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:min-h-12 md:rounded-none md:px-3 md:py-1"
                     >
-                      <span className="min-w-0 truncate font-bold text-on-surface md:pr-8">{familyGroup.code}</span>
-                      <span className="flex shrink-0 items-center gap-1.5">
+                      <span className="flex min-w-0 flex-col justify-center gap-0.5">
+                        <span className="truncate font-bold leading-tight text-on-surface">{familyGroup.code}</span>
                         <span
-                          className={`hidden text-xs font-bold md:inline ${
+                          className={`hidden text-xs font-bold leading-tight md:inline ${
                             isActive ? "text-brand-primary" : "text-on-surface-variant"
                           }`}
                         >
                           {isActive ? "Sedang dibuka" : "Buka"}
                         </span>
-                        <span
-                          className={`material-symbols-outlined inline-flex text-lg md:hidden ${
-                            isActive ? "text-brand-primary" : "text-on-surface-variant/60"
-                          }`}
-                          aria-hidden="true"
-                        >
-                          {isActive ? "radio_button_checked" : "radio_button_unchecked"}
-                        </span>
                       </span>
                       <span
-                        className={`hidden h-5 w-5 shrink-0 items-center justify-center rounded-full md:inline-flex md:absolute md:right-3 md:top-1/2 md:h-6 md:w-6 md:-translate-y-1/2 ${
+                        className={`material-symbols-outlined inline-flex shrink-0 text-lg md:hidden ${
+                          isActive ? "text-brand-primary" : "text-on-surface-variant/60"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {isActive ? "radio_button_checked" : "radio_button_unchecked"}
+                      </span>
+                      <span
+                        className={`hidden h-6 w-6 shrink-0 items-center justify-center rounded-full md:inline-flex ${
                           isActive ? "bg-brand-primary text-on-primary" : "border-2 border-outline-variant/70"
                         }`}
                         aria-hidden="true"
@@ -172,7 +175,7 @@ export function VisaDetailHeader() {
                       <button
                         type="button"
                         onClick={() => handleOpenUnlinkModal(familyGroup)}
-                        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-brand-tertiary transition hover:bg-brand-tertiary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:hidden"
+                        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-brand-tertiary transition hover:bg-brand-tertiary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:w-11 md:justify-center md:gap-0 md:rounded-none md:border-l md:border-outline-variant/35 md:px-0"
                         aria-label={`Pisahkan group ${familyGroup.code}`}
                         title={`Pisahkan group ${familyGroup.code}`}
                       >
@@ -185,23 +188,6 @@ export function VisaDetailHeader() {
                   </div>
                 );
               })}
-              {familyGroups
-                .filter((familyGroup) => familyGroup.code !== activeGroupCode)
-                .map((familyGroup) => (
-                  <button
-                    key={`desktop-unlink-${familyGroup.code}`}
-                    type="button"
-                    onClick={() => handleOpenUnlinkModal(familyGroup)}
-                    className="hidden min-h-16 shrink-0 items-center gap-1.5 border-l border-outline-variant/35 pl-5 pr-1 text-xs font-bold text-brand-tertiary transition hover:text-brand-tertiary/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:inline-flex"
-                    aria-label={`Pisahkan group ${familyGroup.code}`}
-                    title={`Pisahkan group ${familyGroup.code}`}
-                  >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
-                      link_off
-                    </span>
-                    <span>Pisahkan</span>
-                  </button>
-                ))}
             </div>
           </div>
         )}
