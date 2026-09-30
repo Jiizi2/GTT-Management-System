@@ -58,9 +58,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         <header className="serene-card rounded-3xl p-5">
           <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
           <p className="mt-2 text-sm text-on-surface-variant">
-            <span className="sm:hidden">Driver readiness for next 3 days.</span>
+            <span className="sm:hidden">Trip monitoring for the next 3 days.</span>
             <span className="hidden sm:inline">
-              Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
+              Monitor every trip and driver readiness for today, tomorrow, and the day after tomorrow.
             </span>
           </p>
         </header>
@@ -127,9 +127,9 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
           <p className="mt-2 text-sm text-on-surface-variant">
-            <span className="sm:hidden">Driver readiness for next 3 days.</span>
+            <span className="sm:hidden">Trip monitoring for the next 3 days.</span>
             <span className="hidden sm:inline">
-              Driver readiness for trips scheduled today, tomorrow, and the day after tomorrow.
+              Monitor every trip and driver readiness for today, tomorrow, and the day after tomorrow.
             </span>
           </p>
         </div>
