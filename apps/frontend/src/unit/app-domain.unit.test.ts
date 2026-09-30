@@ -564,6 +564,36 @@ function testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow(): void {
   assert.equal(checklistItems[0]?.scheduledTime, "20:00");
 }
 
+function testBuildChecklistItemsKeepsTripsWithoutBusInsideWindow(): void {
+  const [todayIso] = getChecklistRangeDates();
+  const group = createBaseGroup({
+    code: "UNIT-NO-BUS",
+    itinerary: [
+      {
+        date: "Today",
+        year: todayIso.slice(0, 4),
+        category: "Activity",
+        categoryKey: "activity",
+        title: "Walking Activity",
+        meta: "09:00 | Hotel -> Masjid",
+        icon: "directions_walk",
+        isoDate: todayIso,
+        time: "09:00",
+        from: "Hotel",
+        to: "Masjid",
+        requiresBus: false,
+        busCount: 0,
+      },
+    ],
+  });
+
+  const checklistItems = buildChecklistItemsFromGroups([group]);
+
+  assert.equal(checklistItems.length, 1);
+  assert.equal(checklistItems[0]?.groupCode, "UNIT-NO-BUS");
+  assert.equal(checklistItems[0]?.requiredBusCount, 0);
+}
+
 function testBuildChecklistItemsMergesLinkedGroups(): void {
   const [todayIso] = getChecklistRangeDates();
   
@@ -1409,6 +1439,7 @@ describe("app-domain", () => {
   runCase("agreement pax exceeding group pax does not mismatch", testAgreementPaxExceedsGroupPaxDoesNotMismatch);
   runCase("checklist item builder", testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime);
   runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);
+  runCase("checklist keeps trips without bus", testBuildChecklistItemsKeepsTripsWithoutBusInsideWindow);
   runCase("checklist merges linked groups", testBuildChecklistItemsMergesLinkedGroups);
   runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);
   runCase("form/category helpers", testFormFactoryAndCategoryHelpers);

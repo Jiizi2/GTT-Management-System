@@ -139,9 +139,6 @@ export function buildChecklistItemsFromGroups(
           : item.requiresBus
             ? 1
             : 0;
-      if (requiredBusCount === 0) {
-        return;
-      }
       const activityIcon = dependencies.resolveItineraryIcon(item);
       const parsedTime = item.time ?? dependencies.parseTimeForInput(item.meta.split(" | ")[0] ?? "");
       const normalizedTime = parsedTime ? dependencies.formatScheduleTime(parsedTime) : "TBD";

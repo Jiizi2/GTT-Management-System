@@ -177,7 +177,7 @@ const syncChecklistDriverToBackend = async ({
         tripDate: checklistItem.tripDate,
         activity: checklistItem.activity,
         tripLabel: checklistItem.trip,
-        requiredBusCount: checklistItem.requiredBusCount,
+        requiredBusCount: Math.max(1, checklistItem.requiredBusCount),
         scheduledTime: checklistItem.scheduledTime,
         transferByTrain: checklistItem.transferByTrain,
         trainDepartureTime: checklistItem.trainDepartureTime || undefined,
