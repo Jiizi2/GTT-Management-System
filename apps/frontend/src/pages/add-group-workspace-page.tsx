@@ -43,7 +43,7 @@ export function InputItineraryScreen({
     itineraryItems,
     form,
     baseTripDrafts,
-    baseTripStepIndex,
+    baseTripPreviewItems,
     editingItemId,
     isScheduleFormVisible,
     isBaseTripFormVisible,
@@ -117,11 +117,15 @@ export function InputItineraryScreen({
 
         {!isIdentityOnlyMode ? (
           <>
-            <section className="serene-section">
-              <div className="mb-4 flex items-center gap-3">
-                <h2 className="text-xl font-semibold text-on-surface">Itinerary</h2>
-                <div className="h-px flex-1 bg-outline-variant/35" aria-hidden="true" />
-              </div>
+            <section className={`serene-section ${isScheduleOnlyMode ? "itinerary-builder-workspace" : ""}`}>
+              {!(isScheduleOnlyMode && isBaseTripFormVisible) ? (
+                <div className="mb-4 flex items-center gap-3">
+                  <h2 className="text-xl font-semibold text-on-surface">
+                    {isScheduleOnlyMode ? "Trip schedule" : "Itinerary"}
+                  </h2>
+                  <div className="h-px flex-1 bg-outline-variant/35" aria-hidden="true" />
+                </div>
+              ) : null}
 
               <div className="space-y-3">
                 <ItineraryTimelineView
@@ -135,13 +139,14 @@ export function InputItineraryScreen({
                   isBaseTripFormVisible={isBaseTripFormVisible && itineraryItems.length === 0}
                   currentBaseTripStepIndex={currentBaseTripStepIndex}
                   baseTripDrafts={baseTripDrafts}
+                  previewItems={baseTripPreviewItems}
                   enabledBaseTripCount={enabledBaseTripCount}
                   isGroupReadyForItinerary={isGroupReadyForItinerary}
                   handleJumpToBaseTripStep={handleJumpToBaseTripStep}
                   updateBaseTripDraftAtIndex={(tripIndex, updater) =>
                     formState.baseTripMethods.setValue(
                       "trips",
-                      baseTripDrafts.map((trip, idx) => (idx === tripIndex ? updater(trip) : trip))
+                      baseTripDrafts.map((trip, idx) => (idx === tripIndex ? updater(trip) : trip)),
                     )
                   }
                   handleBaseTripChange={handleBaseTripChange}
@@ -222,7 +227,7 @@ export function InputItineraryScreen({
               showFridayCityTourWarning={showFridayCityTourWarning}
             />
 
-            {!hideSaveAction ? (
+            {!hideSaveAction && (!isScheduleOnlyMode || itineraryItems.length > 0) ? (
               <section className="serene-section text-center">
                 <button
                   type="button"
@@ -233,10 +238,9 @@ export function InputItineraryScreen({
                   Save Itinerary
                 </button>
                 <p className="mt-2 text-sm text-on-surface-variant">
-                  <span className="sm:hidden">Saved data will appear on Overview.</span>
-                  <span className="hidden sm:inline">
-                    After saving, the group data will appear on the Overview page.
-                  </span>
+                  {isScheduleOnlyMode
+                    ? "After saving, review the itinerary in Group Detail."
+                    : "After saving, the group data will appear on the Overview page."}
                 </p>
               </section>
             ) : null}

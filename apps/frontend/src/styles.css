@@ -1408,3 +1408,71 @@ img {
     transform: rotate(360deg);
   }
 }
+
+/* Itinerary editing inherits the Group Detail work surfaces. */
+.base-trip-workspace .serene-input,
+.base-trip-workspace .serene-select,
+.base-trip-workspace .serene-textarea {
+  border: 1px solid rgb(var(--color-outline-variant) / 0.45);
+  border-radius: 10px;
+  background: rgb(var(--color-surface-container-lowest));
+  box-shadow: none;
+}
+
+.base-trip-workspace .serene-input,
+.base-trip-workspace .serene-select {
+  min-height: 44px;
+}
+
+.base-trip-workspace .serene-textarea {
+  min-height: 80px;
+}
+
+.base-trip-workspace .serene-input::placeholder,
+.base-trip-workspace .serene-textarea::placeholder {
+  color: rgb(var(--color-on-surface-variant));
+  opacity: 1;
+}
+
+.base-trip-workspace .serene-input:focus,
+.base-trip-workspace .serene-select:focus,
+.base-trip-workspace .serene-textarea:focus {
+  border-color: rgb(var(--color-primary) / 0.65);
+  box-shadow: 0 0 0 2px rgb(var(--color-primary) / 0.12);
+}
+
+.base-trip-actions {
+  bottom: 0;
+}
+
+@media (min-width: 380px) and (max-width: 639px) {
+  .base-trip-actions .serene-btn-primary {
+    width: auto;
+    flex: 1.3;
+  }
+  .base-trip-actions .serene-btn-primary,
+  .base-trip-actions .serene-btn-secondary {
+    min-height: 44px;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .base-trip-actions {
+    bottom: 1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .base-trip-step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 26px;
+    top: calc(50% + 16px);
+    bottom: -20px;
+    width: 1px;
+    background: rgb(var(--color-outline-variant) / 0.45);
+    pointer-events: none;
+  }
+}

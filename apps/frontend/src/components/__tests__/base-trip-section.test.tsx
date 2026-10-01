@@ -2,21 +2,23 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { BaseTripSection } from "../../pages/add-group-workspace/components/BaseTripSection";
-import { createBaseTripDrafts, type BaseTripDraft } from "../../pages/add-group-workspace/helpers/add-group-workspace-helpers";
+import {
+  createBaseTripDrafts,
+  type BaseTripDraft,
+} from "../../pages/add-group-workspace/helpers/add-group-workspace-helpers";
 
 function BaseTripTransferHarness() {
   const initialTransfer = createBaseTripDrafts("2026-08-01", "2026-08-10").find(
     (draft) => draft.category === "transfer",
   );
-  const [drafts, setDrafts] = useState<BaseTripDraft[]>([
-    { ...initialTransfer!, isEnabled: true },
-  ]);
+  const [drafts, setDrafts] = useState<BaseTripDraft[]>([{ ...initialTransfer!, isEnabled: true }]);
 
   return (
     <BaseTripSection
       isBaseTripFormVisible
       currentBaseTripStepIndex={0}
       baseTripDrafts={drafts}
+      previewItems={[]}
       enabledBaseTripCount={1}
       isGroupReadyForItinerary
       handleJumpToBaseTripStep={vi.fn()}

@@ -13,6 +13,7 @@ import {
   shouldShowFridayCityTourWarning,
   TRANSPORT_MODE_META,
   type InputItineraryFormState,
+  type ItineraryItem,
   type TransportMode,
 } from "../../../shared/app-domain";
 import {
@@ -20,12 +21,14 @@ import {
   shouldUseSaudiCityDropdown,
   type BaseTripDraft,
 } from "../helpers/add-group-workspace-helpers";
+import { ItineraryTimeline } from "../../group-detail/components/ItineraryTimeline";
 import { OperationalFormSection } from "./OperationalFormSection";
 
 interface BaseTripSectionProps {
   isBaseTripFormVisible: boolean;
   currentBaseTripStepIndex: number;
   baseTripDrafts: BaseTripDraft[];
+  previewItems: ItineraryItem[];
   enabledBaseTripCount: number;
   isGroupReadyForItinerary: boolean;
   handleJumpToBaseTripStep: (stepIndex: number) => void;
@@ -49,6 +52,7 @@ export function BaseTripSection({
   isBaseTripFormVisible,
   currentBaseTripStepIndex,
   baseTripDrafts,
+  previewItems,
   enabledBaseTripCount,
   isGroupReadyForItinerary,
   handleJumpToBaseTripStep,
@@ -63,174 +67,118 @@ export function BaseTripSection({
   isActiveBaseTripInvalid,
   saudiCityOptions,
 }: BaseTripSectionProps) {
+  const [isPreviewVisible, setIsPreviewVisible] = React.useState(false);
+  const previewHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const showPreview = isPreviewVisible && !isBaseTripSaveDisabled;
+
+  React.useEffect(() => {
+    if (!isBaseTripFormVisible || isBaseTripSaveDisabled) setIsPreviewVisible(false);
+  }, [isBaseTripFormVisible, isBaseTripSaveDisabled]);
+
+  React.useEffect(() => {
+    if (showPreview) previewHeadingRef.current?.focus();
+  }, [showPreview]);
+
   if (!isBaseTripFormVisible) {
     return null;
   }
 
   const activeBaseTrip = baseTripDrafts[currentBaseTripStepIndex] ?? null;
-
-  const activityTypeAccentLineClassMap: Record<string, string> = {
-    arrival: "bg-primary/80",
-    transfer: "bg-secondary/80",
-    "city-tour": "bg-tertiary-fixed/90",
-    departure: "bg-error-container/90",
-  };
-
-  const activityTypeIconClassMap: Record<string, string> = {
-    arrival: "bg-primary-fixed/75 text-primary",
-    transfer: "bg-secondary/18 text-secondary",
-    "city-tour": "bg-tertiary-fixed/18 text-on-tertiary-fixed-variant",
-    departure: "bg-error-container/18 text-on-error-container",
-  };
-
-  const activityTypeTextToneClassMap: Record<string, string> = {
-    arrival: "text-primary",
-    transfer: "text-secondary",
-    "city-tour": "text-on-tertiary-fixed-variant",
-    departure: "text-on-error-container",
-  };
-
-  const activityTypeBadgeClassMap: Record<string, string> = {
-    arrival: "border-primary/30 bg-surface-container-lowest text-primary",
-    transfer: "border-secondary/35 bg-surface-container-lowest text-secondary",
-    "city-tour": "border-tertiary-fixed/40 bg-surface-container-lowest text-on-tertiary-fixed-variant",
-    departure: "border-error-container/40 bg-surface-container-lowest text-on-error-container",
-  };
-
-  const activityTypeActiveStepClassMap: Record<string, string> = {
-    arrival: "border-primary/45 bg-surface-container-lowest text-on-surface",
-    transfer: "border-secondary/45 bg-surface-container-lowest text-on-surface",
-    "city-tour": "border-tertiary-fixed/60 bg-surface-container-lowest text-on-surface",
-    departure: "border-error-container/60 bg-surface-container-lowest text-on-surface",
-  };
-
-  const activityTypeCompletedStepClassMap: Record<string, string> = {
-    arrival: "border-primary/35 bg-surface-container-lowest text-on-surface",
-    transfer: "border-secondary/35 bg-surface-container-lowest text-on-surface",
-    "city-tour": "border-tertiary-fixed/45 bg-surface-container-lowest text-on-surface",
-    departure: "border-error-container/45 bg-surface-container-lowest text-on-surface",
-  };
-
-  const neutralItinerarySectionClass = "border-outline-variant/45 bg-surface-container-lowest";
-  const activityTypeCardClassMap: Record<string, string> = {
-    arrival: neutralItinerarySectionClass,
-    transfer: neutralItinerarySectionClass,
-    "city-tour": neutralItinerarySectionClass,
-    departure: neutralItinerarySectionClass,
-  };
+  const firstIncompleteTripIndex = baseTripDrafts.findIndex((trip) => trip.isEnabled && isBaseTripDraftInvalid(trip));
+  const firstIncompleteTrip = baseTripDrafts[firstIncompleteTripIndex];
+  const firstIncompleteTripLabel = firstIncompleteTrip
+    ? `${getScheduleTypeOption(firstIncompleteTrip.category).cardLabel}${
+        firstIncompleteTrip.category === "city-tour" ? ` ${firstIncompleteTripIndex === 1 ? "1" : "2"}` : ""
+      }`
+    : "";
 
   const fieldClassName = "serene-field min-w-0";
   const wideFieldClassName = `${fieldClassName} md:col-span-2`;
+  const scheduleWideFieldClassName = `${fieldClassName} min-[460px]:col-span-2`;
   const inputClassName = "serene-input";
   const selectClassName = "serene-select";
   const textareaClassName = "serene-textarea";
-  const routeHintClassName =
-    "md:col-span-2 rounded-xl border border-outline-variant/35 bg-surface-container-low px-3 py-2 text-xs font-medium leading-relaxed text-on-surface-variant";
+  const routeHintClassName = "md:col-span-2 text-xs leading-relaxed text-on-surface-variant";
   const warningClassName =
     "md:col-span-2 flex items-start gap-2 rounded-md bg-tertiary-fixed p-3 text-sm text-on-tertiary-fixed-variant";
-  const transferTrainCardClassName = "md:col-span-2 border-l-2 border-primary/35 py-1 pl-4";
+  const transferTrainCardClassName = "md:col-span-2 border-l border-primary/25 py-1 pl-4";
   const transferTrainGridClassName = "mt-3 grid gap-x-5 gap-y-4 md:grid-cols-2";
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start gap-3 rounded-xl bg-surface-container-high px-3 py-3">
-        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
-          <span className="material-symbols-outlined" aria-hidden="true">
-            route
+    <div className="base-trip-workspace min-w-0 space-y-5 xl:grid xl:grid-cols-[15rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:space-y-0">
+      <aside className="min-w-0 xl:sticky xl:top-5 xl:border-r xl:border-outline-variant/30 xl:pr-5">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold tracking-tight text-on-surface">5 Base Trips</h3>
+          <span className="text-xs text-on-surface-variant xl:sr-only">
+            Step {currentBaseTripStepIndex + 1} of {baseTripDrafts.length || 5}
           </span>
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-on-surface">Structured 5 Base Trips</h3>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            <span className="sm:hidden">Isi trip step 1-5. Yang tidak dipakai bisa di-skip.</span>
-            <span className="hidden sm:inline">
-              Isi trip secara bertahap dari step 1 sampai 5. Trip yang tidak dipakai bisa di-skip.
-            </span>
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="rounded-xl bg-surface-container-high p-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-on-surface">
-              Step {currentBaseTripStepIndex + 1} of {baseTripDrafts.length || 5}
-            </p>
-            <span className="text-xs font-semibold text-on-surface-variant">
-              {enabledBaseTripCount} of {baseTripDrafts.length || 5} used
-            </span>
-          </div>
-
-          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-on-surface-variant">
-            Activity type per trip
-          </p>
-
-          <div className="mt-2 flex snap-x gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-5">
-            {baseTripDrafts.map((trip, index) => {
-              const isCurrentStep = index === currentBaseTripStepIndex;
-              const isDisabledStep = !trip.isEnabled;
-              const isCompletedStep = !isBaseTripDraftInvalid(trip);
-              const stepToneClass =
-                activityTypeBadgeClassMap[trip.category] ??
-                "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant";
-              const activeStepToneClass =
-                activityTypeActiveStepClassMap[trip.category] ??
-                "border-primary/35 bg-primary-fixed text-on-primary-fixed-variant";
-              const completedStepToneClass =
-                activityTypeCompletedStepClassMap[trip.category] ??
-                "border-primary/35 bg-surface-container-lowest text-primary";
-              const tripTypeLabel = `${getScheduleTypeOption(trip.category).cardLabel}${
-                trip.category === "city-tour" ? ` ${index === 1 ? "1" : "2"}` : ""
-              }`;
-
-              return (
-                <button
-                  key={trip.id}
-                  type="button"
-                  className={`relative inline-flex min-h-12 min-w-[9.5rem] snap-start items-center justify-start gap-2 overflow-hidden rounded-xl border-2 px-3 text-left text-sm font-semibold transition sm:min-w-0 ${
-                    isCurrentStep
-                      ? activeStepToneClass
-                      : isDisabledStep
-                        ? "border-outline-variant/25 bg-surface-container-low text-on-surface-variant/45"
-                        : isCompletedStep
-                          ? completedStepToneClass
-                          : `${stepToneClass} hover:border-primary/45 hover:text-primary`
-                  }`}
-                  onClick={() => handleJumpToBaseTripStep(index)}
-                  disabled={!isGroupReadyForItinerary}
-                  aria-label={`Go to step ${index + 1}`}
+        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+          Isi trip bertahap. Trip yang tidak dipakai bisa dilewati.
+        </p>
+        <div
+          className="mt-4 grid min-w-0 grid-cols-5 gap-1.5 xl:grid-cols-1 xl:gap-1"
+          role="group"
+          aria-label="Base trip steps"
+        >
+          {baseTripDrafts.map((trip, index) => {
+            const isCurrentStep = index === currentBaseTripStepIndex;
+            const state = !trip.isEnabled ? "Skipped" : isBaseTripDraftInvalid(trip) ? "Pending" : "Ready";
+            const label = `${getScheduleTypeOption(trip.category).cardLabel}${trip.category === "city-tour" ? ` ${index === 1 ? "1" : "2"}` : ""}`;
+            const shortLabel =
+              trip.category === "city-tour"
+                ? `Tour ${index === 1 ? "1" : "2"}`
+                : trip.category === "departure"
+                  ? "Depart"
+                  : label;
+            return (
+              <button
+                key={trip.id}
+                type="button"
+                className={`base-trip-step serene-focus-ring relative flex min-h-14 min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-on-surface transition-colors xl:min-h-16 xl:flex-row xl:gap-2.5 xl:px-2.5 xl:py-3 ${isCurrentStep ? "bg-surface-container-low text-primary" : "hover:bg-surface-container-low"}`}
+                onClick={() => {
+                  setIsPreviewVisible(false);
+                  handleJumpToBaseTripStep(index);
+                }}
+                disabled={!isGroupReadyForItinerary}
+                aria-label={`Step ${index + 1}: ${label}, ${state}`}
+                aria-current={isCurrentStep ? "step" : undefined}
+              >
+                <span
+                  className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${isCurrentStep ? "border-primary bg-primary text-on-primary" : "border-outline-variant/45 bg-surface-container-lowest text-on-surface"}`}
                 >
-                  <span
-                    className={`absolute inset-x-0 top-0 h-0.5 ${
-                      activityTypeAccentLineClassMap[trip.category] ?? "bg-primary/80"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span
-                    className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-bold shadow-sm ${
-                      activityTypeIconClassMap[trip.category] ?? "bg-primary-fixed text-primary"
-                    }`}
-                  >
-                    {index + 1}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className={`material-symbols-outlined text-base ${
-                        activityTypeTextToneClassMap[trip.category] ?? "text-primary"
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {getScheduleTypeOption(trip.category).icon}
-                    </span>
-                    <span className="text-xs sm:text-sm">{tripTypeLabel}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  {index + 1}
+                </span>
+                <span className="material-symbols-outlined text-lg max-xl:!hidden" aria-hidden="true">
+                  {getScheduleTypeOption(trip.category).icon}
+                </span>
+                <span className="text-[10px] font-semibold xl:hidden">{shortLabel}</span>
+                <span className="hidden min-w-0 text-left text-sm font-semibold xl:inline">{label}</span>
+                <span className="ml-auto hidden text-[11px] font-medium text-on-surface-variant xl:inline">
+                  {state}
+                </span>
+              </button>
+            );
+          })}
         </div>
+      </aside>
 
-        {(activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
+      <div className="min-w-0 space-y-5">
+        {showPreview ? (
+          <section aria-labelledby="base-trip-preview-heading">
+            <h3
+              ref={previewHeadingRef}
+              id="base-trip-preview-heading"
+              tabIndex={-1}
+              className="text-xl font-semibold tracking-tight text-on-surface focus:outline-none sm:text-2xl"
+            >
+              Full Itinerary
+            </h3>
+            <p className="mt-1 text-sm text-on-surface-variant">Journey timeline and key milestones</p>
+            <ItineraryTimeline items={previewItems} />
+          </section>
+        ) : null}
+        {(!showPreview && activeBaseTrip ? [activeBaseTrip] : []).map((item) => {
           const transportMode = resolveFormTransportMode(item.category, item.transportMode);
           const allowedTransportModes = getAllowedTransportModes(item.category);
           const showTransportModeInput = allowedTransportModes.length > 0;
@@ -252,9 +200,9 @@ export function BaseTripSection({
           const handleBaseTripBusCountChange = (busCount: number) => {
             const nextMode =
               busCount === 0 && transportMode === "bus"
-                ? allowedTransportModes.find((mode) => mode === "none") ??
+                ? (allowedTransportModes.find((mode) => mode === "none") ??
                   allowedTransportModes.find((mode) => mode === "flight") ??
-                  transportMode
+                  transportMode)
                 : busCount > 0 && transportMode === "none" && allowedTransportModes.includes("bus")
                   ? "bus"
                   : transportMode;
@@ -270,34 +218,22 @@ export function BaseTripSection({
               };
             });
           };
-          const activityCardToneClass =
-            activityTypeCardClassMap[item.category] ?? "border-outline-variant/45 bg-surface-container-lowest";
           const routeFieldConfigForItem = getRouteFieldConfigByCategory(item.category);
           const showFridayWarningForItem = shouldShowFridayCityTourWarning(item.category, item.date);
 
           return (
-            <article
-              key={item.id}
-              className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 ${activityCardToneClass}`}
-            >
-              <span
-                className={`absolute inset-x-0 top-0 h-0.5 ${
-                  activityTypeAccentLineClassMap[item.category] ?? "bg-primary/80"
-                }`}
-                aria-hidden="true"
-              />
+            <article key={item.id} className="min-w-0">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-primary">
-                    Editing step {currentBaseTripStepIndex + 1}
-                  </p>
-                  <h4 className="mt-1 text-base font-semibold text-on-surface">Operational details</h4>
-                  <p className="mt-0.5 text-xs text-on-surface-variant">{item.description}</p>
+                  <h4 className="font-display text-xl font-semibold tracking-tight text-on-surface sm:text-2xl">
+                    Step {currentBaseTripStepIndex + 1} – {getScheduleTypeOption(item.category).cardLabel}
+                  </h4>
+                  <p className="sr-only">{item.description}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant/45 bg-surface-container-lowest px-2.5 py-1 text-xs font-bold leading-none text-on-surface">
+                  <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm font-medium text-on-surface">
                     <input
-                      className="h-3.5 w-3.5 rounded border-outline-variant/45 text-primary focus:ring-primary/25"
+                      className="h-5 w-5 rounded border-outline-variant/45 accent-primary focus:ring-primary/25"
                       type="checkbox"
                       checked={item.isEnabled}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -319,6 +255,8 @@ export function BaseTripSection({
                   icon="event"
                   title="Schedule details"
                   description="Date, time, accommodation, and activity-specific information."
+                  gridClassName="grid grid-cols-1 gap-x-3 gap-y-4 min-[460px]:grid-cols-2 md:gap-x-5"
+                  compactMobile
                 >
                   <label className={fieldClassName}>
                     <span>Date</span>
@@ -334,9 +272,7 @@ export function BaseTripSection({
 
                   {!showTransferTrainInputs ? (
                     <label className={fieldClassName}>
-                      <span>
-                        {item.category === "departure" ? "Departure Activity Time" : "Time (Optional)"}
-                      </span>
+                      <span>{item.category === "departure" ? "Departure Activity Time" : "Time (Optional)"}</span>
                       <TimePickerInput
                         inputClassName={inputClassName}
                         value={item.time}
@@ -349,7 +285,7 @@ export function BaseTripSection({
                   ) : null}
 
                   {showFlightNumberInput ? (
-                    <label className={wideFieldClassName}>
+                    <label className={scheduleWideFieldClassName}>
                       <span>Flight Number</span>
                       <input
                         className={inputClassName}
@@ -364,14 +300,8 @@ export function BaseTripSection({
                     </label>
                   ) : null}
 
-                  {isFlightActivityType(item.category) ? (
-                    <div className={routeHintClassName}>
-                      Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.
-                    </div>
-                  ) : null}
-
                   {showHotelNameInput ? (
-                    <label className={wideFieldClassName}>
+                    <label className={fieldClassName}>
                       <span>Hotel Name</span>
                       <input
                         className={inputClassName}
@@ -387,7 +317,7 @@ export function BaseTripSection({
                   ) : null}
 
                   {showCityTourCityInput ? (
-                    <label className={wideFieldClassName}>
+                    <label className={scheduleWideFieldClassName}>
                       <span>City Tour City</span>
                       <div className="relative">
                         <span
@@ -419,7 +349,7 @@ export function BaseTripSection({
                   ) : null}
 
                   {showDeparturePickupRequestInput ? (
-                    <label className={wideFieldClassName}>
+                    <label className={fieldClassName}>
                       <span>Hotel Pickup Request Time</span>
                       <TimePickerInput
                         inputClassName={inputClassName}
@@ -431,6 +361,11 @@ export function BaseTripSection({
                       />
                     </label>
                   ) : null}
+                  {isFlightActivityType(item.category) ? (
+                    <div className={`${routeHintClassName} min-[460px]:col-span-2`}>
+                      Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.
+                    </div>
+                  ) : null}
                 </OperationalFormSection>
 
                 <OperationalFormSection
@@ -438,6 +373,7 @@ export function BaseTripSection({
                   icon="route"
                   title="Route & transportation"
                   description="Origin, destination, train transfer, pickup, and bus requirements."
+                  compactMobile
                 >
                   <label className={fieldClassName}>
                     <span>{routeFieldConfigForItem.fromLabel}</span>
@@ -458,6 +394,9 @@ export function BaseTripSection({
                           disabled={!isGroupReadyForItinerary || !item.isEnabled}
                         >
                           <option value="">Select city in Saudi</option>
+                          {item.from && !saudiCityOptions.includes(item.from) ? (
+                            <option value={item.from}>{item.from}</option>
+                          ) : null}
                           {saudiCityOptions.map((city) => (
                             <option key={city} value={city}>
                               {city}
@@ -498,6 +437,9 @@ export function BaseTripSection({
                           disabled={!isGroupReadyForItinerary || !item.isEnabled}
                         >
                           <option value="">Select city in Saudi</option>
+                          {item.to && !saudiCityOptions.includes(item.to) ? (
+                            <option value={item.to}>{item.to}</option>
+                          ) : null}
                           {saudiCityOptions.map((city) => (
                             <option key={city} value={city}>
                               {city}
@@ -526,7 +468,7 @@ export function BaseTripSection({
                   {showTransportModeInput ? (
                     <div className={fieldClassName}>
                       <span>Transport Mode</span>
-                      <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Transport Mode">
                         {allowedTransportModes.map((mode) => {
                           const isActive = transportMode === mode;
                           return (
@@ -539,6 +481,7 @@ export function BaseTripSection({
                                   : "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
                               }`}
                               onClick={() => handleBaseTripModeChange(mode)}
+                              aria-pressed={isActive}
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             >
                               <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -608,6 +551,7 @@ export function BaseTripSection({
                   icon="edit_note"
                   title="Operational notes"
                   description="Keep special instructions available to the operations team."
+                  compactMobile
                 >
                   <label className={wideFieldClassName}>
                     <span>Notes</span>
@@ -633,60 +577,69 @@ export function BaseTripSection({
             </article>
           );
         })}
-      </div>
-
-      <div className="sticky bottom-0 z-10 space-y-2 rounded-xl border border-outline-variant/35 bg-surface-container-lowest px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 shadow-float sm:bottom-3">
-        <p
-          className={`text-xs font-medium ${
-            isActiveBaseTripInvalid ? "text-on-tertiary-fixed-variant" : "text-primary"
-          }`}
-        >
-          {enabledBaseTripCount === 0
-            ? "Pilih minimal 1 trip yang digunakan."
-            : isActiveBaseTripInvalid
-              ? "Step aktif belum lengkap. Pastikan tanggal, rute, dan field wajib sudah terisi."
-              : "Step aktif sudah lengkap."}
-        </p>
-
-        <div className="grid gap-3 sm:flex sm:items-center sm:justify-between">
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+        <div className="base-trip-actions sticky z-10 space-y-3 border-t border-outline-variant/30 bg-surface-container-lowest pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3">
+          <p
+            className={`flex items-start gap-2 text-xs font-medium leading-relaxed ${isBaseTripSaveDisabled ? "text-on-surface-variant" : "text-primary"}`}
+            role="status"
+            aria-live="polite"
+          >
+            {!isBaseTripSaveDisabled ? (
+              <span className="material-symbols-outlined shrink-0 text-base" aria-hidden="true">
+                check_circle
+              </span>
+            ) : null}
+            <span>
+              {enabledBaseTripCount === 0
+                ? "Pilih minimal 1 trip yang digunakan."
+                : firstIncompleteTripIndex >= 0
+                  ? `Lengkapi Step ${firstIncompleteTripIndex + 1} (${firstIncompleteTripLabel}) sebelum menyimpan.`
+                  : isActiveBaseTripInvalid
+                    ? "Step aktif belum lengkap. Pastikan tanggal, rute, dan field wajib sudah terisi."
+                    : "Semua trip yang digunakan sudah lengkap. Siap disimpan."}
+            </span>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="serene-btn-secondary min-h-12 w-full sm:min-h-10 sm:w-auto"
-              onClick={() => handleBaseTripStepChange("previous")}
-              disabled={!isGroupReadyForItinerary || isFirstBaseTripStep}
+              className="serene-btn-secondary min-h-12 flex-1 sm:min-h-11 sm:flex-none"
+              onClick={() => {
+                if (showPreview) setIsPreviewVisible(false);
+                else handleBaseTripStepChange("previous");
+              }}
+              disabled={!isGroupReadyForItinerary || (!showPreview && isFirstBaseTripStep)}
             >
               Previous
             </button>
-
             <button
               type="button"
-              className="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-primary/35 bg-primary-fixed px-4 py-2 text-sm font-semibold text-on-primary-fixed-variant transition hover:bg-primary-fixed/80 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
-              onClick={() => handleBaseTripStepChange("next")}
-              disabled={!isGroupReadyForItinerary || isLastBaseTripStep}
-            >
-              Next
-            </button>
-          </div>
-
-          <div className="grid w-full grid-cols-2 gap-2 border-t border-outline-variant/35 pt-3 sm:flex sm:w-auto sm:items-center sm:border-0 sm:pt-0">
-            <button
-              type="button"
-              className="serene-btn-secondary min-h-10 w-full sm:w-auto"
+              className="serene-btn-secondary min-h-12 flex-1 sm:ml-auto sm:min-h-11 sm:flex-none"
               onClick={handleCloseBaseTripForm}
               disabled={!isGroupReadyForItinerary}
             >
               Cancel
             </button>
-            <button
-              type="button"
-              className="serene-btn-primary min-h-12 w-full sm:min-h-10 sm:w-auto"
-              onClick={handleSaveBaseTrips}
-              disabled={isBaseTripSaveDisabled}
-            >
-              <span className="sm:hidden">Save Trips</span>
-              <span className="hidden sm:inline">Save 5 Base Trips</span>
-            </button>
+            {showPreview ? (
+              <button
+                type="button"
+                className="serene-btn-primary min-h-12 w-full sm:min-h-11 sm:w-auto"
+                onClick={handleSaveBaseTrips}
+                disabled={isBaseTripSaveDisabled}
+              >
+                Save Trips
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="serene-btn-primary min-h-12 w-full sm:min-h-11 sm:w-auto"
+                onClick={() => {
+                  if (isLastBaseTripStep) setIsPreviewVisible(true);
+                  else handleBaseTripStepChange("next");
+                }}
+                disabled={!isGroupReadyForItinerary || (isLastBaseTripStep && isBaseTripSaveDisabled)}
+              >
+                {isLastBaseTripStep ? "Preview Trips" : "Next"}
+              </button>
+            )}
           </div>
         </div>
       </div>
