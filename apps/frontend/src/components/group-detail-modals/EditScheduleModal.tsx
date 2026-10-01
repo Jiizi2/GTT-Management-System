@@ -33,8 +33,8 @@ const modalInfoClassName =
 const modalWarnClassName =
   "flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800";
 const modalTransferCardClassName = "rounded-2xl border border-sky-200 bg-sky-50 p-3";
-const modalToggleChipClassName =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
+const modalChoiceButtonClassName =
+  "flex min-h-12 min-w-0 items-center gap-2 rounded-lg border border-solid px-3 py-2.5 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 /**
  * Props untuk EditScheduleModal
@@ -116,16 +116,17 @@ export function EditScheduleModal({
               </div>
             ) : null}
             <div className={modalFieldClassName}>
-              <span>Activity Type</span>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <span id="edit-schedule-activity-type-label">Activity Type</span>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="edit-schedule-activity-type-label">
                 {scheduleTypeOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"
-                    className={`${modalToggleChipClassName} ${
+                    aria-pressed={form.category === option.value}
+                    className={`${modalChoiceButtonClassName} ${
                       form.category === option.value
-                        ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
-                        : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-outline-variant/70 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-low hover:text-primary"
                     }`}
                     onClick={() => {
                       const nextMode = getDefaultTransportMode(option.value);
@@ -167,10 +168,16 @@ export function EditScheduleModal({
                       }
                     }}
                   >
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                    <span className="material-symbols-outlined shrink-0 text-xl" aria-hidden="true">
                       {option.icon}
                     </span>
                     <span>{option.modalLabel}</span>
+                    <span
+                      className={`material-symbols-outlined ml-auto shrink-0 text-base ${form.category === option.value ? "" : "invisible"}`}
+                      aria-hidden="true"
+                    >
+                      check
+                    </span>
                   </button>
                 ))}
               </div>
@@ -178,16 +185,21 @@ export function EditScheduleModal({
 
             {showTransportModeField ? (
               <div className={modalFieldClassName}>
-                <span>Transport Mode</span>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <span id="edit-schedule-transport-mode-label">Transport Mode</span>
+                <div
+                  className="grid gap-2 sm:grid-cols-2"
+                  role="group"
+                  aria-labelledby="edit-schedule-transport-mode-label"
+                >
                   {allowedTransportModes.map((mode) => (
                     <button
                       key={mode}
                       type="button"
-                      className={`${modalToggleChipClassName} ${
+                      aria-pressed={form.transportMode === mode}
+                      className={`${modalChoiceButtonClassName} ${
                         form.transportMode === mode
-                          ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
-                          : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-outline-variant/70 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-low hover:text-primary"
                       }`}
                       onClick={() => {
                         onChange("transportMode", mode);
@@ -206,10 +218,16 @@ export function EditScheduleModal({
                         }
                       }}
                     >
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      <span className="material-symbols-outlined shrink-0 text-xl" aria-hidden="true">
                         {TRANSPORT_MODE_META[mode].icon}
                       </span>
                       <span>{TRANSPORT_MODE_META[mode].label}</span>
+                      <span
+                        className={`material-symbols-outlined ml-auto shrink-0 text-base ${form.transportMode === mode ? "" : "invisible"}`}
+                        aria-hidden="true"
+                      >
+                        check
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -228,9 +246,7 @@ export function EditScheduleModal({
 
               {!showTransferTrainFields ? (
                 <label className={modalFieldClassName}>
-                  <span>
-                    {form.category === "departure" ? "Departure Activity Time" : "Time (optional)"}
-                  </span>
+                  <span>{form.category === "departure" ? "Departure Activity Time" : "Time (optional)"}</span>
                   <TimePickerInput
                     inputClassName={modalInputClassName}
                     value={form.time}
@@ -254,7 +270,9 @@ export function EditScheduleModal({
 
               {showFlightPlanHint ? (
                 <div className={`${modalInfoClassName} md:col-span-3`}>
-                  <span className="material-symbols-outlined" aria-hidden="true">flight</span>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    flight
+                  </span>
                   <p>Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.</p>
                 </div>
               ) : null}

@@ -213,7 +213,7 @@ describe('EditScheduleModal', () => {
         { wrapper: createWrapper() }
       );
 
-      expect(screen.getByText('Requires Bus')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Trip ini membutuhkan bus' })).toBeInTheDocument();
     });
   });
 
