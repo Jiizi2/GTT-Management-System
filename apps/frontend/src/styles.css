@@ -1410,6 +1410,28 @@ img {
 }
 
 /* Itinerary editing inherits the Group Detail work surfaces. */
+.base-trip-transport-option {
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgb(var(--color-on-surface-variant));
+}
+
+.base-trip-transport-option:hover:not(:disabled) {
+  background: rgb(var(--color-surface-container-lowest));
+  color: rgb(var(--color-primary));
+}
+
+.base-trip-transport-option[aria-pressed="true"] {
+  border-color: rgb(var(--color-primary) / 0.3);
+  background: rgb(var(--color-surface-container-lowest));
+  color: rgb(var(--color-primary));
+}
+
+.base-trip-transport-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .base-trip-workspace .serene-input,
 .base-trip-workspace .serene-select,
 .base-trip-workspace .serene-textarea {
