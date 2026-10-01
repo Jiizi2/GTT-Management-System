@@ -1,12 +1,32 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { InputItineraryScreen } from "./add-group-workspace-page";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
-import { buildGroupDetailPath } from "../shared/app-route";
+import { Button } from "../components/button";
+import { PageHeader } from "../components/page-header";
 import type { GroupData, ItineraryPrefill, NewGroupItineraryDraft } from "../shared/app-domain";
 import { resolveTotalBusCount } from "../shared/app-domain";
 
 type SaveGroupResult = { ok: true } | { ok: false; message: string };
+
+function formatCompactDateRange(startIso: string, endIso: string): string {
+  const start = new Date(`${startIso}T12:00:00Z`);
+  const end = new Date(`${endIso}T12:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return `${startIso} to ${endIso}`;
+  }
+
+  const startDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", timeZone: "UTC" }).format(start);
+  const endDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", timeZone: "UTC" }).format(end);
+  const monthAndYear = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+  if (startIso === endIso) {
+    return `${startDay} ${monthAndYear.format(start)}`;
+  }
+  if (startIso.slice(0, 7) === endIso.slice(0, 7)) {
+    return `${startDay}–${endDay} ${monthAndYear.format(end)}`;
+  }
+
+  return `${startDay} ${monthAndYear.format(start)} – ${endDay} ${monthAndYear.format(end)}`;
+}
 
 function buildIdentityDraftFromGroup(group: GroupData): NewGroupItineraryDraft {
   return {
@@ -101,11 +121,6 @@ export function GroupItineraryBuilderPage({
       timeline: itineraryGroup.timeline,
       nextActivity: itineraryGroup.nextActivity,
       itinerary: itineraryGroup.itinerary,
-      notes: itineraryGroup.notes,
-      pax: itineraryGroup.pax,
-      totalBuses: itineraryGroup.totalBuses,
-      packageName: itineraryGroup.packageName,
-      musyrif: itineraryGroup.musyrif,
     };
     const result = onSaveGroup(nextGroup, group.code);
     if (!result.ok) {
@@ -114,62 +129,41 @@ export function GroupItineraryBuilderPage({
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="serene-btn-secondary min-h-10 min-w-0 flex-1 sm:w-auto sm:flex-none"
-          onClick={() => onBack(group.code)}
-        >
-          <span className="material-symbols-outlined text-base" aria-hidden="true">
+    <div className="itinerary-builder mx-auto max-w-7xl space-y-4 pb-12 pt-4 sm:space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <Button variant="secondary" className="min-h-11" onClick={() => onBack(group.code)}>
+          <span className="material-symbols-outlined text-lg" aria-hidden="true">
             arrow_back
           </span>
           <span>Group Detail</span>
-        </button>
-
-        <ThemeToggleButton className="sm:ml-auto sm:mr-5" />
+        </Button>
+        <ThemeToggleButton className="shrink-0" />
       </div>
-
-      <section className="serene-section p-5 sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary/85">Itinerary Workspace</p>
-            <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-on-surface sm:text-3xl lg:text-4xl">
-              Itinerary Builder
-            </h1>
-            <p className="mt-2 text-sm font-semibold text-on-surface-variant">
-              {group.code} | {group.name}
+      <PageHeader
+        variant="detail"
+        title="Itinerary Builder"
+        description={
+          <div>
+            <p className="break-words">
+              {group.code} · {group.name}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-lg bg-surface-container-high px-2.5 py-1 text-xs font-bold text-on-surface-variant">
-                {group.pax} Pax
-              </span>
-              <span className="rounded-lg bg-surface-container-high px-2.5 py-1 text-xs font-bold text-on-surface-variant">
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-outline-variant/30 pt-3 text-xs font-semibold text-on-surface-variant">
+              <span className="rounded-lg bg-surface-container-high px-2.5 py-1">{group.pax} Pax</span>
+              <span className="rounded-lg bg-surface-container-high px-2.5 py-1">
                 {resolveTotalBusCount(group.pax, group.totalBuses)} Bus Grup
               </span>
-              <span className="rounded-lg bg-surface-container-high px-2.5 py-1 text-xs font-bold text-on-surface-variant">
-                {group.arrivalDate} to {group.returnDate}
-              </span>
-              <span
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
-                  hasAgreementPrefill
-                    ? "bg-primary/12 text-primary"
-                    : "bg-tertiary-fixed/70 text-on-tertiary-fixed-variant"
-                }`}
-              >
-                {hasAgreementPrefill ? "Agreement Prefill" : "No Agreement Prefill"}
-              </span>
+              {group.arrivalDate && group.returnDate ? (
+                <span className="rounded-lg bg-surface-container-high px-2.5 py-1">
+                  {formatCompactDateRange(group.arrivalDate, group.returnDate)}
+                </span>
+              ) : null}
+              {hasAgreementPrefill ? (
+                <span className="rounded-lg bg-primary/12 px-2.5 py-1 text-primary">Agreement Prefill</span>
+              ) : null}
             </div>
           </div>
-
-          <Link to={buildGroupDetailPath(group.code)} className="serene-btn-secondary min-h-10 w-full sm:w-auto">
-            <span className="material-symbols-outlined text-base" aria-hidden="true">
-              travel_explore
-            </span>
-            <span>Open Detail</span>
-          </Link>
-        </div>
-      </section>
+        }
+      />
 
       {feedbackMessage ? (
         <section

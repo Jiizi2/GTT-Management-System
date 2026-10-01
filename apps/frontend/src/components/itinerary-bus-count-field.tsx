@@ -49,7 +49,9 @@ export function ItineraryBusCountField({ id, busCount, onChange, disabled = fals
           />
           <span className="text-sm font-semibold text-on-surface">Trip ini membutuhkan bus</span>
         </label>
-        {!requiresBus ? <span className="text-xs text-on-surface-variant">Tidak perlu bus</span> : null}
+        {!requiresBus ? (
+          <span className="hidden text-xs text-on-surface-variant sm:inline">Tidak perlu bus</span>
+        ) : null}
       </div>
       {requiresBus ? (
         <label htmlFor={`${id}-count`} className="mt-3 grid max-w-xs gap-1.5 text-sm font-medium text-on-surface">

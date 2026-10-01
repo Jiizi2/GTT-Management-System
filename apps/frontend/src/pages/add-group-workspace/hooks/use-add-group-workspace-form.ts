@@ -228,6 +228,8 @@ const baseTripFormSchema = z.object({
 
 export type BaseTripFormValues = z.infer<typeof baseTripFormSchema>;
 
+const EMPTY_BASE_TRIP_DRAFTS: BaseTripDraft[] = [];
+
 export function useAddGroupWorkspaceForm({
   onSaveGroup,
   onItineraryDraftChange,
@@ -285,7 +287,7 @@ export function useAddGroupWorkspaceForm({
 
   const [itineraryItems, setItineraryItems] = useState<InputItineraryItem[]>([]);
   const form = scheduleMethods.watch();
-  const baseTripDrafts = baseTripMethods.watch("trips") ?? [];
+  const baseTripDrafts = baseTripMethods.watch("trips") ?? EMPTY_BASE_TRIP_DRAFTS;
   const [baseTripStepIndex, setBaseTripStepIndex] = useState(0);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isScheduleFormVisible, setIsScheduleFormVisible] = useState(false);
@@ -571,10 +573,7 @@ export function useAddGroupWorkspaceForm({
         ...current,
         category: nextCategory,
         transportMode: nextMode,
-        busCount:
-          nextCategory !== "city-tour" && nextMode === "bus"
-            ? Math.max(1, current.busCount ?? 0)
-            : 0,
+        busCount: nextCategory !== "city-tour" && nextMode === "bus" ? Math.max(1, current.busCount ?? 0) : 0,
         flightNumber: nextMode === "flight" ? current.flightNumber : "",
         transferByTrain: nextMode === "train",
         trainDepartureTime: nextMode === "train" ? current.trainDepartureTime : "",
@@ -588,7 +587,9 @@ export function useAddGroupWorkspaceForm({
       const allowedModes = getAllowedTransportModes(current.category);
       const nextMode =
         busCount === 0 && current.transportMode === "bus"
-          ? allowedModes.find((mode) => mode === "none") ?? allowedModes.find((mode) => mode === "flight") ?? current.transportMode
+          ? (allowedModes.find((mode) => mode === "none") ??
+            allowedModes.find((mode) => mode === "flight") ??
+            current.transportMode)
           : busCount > 0 && current.transportMode === "none" && allowedModes.includes("bus")
             ? "bus"
             : current.transportMode;
@@ -808,6 +809,47 @@ export function useAddGroupWorkspaceForm({
     handleCloseScheduleForm();
   });
 
+  const baseTripInputItems = useMemo<InputItineraryItem[]>(() => {
+    return baseTripDrafts
+      .filter((item) => item.isEnabled)
+      .map((item, index) => {
+        const typeOption = getScheduleTypeOption(item.category);
+        const transportMode = resolveFormTransportMode(item.category, item.transportMode);
+        const isTransferByTrain = isTransferActivityType(item.category) && transportMode === "train";
+        const scheduleTime = isTransferByTrain ? item.trainDepartureTime : item.time;
+        const isHotelNameRequired = item.category === "arrival" || item.category === "departure";
+        const nextHotelName = isHotelNameRequired ? item.hotelName?.trim() || resolveSuggestedHotelName(item) : "";
+        const hotelPickupRequestTime = item.category === "departure" ? item.hotelPickupRequestTime.trim() : "";
+        const busCount = Math.max(0, Math.floor(item.busCount ?? 0));
+        const nextIcon = item.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, item.category);
+
+        return {
+          id: `base-trip-${item.id}-${index}`,
+          date: item.date,
+          time: scheduleTime,
+          category: typeOption.cardLabel,
+          categoryKey: typeOption.value,
+          transportMode,
+          hotelName: nextHotelName,
+          from: item.from.trim(),
+          to: item.to.trim(),
+          cityTourCity: isCityTourActivityType(item.category) ? item.cityTourCity.trim() : "",
+          flightNumber: "",
+          busCount,
+          requiresBus: busCount > 0,
+          notes: item.notes.trim(),
+          icon: nextIcon,
+          transferByTrain: isTransferByTrain,
+          trainDepartureTime: isTransferByTrain ? item.trainDepartureTime.trim() : "",
+          destinationPickupTime: isTransferByTrain ? item.destinationPickupTime.trim() : "",
+          hotelPickupRequestTime,
+        };
+      });
+  }, [baseTripDrafts, resolveSuggestedHotelName]);
+  const baseTripPreviewItems = buildItineraryFromInputItems(
+    sortInputItineraryItems(expandInputTransferTrainItems(baseTripInputItems)),
+  );
+
   const handleSaveBaseTrips = () => {
     if (isBaseTripSaveDisabled) {
       return;
@@ -819,39 +861,10 @@ export function useAddGroupWorkspaceForm({
     }
 
     const generatedAt = Date.now();
-    const nextBaseItems: InputItineraryItem[] = enabledBaseTrips.map((item, index) => {
-      const typeOption = getScheduleTypeOption(item.category);
-      const transportMode = resolveFormTransportMode(item.category, item.transportMode);
-      const isTransferByTrain = isTransferActivityType(item.category) && transportMode === "train";
-      const scheduleTime = isTransferByTrain ? item.trainDepartureTime : item.time;
-      const isHotelNameRequired = item.category === "arrival" || item.category === "departure";
-      const nextHotelName = isHotelNameRequired ? item.hotelName?.trim() || resolveSuggestedHotelName(item) : "";
-      const hotelPickupRequestTime = item.category === "departure" ? item.hotelPickupRequestTime.trim() : "";
-      const busCount = Math.max(0, Math.floor(item.busCount ?? 0));
-      const nextIcon = item.category === "city-tour" ? "tour" : getTransportModeIcon(transportMode, item.category);
-
-      return {
-        id: `base-trip-${generatedAt}-${index}`,
-        date: item.date,
-        time: scheduleTime,
-        category: typeOption.cardLabel,
-        categoryKey: typeOption.value,
-        transportMode,
-        hotelName: nextHotelName,
-        from: item.from.trim(),
-        to: item.to.trim(),
-        cityTourCity: isCityTourActivityType(item.category) ? item.cityTourCity.trim() : "",
-        flightNumber: "",
-        busCount,
-        requiresBus: busCount > 0,
-        notes: item.notes.trim(),
-        icon: nextIcon,
-        transferByTrain: isTransferByTrain,
-        trainDepartureTime: isTransferByTrain ? item.trainDepartureTime.trim() : "",
-        destinationPickupTime: isTransferByTrain ? item.destinationPickupTime.trim() : "",
-        hotelPickupRequestTime,
-      };
-    });
+    const nextBaseItems = baseTripInputItems.map((item, index) => ({
+      ...item,
+      id: `base-trip-${generatedAt}-${index}`,
+    }));
 
     const expandedItems = expandInputTransferTrainItems(nextBaseItems);
     setItineraryItems((current) => sortInputItineraryItems([...current, ...expandedItems]));
@@ -1033,6 +1046,7 @@ export function useAddGroupWorkspaceForm({
     setItineraryItems,
     form,
     baseTripDrafts,
+    baseTripPreviewItems,
     baseTripStepIndex,
     editingItemId,
     isScheduleFormVisible,
@@ -1049,7 +1063,7 @@ export function useAddGroupWorkspaceForm({
     effectiveEndDate,
     effectiveMusyrifName,
     effectiveMusyrifPhone,
-     effectiveBusStatus,
+    effectiveBusStatus,
     enabledBaseTripCount,
     isBaseTripSaveDisabled,
     isFirstBaseTripStep,

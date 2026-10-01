@@ -38,6 +38,8 @@ const modalMetaClassName =
 const modalToggleTrackClassName = "inline-flex h-6 w-11 items-center rounded-full bg-slate-300 p-0.5 transition";
 const modalToggleChipClassName =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
+const modalActivityButtonClassName =
+  "flex min-h-12 min-w-0 items-center gap-2 rounded-lg border border-solid px-3 py-2.5 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 /**
  * Props untuk ScheduleModal
@@ -135,16 +137,21 @@ export function ScheduleModal({
             ) : null}
             <div className={modalGridClassName}>
               <div className={`${modalFieldClassName} ${modalWideClassName}`}>
-                <span>Activity Type</span>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <span id="schedule-activity-type-label">Activity Type</span>
+                <div
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+                  role="group"
+                  aria-labelledby="schedule-activity-type-label"
+                >
                   {scheduleTypeOptions.map((option) => (
                     <button
                       key={option.value}
                       type="button"
-                      className={`${modalToggleChipClassName} ${
+                      aria-pressed={form.category === option.value}
+                      className={`${modalActivityButtonClassName} ${
                         form.category === option.value
-                          ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
-                          : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-outline-variant/70 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-low hover:text-primary"
                       }`}
                       onClick={() => {
                         const nextCategory = option.value;
@@ -187,10 +194,16 @@ export function ScheduleModal({
                         }
                       }}
                     >
-                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                      <span className="material-symbols-outlined shrink-0 text-xl" aria-hidden="true">
                         {option.icon}
                       </span>
                       <span>{option.modalLabel}</span>
+                      <span
+                        className={`material-symbols-outlined ml-auto shrink-0 text-base ${form.category === option.value ? "" : "invisible"}`}
+                        aria-hidden="true"
+                      >
+                        check
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -247,9 +260,7 @@ export function ScheduleModal({
 
               {!showTransferTrainFields ? (
                 <label className={modalFieldClassName}>
-                  <span>
-                    {form.category === "departure" ? "Departure Activity Time" : "Time"}
-                  </span>
+                  <span>{form.category === "departure" ? "Departure Activity Time" : "Time"}</span>
                   <TimePickerInput
                     inputClassName={modalInputClassName}
                     value={form.time}
@@ -273,7 +284,9 @@ export function ScheduleModal({
 
               {showFlightPlanHint ? (
                 <div className={`${modalInfoClassName} ${modalWideClassName}`}>
-                  <span className="material-symbols-outlined" aria-hidden="true">flight</span>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    flight
+                  </span>
                   <p>Rute dan nomor penerbangan internasional dikelola di Visa Detail → Detail Penerbangan.</p>
                 </div>
               ) : null}
