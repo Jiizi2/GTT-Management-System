@@ -36,9 +36,7 @@ const modalTransferCardClassName = "md:col-span-2 rounded-2xl border border-sky-
 const modalMetaClassName =
   "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2";
 const modalToggleTrackClassName = "inline-flex h-6 w-11 items-center rounded-full bg-slate-300 p-0.5 transition";
-const modalToggleChipClassName =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
-const modalActivityButtonClassName =
+const modalChoiceButtonClassName =
   "flex min-h-12 min-w-0 items-center gap-2 rounded-lg border border-solid px-3 py-2.5 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 /**
@@ -148,7 +146,7 @@ export function ScheduleModal({
                       key={option.value}
                       type="button"
                       aria-pressed={form.category === option.value}
-                      className={`${modalActivityButtonClassName} ${
+                      className={`${modalChoiceButtonClassName} ${
                         form.category === option.value
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-outline-variant/70 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-low hover:text-primary"
@@ -211,16 +209,21 @@ export function ScheduleModal({
 
               {showTransportModeField ? (
                 <div className={`${modalFieldClassName} ${modalWideClassName}`}>
-                  <span>Transport Mode</span>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <span id="schedule-transport-mode-label">Transport Mode</span>
+                  <div
+                    className="grid gap-2 sm:grid-cols-2"
+                    role="group"
+                    aria-labelledby="schedule-transport-mode-label"
+                  >
                     {allowedTransportModes.map((mode) => (
                       <button
                         key={mode}
                         type="button"
-                        className={`${modalToggleChipClassName} ${
+                        aria-pressed={form.transportMode === mode}
+                        className={`${modalChoiceButtonClassName} ${
                           form.transportMode === mode
-                            ? "border-primary/60 bg-primary/18 text-primary shadow-sm"
-                            : "border-slate-300 bg-surface-container-lowest text-slate-700 hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-outline-variant/70 bg-surface-container-lowest text-on-surface-variant hover:border-primary/50 hover:bg-surface-container-low hover:text-primary"
                         }`}
                         onClick={() => {
                           onChange("transportMode", mode);
@@ -239,10 +242,16 @@ export function ScheduleModal({
                           }
                         }}
                       >
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        <span className="material-symbols-outlined shrink-0 text-xl" aria-hidden="true">
                           {TRANSPORT_MODE_META[mode].icon}
                         </span>
                         <span>{TRANSPORT_MODE_META[mode].label}</span>
+                        <span
+                          className={`material-symbols-outlined ml-auto shrink-0 text-base ${form.transportMode === mode ? "" : "invisible"}`}
+                          aria-hidden="true"
+                        >
+                          check
+                        </span>
                       </button>
                     ))}
                   </div>
