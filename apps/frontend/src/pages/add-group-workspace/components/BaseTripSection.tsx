@@ -105,7 +105,7 @@ export function BaseTripSection({
   const transferTrainGridClassName = "mt-3 grid gap-x-5 gap-y-4 md:grid-cols-2";
 
   return (
-    <div className="base-trip-workspace min-w-0 space-y-5 xl:grid xl:grid-cols-[15rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:space-y-0">
+    <div className="base-trip-workspace min-w-0 space-y-5 xl:grid xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:space-y-0">
       <aside className="min-w-0 xl:sticky xl:top-5 xl:border-r xl:border-outline-variant/30 xl:pr-5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-lg font-semibold tracking-tight text-on-surface">5 Base Trips</h3>
@@ -135,7 +135,7 @@ export function BaseTripSection({
               <button
                 key={trip.id}
                 type="button"
-                className={`base-trip-step serene-focus-ring relative flex min-h-14 min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-on-surface transition-colors xl:min-h-16 xl:flex-row xl:gap-2.5 xl:px-2.5 xl:py-3 ${isCurrentStep ? "bg-surface-container-low text-primary" : "hover:bg-surface-container-low"}`}
+                className={`base-trip-step serene-focus-ring relative flex min-h-14 min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-on-surface transition-colors xl:grid xl:min-h-16 xl:grid-cols-[2rem_1.25rem_minmax(0,1fr)_auto] xl:gap-2 xl:px-2.5 xl:py-3 ${isCurrentStep ? "bg-surface-container-low text-primary" : "hover:bg-surface-container-low"}`}
                 onClick={() => {
                   setIsPreviewVisible(false);
                   handleJumpToBaseTripStep(index);
@@ -149,12 +149,14 @@ export function BaseTripSection({
                 >
                   {index + 1}
                 </span>
-                <span className="material-symbols-outlined text-lg max-xl:!hidden" aria-hidden="true">
+                <span className="material-symbols-outlined text-lg max-xl:!hidden xl:!text-xl" aria-hidden="true">
                   {getScheduleTypeOption(trip.category).icon}
                 </span>
                 <span className="text-[10px] font-semibold xl:hidden">{shortLabel}</span>
-                <span className="hidden min-w-0 text-left text-sm font-semibold xl:inline">{label}</span>
-                <span className="ml-auto hidden text-[11px] font-medium text-on-surface-variant xl:inline">
+                <span className="hidden min-w-0 whitespace-nowrap text-left text-sm font-semibold xl:block">
+                  {label}
+                </span>
+                <span className="hidden whitespace-nowrap text-[11px] font-medium text-on-surface-variant xl:block xl:justify-self-end">
                   {state}
                 </span>
               </button>
@@ -466,22 +468,21 @@ export function BaseTripSection({
                   ) : null}
 
                   {showTransportModeInput ? (
-                    <div className={fieldClassName}>
+                    <div className={wideFieldClassName}>
                       <span>Transport Mode</span>
-                      <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Transport Mode">
+                      <div
+                        className="base-trip-transport-options inline-grid w-full grid-flow-col auto-cols-fr gap-1 rounded-xl border border-outline-variant/35 bg-surface-container-low p-1 sm:w-fit sm:min-w-80"
+                        role="group"
+                        aria-label="Transport Mode"
+                      >
                         {allowedTransportModes.map((mode) => {
-                          const isActive = transportMode === mode;
                           return (
                             <button
                               key={mode}
                               type="button"
-                              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                                isActive
-                                  ? "border-primary/55 bg-primary/12 text-primary"
-                                  : "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant hover:border-primary/45 hover:bg-primary/10 hover:text-primary"
-                              }`}
+                              className="base-trip-transport-option serene-focus-ring inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
                               onClick={() => handleBaseTripModeChange(mode)}
-                              aria-pressed={isActive}
+                              aria-pressed={transportMode === mode}
                               disabled={!isGroupReadyForItinerary || !item.isEnabled}
                             >
                               <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -540,6 +541,7 @@ export function BaseTripSection({
 
                   <ItineraryBusCountField
                     id={`base-trip-${item.id}-bus`}
+                    compact
                     busCount={item.busCount ?? 0}
                     onChange={handleBaseTripBusCountChange}
                     disabled={!isGroupReadyForItinerary || !item.isEnabled}
