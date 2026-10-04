@@ -11,6 +11,8 @@ import { getAllAgentGroups } from "../data/all-groups-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
 import { ErrorState, LoadingState } from "../components/data-state";
 
+import { groupAgentFamilies } from "../data/group-families";
+
 const PAGE_SIZE = 6;
 const departureDay = new Intl.DateTimeFormat("id-ID", { day: "2-digit", timeZone: "Asia/Jakarta" });
 const departureMonth = new Intl.DateTimeFormat("id-ID", { month: "short", timeZone: "Asia/Jakarta" });
@@ -56,15 +58,18 @@ export function TripsPage({ principalId }: { principalId: string }) {
     ],
     [groups],
   );
+  const families = useMemo(() => groupAgentFamilies(groups), [groups]);
   const filteredGroups = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return groups.filter(
-      (group) =>
-        (!term || `${group.code} ${group.name} ${group.packageName}`.toLowerCase().includes(term)) &&
-        (!activeOnly || group.lifecycleStatus === "ACTIVE") &&
-        (month === "all" || group.arrivalDate.slice(0, 7) === month),
+    return families.filter((family) =>
+      family.members.some(
+        (group) =>
+          (!term || `${group.code} ${group.name} ${group.packageName}`.toLowerCase().includes(term)) &&
+          (!activeOnly || group.lifecycleStatus === "ACTIVE") &&
+          (month === "all" || group.arrivalDate.slice(0, 7) === month),
+      ),
     );
-  }, [activeOnly, groups, month, search]);
+  }, [activeOnly, families, month, search]);
   const totalPages = Math.max(1, Math.ceil(filteredGroups.length / PAGE_SIZE));
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const visibleGroups = filteredGroups.slice(pageStart, pageStart + PAGE_SIZE);
@@ -89,16 +94,20 @@ export function TripsPage({ principalId }: { principalId: string }) {
   if (query.isPending) return <LoadingState label="Memuat perjalanan..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
 
-  const activeGroupCount = groups.filter((group) => group.lifecycleStatus === "ACTIVE").length;
+  const activeGroupCount = families.filter((family) =>
+    family.members.some((group) => group.lifecycleStatus === "ACTIVE"),
+  ).length;
   const totalPax = groups.reduce((total, group) => total + group.pax, 0);
 
   return (
-    <PageLayout>
+    <PageLayout className="agent-page-layout">
       <PageHeader
+        variant="compact"
         title="Perjalanan"
         description="Temukan group yang ditugaskan dan buka itinerary perjalanannya."
-        actions={<TripHeaderSummary total={groups.length} active={activeGroupCount} pax={totalPax} />}
-        className="overflow-hidden xl:pr-20"
+        actions={
+          <TripHeaderSummary total={families.length} groups={groups.length} active={activeGroupCount} pax={totalPax} />
+        }
       />
 
       <section className="serene-section p-4 sm:p-5" aria-label="Filter perjalanan">
@@ -184,8 +193,15 @@ export function TripsPage({ principalId }: { principalId: string }) {
       ) : (
         <>
           <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Daftar perjalanan">
-            {visibleGroups.map((group) => (
-              <TripCard key={group.id} group={group} onOpen={() => openDetail(group.code)} />
+            {visibleGroups.map(({ root, members }) => (
+              <TripCard
+                key={root.id}
+                group={root}
+                members={members}
+                expandFamily={hasFilters}
+                onOpen={() => openDetail(root.code)}
+                onOpenMember={openDetail}
+              />
             ))}
           </section>
           <PaginationControls
@@ -204,7 +220,19 @@ export function TripsPage({ principalId }: { principalId: string }) {
   );
 }
 
-function TripCard({ group, onOpen }: { group: GroupSummary; onOpen: () => void }) {
+function TripCard({
+  group,
+  members,
+  expandFamily,
+  onOpen,
+  onOpenMember,
+}: {
+  group: GroupSummary;
+  members: GroupSummary[];
+  expandFamily: boolean;
+  onOpen: () => void;
+  onOpenMember: (code: string) => void;
+}) {
   const preview = group.itinerary.slice(0, 3);
   const parsedDeparture = new Date(group.arrivalDate);
   const departure = Number.isNaN(parsedDeparture.getTime())
@@ -242,11 +270,53 @@ function TripCard({ group, onOpen }: { group: GroupSummary; onOpen: () => void }
       <div className="flex flex-1 flex-col p-5">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-outline-variant/30 pb-4 text-sm">
           <TripValue label="Kembali" value={formatDate(group.returnDate)} />
-          <TripValue label="Jamaah" value={`${group.pax} pax`} />
+          <TripValue
+            label={members.length > 1 ? "Total jamaah" : "Jamaah"}
+            value={`${members.reduce((total, member) => total + member.pax, 0)} pax`}
+          />
           <TripValue label="Paket" value={group.packageName || "Belum tersedia"} />
           <TripValue label="Armada" value={group.totalBuses ? `${group.totalBuses} bus` : "Belum tersedia"} />
         </dl>
 
+        {members.length > 1 ? (
+          <details
+            className="agent-family mt-4 border-b border-outline-variant/30 pb-3"
+            open={expandFamily || undefined}
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-primary">
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                  groups
+                </span>
+                {members.length} group terhubung
+              </span>
+              <span className="agent-disclosure-icon material-symbols-outlined text-lg" aria-hidden="true">
+                expand_more
+              </span>
+            </summary>
+            <ul className="mt-2 divide-y divide-outline-variant/30">
+              {members.map((member) => (
+                <li key={member.id}>
+                  <button
+                    type="button"
+                    className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left transition hover:bg-surface-container-low"
+                    onClick={() => onOpenMember(member.code)}
+                  >
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <strong className="break-all text-sm text-primary">{member.code}</strong>
+                      </span>
+                      <span className="mt-1 block break-words text-xs text-on-surface-variant">{member.name}</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-on-surface tabular-nums">
+                      {member.pax} pax
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
         <section className="mt-5 flex-1" aria-label={`Ringkasan itinerary ${group.code}`}>
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-extrabold text-on-surface">Itinerary terdekat</h3>
@@ -316,19 +386,28 @@ function TripCard({ group, onOpen }: { group: GroupSummary; onOpen: () => void }
   );
 }
 
-function TripHeaderSummary({ total, active, pax }: { total: number; active: number; pax: number }) {
+function TripHeaderSummary({
+  total,
+  groups,
+  active,
+  pax,
+}: {
+  total: number;
+  groups: number;
+  active: number;
+  pax: number;
+}) {
   return (
-    <div
-      className="hidden min-w-72 items-center gap-4 xl:flex"
-      aria-label={`${total} perjalanan, ${active} aktif, ${pax} jamaah`}
-    >
-      <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-sm">
+    <div className="flex min-w-0 items-center gap-3" aria-label={`${total} perjalanan, ${active} aktif, ${pax} jamaah`}>
+      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-primary">
         <span className="material-symbols-outlined text-2xl" aria-hidden="true">
           luggage
         </span>
       </span>
       <div className="min-w-0">
-        <p className="text-base font-extrabold text-on-surface">{total} group perjalanan</p>
+        <p className="text-sm font-extrabold text-on-surface">
+          {total} perjalanan <span className="font-medium text-on-surface-variant">· {groups} group</span>
+        </p>
         <p className="mt-1 text-sm text-on-surface-variant">
           <strong className="text-primary tabular-nums">{active}</strong> aktif · {pax} jamaah
         </p>

@@ -510,7 +510,7 @@ function testBuildChecklistItemsFiltersDateWindowAndUsesDeparturePickupTime(): v
   const departure = checklistItems.find((entry) => entry.activity === "Departure");
   assert.ok(departure);
   assert.equal(departure?.scheduledTime, "18:30");
-  assert.equal(departure?.requiredBusCount, 2);
+  assert.equal(departure?.requiredBusCount, 1);
 
   const transferItems = checklistItems.filter((entry) => entry.activity.startsWith("Transfer -"));
   assert.equal(transferItems.length, 2);
@@ -759,7 +759,7 @@ function testOverviewAndStatusNormalizationHelpers(): void {
 function testFormFactoryAndCategoryHelpers(): void {
   const initialInputForm = createInitialInputItineraryForm();
   assert.equal(initialInputForm.category, "city-tour");
-  assert.equal(initialInputForm.requiresBus, true);
+  assert.equal(initialInputForm.busCount, 0);
   assert.equal(initialInputForm.transferByTrain, false);
 
   const agreementForm = createNewGroupAgreementForm("makkah");
@@ -1367,7 +1367,7 @@ function testItineraryDateToleranceWarning(): void {
 function testTransportModeHelpersAndBusDeparture(): void {
   // Allowed modes + defaults per category.
   assert.deepEqual(getAllowedTransportModes("arrival"), ["flight", "bus"]);
-  assert.deepEqual(getAllowedTransportModes("transfer"), ["bus", "train"]);
+  assert.deepEqual(getAllowedTransportModes("transfer"), ["bus", "train", "none"]);
   assert.deepEqual(getAllowedTransportModes("city-tour"), []);
   assert.equal(getDefaultTransportMode("departure"), "flight");
   assert.equal(getDefaultTransportMode("transfer"), "bus");
@@ -1408,6 +1408,7 @@ function testTransportModeHelpersAndBusDeparture(): void {
     category: "departure",
     transportMode: "bus",
     flightNumber: "SV-999",
+    busCount: 1,
     hotelName: "Madinah Hotel",
     fromHotelName: "",
     from: "Madinah",

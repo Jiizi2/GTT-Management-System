@@ -810,7 +810,7 @@ export function removeFromMemory(
   );
   if (hasChildGroups) {
     throw new ConflictException(
-      `Group '${target.code}' still has child groups and cannot be deleted. Unlink child groups first.`,
+      `Group '${target.code}' still has linked groups and cannot be deleted. Unlink the groups first.`,
     );
   }
 

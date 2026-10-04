@@ -1,6 +1,7 @@
 export type LifecycleStatus = "ENTRY_ONLY" | "ACTIVE" | "INACTIVE" | "COMPLETED" | "ARCHIVED";
 
 export type GroupSummary = {
+  parentGroupId?: string | null;
   id: string;
   code: string;
   name: string;
@@ -14,12 +15,12 @@ export type GroupSummary = {
   notes: GroupNote[];
   itinerary: ItineraryItem[];
 };
-export type GroupDetail = GroupSummary & { totalBuses: number | null; durationDays: number };
+export type GroupDetail = GroupSummary & { totalBuses: number | null; durationDays: number; familyGroups?: GroupSummary[] };
 export type GroupNote = { id: string; sortOrder: number; text: string; pinned: boolean };
 export type Page<T> = { items: T[]; total: number; page: number; pageSize: number };
 
 export type Dashboard = {
-  groups: { total: number; active: number; completed: number; archived: number; upcoming: number; totalPax: number };
+  groups: { journeys?: number; total: number; active: number; completed: number; archived: number; upcoming: number; totalPax: number };
   attention: { visaGroups: number; hotelGroups: number };
   upcomingGroups: GroupSummary[];
   recentTimeline: Array<{
@@ -31,6 +32,7 @@ export type Dashboard = {
 };
 
 export type ItineraryItem = {
+  transportMode?: "bus" | "train" | "flight" | "none" | null;
   id: string;
   sortOrder: number;
   dateLabel: string;
@@ -53,7 +55,16 @@ export type ItineraryItem = {
   hotelPickupRequestTime: string | null;
 };
 export type TimelineItem = { dateLabel: string; title: string; isCurrent: boolean };
+export type FlightLeg = {
+  id: string; direction: "ONWARD" | "RETURN"; sortOrder: number;
+  departureAirportCode: string | null; arrivalAirportCode: string | null;
+  departureDate: string | null; departureTime: string | null; arrivalDate: string | null; arrivalTime: string | null;
+  carrierCode: string | null; flightNumber: string | null;
+};
 export type VisaFacet = {
+  flightLegs?: FlightLeg[];
+  raudhahAppointments?: Array<{ id: string; date: string | null; status: "FREE" | "AFTER" | "BEFORE"; tasrehPrinted: boolean }>;
+  makkahHotelWaived?: boolean; madinahHotelWaived?: boolean;
   status: "DRAFT" | "PENDING" | "ISSUED" | null;
   issuedDate: string | null;
   syarikah: string | null;
@@ -81,6 +92,7 @@ export type TransportationItem = {
   trainDepartureTime: string | null;
   stationPickupTime: string | null;
   status: "NOT_COMPLETE" | "ASSIGNED";
+  drivers?: Array<{ slotNumber: number | null; name: string; phone: string; plateNumber: string; isVerified: boolean }>;
   assignedDriverCount: number;
   verifiedDriverCount: number;
 };

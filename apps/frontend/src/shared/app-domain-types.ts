@@ -322,6 +322,8 @@ export type AgreementDraftAssignmentStatus = "Unassigned" | "Assigned" | "Partia
 export type HotelAgreementDraft = {
   id: string;
   agentId: string;
+  muassasahId?: string;
+  muassasahName?: string;
   city: "makkah" | "madinah";
   agentName: string;
   groupName?: string;
@@ -342,6 +344,7 @@ export type HotelAgreementDraft = {
 export type HotelAgreementDraftFormState = {
   city: "makkah" | "madinah";
   agentId: string;
+  muassasahId?: string;
   groupName: string;
   hotelName: string;
   agreementNumber: string;

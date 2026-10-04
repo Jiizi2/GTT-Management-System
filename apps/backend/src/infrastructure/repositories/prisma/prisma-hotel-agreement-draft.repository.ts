@@ -15,6 +15,7 @@ type PrismaHotelAgreementDraftRecord = {
   id: string;
   city: UpsertHotelAgreementDraftDto["city"];
   agentId: string;
+  muassasahId?: string | null;
   groupName: string;
   agent?: { id: string; code: string; name: string };
   hotelName: string;
@@ -170,6 +171,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     return {
       city,
       agentId: payload.agentId?.trim() || "agent_gtt_direct",
+      ...(payload.muassasahId !== undefined ? { muassasahId: payload.muassasahId?.trim() || null } : {}),
       groupName: payload.groupName?.trim() || "",
       hotelName,
       agreementNumber,
@@ -192,29 +194,39 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
   }
 
   private async getPrismaDraftRemainingAndGroups(
-    draft: Pick<PrismaHotelAgreementDraftRecord, "agreementNumber" | "city" | "pax" | "hotelName" | "stayStart" | "stayEnd" | "id">
+    draft: Pick<PrismaHotelAgreementDraftRecord, "agreementNumber" | "city" | "pax" | "hotelName" | "stayStart" | "stayEnd" | "id">, agentId?: string
   ) {
-    const assignedAgreements = await this.prisma.visaHotelAgreement.findMany({
-      where: {
-        OR: buildPrismaDraftAgreementMatchers(draft),
-      },
-      include: {
-        visaSetup: {
-          select: {
-            group: {
-              select: {
-                code: true,
+    const [assignedAgreements, capacityAgreements] = await Promise.all([
+      this.prisma.visaHotelAgreement.findMany({
+        where: {
+          OR: buildPrismaDraftAgreementMatchers(draft),
+          ...(agentId ? { visaSetup: { group: { agentId } } } : {}),
+        },
+        include: {
+          visaSetup: {
+            select: {
+              group: {
+                select: {
+                  code: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+      // Capacity is shared with Admin; foreign group identities stay outside the Agent query.
+      agentId ? this.prisma.visaHotelAgreement.findMany({
+        where: { OR: buildPrismaDraftAgreementMatchers(draft) },
+        select: { pax: true, stayStart: true, stayEnd: true },
+      }) : Promise.resolve(null),
+    ]);
+
+    const capacity = capacityAgreements ?? assignedAgreements;
 
     const draftNights = getStayNights(toIsoDateOnly(draft.stayStart), toIsoDateOnly(draft.stayEnd));
     let maxOccupied = 0;
     for (const night of draftNights) {
-      const occupiedOnNight = assignedAgreements
+      const occupiedOnNight = capacity
         .filter((a) => {
           const aStart = toIsoDateOnly(a.stayStart);
           const aEnd = toIsoDateOnly(a.stayEnd);
@@ -244,6 +256,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     return {
       remainingPax,
       assignedGroups: groups,
+      hasAllocations: capacity.length > 0,
     };
   }
 
@@ -260,6 +273,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       city: draft.city,
       agentName: draft.agent?.name,
       agentId: draft.agentId,
+      muassasahId: draft.muassasahId ?? null,
       agent: draft.agent,
       groupName: draft.groupName,
       hotelName: draft.hotelName,
@@ -273,6 +287,21 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       assignedGroups,
       assignmentStatus,
     };
+  }
+
+  async findForAgent(agentId: string, query?: string): Promise<unknown[]> {
+    const term = query?.trim() ?? "";
+    const rows = await this.prisma.hotelAgreementDraft.findMany({
+      where: { agentId, ...(term ? { OR: ["hotelName", "agreementNumber", "groupName"].map((key) => ({ [key]: { contains: term, mode: "insensitive" } })) } : {}) },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return Promise.all(rows.map(async (draft) => {
+      const allocation = await this.getPrismaDraftRemainingAndGroups(draft, agentId);
+      return {
+        ...this.mapPrismaDraft(draft, allocation.remainingPax, allocation.assignedGroups),
+        hasAllocations: allocation.hasAllocations,
+      };
+    }));
   }
 
   async findAll(query?: string, rawStatus?: string, agentId?: string): Promise<unknown[]> {
@@ -314,7 +343,9 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       if (status === "assigned") {
         if (draft.assignedGroups.length === 0) return false;
       } else if (status === "unassigned") {
-        if (draft.assignedGroups.length > 0) return false;
+        // Rejected drafts stay in the default inbox so they can be revised,
+        // including drafts that already have group links.
+        if (draft.status !== AgreementApprovalStatus.REJECTED && draft.assignedGroups.length > 0) return false;
       }
 
       if (normalizedQuery) {
@@ -336,6 +367,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       data: {
         city: normalizedPayload.city,
         agentId: normalizedPayload.agentId,
+        muassasahId: normalizedPayload.muassasahId,
         groupName: normalizedPayload.groupName,
         hotelName: normalizedPayload.hotelName,
         agreementNumber: normalizedPayload.agreementNumber,
@@ -367,6 +399,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       data: {
         city: normalizedPayload.city,
         agentId: normalizedPayload.agentId,
+        muassasahId: normalizedPayload.muassasahId,
         groupName: normalizedPayload.groupName,
         hotelName: normalizedPayload.hotelName,
         agreementNumber: normalizedPayload.agreementNumber,

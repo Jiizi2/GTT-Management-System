@@ -14,6 +14,8 @@ describe("central permission resolver", () => {
       exp: 1,
     });
     expect(can(principal, PERMISSIONS.visaTrackingRead)).toBe(true);
+    expect(can(principal, PERMISSIONS.agreementsRead)).toBe(true);
+    expect(can(principal, PERMISSIONS.agreementsWrite)).toBe(false);
     expect(can(principal, PERMISSIONS.operationsWrite)).toBe(false);
   });
 
@@ -26,5 +28,7 @@ describe("central permission resolver", () => {
       accessTier: "admin",
     });
     expect(can(principal, PERMISSIONS.operationsWrite)).toBe(true);
+    expect(can(principal, PERMISSIONS.agreementsRead)).toBe(true);
+    expect(can(principal, PERMISSIONS.agreementsWrite)).toBe(true);
   });
 });

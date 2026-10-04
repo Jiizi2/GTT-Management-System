@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardPage } from "../../agent/pages/dashboard-page";
+import { ChecklistPage } from "../../agent/pages/checklist-page";
 import { getItineraryFocusStates, GroupDetailPage } from "../../agent/pages/group-detail-page";
 import { TripsPage } from "../../agent/pages/trips-page";
 import type { Dashboard, GroupSummary, TransportationItem } from "../../agent/data/contracts";
@@ -26,8 +27,13 @@ vi.mock("../../agent/data/use-agent-trip-detail", () => ({
   useAgentTripDetail: (...args: unknown[]) => useAgentTripDetailMock(...args),
 }));
 
+vi.mock("../../agent/data/departure-calendar", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agent/data/departure-calendar")>()),
+  jakartaToday: () => "2026-10-03",
+}));
+
 const dashboard: Dashboard = {
-  groups: { total: 19, active: 12, completed: 4, archived: 1, upcoming: 2, totalPax: 721 },
+  groups: { journeys: 14, total: 19, active: 12, completed: 4, archived: 1, upcoming: 2, totalPax: 721 },
   attention: { visaGroups: 3, hotelGroups: 2 },
   upcomingGroups: [],
   recentTimeline: [],
@@ -95,20 +101,22 @@ function detailGroup(overrides: Partial<GroupData> = {}): GroupData {
       { date: "11 Okt", title: "Check-in hotel" },
     ],
     nextActivity: { title: "Penerbangan menuju Jeddah", date: "10 Okt", time: "08:00", icon: "flight" },
-    itinerary: [{
-      date: "10 Okt",
-      year: "2026",
-      category: "Penerbangan",
-      title: "Penerbangan menuju Jeddah",
-      meta: "08:00 | Jakarta → Jeddah",
-      icon: "flight",
-      isoDate: "2026-10-10",
-      time: "08:00",
-      flightNumber: "GA-001",
-      from: "Jakarta",
-      to: "Jeddah",
-      requiresBus: true,
-    }],
+    itinerary: [
+      {
+        date: "10 Okt",
+        year: "2026",
+        category: "Penerbangan",
+        title: "Penerbangan menuju Jeddah",
+        meta: "08:00 | Jakarta → Jeddah",
+        icon: "flight",
+        isoDate: "2026-10-10",
+        time: "08:00",
+        flightNumber: "GA-001",
+        from: "Jakarta",
+        to: "Jeddah",
+        requiresBus: true,
+      },
+    ],
     notes: ["Pastikan jamaah berkumpul tiga jam sebelum keberangkatan."],
     musyrif: { name: "Ustadz Ahmad", phone: "+628123456789", avatar: "" },
     visaSetup: {
@@ -116,7 +124,17 @@ function detailGroup(overrides: Partial<GroupData> = {}): GroupData {
       syarikah: "Provider A",
       busStatus: "Visa+",
       paymentStatus: "Partial",
-      makkahHotels: [{ id: "hotel-1", hotelName: "Hotel Makkah", agreementNumber: "AGR-001", pax: 32, status: "Approved", stayStartIso: "2026-10-11", stayEndIso: "2026-10-14" }],
+      makkahHotels: [
+        {
+          id: "hotel-1",
+          hotelName: "Hotel Makkah",
+          agreementNumber: "AGR-001",
+          pax: 32,
+          status: "Approved",
+          stayStartIso: "2026-10-11",
+          stayEndIso: "2026-10-14",
+        },
+      ],
       madinahHotels: [],
       raudhahAppointments: [],
     },
@@ -124,20 +142,23 @@ function detailGroup(overrides: Partial<GroupData> = {}): GroupData {
   };
 }
 
-const transportation: TransportationItem[] = [{
-  id: "transport-1",
-  tripDate: "2026-10-10",
-  activity: "Penerbangan",
-  tripLabel: "Penerbangan menuju Jeddah",
-  requiredBusCount: 1,
-  scheduledTime: "12:00",
-  transferByTrain: false,
-  trainDepartureTime: null,
-  stationPickupTime: null,
-  status: "ASSIGNED",
-  assignedDriverCount: 1,
-  verifiedDriverCount: 1,
-}];
+const transportation: TransportationItem[] = [
+  {
+    id: "transport-1",
+    tripDate: "2026-10-10",
+    activity: "Penerbangan",
+    tripLabel: "Penerbangan menuju Jeddah",
+    requiredBusCount: 1,
+    scheduledTime: "12:00",
+    transferByTrain: false,
+    trainDepartureTime: null,
+    stationPickupTime: null,
+    status: "ASSIGNED",
+    drivers: [{ slotNumber: 1, name: "Pak Ahmad", phone: "081234", plateNumber: "B 123", isVerified: true }],
+    assignedDriverCount: 1,
+    verifiedDriverCount: 1,
+  },
+];
 
 function renderPage(node: React.ReactNode, initialEntry = "/agent/overview") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -165,24 +186,133 @@ describe("Agent Dashboard and Perjalanan", () => {
     useAgentTripDetailMock.mockReset();
   });
 
-  it("renders server-authoritative Dashboard statistics without loading the group index", async () => {
+  it("keeps server-authoritative statistics separate from the month calendar", async () => {
     portalGetMock.mockResolvedValue(dashboard);
+    getAllAgentGroupsMock.mockResolvedValue([]);
     renderPage(<DashboardPage principalId="portal-1" agentName="Agent A" />);
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(screen.getByText("19")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Ringkasan statistik")).getByText("19")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Ringkasan statistik")).getByText("14")).toBeInTheDocument();
     expect(screen.getByText("721")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "5 catatan perhatian" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Perlu perhatian" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Perhatian visa/i })).toHaveAttribute("href", "/agent/visa");
     expect(screen.getByRole("link", { name: /Perhatian hotel/i })).toHaveAttribute("href", "/agent/groups");
-    expect(screen.getByRole("link", { name: /Buka Perjalanan/i })).toHaveAttribute("href", "/agent/groups");
-    expect(screen.getByRole("link", { name: /Lihat Visa Tracking/i })).toHaveAttribute("href", "/agent/visa");
-    expect(screen.getByRole("heading", { name: "Jadwal berikutnya belum tersedia" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Belum ada aktivitas itinerary" })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Lihat Perjalanan" })).toHaveLength(2);
+    expect(await screen.findByRole("heading", { name: "Jadwal berikutnya belum tersedia" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Lihat Perjalanan/i })[0]).toHaveAttribute("href", "/agent/groups");
     expect(portalGetMock).toHaveBeenCalledTimes(1);
     expect(portalGetMock.mock.calls[0]?.[1]).toBe("/dashboard");
-    expect(getAllAgentGroupsMock).not.toHaveBeenCalled();
+    expect(getAllAgentGroupsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("groups family passengers once, filters a selected date and clears selection when changing months", async () => {
+    portalGetMock.mockImplementation(async (_client, path) =>
+      path === "/dashboard" ? { ...dashboard, groups: { ...dashboard.groups, journeys: 2 } } : [],
+    );
+    const parent = { ...group(1), arrivalDate: "2026-10-10", itinerary: [] };
+    const child = { ...group(2), parentGroupId: parent.id, arrivalDate: "2026-10-10", itinerary: [] };
+    const other = { ...group(3), arrivalDate: "2026-10-18", itinerary: [] };
+    getAllAgentGroupsMock.mockResolvedValue([child, parent, other]);
+    renderPage(<DashboardPage principalId="portal-1" agentName="Agent A" />);
+    await screen.findByRole("heading", { name: "Dashboard" });
+    fireEvent.click(screen.getByRole("button", { name: "Pilih bulan keberangkatan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Oktober 2026" }));
+    const agenda = within(screen.getByRole("region", { name: "Jadwal mendatang" }));
+    expect(await agenda.findByText("63 jamaah")).toBeInTheDocument();
+    expect(agenda.getAllByRole("link")).toHaveLength(2);
+    expect(agenda.getAllByRole("link", { name: /tanggal awal perjalanan$/ })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Lihat jadwal 10 Oktober 2026" }));
+    expect(agenda.getAllByRole("link")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Lihat jadwal 11 Oktober 2026" }));
+    expect(screen.getByText("Belum ada keberangkatan pada 11 Oktober 2026.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lihat jadwal 11 Oktober 2026" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Bulan berikutnya" }));
+    expect(screen.getByRole("button", { name: "Pilih bulan keberangkatan" })).toHaveTextContent("November 2026");
+    expect(screen.queryByRole("button", { name: "Semua tanggal" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Ringkasan statistik")).getByText("721")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Jadwal berikutnya belum tersedia" })).toBeInTheDocument();
+  });
+
+  it.each(["dashboard", "checklist"])(
+    "shows only the nearby H-1 window on %s without duplicating child transport",
+    async (surface) => {
+      const parent = group(1);
+      const child = { ...group(2), parentGroupId: parent.id };
+      getAllAgentGroupsMock.mockResolvedValue([child, parent]);
+      const rows: TransportationItem[] = [
+        { ...transportation[0], id: "old", tripDate: "2026-09-23", tripLabel: "Aktivitas lama September" },
+        { ...transportation[0], id: "today", tripDate: "2026-10-03", tripLabel: "Jadwal hari ini" },
+        {
+          ...transportation[0],
+          id: "tomorrow",
+          tripDate: "2026-10-04",
+          tripLabel: "Jadwal besok",
+          status: "NOT_COMPLETE",
+          verifiedDriverCount: 0,
+        },
+        { ...transportation[0], id: "next", tripDate: "2026-10-05", tripLabel: "Jadwal lusa", verifiedDriverCount: 0 },
+        { ...transportation[0], id: "far", tripDate: "2026-10-18", tripLabel: "Jadwal terlalu jauh" },
+        { ...transportation[0], id: "missing", tripDate: null, tripLabel: "Jadwal tanpa tanggal" },
+      ];
+      portalGetMock.mockImplementation(async (_client, path) =>
+        path === "/dashboard"
+          ? {
+              ...dashboard,
+              recentTimeline: [
+                { group: parent, dateLabel: "23 Sep", title: "Aktivitas lama September", isCurrent: true },
+              ],
+            }
+          : rows,
+      );
+      renderPage(
+        surface === "dashboard" ? (
+          <DashboardPage principalId="portal-1" agentName="Agent A" />
+        ) : (
+          <ChecklistPage principalId="portal-1" />
+        ),
+      );
+
+      expect(await screen.findByText(/Jadwal besok/)).toBeInTheDocument();
+      expect(screen.getByText(/Jadwal hari ini/)).toBeInTheDocument();
+      expect(screen.getByText(/Jadwal lusa/)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Aktivitas lama September|Jadwal terlalu jauh|Jadwal tanpa tanggal/),
+      ).not.toBeInTheDocument();
+      expect(portalGetMock.mock.calls.filter(([, path]) => path.endsWith("/transportation"))).toHaveLength(1);
+      expect(portalGetMock).toHaveBeenCalledWith(expect.anything(), "/groups/GTT-001/transportation");
+      if (surface === "dashboard") {
+        const summary = within(screen.getByLabelText("Kesiapan H-1"));
+        expect(summary.getByText("Perlu perhatian").nextElementSibling).toHaveTextContent("2");
+        expect(summary.getByText("Siap").nextElementSibling).toHaveTextContent("1");
+        expect(summary.getByText("Jadwal").nextElementSibling).toHaveTextContent("3");
+        const checklist = within(screen.getByRole("region", { name: "H-1 Checklist" }));
+        expect(checklist.getAllByRole("listitem")[0]).toHaveTextContent("Jadwal besok");
+        expect(checklist.getByRole("link", { name: /Lihat checklist/ })).toHaveAttribute("href", "/agent/checklist");
+      }
+    },
+  );
+
+  it("keeps the H-1 summary empty instead of falling back to old itinerary activity", async () => {
+    const parent = group(1);
+    getAllAgentGroupsMock.mockResolvedValue([parent]);
+    portalGetMock.mockImplementation(async (_client, path) =>
+      path === "/dashboard"
+        ? {
+            ...dashboard,
+            recentTimeline: [
+              { group: parent, dateLabel: "23 Sep", title: "Aktivitas lama September", isCurrent: true },
+            ],
+          }
+        : [{ ...transportation[0], tripDate: "2026-09-23" }],
+    );
+    renderPage(<DashboardPage principalId="portal-1" agentName="Agent A" />);
+
+    expect(await screen.findByText("Tidak ada jadwal checklist untuk hari ini, besok, atau lusa.")).toBeInTheDocument();
+    expect(screen.queryByText("Aktivitas lama September")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "H-1 Checklist" })).queryByRole("list")).not.toBeInTheDocument();
   });
 
   it("renders and paginates the maximum observed 19-group Perjalanan scenario", async () => {
@@ -194,7 +324,7 @@ describe("Agent Dashboard and Perjalanan", () => {
       screen.getByText((_, element) => element?.textContent === "19 perjalanan ditemukan", { selector: "p" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toBeInTheDocument();
-    expect(screen.getByText("19 group perjalanan")).toBeInTheDocument();
+    expect(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toHaveTextContent("19 perjalanan · 19 group");
     expect(screen.getAllByText("Musyrif")).toHaveLength(6);
     expect(screen.getAllByText("Belum ditugaskan")).toHaveLength(6);
     expect(screen.getAllByRole("button", { name: /Lihat itinerary/i })).toHaveLength(6);
@@ -212,6 +342,20 @@ describe("Agent Dashboard and Perjalanan", () => {
     getAllAgentGroupsMock.mockResolvedValueOnce([]);
     renderPage(<TripsPage principalId="portal-2" />, "/agent/groups");
     expect(await screen.findByRole("heading", { name: "Belum ada perjalanan yang ditugaskan" })).toBeInTheDocument();
+  });
+
+  it("reveals the matching child while preserving the journey and group counts", async () => {
+    const parent = { ...group(1), pax: 20 };
+    const child = { ...group(2), parentGroupId: parent.id, pax: 10 };
+    getAllAgentGroupsMock.mockResolvedValue([parent, child]);
+    const view = renderPage(<TripsPage principalId="portal-1" />, "/agent/groups?q=GTT-002");
+
+    expect(await screen.findByRole("heading", { name: "Perjalanan" })).toBeInTheDocument();
+    expect(screen.getByLabelText("1 perjalanan, 1 aktif, 30 jamaah")).toHaveTextContent("1 perjalanan · 2 group");
+    expect(view.container.querySelector("details")).toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: /GTT-002/ })).toBeInTheDocument();
+    expect(screen.queryByText(/^(Parent|Child)$/)).not.toBeInTheDocument();
+    expect(screen.getByText("30 pax")).toBeInTheDocument();
   });
 
   it("opens Group Detail while retaining the current Perjalanan filter URL", async () => {
@@ -237,10 +381,17 @@ describe("Agent Dashboard and Perjalanan", () => {
   });
 
   it("presents complete trip evidence in an Agent-specific read-only sequence", () => {
-    useAgentTripDetailMock.mockReturnValue({ isPending: false, isError: false, data: { group: detailGroup(), transportation } });
+    useAgentTripDetailMock.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { group: detailGroup(), transportation },
+    });
     renderPage(
       <Routes>
-        <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />} />
+        <Route
+          path="/agent/groups/:identity"
+          element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />}
+        />
       </Routes>,
       "/agent/groups/GTT-002",
     );
@@ -256,7 +407,9 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.getAllByText("Driver")).toHaveLength(2);
     expect(screen.getAllByText("Plat")).toHaveLength(2);
     expect(screen.getAllByText("Telepon")).toHaveLength(2);
-    expect(screen.getAllByText("—")).toHaveLength(6);
+    expect(screen.getAllByText("Pak Ahmad")).toHaveLength(2);
+    expect(screen.getAllByText("B 123")).toHaveLength(2);
+    expect(screen.getAllByText("081234")).toHaveLength(2);
     expect(screen.getByText("Detail pengemudi")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Kesiapan transportasi dan H-1" })).not.toBeInTheDocument();
     expect(screen.getByText("Hotel Makkah", { selector: "p" })).toBeInTheDocument();
@@ -281,14 +434,24 @@ describe("Agent Dashboard and Perjalanan", () => {
           itinerary: [],
           notes: [],
           nextActivity: { title: "Belum ada aktivitas", date: "-", time: "-", icon: "schedule" },
-          visaSetup: { visaStatus: "Draft", syarikah: "", paymentStatus: "Unpaid", makkahHotels: [], madinahHotels: [], raudhahAppointments: [] },
+          visaSetup: {
+            visaStatus: "Draft",
+            syarikah: "",
+            paymentStatus: "Unpaid",
+            makkahHotels: [],
+            madinahHotels: [],
+            raudhahAppointments: [],
+          },
         }),
         transportation: [],
       },
     });
     renderPage(
       <Routes>
-        <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />} />
+        <Route
+          path="/agent/groups/:identity"
+          element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />}
+        />
       </Routes>,
       "/agent/groups/GTT-002",
     );
@@ -300,10 +463,17 @@ describe("Agent Dashboard and Perjalanan", () => {
   });
 
   it("reserves driver, plate, and phone columns on bus itinerary without an assignment", () => {
-    useAgentTripDetailMock.mockReturnValue({ isPending: false, isError: false, data: { group: detailGroup(), transportation: [] } });
+    useAgentTripDetailMock.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { group: detailGroup(), transportation: [] },
+    });
     renderPage(
       <Routes>
-        <Route path="/agent/groups/:identity" element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />} />
+        <Route
+          path="/agent/groups/:identity"
+          element={<GroupDetailPage principalId="portal-1" agentId="agent-1" agentName="Agent A" />}
+        />
       </Routes>,
       "/agent/groups/GTT-002",
     );

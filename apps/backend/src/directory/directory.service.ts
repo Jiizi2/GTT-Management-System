@@ -77,7 +77,7 @@ export class DirectoryService {
     return this.memoryMuassasah.find((item) => item.id === muassasahId)?.name ?? null;
   }
 
-  private async assertMuassasahExists(muassasahId: string | null | undefined): Promise<string | null> {
+  async assertMuassasahExists(muassasahId: string | null | undefined): Promise<string | null> {
     const id = muassasahId?.trim() || null;
     if (!id) return null;
     if (this.dataSource === "memory") {
@@ -92,6 +92,19 @@ export class DirectoryService {
   }
 
   // ----- Muassasah -----
+
+  /** Resolve linked agreement labels without loading driver/vehicle directory data. */
+  async resolveMuassasahNames(ids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) return new Map();
+    const rows = this.dataSource === "memory"
+      ? this.memoryMuassasah.filter((item) => uniqueIds.includes(item.id))
+      : await this.prisma.muassasah.findMany({
+          where: { id: { in: uniqueIds } },
+          select: { id: true, name: true },
+        });
+    return new Map(rows.map((item) => [item.id, item.name]));
+  }
 
   async listMuassasah(query?: string): Promise<MuassasahRecord[]> {
     const needle = query?.trim().toLowerCase();

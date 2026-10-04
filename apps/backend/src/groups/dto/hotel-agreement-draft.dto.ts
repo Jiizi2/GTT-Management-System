@@ -17,6 +17,11 @@ export class UpsertHotelAgreementDraftDto {
   @IsNotEmpty()
   agentId?: string;
 
+  @ApiPropertyOptional({ description: "Muassasah from Master Data; null clears the selection.", nullable: true })
+  @IsOptional()
+  @IsString()
+  muassasahId?: string | null;
+
   @ApiPropertyOptional({ example: "Group Al Falah April" })
   @IsOptional()
   @IsString()
@@ -86,6 +91,12 @@ export class AssignHotelAgreementDraftDto {
 export class HotelAgreementDraftResponseDto {
   @ApiProperty({ example: "cldraftagreementid123" })
   id!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  muassasahId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  muassasahName?: string | null;
 
   @ApiProperty({ enum: AgreementCity, example: AgreementCity.MAKKAH })
   city!: AgreementCity;

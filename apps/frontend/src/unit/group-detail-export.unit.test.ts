@@ -152,6 +152,10 @@ describe("exportGroupDetailPdf", () => {
     expect(pdfSource).toContain("AGR-MKK-2026-00001234");
     expect(pdfSource).toContain("2 BUSES");
     expect(pdfSource).toContain("QR-955");
+    expect(pdfSource).toContain("QR-1188");
+    expect(pdfSource).toContain("GA-981");
+    expect(pdfSource).toContain("ONWARD");
+    expect(pdfSource).toContain("RETURN");
     expect(pdfSource).toContain("City Tour");
     expect(pdfSource).not.toContain("Company Masyan AlMashaer Hotel");
     expect(pdfSource).not.toContain("Winner Inn Al Khair Hotel");
@@ -237,8 +241,10 @@ describe("exportGroupDetailPdf", () => {
     );
 
     expect(result).toBe(true);
-    expect(pdfSource).toContain("PARENT | GRP-PARENT | Parent Group");
-    expect(pdfSource).toContain("CHILD | GRP-CHILD | Child Group");
+    expect(pdfSource).toContain("GRP-PARENT | Parent Group");
+    expect(pdfSource).toContain("GRP-CHILD | Child Group");
+    expect(pdfSource).not.toContain("PARENT | GRP-PARENT");
+    expect(pdfSource).not.toContain("CHILD | GRP-CHILD");
     expect(pdfSource).toContain("GA-980");
     expect(pdfSource).toContain("SV-818");
   });
@@ -307,7 +313,8 @@ describe("exportGroupDetailPdf", () => {
     );
 
     expect(result).toBe(true);
-    expect(pdfSource).toContain("CHILD | GRP-CHILD | Child Group | USING PARENT FLIGHT: GRP-PARENT");
+    expect(pdfSource).toContain("GRP-CHILD | Child Group | FLIGHT FROM: GRP-PARENT");
+    expect(pdfSource).not.toContain("USING PARENT FLIGHT");
     expect(pdfSource.match(/GA-980/g)).toHaveLength(2);
   });
 });

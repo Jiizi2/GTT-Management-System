@@ -1,25 +1,19 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { portalGet } from "../data/portal-query";
-import type { GroupSummary, TransportationItem } from "../data/contracts";
+import {
+  checklistDateRange,
+  checklistInRange,
+  checklistReady,
+  getAgentChecklist,
+  type ChecklistRow,
+} from "../data/h1-checklist";
+import { jakartaToday } from "../data/departure-calendar";
 import { getAllAgentGroups } from "../data/all-groups-query";
 import { formatDate } from "../data/format";
 import { ErrorState, LoadingState } from "../components/data-state";
 import { PageLayout } from "../../components/page-layout";
 import { PageHeader } from "../../components/page-header";
-
-type ChecklistRow = TransportationItem & { group: GroupSummary };
-const jakartaDate = (offset: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-};
 
 export function ChecklistPage({ principalId }: { principalId: string }) {
   const client = useQueryClient();
@@ -28,30 +22,22 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
     queryKey: agentQueryKeys.checklist(principalId),
     queryFn: async () => {
       const groups = await getAllAgentGroups(client, "asc");
-      const rows = await Promise.all(
-        groups.map(async (group) =>
-          (
-            await portalGet<TransportationItem[]>(client, `/groups/${encodeURIComponent(group.code)}/transportation`)
-          ).map((item) => ({ ...item, group })),
-        ),
-      );
-      return rows.flat().sort((a, b) => String(a.tripDate).localeCompare(String(b.tripDate)));
+      return getAgentChecklist(client, groups);
     },
     staleTime: 30_000,
   });
-  const range = useMemo(() => new Set([jakartaDate(0), jakartaDate(1), jakartaDate(2)]), []);
+  const range = useMemo(() => checklistDateRange(jakartaToday()), []);
   const rows = useMemo(
     () =>
       (query.data ?? []).filter(
         (row) =>
-          row.tripDate &&
-          range.has(row.tripDate.slice(0, 10)) &&
+          checklistInRange(row, range) &&
           (!search.trim() || `${row.group.code} ${row.group.name}`.toLowerCase().includes(search.trim().toLowerCase())),
       ),
     [query.data, range, search],
   );
-  const incomplete = rows.filter((row) => row.status !== "ASSIGNED" || row.verifiedDriverCount < row.requiredBusCount);
-  const complete = rows.filter((row) => !incomplete.includes(row));
+  const incomplete = rows.filter((row) => !checklistReady(row));
+  const complete = rows.filter(checklistReady);
   if (query.isPending) return <LoadingState label="Memuat checklist H-1..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
   return (

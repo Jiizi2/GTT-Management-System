@@ -2,6 +2,8 @@ import type { AuthSessionUser } from "../shared/auth-session";
 import type { AgentPrincipal } from "../agent/auth/agent-session";
 
 export const PERMISSIONS = {
+  agreementsRead: "agreements.read",
+  agreementsWrite: "agreements.write",
   overviewRead: "overview.read",
   groupsRead: "groups.read",
   visaTrackingRead: "visa-tracking.read",
@@ -17,6 +19,7 @@ export type AppPrincipal =
   | { kind: "agent"; id: string; agentId: string; permissions: ReadonlySet<Permission> };
 
 const AGENT_READ_PERMISSIONS: readonly Permission[] = [
+  PERMISSIONS.agreementsRead,
   PERMISSIONS.overviewRead,
   PERMISSIONS.groupsRead,
   PERMISSIONS.visaTrackingRead,
@@ -25,6 +28,7 @@ const AGENT_READ_PERMISSIONS: readonly Permission[] = [
 ];
 const INTERNAL_PERMISSIONS: readonly Permission[] = [
   ...AGENT_READ_PERMISSIONS,
+  PERMISSIONS.agreementsWrite,
   PERMISSIONS.operationsWrite,
   PERMISSIONS.accessManage,
 ];

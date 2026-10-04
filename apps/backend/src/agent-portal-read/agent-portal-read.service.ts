@@ -67,7 +67,7 @@ export class AgentPortalReadService {
         { returnDate: { gte: start, lt: end } },
       ],
     };
-    const [aggregate, lifecycle, upcoming, upcomingGroups, visaGroups, hotelGroups, timeline] =
+    const [aggregate, lifecycle, upcoming, upcomingGroups, visaGroups, hotelGroups, timeline, journeys] =
       await Promise.all([
         this.prisma.group.aggregate({
           where: { agentId },
@@ -128,12 +128,16 @@ export class AgentPortalReadService {
             group: { select: { id: true, code: true, name: true } },
           },
         }),
+        this.prisma.group.count({ where: { agentId, OR: [
+          { parentGroupId: null }, { parentGroup: { is: { agentId: { not: agentId } } } },
+        ] } }),
       ]);
     const countFor = (status: GroupLifecycleStatus): number =>
       lifecycle.find((row) => row.lifecycleStatus === status)?._count._all ?? 0;
 
     return {
       groups: {
+        journeys,
         total: aggregate._count._all,
         active: countFor(GroupLifecycleStatus.ACTIVE),
         completed: countFor(GroupLifecycleStatus.COMPLETED),
@@ -162,6 +166,7 @@ export class AgentPortalReadService {
 
     return {
       groups: {
+        journeys: owned.filter((group) => !group.parentGroupId || !owned.some((parent) => parent.id === group.parentGroupId)).length,
         total: owned.length,
         active: statusCount(GroupLifecycleStatus.ACTIVE),
         completed: statusCount(GroupLifecycleStatus.COMPLETED),

@@ -61,7 +61,7 @@ describe("group itinerary display", () => {
       { label: "Start Time", value: "07:00 LT" },
       { label: "Tour Area", value: "Madinah" },
       { label: "Pickup Hotel", value: "Jiwar Al Saha" },
-      { label: "Transportation", value: "Bus" },
+      { label: "Bus for this trip", value: "1 bus" },
     ]);
   });
 

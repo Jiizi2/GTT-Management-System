@@ -62,11 +62,17 @@ export function currentVisaProcessStage(stages: VisaProcessStage[]): VisaProcess
 }
 
 function buildGroupFallbackStages(group: GroupData | null): VisaProcessStage[] {
-  const hotels = [...(group?.visaSetup?.makkahHotels ?? []), ...(group?.visaSetup?.madinahHotels ?? [])];
+  const visaSetup = group?.visaSetup;
+  const hotels = [
+    ...(visaSetup?.makkahHotelWaived ? [] : visaSetup?.makkahHotels ?? []),
+    ...(visaSetup?.madinahHotelWaived ? [] : visaSetup?.madinahHotels ?? []),
+  ];
   const agreement = hotels.some((hotel) => hotel.status === "Rejected")
     ? stage("agreement", 1, "Agreement ditolak", "attention")
     : hotels.some((hotel) => hotel.status === "Waiting for Approval")
       ? stage("agreement", 1, "Menunggu persetujuan", "in-progress")
+      : visaSetup?.makkahHotelWaived && visaSetup?.madinahHotelWaived
+        ? stage("agreement", 1, "Hotel tidak diperlukan", "complete", true)
       : hotels.length > 0 && hotels.every((hotel) => hotel.status === "Approved")
         ? stage("agreement", 1, "Agreement disetujui", "complete", true)
         : stage("agreement", 1, "Belum tercatat", "neutral");

@@ -177,7 +177,7 @@ describe.each(["desktop", "mobile"] as const)("compact visa rows (%s)", (view) =
   it("keeps family counts visible when closed and expands all four children with keyboard", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    const toggle = screen.getByRole("button", { name: `Show 4 child groups for ${row.groupCode}` });
+    const toggle = screen.getByRole("button", { name: `Show 4 linked groups for ${row.groupCode}` });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveTextContent("45 Pax · Total 56 Pax");
     expect(document.getElementById(toggle.getAttribute("aria-controls")!)).not.toBeVisible();
@@ -186,7 +186,8 @@ describe.each(["desktop", "mobile"] as const)("compact visa rows (%s)", (view) =
     await user.keyboard("{Enter}");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByRole("article")).toHaveLength(5);
-    expect(screen.getAllByText("Child", { exact: true })).toHaveLength(4);
+    expect(screen.getAllByRole("article", { name: /^Group / })).toHaveLength(5);
+    expect(screen.queryByText(/^(Parent|Child|Parent pax)$/)).not.toBeInTheDocument();
     await user.click(toggle);
     expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(toggle).toHaveFocus();
@@ -197,7 +198,7 @@ describe.each(["desktop", "mobile"] as const)("compact visa rows (%s)", (view) =
     const onDetail = vi.fn();
     const onUpdate = vi.fn();
     render(<Harness onDetail={onDetail} onUpdate={onUpdate} />);
-    await user.click(screen.getByRole("button", { name: /Show 4 child groups/ }));
+    await user.click(screen.getByRole("button", { name: /Show 4 linked groups/ }));
     await user.click(screen.getByRole("button", { name: `View details for group ${children[2].groupCode}` }));
     expect(onDetail).toHaveBeenCalledWith(children[2]);
     await user.click(
@@ -229,7 +230,7 @@ describe.each(["desktop", "mobile"] as const)("compact visa rows (%s)", (view) =
 
   it("does not render an accordion or parent label for standalone groups", () => {
     render(<Harness standalone />);
-    expect(screen.queryByRole("button", { name: /child groups/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /linked groups/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Parent", { exact: true })).not.toBeInTheDocument();
   });
 

@@ -10,7 +10,6 @@ type OverviewTripRow = {
   category: string;
   title: string;
   isoDate: string;
-  dateLabel: string;
   timeLabel: string;
   routeLabel: string;
   flightNumber: string;
@@ -27,7 +26,7 @@ function formatDateLabel(isoDate: string, fallbackDate: string, fallbackYear: st
   if (!isoDate) return `${fallbackDate} ${fallbackYear}`.trim();
   const date = new Date(`${isoDate}T12:00:00`);
   if (Number.isNaN(date.getTime())) return `${fallbackDate} ${fallbackYear}`.trim();
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function resolveTripTime(item: ItineraryItem): string {
@@ -61,7 +60,6 @@ function buildOverviewTripRows(groups: GroupData[]): OverviewTripRow[] {
           category: item.category.trim() || "Other",
           title: item.title.trim() || "Untitled activity",
           isoDate: safeIsoDate === "9999-12-31" ? "" : safeIsoDate,
-          dateLabel: formatDateLabel(isoDate, item.date, item.year),
           timeLabel,
           routeLabel: resolveRouteLabel(item),
           flightNumber: item.flightNumber?.trim() || "—",
@@ -124,7 +122,7 @@ export function exportOverviewReportPdf(
     reusableWindow && !reusableWindow.closed ? reusableWindow : window.open("", "_blank", "width=1280,height=860");
   if (!printableWindow) return false;
 
-  const generatedTimestamp = new Date().toLocaleString("en-GB", {
+  const generatedTimestamp = new Date().toLocaleString("id-ID", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -144,131 +142,130 @@ export function exportOverviewReportPdf(
     .filter((group) => scheduledGroupCodes.has(group.code))
     .reduce((total, group) => total + group.pax, 0);
   const busMovementCount = rows.reduce((total, row) => total + row.busCount, 0);
-  const activeDays = new Set(rows.map((row) => row.isoDate).filter(Boolean)).size;
   const scheduledGroupCount = scheduledGroupCodes.size;
-  const tripsByDate = new Map<string, number>();
-  for (const row of rows) tripsByDate.set(row.isoDate, (tripsByDate.get(row.isoDate) ?? 0) + 1);
-  const peakDay = [...tripsByDate.entries()].sort(
-    ([leftDate, leftCount], [rightDate, rightCount]) => rightCount - leftCount || leftDate.localeCompare(rightDate),
-  )[0];
+  const tripsByDate = new Map<string, OverviewTripRow[]>();
+  for (const row of rows) {
+    const dailyRows = tripsByDate.get(row.isoDate) ?? [];
+    dailyRows.push(row);
+    tripsByDate.set(row.isoDate, dailyRows);
+  }
   const reportRange = `${formatDateLabel(weekStartIso, "", "")} – ${formatDateLabel(weekEndIso, "", "")}`;
-  const weeklyInsight = rows.length
-    ? `${rows.length} trips are scheduled across ${scheduledGroupCount} groups and ${activeDays} active days this week.${
-        peakDay ? ` Peak day is ${formatDateLabel(peakDay[0], "", "")} with ${peakDay[1]} trips.` : ""
-      }`
-    : `No trips are scheduled between ${reportRange}.`;
-  const scopeLabel = isActiveOnly ? "Active groups" : "All groups";
+  const scopeLabel = isActiveOnly ? "Group di Saudi" : "Semua group";
   const logoUrl = new URL("/logo-ghaniya-travel-polos.png", window.location.origin).toString();
   const fontsUrl = new URL("/fonts.css", window.location.origin).toString();
 
-  const tableRows = rows
-    .map(
-      (row, index) => `
+  const dailySchedules = [...tripsByDate.entries()]
+    .map(([isoDate, dailyRows]) => {
+      const dateLabel = new Date(`${isoDate}T12:00:00`).toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      const tableRows = dailyRows
+        .map(
+          (row) => `
         <tr>
-          <td class="number">${index + 1}</td>
+          <td class="time">${escapeHtml(row.timeLabel)}</td>
           <td>
             <strong class="primary-text">${escapeHtml(row.groupCode)}</strong>
             <span class="secondary-text">${escapeHtml(row.groupName)}</span>
-            <span class="tertiary-text">${escapeHtml(row.agentName)}</span>
+            <span class="tertiary-text">Agent: ${escapeHtml(row.agentName)}</span>
           </td>
           <td>
-            <strong class="primary-text">${escapeHtml(row.dateLabel)}</strong>
-            <span class="time-chip">${escapeHtml(row.timeLabel)}</span>
-          </td>
-          <td>
-            <span class="category-chip">${escapeHtml(row.category)}</span>
+            <span class="category">${escapeHtml(row.category)}</span>
             <span class="secondary-text activity-title">${escapeHtml(row.title)}</span>
           </td>
           <td class="route">${escapeHtml(row.routeLabel)}</td>
-          <td class="center"><strong>${escapeHtml(row.flightNumber)}</strong></td>
-          <td class="center"><span class="transport ${row.busCount > 0 ? "bus" : "none"}">${row.busCount > 0 ? `${row.busCount} ${row.busCount === 1 ? "bus" : "buses"}` : "No bus"}</span></td>
+          <td class="center">${escapeHtml(row.flightNumber)}</td>
+          <td class="center transport">${row.busCount > 0 ? `${row.busCount} bus` : "—"}</td>
         </tr>`,
-    )
+        )
+        .join("");
+      return `
+    <section class="daily-schedule">
+      <table aria-label="Jadwal ${escapeHtml(dateLabel)}">
+        <colgroup><col style="width:9%" /><col style="width:22%" /><col style="width:23%" /><col style="width:26%" /><col style="width:12%" /><col style="width:8%" /></colgroup>
+        <thead>
+          <tr><th class="day-heading" colspan="6"><div class="day-title"><h2>${escapeHtml(dateLabel)}</h2><span>${dailyRows.length} aktivitas</span></div></th></tr>
+          <tr class="column-headings"><th scope="col">Jam</th><th scope="col">Group / Agent</th><th scope="col">Aktivitas</th><th scope="col">Rute</th><th scope="col" class="center">Flight / Train</th><th scope="col" class="center">Bus</th></tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </section>`;
+    })
     .join("");
 
   const printableHtml = `<!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Weekly Operations Report</title>
+  <title>Laporan Operasional Mingguan</title>
   <link rel="stylesheet" href="${escapeHtml(fontsUrl)}" />
   <style>
-    :root { --brand:#087f5b; --brand-dark:#064e3b; --brand-soft:#ecfdf5; --ink:#14211d; --muted:#64748b; --line:#dce5e1; --soft:#f6f9f8; }
+    :root { --ink:#202020; --muted:#595959; --line:#d6d6d6; }
     * { box-sizing:border-box; }
-    body { margin:0; padding:22px; color:var(--ink); background:#fff; font-family:"Inter","Segoe UI",Arial,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    .report { width:100%; max-width:1240px; margin:0 auto; }
-    .masthead { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:0 0 18px; border-bottom:3px solid var(--brand); }
-    .brand { display:flex; align-items:center; gap:14px; }
-    .logo { width:54px; height:54px; object-fit:contain; }
-    .brand-name { margin:0; color:var(--brand-dark); font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-    h1 { margin:3px 0 0; font-family:"Sora","Segoe UI",sans-serif; font-size:25px; line-height:1.15; letter-spacing:-.025em; }
-    .document-meta { text-align:right; }
-    .document-label { display:inline-block; padding:5px 9px; border-radius:999px; color:var(--brand-dark); background:var(--brand-soft); font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-    .generated { margin:8px 0 0; color:var(--muted); font-size:10px; }
-    .report-context { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; padding:16px 0 13px; }
-    .context-title { margin:0 0 4px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--brand); }
-    .period { margin:0; font-size:17px; font-weight:750; }
-    .filters { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
-    .filter-chip { padding:5px 8px; border:1px solid var(--line); border-radius:7px; background:var(--soft); color:#475569; font-size:9px; font-weight:650; }
-    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin-bottom:13px; }
-    .metric { position:relative; overflow:hidden; min-height:70px; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; }
-    .metric::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--brand); }
-    .metric-label { color:var(--muted); font-size:8px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
-    .metric-value { display:block; margin-top:5px; font-family:"Sora",sans-serif; font-size:21px; font-weight:750; color:var(--brand-dark); }
-    .metric-note { display:block; margin-top:2px; color:var(--muted); font-size:8px; }
-    .insight { display:flex; align-items:flex-start; gap:9px; margin-bottom:14px; padding:9px 11px; border-radius:9px; background:var(--brand-soft); color:#315c4e; font-size:9px; line-height:1.5; }
-    .insight-mark { flex:0 0 auto; width:17px; height:17px; border-radius:5px; background:var(--brand); color:#fff; text-align:center; line-height:17px; font-weight:900; }
-    .section-heading { display:flex; justify-content:space-between; align-items:center; margin:0 0 7px; }
-    .section-heading h2 { margin:0; font-size:12px; letter-spacing:.05em; text-transform:uppercase; }
-    .section-heading span { color:var(--muted); font-size:9px; }
-    table { width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+    body { margin:0; padding:24px; color:var(--ink); background:#fff; font-family:"Inter","Segoe UI",Arial,sans-serif; font-size:10pt; font-weight:400; line-height:1.25; font-variant-numeric:tabular-nums; }
+    .report { width:100%; max-width:1040px; margin:0 auto; }
+    .masthead { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:14px; min-width:0; }
+    .logo { width:42px; height:52px; object-fit:contain; filter:grayscale(1); }
+    .brand-name { margin:0 0 4px; font-size:8pt; font-weight:500; letter-spacing:.12em; text-transform:uppercase; }
+    h1 { margin:0; font-family:"Manrope","Inter",sans-serif; font-size:20pt; font-weight:600; line-height:1.2; letter-spacing:-.02em; }
+    .period { margin:4px 0 0; color:var(--muted); font-size:11pt; }
+    .document-meta { flex-shrink:0; padding-top:3px; text-align:right; color:var(--muted); font-size:8pt; }
+    .document-label { font-weight:500; letter-spacing:.08em; text-transform:uppercase; }
+    .generated { margin:6px 0 0; }
+    .metrics { display:grid; grid-template-columns:repeat(4,1fr); margin:12px 0 6px; }
+    .metric { padding:0 14px; text-align:center; }
+    .metric + .metric { border-left:1px solid var(--line); }
+    .metric-value { display:block; font-size:22pt; font-weight:500; line-height:1.2; }
+    .metric-label { display:block; margin-top:3px; color:var(--muted); font-size:8pt; font-weight:500; letter-spacing:.1em; text-transform:uppercase; }
+    .metric-note { margin:0 0 10px; color:var(--muted); font-size:8pt; }
+    .daily-schedule { margin-top:12px; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
     thead { display:table-header-group; }
-    thead th { padding:8px 7px; border-bottom:1px solid var(--line); background:var(--brand-dark); color:#fff; font-size:8px; text-align:left; text-transform:uppercase; letter-spacing:.08em; }
-    tbody tr:nth-child(even) { background:var(--soft); }
-    tbody td { padding:8px 7px; border-bottom:1px solid #e8eeeb; font-size:9px; line-height:1.35; vertical-align:middle; overflow-wrap:anywhere; }
-    tbody tr:last-child td { border-bottom:0; }
-    .number,.center { text-align:center; }
+    th { text-align:left; font-weight:500; }
+    .day-heading { padding:0 0 5px; }
+    .day-title { display:flex; justify-content:space-between; align-items:baseline; gap:16px; }
+    .day-title h2 { margin:0; font-family:"Manrope","Inter",sans-serif; font-size:11pt; font-weight:600; }
+    .day-title span { flex-shrink:0; color:var(--muted); font-size:9pt; font-weight:400; }
+    .column-headings th { padding:4px 8px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); font-size:9pt; }
+    tbody td { padding:4px 8px; border-bottom:1px solid var(--line); line-height:1.2; vertical-align:middle; overflow-wrap:anywhere; }
+    .time { font-size:13pt; font-weight:600; white-space:nowrap; }
+    .center { text-align:center; }
     .primary-text,.secondary-text,.tertiary-text { display:block; }
-    .primary-text { font-size:9px; }
-    .secondary-text { margin-top:2px; color:#475569; }
-    .tertiary-text { margin-top:2px; color:var(--muted); font-size:8px; }
-    .time-chip,.category-chip,.transport { display:inline-block; margin-top:4px; padding:2px 5px; border-radius:5px; font-size:7px; font-weight:800; }
-    .time-chip { color:var(--brand-dark); background:var(--brand-soft); }
-    .category-chip { margin:0; color:#075985; background:#e0f2fe; text-transform:uppercase; letter-spacing:.04em; }
-    .activity-title { margin-top:4px; }
-    .route { font-weight:650; color:#334155; }
-    .transport.bus { color:#92400e; background:#fef3c7; }
-    .transport.none { color:#64748b; background:#eef2f6; }
-    .empty { padding:24px; text-align:center; color:var(--muted); }
-    .footer { display:flex; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px solid var(--line); color:var(--muted); font-size:8px; }
-    @page { size:A4 landscape; margin:10mm 11mm 12mm; }
-    @media print { body { padding:0; } .report { max-width:none; } tr,.metric { break-inside:avoid; } }
+    .primary-text { font-weight:600; }
+    .secondary-text { margin-top:1px; color:var(--muted); }
+    .tertiary-text { margin-top:1px; color:var(--muted); font-size:9pt; }
+    .category,.route { font-weight:500; }
+    .transport { white-space:nowrap; }
+    .empty { padding:24px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); }
+    .empty h2 { margin:0 0 6px; color:var(--ink); font-size:12pt; font-weight:500; }
+    .empty p { margin:0; }
+    .footer { display:flex; justify-content:space-between; gap:20px; margin-top:4px; padding-top:4px; border-top:1px solid var(--line); color:var(--muted); font-size:8pt; overflow-wrap:anywhere; }
+    .footer p { margin:0; }
+    .footer p:last-child { max-width:36%; text-align:right; }
+    @page { size:A4 landscape; margin:10mm 11mm; @bottom-right { content:"Halaman " counter(page); font-family:"Inter",Arial,sans-serif; font-size:8pt; color:#595959; } }
+    @media print { body { padding:0; } .report { max-width:none; } tr,.masthead,.metrics,.empty { break-inside:avoid; } thead { break-inside:avoid; } .footer { break-inside:avoid; } }
   </style>
 </head>
 <body>
   <main class="report">
     <header class="masthead">
-      <div class="brand"><img class="logo" src="${escapeHtml(logoUrl)}" alt="Ghaniya Travel" /><div><p class="brand-name">Ghaniya Tour & Travel</p><h1>Weekly Operations Report</h1></div></div>
-      <div class="document-meta"><span class="document-label">Internal Operations</span><p class="generated">Generated ${escapeHtml(generatedTimestamp)}</p></div>
+      <div class="brand"><img class="logo" src="${escapeHtml(logoUrl)}" alt="Ghaniya Travel" /><div><p class="brand-name">Ghaniya Tour & Travel</p><h1>Laporan Operasional Mingguan</h1><p class="period">${escapeHtml(reportRange)}</p></div></div>
+      <div class="document-meta"><span class="document-label">Internal Operations</span><p class="generated">Dicetak: ${escapeHtml(generatedTimestamp)}</p></div>
     </header>
-    <section class="report-context">
-      <div><p class="context-title">Weekly reporting period</p><p class="period">${escapeHtml(reportRange)}</p></div>
-      <div class="filters"><span class="filter-chip">${escapeHtml(scopeLabel)}</span><span class="filter-chip">Source view: ${escapeHtml(monthLabel)}</span>${normalizedQuery ? `<span class="filter-chip">Search: ${escapeHtml(normalizedQuery)}</span>` : ""}${skippedInactiveCount ? `<span class="filter-chip">${skippedInactiveCount} inactive excluded</span>` : ""}</div>
+    <section class="metrics" aria-label="Ringkasan minggu berjalan">
+      <div class="metric"><strong class="metric-value">${scheduledGroupCount}</strong><span class="metric-label">Group</span></div>
+      <div class="metric"><strong class="metric-value">${totalPilgrims}</strong><span class="metric-label">Jamaah</span></div>
+      <div class="metric"><strong class="metric-value">${rows.length}</strong><span class="metric-label">Aktivitas</span></div>
+      <div class="metric"><strong class="metric-value">${busMovementCount}</strong><span class="metric-label">Pergerakan bus</span></div>
     </section>
-    <section class="metrics">
-      <div class="metric"><span class="metric-label">Groups with trips</span><strong class="metric-value">${scheduledGroupCount}</strong><span class="metric-note">This week</span></div>
-      <div class="metric"><span class="metric-label">Pilgrims</span><strong class="metric-value">${totalPilgrims}</strong><span class="metric-note">Total pax</span></div>
-      <div class="metric"><span class="metric-label">Scheduled trips</span><strong class="metric-value">${rows.length}</strong><span class="metric-note">Across ${activeDays} active days</span></div>
-      <div class="metric"><span class="metric-label">Bus movements</span><strong class="metric-value">${busMovementCount}</strong><span class="metric-note">Transport required</span></div>
-    </section>
-    <aside class="insight"><span class="insight-mark">i</span><span>${escapeHtml(weeklyInsight)}</span></aside>
-    <div class="section-heading"><h2>Trip schedule</h2><span>Chronological order · ${rows.length} records</span></div>
-    <table aria-label="Overview trip schedule">
-      <thead><tr><th style="width:4%">No.</th><th style="width:17%">Group / Agent</th><th style="width:12%">Schedule</th><th style="width:20%">Activity</th><th style="width:24%">Route</th><th style="width:10%">Flight / Train</th><th style="width:13%">Transport</th></tr></thead>
-      <tbody>${tableRows || '<tr><td class="empty" colspan="7">No trip data is available for the selected filters.</td></tr>'}</tbody>
-    </table>
-    <footer class="footer"><span>PT. Ghaniya Zilia Rahman · Confidential operational document</span><span>Weekly Report · ${escapeHtml(reportRange)}</span></footer>
+    <p class="metric-note">Jamaah dihitung per group yang memiliki jadwal minggu ini; pergerakan bus dijumlahkan per aktivitas.</p>
+    ${dailySchedules || `<section class="empty"><h2>Belum ada aktivitas minggu ini</h2><p>Tidak ada jadwal pada ${escapeHtml(reportRange)} untuk filter yang dipilih.</p></section>`}
+    <footer class="footer"><p>Sumber: Overview · ${escapeHtml(monthLabel)} · ${escapeHtml(scopeLabel)}${normalizedQuery ? ` · Pencarian: ${escapeHtml(normalizedQuery)}` : ""} · Group nonaktif dikecualikan${skippedInactiveCount ? ` (${skippedInactiveCount})` : ""}</p><p>PT. Ghaniya Zilia Rahman · Dokumen operasional internal</p></footer>
   </main>
 </body>
 </html>`;

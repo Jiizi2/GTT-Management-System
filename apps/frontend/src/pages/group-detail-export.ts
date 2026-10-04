@@ -242,35 +242,29 @@ export async function exportGroupDetailPdf(
     const parentGroup = relatedGroups.find((relatedGroup) => !relatedGroup.parentGroupId);
     const parentFlightLegs = parentGroup?.visaSetup?.flightLegs ?? [];
     for (const relatedGroup of relatedGroups) {
-      const groupRole = relatedGroups.length === 1
-        ? "GROUP"
-        : relatedGroup.parentGroupId
-          ? "CHILD"
-          : "PARENT";
       const configuredFlightLegs = relatedGroup.visaSetup?.flightLegs ?? [];
       const inheritsParentFlight = Boolean(
         relatedGroup.parentGroupId && configuredFlightLegs.length === 0 && parentFlightLegs.length > 0,
       );
       const flightLegs = inheritsParentFlight ? parentFlightLegs : configuredFlightLegs;
       const flightSourceLabel = inheritsParentFlight && parentGroup
-        ? ` | USING PARENT FLIGHT: ${parentGroup.code}`
+        ? ` | FLIGHT FROM: ${parentGroup.code}`
         : "";
-      flightBody.push([{ content: `${groupRole} | ${relatedGroup.code} | ${relatedGroup.name}${flightSourceLabel}`, colSpan: 8, styles: {
+      flightBody.push([{ content: `${relatedGroup.code} | ${relatedGroup.name}${flightSourceLabel}`, colSpan: 9, styles: {
         fillColor: PRIMARY_SOFT, textColor: PRIMARY_DARK, fontStyle: "bold", fontSize: 7,
       } }]);
 
       for (const direction of ["ONWARD", "RETURN"] as const) {
-        flightBody.push([{ content: direction, colSpan: 8, styles: {
-          fillColor: SURFACE_SOFT, textColor: MUTED, fontStyle: "bold", fontSize: 6.3,
-        } }]);
         const legs = flightLegs
           .filter((leg) => leg.direction === direction)
           .sort((left, right) => left.sortOrder - right.sortOrder);
-        if (legs.length === 0) flightBody.push(["", "", "", "", "", "", "", ""]);
+        if (legs.length === 0) {
+          flightBody.push([direction, { content: "Flight details not available", colSpan: 8, styles: { textColor: MUTED } }]);
+        }
         legs.forEach((leg) => {
           const flightNumber = leg.flightNumber.trim();
           flightBody.push([
-            formatDocumentDate(leg.departureDate), leg.departureAirportCode.trim().toUpperCase(),
+            direction, formatDocumentDate(leg.departureDate), leg.departureAirportCode.trim().toUpperCase(),
             leg.arrivalAirportCode.trim().toUpperCase(), formatDocumentTime(leg.departureTime),
             formatDocumentTime(leg.arrivalTime), leg.carrierCode.trim().toUpperCase() || inferCarrierCode(flightNumber),
             flightNumber, leg.remarks.trim(),
@@ -280,11 +274,21 @@ export async function exportGroupDetailPdf(
     }
     y = drawSectionTitle(document, "Flight Detail", y);
     y = drawTable(document, y, {
-      head: [["Date", "From", "To", "ETD", "ETA", "Carrier", "Flight No.", "Remarks"]],
+      head: [["Direction", "Date", "From", "To", "ETD", "ETA", "Carrier", "Flight No.", "Remarks"]],
       body: flightBody,
+      styles: {
+        fontSize: 7.2, textColor: INK, lineColor: OUTLINE, lineWidth: 0.12,
+        cellPadding: { top: 1.2, right: 1.5, bottom: 1.2, left: 1.5 },
+        valign: "middle", overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: PRIMARY_SOFT, textColor: PRIMARY_DARK, fontStyle: "bold", fontSize: 6.3, minCellHeight: 5,
+      },
       columnStyles: {
-        0: { cellWidth: 22 }, 1: { cellWidth: 15 }, 2: { cellWidth: 15 }, 3: { cellWidth: 16, halign: "center" },
-        4: { cellWidth: 16, halign: "center" }, 5: { cellWidth: 20 }, 6: { cellWidth: 23 }, 7: { cellWidth: 59 },
+        0: { cellWidth: 18, fillColor: SURFACE_SOFT, textColor: MUTED, fontStyle: "bold", fontSize: 6.3 },
+        1: { cellWidth: 23 }, 2: { cellWidth: 13 }, 3: { cellWidth: 13 },
+        4: { cellWidth: 13, halign: "center" }, 5: { cellWidth: 13, halign: "center" },
+        6: { cellWidth: 16 }, 7: { cellWidth: 23 }, 8: { cellWidth: 54 },
       },
     });
 

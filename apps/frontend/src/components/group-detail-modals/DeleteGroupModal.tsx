@@ -87,8 +87,8 @@ export function DeleteGroupModal({
 
             {hasChildGroups ? (
               <div className="rounded-2xl border border-brand-tertiary/30 bg-brand-tertiary/10 px-3 py-2 text-sm font-semibold text-brand-tertiary">
-                This group has {childGroupCount} linked child {childGroupCount === 1 ? "group" : "groups"}. Unlink the
-                child {childGroupCount === 1 ? "group" : "groups"} before deleting the parent group.
+                This group has {childGroupCount} linked {childGroupCount === 1 ? "group" : "groups"}.
+                {" "}Unlink the {childGroupCount === 1 ? "group" : "groups"} before deleting this group.
               </div>
             ) : null}
 

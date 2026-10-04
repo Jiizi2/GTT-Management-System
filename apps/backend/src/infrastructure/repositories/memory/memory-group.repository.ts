@@ -142,7 +142,7 @@ export class MemoryGroupRepository implements GroupRepository {
 
   async reassignAgent(idOrCode: string, agentId: string): Promise<GroupDetailRecord> {
     const group = findOneFromMemory(this.memoryStore.groups, idOrCode);
-    if (group.parentGroupId) throw new BadRequestException("Reassign Agent harus dilakukan dari parent Group.");
+    if (group.parentGroupId) throw new BadRequestException("Reassign Agent harus dilakukan dari group sumber data bersama.");
     const familyIds = new Set([group.id, ...this.memoryStore.groups.filter((item) => item.parentGroupId === group.id).map((item) => item.id)]);
     this.memoryStore.groups.forEach((item) => { if (familyIds.has(item.id)) item.agentId = agentId; });
     return findOneFromMemory(this.memoryStore.groups, idOrCode);
@@ -206,7 +206,7 @@ export class MemoryGroupRepository implements GroupRepository {
     const group = await this.findOneByIdOrCode(idOrCode);
     if (group.parentGroupId) {
       throw new BadRequestException(
-        `Grup '${group.code}' adalah child group. Silakan edit ${context} pada parent group.`,
+        `Grup '${group.code}' menggunakan data bersama. Silakan edit ${context} pada group sumber data.`,
       );
     }
   }
@@ -216,7 +216,7 @@ export class MemoryGroupRepository implements GroupRepository {
     const key = payload.parentGroupId.trim().toUpperCase();
     const parent = this.memoryStore.groups.find((group) => group.id === payload.parentGroupId || group.code === key);
     if (parent && parent.agentId !== (payload.agentId?.trim() || "agent_gtt_direct")) {
-      throw new BadRequestException("Parent Group dan Child Group harus berasal dari Agent yang sama.");
+      throw new BadRequestException("Group yang terhubung harus berasal dari Agent yang sama.");
     }
   }
 }
