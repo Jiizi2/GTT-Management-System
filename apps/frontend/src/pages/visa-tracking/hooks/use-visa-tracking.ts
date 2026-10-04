@@ -168,8 +168,10 @@ export function getVisaRowGroupKey(rowGroup: VisaRowGroup): string {
 
 export function useVisaTracking({
   groups,
+  agentLabel,
 }: {
   groups: GroupData[];
+  agentLabel?: string;
 }) {
   const currentIssuedMonthKey = useMemo(() => formatLocalIsoDate(new Date()).slice(0, 7), []);
   const [query, setQuery] = useState("");
@@ -375,7 +377,7 @@ export function useVisaTracking({
             groups,
             query,
             activeFilter,
-            issuedMonthLabel: selectedIssuedMonthLabel,
+            agentLabel,
           },
           {
             printWindow: printableWindow,

@@ -4,6 +4,7 @@ import { AgentApiError } from "../auth/agent-api";
 export const AGENT_PORTAL_QUERY_ROOT = "agent-portal" as const;
 export const agentSessionQueryKey = [AGENT_PORTAL_QUERY_ROOT, "session"] as const;
 export const agentQueryKeys = {
+  agreements: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "agreement-drafts"] as const,
   dashboard: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "dashboard"] as const,
   checklist: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "checklist"] as const,
   visaTracking: (principalId: string) => [AGENT_PORTAL_QUERY_ROOT, principalId, "visa-tracking"] as const,

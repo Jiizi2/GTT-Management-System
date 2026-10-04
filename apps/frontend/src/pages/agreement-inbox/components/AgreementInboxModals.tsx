@@ -14,6 +14,7 @@ function toDraftFormState(draft: HotelAgreementDraft): HotelAgreementDraftFormSt
   return {
     city: draft.city,
     agentId: draft.agentId,
+    muassasahId: draft.muassasahId ?? "",
     groupName: draft.groupName ?? "",
     hotelName: draft.hotelName,
     agreementNumber: draft.agreementNumber,
@@ -230,26 +231,27 @@ export function AgreementDraftEditModal({
           </div>
 
           <form
-            className="serene-dialog-body overflow-y-auto px-5 py-4"
-            onSubmit={handleSubmit((values) => void onSave(values))}
+            className="serene-dialog-body min-h-0 space-y-5 overflow-y-auto px-5 py-4"
+            onSubmit={handleSubmit(onSave)}
           >
             <AgreementDraftFields
               control={control}
               register={register}
               errors={errors}
               idPrefix={`agreement-draft-edit-${draft.id}`}
+              layout="stacked"
             />
 
-            <div className="serene-dialog-footer-bar -mx-5 -mb-4 mt-5 bg-surface-container-low">
-              <button type="submit" className="serene-btn-primary" disabled={isBusy}>
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  {isBusy ? "sync" : "check_circle"}
+            <div className="flex flex-col-reverse gap-2 border-t border-outline-variant/25 pt-4 sm:flex-row sm:justify-end">
+              <Button variant="secondary" type="button" onClick={onClose} disabled={isBusy}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" className="inline-flex items-center gap-1.5" disabled={isBusy}>
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  save
                 </span>
                 <span>{isBusy ? "Saving..." : "Save Changes"}</span>
-              </button>
-              <button type="button" className="serene-btn-secondary" onClick={onClose}>
-                Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </section>

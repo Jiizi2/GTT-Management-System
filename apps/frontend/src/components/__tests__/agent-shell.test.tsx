@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AgentShell } from "../../agent/agent-shell";
@@ -52,16 +52,22 @@ describe("AgentShell routes", () => {
     expect(screen.getAllByRole("link", { name: "Dashboard" })).toHaveLength(2);
     expect(screen.getAllByRole("link", { name: "Perjalanan" })).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "Checklist" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Buka profil" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Ruang kerja Agent A" })).toHaveTextContent("AA");
-    expect(screen.getByRole("region", { name: "Ruang kerja Agent A" })).toHaveTextContent(
-      "Dashboard, visa, dan perjalanan dalam satu ruang kerja.",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Buka menu akun" }));
+    expect(screen.getByRole("link", { name: "Buka profil" })).toHaveAttribute("href", "/agent/profile");
+    expect(screen.getByRole("button", { name: "Buka menu akun" })).toHaveAttribute("aria-expanded", "true");
     for (const label of screen.getAllByText("Perjalanan")) {
       expect(label).not.toHaveClass("opacity-0");
     }
     expect(screen.queryByRole("link", { name: /^Agreement$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Invoice$/i })).not.toBeInTheDocument();
+    const mobileNav = within(screen.getByRole("navigation", { name: "Mobile navigation" }));
+    expect(mobileNav.getAllByRole("link")).toHaveLength(4);
+    expect(mobileNav.getByRole("link", { name: "Agreement Inbox" })).toHaveAttribute("href", "/agent/agreement-inbox");
+    expect(screen.getAllByRole("link", { name: "Agreement Inbox" })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Logout" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("button", { name: "Logout" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Buka menu akun" })).toHaveFocus();
   });
 
   it("keeps Perjalanan active while viewing a group detail", () => {

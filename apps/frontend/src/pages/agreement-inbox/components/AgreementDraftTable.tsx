@@ -3,7 +3,7 @@ import { Button } from "../../../components/button";
 import { SereneSelect } from "../../../components/serene-select";
 import { Badge, type BadgeStatus } from "../../../components/badge";
 import type { HotelAgreementDraft, AgreementApprovalStatus } from "../../../shared/app-domain";
-import { formatVisaShortDate } from "../../../shared/app-domain";
+import { AgreementDraftSummary } from "./AgreementDraftSummary";
 
 const APPROVAL_STATUSES: AgreementApprovalStatus[] = ["Waiting for Approval", "Approved", "Rejected"];
 
@@ -17,14 +17,6 @@ function assignmentBadgeStatus(draft: HotelAgreementDraft): BadgeStatus {
   if (draft.assignmentStatus === "Assigned") return "success";
   if (draft.assignmentStatus === "Partially Assigned") return "info";
   return "warning";
-}
-
-function cityLabel(city: HotelAgreementDraft["city"]): string {
-  return city === "makkah" ? "Makkah" : "Madinah";
-}
-
-function cityIcon(city: HotelAgreementDraft["city"]): "location_on" | "mosque" {
-  return city === "makkah" ? "location_on" : "mosque";
 }
 
 function availablePax(draft: HotelAgreementDraft): number {
@@ -62,17 +54,6 @@ function RowActions({ draft, expanded, onToggle, onEdit, onDelete, deletePending
   );
 }
 
-function Capacity({ draft }: { draft: HotelAgreementDraft }) {
-  const remaining = availablePax(draft);
-  const percent = draft.pax > 0 ? Math.min(100, (remaining / draft.pax) * 100) : 0;
-  return (
-    <div className="min-w-[118px]">
-      <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-semibold text-on-surface-variant"><span>Pax</span><span className="tabular-nums text-on-surface">{remaining}/{draft.pax}</span></div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200" aria-label={`${remaining} dari ${draft.pax} pax tersedia`} role="img"><div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${percent}%` }} /></div>
-    </div>
-  );
-}
-
 function ExpandedGroups({ draft, linkedGroupCode, assignmentGroupCode, onAssignmentGroupCodeChange, onAssignToGroup, onUnassignFromGroup, assignPending, unassignPending, isLastDraft }: { draft: HotelAgreementDraft; linkedGroupCode: string; assignmentGroupCode: string; onAssignmentGroupCodeChange: (draftId: string, groupCode: string) => void; onAssignToGroup: (draft: HotelAgreementDraft) => void; onUnassignFromGroup: (draft: HotelAgreementDraft, groupCode?: string) => void; assignPending: boolean; unassignPending: boolean; isLastDraft: boolean }) {
   const links = draft.assignedGroups ?? [];
   const canAssign = draft.status !== "Rejected" && availablePax(draft) > 0;
@@ -100,7 +81,7 @@ function ExpandedGroups({ draft, linkedGroupCode, assignmentGroupCode, onAssignm
           ))}
         </div>
       ) : <p className="mt-3 rounded-xl border border-dashed border-outline-variant/40 bg-surface-container-lowest px-3 py-2.5 text-sm font-semibold text-on-surface-variant">Belum terhubung ke group.</p>}
-      {draft.status === "Rejected" ? <p className="mt-3 text-xs font-semibold text-rose-700">Draft ditolak. Perbarui nomor agreement sebelum menghubungkannya ke group.</p> : null}
+      {draft.status === "Rejected" ? <p className="mt-3 text-xs font-semibold text-rose-700">Draft ditolak. Gunakan Edit untuk memperbarui nomor agreement dan statusnya. Detail lainnya juga dapat diubah.</p> : null}
     </div>
   );
 }
@@ -126,18 +107,14 @@ export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCo
         const isLastDraft = index === drafts.length - 1;
         return (
           <article key={draft.id} className={`rounded-2xl border border-outline-variant/35 bg-surface-container-lowest shadow-sm lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b-outline-variant/25 lg:shadow-none lg:last:border-b-0 ${isFirstDraft ? "lg:rounded-tl-2xl lg:rounded-tr-2xl" : ""} ${isLastDraft && !expanded ? "lg:rounded-br-2xl lg:rounded-bl-2xl" : ""}`}>
-            <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-4 py-4 transition-colors sm:px-5 xl:grid-cols-[minmax(190px,1.45fr)_minmax(125px,.85fr)_minmax(150px,1fr)_minmax(120px,.78fr)_minmax(145px,1fr)_minmax(110px,.78fr)_112px] xl:items-center ${expanded ? "bg-primary/[0.035]" : "hover:bg-primary/[0.025]"} ${isFirstDraft ? "lg:rounded-tl-[15px] lg:rounded-tr-[15px]" : ""} ${isLastDraft && !expanded ? "lg:rounded-br-[15px] lg:rounded-bl-[15px]" : ""}`}>
-              <div className="col-span-2 flex min-w-0 items-center gap-3 xl:col-span-1">
-                <span className="material-symbols-outlined grid h-8 w-8 shrink-0 place-items-center text-xl leading-none text-primary" aria-hidden="true">{cityIcon(draft.city)}</span>
-                <div className="min-w-0"><p className="text-sm font-extrabold text-on-surface">{cityLabel(draft.city)}</p><p className="truncate text-sm font-medium text-on-surface-variant">{draft.hotelName}</p></div>
-              </div>
-              <div className="min-w-0"><p className="text-[11px] font-semibold text-on-surface-variant">Agreement No.</p><p className="mt-1 truncate text-sm font-bold tabular-nums text-on-surface">{draft.agreementNumber}</p></div>
-              <div><p className="text-[11px] font-semibold text-on-surface-variant">Stay Period</p><p className="mt-1 whitespace-nowrap text-sm font-bold text-on-surface">{formatVisaShortDate(draft.stayStartIso)} → {formatVisaShortDate(draft.stayEndIso)}</p></div>
-              <div className="col-span-2 xl:col-span-1"><Capacity draft={draft} /></div>
-              <div><p className="mb-1 text-[11px] font-semibold text-on-surface-variant">Status</p><StatusSelect draft={draft} onChange={onStatusChange} disabled={statusChangePending} /></div>
-              <div><p className="mb-1 text-[11px] font-semibold text-on-surface-variant">Assignment</p><Badge status={assignmentBadgeStatus(draft)}>{draft.assignmentStatus}</Badge></div>
-              <div className="col-span-2 mt-1 border-t border-outline-variant/25 pt-2 xl:col-span-1 xl:col-start-7 xl:row-start-1 xl:mt-0 xl:border-0 xl:pt-0"><RowActions draft={draft} expanded={expanded} onToggle={() => setExpandedDraftId(expanded ? null : draft.id)} onEdit={onStartEdit} onDelete={onDeleteRequest} deletePending={deleteDraftMutationPending} /></div>
-            </div>
+            <AgreementDraftSummary
+              city={draft.city} hotelName={draft.hotelName} agreementNumber={draft.agreementNumber}
+              muassasahName={draft.muassasahName} stayStart={draft.stayStartIso} stayEnd={draft.stayEndIso}
+              pax={draft.pax} remainingPax={availablePax(draft)} expanded={expanded} first={isFirstDraft} last={isLastDraft}
+              approval={<StatusSelect draft={draft} onChange={onStatusChange} disabled={statusChangePending} />}
+              assignment={<Badge status={assignmentBadgeStatus(draft)}>{draft.assignmentStatus}</Badge>}
+              actions={<RowActions draft={draft} expanded={expanded} onToggle={() => setExpandedDraftId(expanded ? null : draft.id)} onEdit={onStartEdit} onDelete={onDeleteRequest} deletePending={deleteDraftMutationPending} />}
+            />
             {expanded ? <ExpandedGroups draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? ""} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} isLastDraft={isLastDraft} /> : null}
           </article>
         );

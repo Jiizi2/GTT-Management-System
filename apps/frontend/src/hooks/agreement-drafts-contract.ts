@@ -15,6 +15,8 @@ export const backendHotelAgreementDraftRecordSchema = z
     city: z.string().optional(),
     agentName: z.string().nullable().optional(),
     agentId: z.string().optional(),
+    muassasahId: z.string().nullable().optional(),
+    muassasahName: z.string().nullable().optional(),
     agent: z.object({ id: z.string(), code: z.string(), name: z.string() }).optional(),
     groupName: z.string().optional(),
     hotelName: z.string().optional(),

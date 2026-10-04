@@ -4,6 +4,7 @@ import {
 } from "../../groups/dto/hotel-agreement-draft.dto";
 
 export interface HotelAgreementDraftRepository {
+  findForAgent(agentId: string, query?: string): Promise<unknown[]>;
   findAll(query?: string, status?: string, agentId?: string): Promise<unknown[]>;
   create(payload: UpsertHotelAgreementDraftDto): Promise<unknown>;
   update(draftId: string, payload: UpsertHotelAgreementDraftDto): Promise<unknown>;

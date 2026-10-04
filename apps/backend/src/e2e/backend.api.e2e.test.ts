@@ -1631,6 +1631,110 @@ async function testAgentAuthBoundaryAndMutationFirewall(): Promise<void> {
       assert.equal(facetResponse.text.includes("PRIVATE NOTE"), false, `${facet} must not expose internal notes.`);
     }
 
+    const draftBody = { city: "MAKKAH", hotelName: "Agent Hotel", agreementNumber: `AG-${uniqueSuffix}`,
+      groupName: "Agent Group", pax: 25, stayStart: "2026-08-01", stayEnd: "2026-08-05" };
+    const deniedCreate = await requestJson(server.baseUrl, "/api/agent/agreement-drafts", {
+      method: "POST", headers: { cookie: agentCookie, "content-type": "application/json" }, body: JSON.stringify(draftBody),
+    });
+    assert.equal(deniedCreate.status, 403, deniedCreate.text);
+    const emptyAfterDeniedCreate = await requestJson(server.baseUrl, "/api/agent/agreement-drafts", { headers: { cookie: agentCookie } });
+    assert.deepEqual(emptyAfterDeniedCreate.json, []);
+    const adminCreated = await requestJson(server.baseUrl, "/api/visa/agreement-drafts", {
+      method: "POST", headers: { cookie: internalCookie, "content-type": "application/json" }, body: JSON.stringify({ ...draftBody, agentId }),
+    });
+    assert.equal(adminCreated.status, 201, adminCreated.text);
+    const agentDraft = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${(adminCreated.json as { id: string }).id}`, { headers: { cookie: agentCookie } });
+    assert.equal(agentDraft.status, 200, agentDraft.text);
+    const draft = agentDraft.json as { id: string; status: string; editable: boolean };
+    assert.equal(draft.status, "WAITING");
+    assert.equal(draft.editable, false);
+    const muassasahResponse = await requestJson(server.baseUrl, "/api/directory/muassasah", {
+      method: "POST", headers: { cookie: internalCookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: `Muassasah Portal ${uniqueSuffix}` }),
+    });
+    assert.equal(muassasahResponse.status, 201, muassasahResponse.text);
+    const muassasah = muassasahResponse.json as { id: string; name: string };
+    const linkedDraft = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${draft.id}`, {
+      method: "PATCH", headers: { cookie: internalCookie, "content-type": "application/json" },
+      body: JSON.stringify({ ...draftBody, agentId, muassasahId: muassasah.id, notes: "OWN PRIVATE DRAFT NOTE" }),
+    });
+    assert.equal(linkedDraft.status, 200, linkedDraft.text);
+    const readLinked = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, { headers: { cookie: agentCookie } });
+    assert.equal(readLinked.status, 200, readLinked.text);
+    assert.equal((readLinked.json as { muassasahId: string }).muassasahId, muassasah.id);
+    assert.equal((readLinked.json as { muassasahName: string }).muassasahName, muassasah.name);
+    assert.equal(readLinked.text.includes("PRIVATE"), false);
+    const updatedMuassasah = await requestJson(server.baseUrl, `/api/directory/muassasah/${muassasah.id}`, {
+      method: "PATCH", headers: { cookie: internalCookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: `${muassasah.name} Updated`, isActive: false }),
+    });
+    assert.equal(updatedMuassasah.status, 200, updatedMuassasah.text);
+    for (const prohibited of [{ status: "APPROVED" }, { agentId: foreignAgentId }, { groupCode: ownGroupCode }, { muassasahId: null }, { muassasahName: "Forged" }, { notes: "Forged" }]) {
+      const deniedDraft = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, {
+        method: "PATCH", headers: { cookie: agentCookie, "content-type": "application/json" }, body: JSON.stringify({ ...draftBody, ...prohibited }),
+      });
+      assert.equal(deniedDraft.status, 403, deniedDraft.text);
+    }
+    const forgedCreate = await requestJson(server.baseUrl, "/api/agent/agreement-drafts", {
+      method: "POST", headers: { cookie: agentCookie, "content-type": "application/json" }, body: JSON.stringify({ ...draftBody, muassasahId: muassasah.id }),
+    });
+    assert.equal(forgedCreate.status, 403, forgedCreate.text);
+    const deniedRevision = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, {
+      method: "PATCH", headers: { cookie: agentCookie, "content-type": "application/json" }, body: JSON.stringify({ ...draftBody, hotelName: "Revised Agent Hotel" }),
+    });
+    assert.equal(deniedRevision.status, 403, deniedRevision.text);
+    const unchangedDraft = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, { headers: { cookie: agentCookie } });
+    assert.equal((unchangedDraft.json as { hotelName: string }).hotelName, draftBody.hotelName);
+    const adminRevision = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${draft.id}`, {
+      method: "PATCH", headers: { cookie: internalCookie, "content-type": "application/json" },
+      body: JSON.stringify({ ...draftBody, agentId, hotelName: "Revised Admin Hotel", notes: "OWN PRIVATE DRAFT NOTE" }),
+    });
+    assert.equal(adminRevision.status, 200, adminRevision.text);
+    const revised = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, { headers: { cookie: agentCookie } });
+    assert.equal(revised.status, 200, revised.text);
+    assert.equal((revised.json as { muassasahId: string }).muassasahId, muassasah.id);
+    assert.equal((revised.json as { muassasahName: string }).muassasahName, `${muassasah.name} Updated`);
+    assert.equal(revised.text.includes("PRIVATE"), false);
+    const adminDrafts = await requestJson(server.baseUrl, "/api/visa/agreement-drafts?status=all", { headers: { cookie: internalCookie } });
+    assert.ok((adminDrafts.json as Array<{ id: string; hotelName: string }>).some((item) => item.id === draft.id && item.hotelName === "Revised Admin Hotel"));
+    assert.ok((adminDrafts.json as Array<{ id: string; notes: string; muassasahId: string }>).some((item) => item.id === draft.id && item.notes === "OWN PRIVATE DRAFT NOTE" && item.muassasahId === muassasah.id));
+    const otherDraft = await requestJson(server.baseUrl, "/api/visa/agreement-drafts", {
+      method: "POST", headers: { cookie: internalCookie, "content-type": "application/json" },
+      body: JSON.stringify({ ...draftBody, agentId: foreignAgentId, agreementNumber: `FOREIGN-${uniqueSuffix}`, notes: "INTERNAL DRAFT NOTE" }),
+    });
+    assert.equal(otherDraft.status, 201, otherDraft.text);
+    const foreignDraftId = (otherDraft.json as { id: string }).id;
+    const ownedDrafts = await requestJson(server.baseUrl, "/api/agent/agreement-drafts", { headers: { cookie: agentCookie } });
+    assert.equal(ownedDrafts.status, 200, ownedDrafts.text);
+    assert.equal(ownedDrafts.text.includes(foreignDraftId), false);
+    assert.equal(ownedDrafts.text.includes("INTERNAL DRAFT NOTE"), false);
+    assert.equal(ownedDrafts.text.includes("OWN PRIVATE DRAFT NOTE"), false);
+    assert.equal(ownedDrafts.text.includes(`${muassasah.name} Updated`), true);
+    for (const method of ["GET", "PATCH"]) {
+      const denied = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${foreignDraftId}`, {
+        method, headers: { cookie: agentCookie, "content-type": "application/json" },
+        ...(method === "PATCH" ? { body: JSON.stringify(draftBody) } : {}),
+      });
+      assert.equal(denied.status, method === "GET" ? 404 : 403, denied.text);
+    }
+    const allocated = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${draft.id}/assign`, {
+      method: "POST", headers: { cookie: internalCookie, "content-type": "application/json" }, body: JSON.stringify({ groupCode: ownGroupCode }),
+    });
+    assert.equal(allocated.status, 201, allocated.text);
+    const afterAllocation = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, { headers: { cookie: agentCookie } });
+    assert.equal((afterAllocation.json as { editable: boolean }).editable, false);
+    for (const field of ["status", "assignmentStatus", "remainingPax", "muassasahId", "muassasahName"] as const) {
+      assert.equal((afterAllocation.json as Record<string, unknown>)[field], (allocated.json as Record<string, unknown>)[field], `${field} must match Admin after allocation.`);
+    }
+    const blockedEdit = await requestJson(server.baseUrl, `/api/agent/agreement-drafts/${draft.id}`, {
+      method: "PATCH", headers: { cookie: agentCookie, "content-type": "application/json" }, body: JSON.stringify(draftBody),
+    });
+    assert.equal(blockedEdit.status, 403, blockedEdit.text);
+    const invalidDates = await requestJson(server.baseUrl, "/api/agent/agreement-drafts", {
+      method: "POST", headers: { cookie: agentCookie, "content-type": "application/json" }, body: JSON.stringify({ ...draftBody, stayEnd: "2026-07-30" }),
+    });
+    assert.equal(invalidDates.status, 403, invalidDates.text);
+
     const unknownGroupQuery = await requestJson(server.baseUrl, "/api/agent/groups?debug=1", {
       headers: { cookie: agentCookie },
     });

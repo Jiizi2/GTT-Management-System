@@ -778,6 +778,7 @@ async function testInputValidationHelpers(): Promise<void> {
     date: "2026-09-01",
     time: "08:00",
     category: "arrival",
+    transportMode: "flight",
     hotelName: "Makkah Hotel",
     from: "JED Airport",
     to: "Makkah Hotel",
@@ -806,7 +807,7 @@ async function testInputValidationHelpers(): Promise<void> {
   assertEqual(readyState.minimumBusCount, 2);
   assertEqual(readyState.isGroupReadyForItinerary, true);
   assertEqual(readyState.isFormDisabled, false);
-  assertEqual(readyState.showFlightNumberField, true);
+  assertEqual(readyState.showFlightNumberField, false);
 
   const transferTrainState = buildInputItineraryValidationState({
     effectiveGroupCode: "G-TRAIN",
@@ -822,6 +823,7 @@ async function testInputValidationHelpers(): Promise<void> {
       ...baseForm,
       category: "transfer",
       time: "09:00",
+      transportMode: "train",
       transferByTrain: true,
       trainDepartureTime: "09:00",
       destinationPickupTime: "",

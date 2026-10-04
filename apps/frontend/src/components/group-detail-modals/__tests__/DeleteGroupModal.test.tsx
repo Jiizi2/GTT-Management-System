@@ -126,7 +126,7 @@ describe('DeleteGroupModal', () => {
       );
 
       expect(
-        screen.getByText(/This group has 1 linked child group\. Unlink the child group before deleting the parent group\./)
+        screen.getByText(/This group has 1 linked group\. Unlink the group before deleting this group\./)
       ).toBeInTheDocument();
     });
 
@@ -142,7 +142,7 @@ describe('DeleteGroupModal', () => {
       );
 
       expect(
-        screen.getByText(/This group has 3 linked child groups\. Unlink the child groups before deleting the parent group\./)
+        screen.getByText(/This group has 3 linked groups\. Unlink the groups before deleting this group\./)
       ).toBeInTheDocument();
     });
   });

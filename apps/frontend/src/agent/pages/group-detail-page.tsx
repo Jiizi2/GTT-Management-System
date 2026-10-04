@@ -1,5 +1,5 @@
-import { useEffect, type ReactNode } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/page-header";
 import { PageLayout } from "../../components/page-layout";
 import { ReadOnlyIndicator } from "../../components/read-only-indicator";
@@ -10,6 +10,9 @@ import { LoadingState, ResourceErrorState } from "../components/data-state";
 import type { TransportationItem } from "../data/contracts";
 import { formatDate } from "../data/format";
 import { useAgentTripDetail } from "../data/use-agent-trip-detail";
+
+import { ItineraryTimeline } from "../../pages/group-detail/components/ItineraryTimeline";
+import { TravelVisaFacts } from "../components/travel-visa-facts";
 
 type Tone = "complete" | "in-progress" | "waiting" | "attention" | "neutral";
 type ItineraryFocus = "today" | "next" | null;
@@ -38,6 +41,8 @@ export function GroupDetailPage({
   agentId: string;
   agentName: string;
 }) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const identity = useParams().identity ?? "";
@@ -53,6 +58,17 @@ export function GroupDetailPage({
   if (query.isError) return <ResourceErrorState error={query.error} retry={() => void query.refetch()} />;
 
   const { group, transportation } = query.data;
+  const familyGroups = query.data.familyGroups ?? [group];
+  const exportPdf = async () => {
+    if (exporting) return;
+    setExporting(true); setExportError("");
+    try {
+      const { exportGroupDetailPdf } = await import("../../pages/group-detail-export");
+      const saved = await exportGroupDetailPdf({ group, itineraryItems: group.itinerary, noteItems: [], musyrifProfile: group.musyrif, familyGroups });
+      if (!saved) setExportError("PDF belum berhasil dibuat. Silakan coba lagi.");
+    } catch { setExportError("PDF belum berhasil dibuat. Silakan coba lagi."); }
+    finally { setExporting(false); }
+  };
   const lifecycle = lifecycleLabel[group.lifecycleStatus ?? ""] ?? group.status;
 
   return (
@@ -66,19 +82,27 @@ export function GroupDetailPage({
         variant="detail"
         title={<span className="break-all">{group.code}</span>}
         description={<strong className="break-words text-on-surface">{group.name}</strong>}
-        actions={<><StatusBadge tone={group.lifecycleStatus === "ACTIVE" ? "in-progress" : "neutral"}>{lifecycle}</StatusBadge><ReadOnlyIndicator label="Read-only" /></>}
+        actions={<><StatusBadge tone={group.lifecycleStatus === "ACTIVE" ? "in-progress" : "neutral"}>{lifecycle}</StatusBadge><ReadOnlyIndicator label="Read-only" /><button type="button" className="serene-btn-secondary min-h-11" disabled={exporting || group.itinerary.length === 0} onClick={() => void exportPdf()}>{exporting ? "Membuat PDF…" : "Unduh itinerary PDF"}</button></>}
         className="overflow-hidden"
       />
 
+      {exportError ? <p role="alert" className="rounded-xl bg-error-container p-4 text-sm text-on-error-container">{exportError}</p> : null}
+      {familyGroups.length > 1 ? <section className="serene-section p-5 sm:p-6" aria-label="Group terhubung">
+        <h2 className="text-lg font-extrabold">Group terhubung</h2>
+        <p className="mt-2 text-sm text-on-surface-variant">{familyGroups.length} group · {familyGroups.reduce((sum, member) => sum + member.pax, 0)} jamaah. Itinerary, musyrif, dan armada digunakan bersama; visa dan hotel mengikuti masing-masing group.</p>
+        <ul className="mt-4 divide-y divide-outline-variant/30">{familyGroups.map((member) => <li key={member.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><Link className="inline-flex min-h-11 items-center break-all text-sm font-bold text-primary" aria-current={member.code === group.code ? "page" : undefined} to={`/agent/groups/${encodeURIComponent(member.code)}`} state={{ from: backTarget }}>{member.code}</Link><span className="text-sm text-on-surface-variant">{member.pax} jamaah</span></li>)}</ul>
+      </section> : group.parentGroupId ? <p className="text-sm text-on-surface-variant">Itinerary dan armada digunakan bersama group terhubung.</p> : null}
       <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.55fr)]">
         <TripIdentity group={group} />
         <NextActivity group={group} />
       </div>
+      {group.itinerary.length > 0 ? <details className="serene-section p-5 sm:p-6"><summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-primary">Preview itinerary</summary><ItineraryTimeline items={group.itinerary} /></details> : null}
       <ItinerarySection items={group.itinerary} transportation={transportation} />
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.55fr)]">
         <VisaAndHotelSection group={group} />
         <NotesSection notes={group.notes} />
       </div>
+      <TravelVisaFacts visa={group.visaSetup} />
     </PageLayout>
   );
 }
@@ -290,11 +314,7 @@ function DriverColumns({ row }: { row: TransportationItem | null }) {
 function DriverFields({ row }: { row: TransportationItem | null }) {
   return (
     <>
-      <dl className="grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3">
-        <DriverValue label="Driver" value={row ? "—" : "Belum ditugaskan"} />
-        <DriverValue label="Plat" value="—" />
-        <DriverValue label="Telepon" value="—" />
-      </dl>
+      {row?.drivers?.length ? <div className="space-y-3">{row.drivers.map((driver, index) => <dl key={driver.slotNumber ?? index} className="grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3"><DriverValue label="Driver" value={driver.name || "Belum dicatat"} /><DriverValue label="Plat" value={driver.plateNumber || "Belum dicatat"} /><DriverValue label="Telepon" value={driver.phone || "Belum dicatat"} /></dl>)}</div> : <dl className="grid grid-cols-3 gap-3 border-t border-outline-variant/30 pt-3"><DriverValue label="Driver" value={row ? "Belum tersedia" : "Belum ditugaskan"} /><DriverValue label="Plat" value="Belum dicatat" /><DriverValue label="Telepon" value="Belum dicatat" /></dl>}
       {row ? <p className="mt-2 text-xs text-on-surface-variant">{row.verifiedDriverCount}/{row.requiredBusCount} driver terverifikasi</p> : null}
     </>
   );
@@ -341,8 +361,8 @@ function VisaAndHotelSection({ group }: { group: GroupData }) {
             <DetailValue label="Pembayaran" value={visa.paymentStatus === "Paid" ? "Lunas" : visa.paymentStatus === "Partial" ? "Sebagian" : "Belum lunas"} icon="payments" />
           </dl>
           <div className="mt-6 grid border-t border-outline-variant/30 lg:grid-cols-2 lg:divide-x lg:divide-outline-variant/30">
-            <HotelSummary city="Makkah" hotels={visa.makkahHotels} />
-            <HotelSummary city="Madinah" hotels={visa.madinahHotels} />
+            <HotelSummary city="Makkah" hotels={visa.makkahHotels} waived={visa.makkahHotelWaived} />
+            <HotelSummary city="Madinah" hotels={visa.madinahHotels} waived={visa.madinahHotelWaived} />
           </div>
         </div>
       )}
@@ -350,7 +370,7 @@ function VisaAndHotelSection({ group }: { group: GroupData }) {
   );
 }
 
-function HotelSummary({ city, hotels }: { city: string; hotels: GroupAgreementHotel[] }) {
+function HotelSummary({ city, hotels, waived }: { city: string; hotels: GroupAgreementHotel[]; waived?: boolean }) {
   return (
     <div className="py-5 lg:px-5 lg:first:pl-0 lg:last:pr-0">
       <div className="flex items-center gap-2">
@@ -358,7 +378,7 @@ function HotelSummary({ city, hotels }: { city: string; hotels: GroupAgreementHo
         <h3 className="font-extrabold text-on-surface">Hotel {city}</h3>
       </div>
       {hotels.length === 0 ? (
-        <p className="mt-3 text-sm text-on-surface-variant">Hotel agreement belum dicatat.</p>
+        <p className="mt-3 text-sm text-on-surface-variant">{waived ? "Hotel tidak diperlukan sesuai pengaturan group." : "Hotel agreement belum dicatat."}</p>
       ) : (
         <ul className="mt-4 space-y-4">
           {hotels.map((hotel) => (

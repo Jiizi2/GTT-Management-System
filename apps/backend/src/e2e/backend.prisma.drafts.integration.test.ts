@@ -4,6 +4,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ValidationPipe, type INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { PrismaClient, AgreementCity, AgreementApprovalStatus } from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
+import type { PrismaService } from "../prisma/prisma.service";
+import type { GroupsService } from "../groups/application/groups.service";
+import { DirectoryService } from "../directory/directory.service";
+import { AgentAgreementDraftsService } from "../agent-portal-read/agent-agreement-drafts.service";
+import { PrismaHotelAgreementDraftRepository } from "../infrastructure/repositories/prisma/prisma-hotel-agreement-draft.repository";
 
 type StartedServer = {
   baseUrl: string;
@@ -22,6 +28,14 @@ const DEV_AUTH_PASSWORD = process.env.DEV_AUTH_SUPERADMIN_PASSWORD?.trim() || "D
 const GTT_DIRECT_AGENT_ID = "agent_gtt_direct";
 const prisma = new PrismaClient();
 let activeAuthCookie: string | null = null;
+
+function createAgentDraftService() {
+  const client = prisma as unknown as PrismaService;
+  return new AgentAgreementDraftsService(
+    new PrismaHotelAgreementDraftRepository(client, {} as GroupsService),
+    new DirectoryService(new ConfigService({ DATA_SOURCE: "prisma" }), client),
+  );
+}
 
 function restoreEnvVar(key: string, previousValue: string | undefined): void {
   if (previousValue === undefined) {
@@ -182,6 +196,8 @@ async function cleanupOwnedDraftFixtures(): Promise<void> {
       ],
     },
   });
+  await prisma.muassasah.deleteMany({ where: { name: { startsWith: "Muassasah Draft E2E " } } });
+  await prisma.agent.deleteMany({ where: { code: { startsWith: "DRAFT-CONSISTENCY-" } } });
 }
 
 describe("backend prisma hotel agreement drafts integration tests", () => {
@@ -201,6 +217,102 @@ describe("backend prisma hotel agreement drafts integration tests", () => {
     activeAuthCookie = null;
     await server.shutdown();
     await prisma.$disconnect();
+  });
+
+  it("persists Muassasah, rejects unknown references and clears a deleted directory reference", async () => {
+    const muassasah = await prisma.muassasah.create({ data: { name: `Muassasah Draft E2E ${Date.now()}` } });
+    const payload = { agentId: GTT_DIRECT_AGENT_ID, city: "MAKKAH", hotelName: "Muassasah E2E Hotel", agreementNumber: `AGR-E2E-MUASSASAH-${Date.now()}`, pax: 10, stayStart: "2026-10-10", stayEnd: "2026-10-15", muassasahId: muassasah.id };
+    const create = await requestJson(server.baseUrl, "/api/visa/agreement-drafts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    expect(create.status).toBe(201);
+    expect(create.json).toMatchObject({ muassasahId: muassasah.id, muassasahName: muassasah.name, assignmentStatus: "Unassigned" });
+    expect(await prisma.hotelAgreementDraft.findUnique({ where: { id: create.json.id } })).toMatchObject({ muassasahId: muassasah.id });
+    const invalid = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${create.json.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, muassasahId: "missing-muassasah" }) });
+    expect(invalid.status).toBe(404);
+    const cleared = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${create.json.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, muassasahId: null }) });
+    expect(cleared.status).toBe(200);
+    expect(cleared.json.muassasahId).toBeNull();
+    await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${create.json.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    await prisma.muassasah.delete({ where: { id: muassasah.id } });
+    expect(await prisma.hotelAgreementDraft.findUnique({ where: { id: create.json.id } })).toMatchObject({ muassasahId: null });
+    const list = await requestJson(server.baseUrl, `/api/visa/agreement-drafts?q=${payload.agreementNumber}`);
+    expect(list.json).toEqual(expect.arrayContaining([expect.objectContaining({ id: create.json.id, muassasahId: null, muassasahName: null })]));
+  });
+
+  it("shares Admin changes and keeps Agent agreements read-only with private notes filtered", async () => {
+    const agent = createAgentDraftService();
+    const muassasah = await prisma.muassasah.create({ data: { name: `Muassasah Draft E2E ${Date.now()}` } });
+    const input = { city: AgreementCity.MAKKAH, hotelName: "Agent consistency hotel", agreementNumber: `AGR-E2E-CONSISTENCY-${Date.now()}`, groupName: "Agent group", pax: 10, stayStart: "2026-10-05", stayEnd: "2026-10-10" };
+    const payload = { ...input, agentId: GTT_DIRECT_AGENT_ID, muassasahId: muassasah.id, notes: "PRIVATE ADMIN NOTE", status: AgreementApprovalStatus.REJECTED };
+    const created = await requestJson(server.baseUrl, "/api/visa/agreement-drafts", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    });
+    expect(created.status).toBe(201);
+    const id = created.json.id as string;
+    await prisma.muassasah.update({ where: { id: muassasah.id }, data: { name: `${muassasah.name} Renamed`, isActive: false } });
+    const before = await prisma.hotelAgreementDraft.findUnique({ where: { id } });
+    await expect(agent.create()).rejects.toThrow("Pembuatan agreement dilakukan oleh Admin.");
+    await expect(agent.update()).rejects.toThrow("Perubahan agreement dilakukan oleh Admin.");
+    expect(await prisma.hotelAgreementDraft.findUnique({ where: { id } })).toEqual(before);
+    const adminRevision = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, hotelName: "Revised Admin hotel", status: "WAITING" }),
+    });
+    expect(adminRevision.status).toBe(200);
+    const revised = await agent.detail(GTT_DIRECT_AGENT_ID, id);
+    const expected = { muassasahId: muassasah.id, muassasahName: `${muassasah.name} Renamed`, hotelName: "Revised Admin hotel", status: "WAITING", editable: false };
+    expect(revised).toMatchObject(expected);
+    expect(revised).not.toHaveProperty("notes");
+    expect(revised).not.toHaveProperty("hasAllocations");
+    expect(await agent.detail(GTT_DIRECT_AGENT_ID, id)).toMatchObject(expected);
+    expect(await agent.list(GTT_DIRECT_AGENT_ID, input.agreementNumber)).toEqual([expect.objectContaining(expected)]);
+    expect(await prisma.hotelAgreementDraft.findUnique({ where: { id } })).toMatchObject({ muassasahId: muassasah.id, notes: payload.notes });
+    const adminRead = await requestJson(server.baseUrl, `/api/visa/agreement-drafts?q=${input.agreementNumber}`);
+    expect(adminRead.json).toEqual([expect.objectContaining({ muassasahId: muassasah.id, muassasahName: expected.muassasahName, hotelName: expected.hotelName, status: "WAITING", notes: payload.notes })]);
+    await expect(agent.detail("foreign-agent", id)).rejects.toThrow("RESOURCE_NOT_FOUND");
+    const approved = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, status: "APPROVED" }),
+    });
+    expect(approved.status).toBe(200);
+    await expect(agent.update()).rejects.toThrow("Perubahan agreement dilakukan oleh Admin.");
+    await prisma.muassasah.delete({ where: { id: muassasah.id } });
+    expect(await agent.detail(GTT_DIRECT_AGENT_ID, id)).toMatchObject({ muassasahId: null, muassasahName: null, editable: false });
+  });
+
+  it("shares nightly capacity for separate stays and hides legacy foreign allocation identities", async () => {
+    const agent = createAgentDraftService();
+    const suffix = Date.now();
+    const input = { city: AgreementCity.MAKKAH, hotelName: "Nightly capacity hotel", agreementNumber: `AGR-E2E-CAPACITY-${suffix}`, groupName: "Capacity group", pax: 10, stayStart: "2026-10-05", stayEnd: "2026-10-10" };
+    const created = await requestJson(server.baseUrl, "/api/visa/agreement-drafts", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, agentId: GTT_DIRECT_AGENT_ID }),
+    });
+    expect(created.status).toBe(201);
+    const draft = await agent.detail(GTT_DIRECT_AGENT_ID, created.json.id);
+    const codes: string[] = [];
+    for (const [index, start, end] of [[0, "2026-10-05", "2026-10-07"], [1, "2026-10-07", "2026-10-10"]] as const) {
+      const code = `GRP-DRAFT-CAPACITY-${suffix}-${index}`;
+      codes.push(code);
+      const group = await requestJson(server.baseUrl, "/api/groups", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agentId: GTT_DIRECT_AGENT_ID, code, name: code, status: "Active", tone: "ACTIVE", pax: 6, arrivalDate: start, returnDate: end, durationDays: 3, packageName: "QA", timeline: [], itinerary: [] }),
+      });
+      expect(group.status).toBe(201);
+      const assigned = await requestJson(server.baseUrl, `/api/visa/agreement-drafts/${draft.id}/assign`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupCode: code }),
+      });
+      expect(assigned.status).toBe(201);
+      expect(assigned.json).toMatchObject({ remainingPax: 4, assignmentStatus: "Assigned" });
+    }
+    const own = await agent.detail(GTT_DIRECT_AGENT_ID, draft.id);
+    expect(own).toMatchObject({ remainingPax: 4, assignmentStatus: "Assigned", editable: false });
+    expect(own.assignedGroups).toHaveLength(2);
+    // Simulate old data that predates the cross-Agent assignment guard.
+    const foreign = await prisma.agent.create({ data: { code: `DRAFT-CONSISTENCY-${suffix}`, name: "PRIVATE FOREIGN AGENT", type: "PARTNER" } });
+    await prisma.group.updateMany({ where: { code: { in: codes } }, data: { agentId: foreign.id } });
+    const hidden = await agent.detail(GTT_DIRECT_AGENT_ID, draft.id);
+    expect(hidden).toMatchObject({ remainingPax: 4, assignmentStatus: "Assigned", assignedGroups: [], editable: false });
+    expect(JSON.stringify(hidden)).not.toMatch(/GRP-DRAFT|PRIVATE/);
+    const adminRead = await requestJson(server.baseUrl, `/api/visa/agreement-drafts?q=${input.agreementNumber}`);
+    expect(adminRead.json).toEqual([expect.objectContaining({ remainingPax: hidden.remainingPax, assignmentStatus: hidden.assignmentStatus })]);
+    await expect(agent.update()).rejects.toThrow("Perubahan agreement dilakukan oleh Admin.");
   });
 
   it("should perform hotel agreement draft CRUD", async () => {
