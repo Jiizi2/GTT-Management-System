@@ -69,7 +69,7 @@ describe("AgentPortalGroupsService", () => {
     expect(await capture("OTHER-1")).toEqual(await capture("MISSING"));
   });
 
-  it("projects owned group detail while still excluding driver identity and internal itinerary metadata", async () => {
+  it("projects owned driver details while excluding internal itinerary metadata", async () => {
     const store = new GroupMemoryStore();
     store.groups.splice(0, store.groups.length, record("a", "OWN-1", "agent-a"));
     const service = new AgentPortalGroupsService(config("memory"), {} as PrismaService, store);
@@ -89,15 +89,44 @@ describe("AgentPortalGroupsService", () => {
       notes: [],
       itinerary: [{ title: "Scheduled arrival" }],
     });
-    expect(serialized).not.toMatch(/PRIVATE GROUP NOTE|PRIVATE NEXT|PRIVATE META|PRIVATE ITINERARY NOTE|PRIVATE DRIVER|08999|B SECRET/i);
+    expect(serialized).not.toMatch(/PRIVATE GROUP NOTE|PRIVATE NEXT|PRIVATE META|PRIVATE ITINERARY NOTE/i);
+    expect(facets.transportation[0].drivers).toEqual([{ slotNumber: 1, name: "PRIVATE DRIVER", phone: "08999", plateNumber: "B SECRET", isVerified: true }]);
     expect(facets.visa).toMatchObject({ status: "PENDING", syarikah: "PRIVATE SYARIKAH" });
     expect(facets.hotels[0]).toMatchObject({ agreementNumber: "PRIVATE-AGREEMENT" });
     expect(facets.transportation[0]).toMatchObject({ assignedDriverCount: 1, verifiedDriverCount: 1 });
   });
 
+  it("inherits the owned parent schedule but keeps the child visa and hotels", async () => {
+    const store = new GroupMemoryStore();
+    const parent = record("parent", "PARENT", "agent-a");
+    const child = { ...record("child", "CHILD", "agent-a"), parentGroupId: parent.id, itinerary: [], checklistAssignments: [] };
+    child.visaSetup!.visaStatus = "ISSUED";
+    store.groups.splice(0, store.groups.length, parent, child);
+    const service = new AgentPortalGroupsService(config("memory"), {} as PrismaService, store);
+    const detail = await service.detail("agent-a", child.code);
+    expect(detail.parentGroupId).toBe(parent.id);
+    expect(detail.familyGroups.map((group) => group.code)).toEqual(["PARENT", "CHILD"]);
+    expect(detail.itinerary[0].id).toBe("parent-trip");
+    expect((await service.transportation("agent-a", child.code))[0].id).toBe("parent-transport");
+    expect((await service.visa("agent-a", child.code)).status).toBe("ISSUED");
+    expect((await service.hotels("agent-a", child.code))[0].id).toBe("child-hotel");
+  });
+
+  it("does not inherit or expose a legacy parent from another Agent", async () => {
+    const store = new GroupMemoryStore();
+    store.groups.splice(0, store.groups.length, record("other", "OTHER", "agent-b"),
+      { ...record("owned", "OWNED", "agent-a"), parentGroupId: "other", itinerary: [] });
+    const service = new AgentPortalGroupsService(config("memory"), {} as PrismaService, store);
+    const detail = await service.detail("agent-a", "OWNED");
+    expect(detail.parentGroupId).toBeNull();
+    expect(detail.itinerary).toEqual([]);
+    expect(JSON.stringify(detail)).not.toContain("OTHER");
+  });
+
   it("combines tenant and resource identity in Prisma lookups", async () => {
     const prisma = {
       group: {
+        findMany: vi.fn().mockResolvedValue([]),
         findFirst: vi.fn().mockResolvedValue({
           id: "a", code: "OWN-1", name: "Own", lifecycleStatus: "ACTIVE",
           arrivalDate: new Date(), returnDate: new Date(), pax: 1, totalBuses: null, durationDays: 1,
@@ -111,5 +140,24 @@ describe("AgentPortalGroupsService", () => {
     expect(prisma.group.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { agentId: "agent-a", OR: [{ id: "own-1" }, { code: "OWN-1" }] },
     }));
+  });
+
+  it.each(["agent-a", "agent-b"])("validates Prisma parent ownership before sharing its itinerary (%s)", async (parentAgent) => {
+    const parent = { id: "parent", agentId: parentAgent, itinerary: [{ id: "parent-trip", title: "Shared schedule" }],
+      musyrif: { name: "Parent guide", phone: "123", avatar: "" } };
+    const prisma = { group: {
+      findFirst: vi.fn().mockResolvedValue({ id: "child", code: "CHILD", name: "Child", lifecycleStatus: "ACTIVE",
+        arrivalDate: new Date("2026-10-05"), returnDate: new Date("2026-10-08"), pax: 10,
+        parentGroupId: "parent", parentGroup: parent, itinerary: [], notes: [] }),
+      findMany: vi.fn().mockResolvedValue([]),
+    } };
+    const service = new AgentPortalGroupsService(config("prisma"), prisma as unknown as PrismaService, new GroupMemoryStore());
+    const detail = await service.detail("agent-a", "CHILD");
+    expect(detail.parentGroupId).toBe(parentAgent === "agent-a" ? "parent" : null);
+    expect(detail.itinerary).toHaveLength(parentAgent === "agent-a" ? 1 : 0);
+    expect(prisma.group.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      agentId: "agent-a", OR: [{ id: parentAgent === "agent-a" ? "parent" : "child" },
+        { parentGroupId: parentAgent === "agent-a" ? "parent" : "child" }],
+    } }));
   });
 });

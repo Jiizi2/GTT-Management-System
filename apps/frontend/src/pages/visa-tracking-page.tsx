@@ -31,7 +31,12 @@ export function VisaTrackingScreen({
 
   const [agentFilter, setAgentFilter] = useState("all");
   const scopedGroups = agentFilter === "all" ? groups : groups.filter((group) => group.agentId === agentFilter);
-  const state = useVisaTracking({ groups: scopedGroups });
+  const state = useVisaTracking({
+    groups: scopedGroups,
+    agentLabel:
+      fixedAgentName ||
+      (agentFilter === "all" ? "Semua agent" : scopedGroups[0]?.agent?.name?.trim() || "Agent belum ditentukan"),
+  });
 
   const {
     query,

@@ -244,6 +244,9 @@ Setelah domain siap, set:
 
 ## Step 7: Update Aplikasi
 
+Untuk rilis Portal Agent dan pembuatan satu akun percobaan pada Partner Agent
+dengan grup terbanyak, ikuti [panduan update VPS dan seed akun uji](operations/update-vps-agent-portal-20261004.md).
+
 Saat ada rilis baru:
 
 ```bash

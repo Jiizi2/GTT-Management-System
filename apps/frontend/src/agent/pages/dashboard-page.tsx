@@ -1,334 +1,428 @@
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { PageHeader } from "../../components/page-header";
-import { PageLayout } from "../../components/page-layout";
-import type { Dashboard, GroupSummary } from "../data/contracts";
-import { formatDate } from "../data/format";
+import type { Dashboard } from "../data/contracts";
+import { getAllAgentGroups } from "../data/all-groups-query";
+import { groupAgentFamilies } from "../data/group-families";
+import {
+  calendarDays,
+  departureDateLabel,
+  departureJourneys,
+  jakartaToday,
+  monthLabel,
+  shiftCalendarMonth,
+  type DepartureJourney,
+} from "../data/departure-calendar";
 import { portalGet } from "../data/portal-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
 import { ErrorState, LoadingState } from "../components/data-state";
-
+import { DepartureMonthPicker } from "../components/departure-month-picker";
+import { StatusBadge } from "../../components/status-badge";
+import { formatDate } from "../data/format";
+import { checklistDateRange, checklistInRange, checklistReady, getAgentChecklist } from "../data/h1-checklist";
 const number = new Intl.NumberFormat("id-ID");
-
+const weekdays = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 export function DashboardPage({ principalId, agentName }: { principalId: string; agentName: string }) {
   const client = useQueryClient();
+  const [today] = useState(jakartaToday);
+  const [month, setMonth] = useState(() => today.slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const query = useQuery({
     queryKey: agentQueryKeys.dashboard(principalId),
     queryFn: () => portalGet<Dashboard>(client, "/dashboard"),
     staleTime: 30_000,
   });
-
+  const groupsQuery = useQuery({
+    queryKey: agentQueryKeys.groups(principalId, "departure-calendar"),
+    queryFn: () => getAllAgentGroups(client),
+    staleTime: 30_000,
+  });
+  const checklistQuery = useQuery({
+    queryKey: agentQueryKeys.checklist(principalId),
+    queryFn: () => getAgentChecklist(client, groupsQuery.data ?? []),
+    enabled: groupsQuery.isSuccess,
+    staleTime: 30_000,
+  });
+  const checklist = useMemo(() => {
+    const range = checklistDateRange(today);
+    return (checklistQuery.data ?? [])
+      .filter((row) => checklistInRange(row, range))
+      .sort((a, b) => Number(checklistReady(a)) - Number(checklistReady(b)));
+  }, [checklistQuery.data, today]);
+  const readyCount = checklist.filter(checklistReady).length;
+  const departures = useMemo(() => departureJourneys(groupsQuery.data ?? []), [groupsQuery.data]);
+  const journeys = departures.filter((journey) => journey.date.startsWith(month));
+  const agenda = selectedDate ? journeys.filter((journey) => journey.date === selectedDate) : journeys;
+  const days = calendarDays(month);
+  const chooseMonth = (next: string) => {
+    setMonth(next);
+    setSelectedDate(null);
+  };
+  const selectDate = (date: string) => setSelectedDate((selected) => (selected === date ? null : date));
   if (query.isPending) return <LoadingState label="Memuat dashboard..." />;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
-
   const dashboard = query.data;
-  const attentionCount = dashboard.attention.visaGroups + dashboard.attention.hotelGroups;
   return (
-    <PageLayout>
-      <PageHeader
-        title="Dashboard"
-        description={
-          <>
-            Ringkasan statistik group yang ditangani oleh <strong className="text-on-surface">{agentName}</strong>.
-          </>
-        }
-        actions={<DashboardJourneyOrnament />}
-        className="relative overflow-hidden xl:pr-20"
-      />
-
-      <section className="serene-section overflow-hidden" aria-labelledby="group-summary-title">
-        <div className="grid lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,2.2fr)]">
-          <div className="relative flex min-h-48 flex-col justify-between overflow-hidden bg-primary px-5 py-6 text-on-primary sm:px-7">
-            <span
-              className="material-symbols-outlined pointer-events-none absolute -bottom-6 -right-3 rotate-[-10deg] text-[8rem] leading-none text-on-primary/20"
-              aria-hidden="true"
-            >
-              luggage
-            </span>
-            <div>
-              <h2 id="group-summary-title" className="text-sm font-bold text-on-primary/80">
-                Total group ditangani
-              </h2>
-              <strong className="mt-3 block text-5xl font-extrabold leading-none tabular-nums">
-                {number.format(dashboard.groups.total)}
-              </strong>
-            </div>
-            <Link
-              to="/agent/groups"
-              className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl bg-on-primary px-4 py-2 text-sm font-bold text-primary transition hover:bg-on-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary"
-            >
-              Buka Perjalanan
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">
-                arrow_forward
-              </span>
-            </Link>
-          </div>
-
-          <dl className="grid grid-cols-2 sm:grid-cols-4">
-            <DashboardValue label="Aktif" value={dashboard.groups.active} icon="travel_explore" />
-            <DashboardValue label="Akan datang" value={dashboard.groups.upcoming} icon="event_upcoming" />
-            <DashboardValue label="Selesai" value={dashboard.groups.completed} icon="task_alt" />
-            <DashboardValue label="Diarsipkan" value={dashboard.groups.archived} icon="inventory_2" />
-          </dl>
+    <div className="agent-calendar-dashboard">
+      <div className="agent-dashboard-heading">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Ringkasan perjalanan dan jadwal keberangkatan Anda.</p>
         </div>
-      </section>
-
-      <div className="grid min-w-0 gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-        <section className="serene-section min-w-0 overflow-hidden p-0" aria-labelledby="operational-summary-title">
-          <div className="bg-surface-container-high px-5 py-5 sm:px-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <h2 id="operational-summary-title" className="text-xl font-extrabold text-on-surface">
-                  {attentionCount > 0 ? `${number.format(attentionCount)} catatan perhatian` : "Operasional terkendali"}
-                </h2>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  {attentionCount > 0
-                    ? "Prioritas yang perlu dipantau dari data operasional terkini."
-                    : "Belum ada perhatian visa atau hotel pada data saat ini."}
-                </p>
-              </div>
-              <span className="material-symbols-outlined text-3xl text-primary" aria-hidden="true">
-                route
-              </span>
+        <p className="agent-dashboard-period">{monthLabel(month)}</p>
+      </div>
+      <dl className="agent-dashboard-stats" aria-label="Ringkasan statistik">
+        <Metric
+          label="perjalanan"
+          value={
+            dashboard.groups.journeys ?? (groupsQuery.data ? groupAgentFamilies(groupsQuery.data).length : undefined)
+          }
+          icon="luggage"
+          description="Total perjalanan Anda."
+        />
+        <Metric label="group" value={dashboard.groups.total} icon="groups" description="Total group yang ditangani." />
+        <Metric
+          label="jamaah"
+          value={dashboard.groups.totalPax}
+          icon="groups"
+          description="Total jamaah di seluruh group."
+        />
+      </dl>
+      <div className="agent-dashboard-workspace">
+        <section className="agent-calendar-panel" aria-labelledby="departure-calendar-title">
+          <div className="agent-calendar-header">
+            <div>
+              <h2 id="departure-calendar-title">Kalender keberangkatan</h2>
+              <p>Jadwal keberangkatan group pada bulan ini.</p>
+            </div>
+            <div className="agent-month-controls">
+              <button
+                type="button"
+                className="agent-month-arrow"
+                aria-label="Bulan sebelumnya"
+                disabled={month === "1000-01"}
+                onClick={() => chooseMonth(shiftCalendarMonth(month, -1))}
+              >
+                <Icon icon="chevron_left" />
+              </button>
+              <DepartureMonthPicker value={month} currentMonth={today.slice(0, 7)} onChange={chooseMonth} />
+              <button
+                type="button"
+                className="agent-month-arrow"
+                aria-label="Bulan berikutnya"
+                disabled={month === "9999-12"}
+                onClick={() => chooseMonth(shiftCalendarMonth(month, 1))}
+              >
+                <Icon icon="chevron_right" />
+              </button>
             </div>
           </div>
-
-          <div className="divide-y divide-outline-variant/30 px-5 sm:px-6">
-            <OperationalValue
-              label="Perhatian visa"
+          {groupsQuery.isPending ? (
+            <LoadingState label="Memuat jadwal keberangkatan…" />
+          ) : groupsQuery.isError ? (
+            <ErrorState retry={() => void groupsQuery.refetch()} />
+          ) : (
+            <>
+              <div className="agent-calendar-grid">
+                <table aria-label={`Kalender keberangkatan ${monthLabel(month)}`}>
+                  <thead>
+                    <tr>
+                      {weekdays.map((day) => (
+                        <th key={day} scope="col">
+                          {day}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: days.length / 7 }, (_, week) => (
+                      <tr key={week}>
+                        {days.slice(week * 7, week * 7 + 7).map((day) => {
+                          const events = journeys.filter((journey) => journey.date === day.date);
+                          return (
+                            <td
+                              key={day.date}
+                              className={`${!day.inMonth ? "is-adjacent" : ""} ${day.date === selectedDate ? "is-selected" : ""}`}
+                            >
+                              {day.inMonth ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="agent-calendar-day"
+                                    aria-label={`Lihat jadwal ${departureDateLabel(day.date)}`}
+                                    aria-pressed={selectedDate === day.date}
+                                    aria-current={day.date === today ? "date" : undefined}
+                                    onClick={() => selectDate(day.date)}
+                                  >
+                                    {day.day}
+                                  </button>
+                                  <div className="agent-calendar-events">
+                                    {events.slice(0, 2).map((journey) => (
+                                      <Link
+                                        key={journey.root.id}
+                                        to={`/agent/groups/${encodeURIComponent(journey.root.code)}`}
+                                        state={{ from: "/agent/overview" }}
+                                        className="agent-calendar-event"
+                                        aria-label={`Buka ${journey.root.name}, ${journey.root.code}, ${departureDateLabel(journey.date)}, ${journey.pax} jamaah${journey.dateSource === "journey" ? ", tanggal awal perjalanan" : ""}`}
+                                      >
+                                        <span className="agent-event-dot" aria-hidden="true" />
+                                        <span>
+                                          {journey.root.code} · {number.format(journey.pax)}
+                                        </span>
+                                      </Link>
+                                    ))}
+                                    {events.length > 2 ? (
+                                      <button
+                                        type="button"
+                                        className="agent-calendar-more"
+                                        onClick={() => selectDate(day.date)}
+                                        aria-label={`Lihat semua ${events.length} perjalanan pada ${departureDateLabel(day.date)}`}
+                                      >
+                                        +{events.length - 2} lainnya
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </>
+                              ) : null}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {journeys.some((journey) => journey.dateSource === "journey") ? (
+                <p className="agent-calendar-note">
+                  Tanggal awal perjalanan digunakan saat jadwal penerbangan belum tersedia.
+                </p>
+              ) : null}
+              {journeys.length === 0 ? (
+                <p className="agent-calendar-note">Belum ada jadwal pada {monthLabel(month)}.</p>
+              ) : null}
+            </>
+          )}
+        </section>
+        <div className="agent-dashboard-sidebar">
+          <section className="agent-agenda-panel" aria-labelledby="departure-agenda-title">
+            <div className="agent-agenda-header">
+              <h2 id="departure-agenda-title">{month < today.slice(0, 7) ? "Jadwal bulan ini" : "Jadwal mendatang"}</h2>
+              <p>{selectedDate ? departureDateLabel(selectedDate) : "Daftar keberangkatan pada bulan ini."}</p>
+              {selectedDate ? (
+                <button type="button" className="agent-text-button" onClick={() => setSelectedDate(null)}>
+                  Semua tanggal
+                </button>
+              ) : null}
+            </div>
+            {groupsQuery.isPending ? (
+              <LoadingState label="Memuat agenda…" />
+            ) : groupsQuery.isError ? (
+              <p className="agent-calendar-note">Jadwal belum dapat dimuat. Coba kembali melalui kalender.</p>
+            ) : agenda.length ? (
+              <ul className="agent-departure-agenda" key={`${month}:${selectedDate ?? "all"}`}>
+                {agenda.map((journey) => (
+                  <AgendaJourney key={journey.root.id} journey={journey} />
+                ))}
+              </ul>
+            ) : (
+              <div className="agent-agenda-empty">
+                <Icon icon="event_upcoming" />
+                <h3>{selectedDate ? "Tidak ada keberangkatan" : "Jadwal berikutnya belum tersedia"}</h3>
+                <p>
+                  Belum ada keberangkatan pada {selectedDate ? departureDateLabel(selectedDate) : monthLabel(month)}.
+                </p>
+                <Link to="/agent/groups">
+                  Lihat Perjalanan <Icon icon="arrow_forward" />
+                </Link>
+              </div>
+            )}
+          </section>
+          <section className="agent-attention-panel" aria-labelledby="agent-attention-title">
+            <h2 id="agent-attention-title">Perlu perhatian</h2>
+            <p>Group yang perlu ditindaklanjuti berdasarkan data operasional.</p>
+            <Attention
+              label="Group perlu perhatian visa"
               description="Periksa progres dan kelengkapan dokumen."
               value={dashboard.attention.visaGroups}
               icon="description"
               to="/agent/visa"
+              tone="visa"
             />
-            <OperationalValue
-              label="Perhatian hotel"
+            <Attention
+              label="Group perlu perhatian hotel"
               description="Tinjau kesiapan agreement perjalanan."
               value={dashboard.attention.hotelGroups}
               icon="hotel"
               to="/agent/groups"
+              tone="hotel"
             />
-            <OperationalValue
-              label="Jamaah dipantau"
-              description="Total jamaah di seluruh group Anda."
-              value={dashboard.groups.totalPax}
-              icon="groups"
-            />
-          </div>
-
-          <div className="px-5 pb-5 pt-2 sm:px-6 sm:pb-6">
-            <Link to="/agent/visa" className="serene-btn-secondary min-h-11 w-full justify-center">
-              Lihat Visa Tracking
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">
-                arrow_forward
-              </span>
-            </Link>
-          </div>
-        </section>
-
-        <section className="serene-section flex min-w-0 flex-col p-5 sm:p-6" aria-labelledby="upcoming-groups-title">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <h2 id="upcoming-groups-title" className="text-xl font-extrabold text-on-surface">
-                Group mendatang
-              </h2>
-              <p className="mt-1 text-sm text-on-surface-variant">Jadwal terdekat dari ringkasan Dashboard.</p>
-            </div>
-            {dashboard.upcomingGroups.length > 0 ? (
-              <Link
-                className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline-offset-4 hover:underline"
-                to="/agent/groups"
-              >
-                Lihat semua
-              </Link>
-            ) : null}
-          </div>
-
-          {dashboard.upcomingGroups.length > 0 ? (
-            <ul className="mt-5 divide-y divide-outline-variant/30">
-              {dashboard.upcomingGroups.slice(0, 4).map((group) => (
-                <UpcomingGroup key={group.id} group={group} />
-              ))}
-            </ul>
-          ) : (
-            <DashboardEmptyState
-              icon="event_upcoming"
-              title="Jadwal berikutnya belum tersedia"
-              description="Perjalanan yang memiliki tanggal keberangkatan mendatang akan muncul di area ini."
-            />
-          )}
-        </section>
+          </section>
+        </div>
       </div>
-
-      <section className="serene-section p-5 sm:p-6" aria-labelledby="recent-activity-title">
-        <h2 id="recent-activity-title" className="text-xl font-extrabold text-on-surface">
-          Aktivitas terbaru
-        </h2>
-        <p className="mt-1 text-sm text-on-surface-variant">Aktivitas itinerary yang tercatat untuk group Anda.</p>
-
-        {dashboard.recentTimeline.length > 0 ? (
-          <ol className="mt-5 grid gap-x-8 gap-y-1 md:grid-cols-2">
-            {dashboard.recentTimeline.slice(0, 6).map((item, index) => (
-              <li
-                key={`${item.group.id}-${item.dateLabel}-${index}`}
-                className="flex gap-3 border-b border-outline-variant/25 py-4"
-              >
-                <span
-                  className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.isCurrent ? "bg-primary" : "bg-outline"}`}
-                  aria-hidden="true"
-                />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-primary">
-                    {item.group.code} · {item.dateLabel}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-on-surface">{item.title}</p>
-                  <p className="mt-1 truncate text-xs text-on-surface-variant">{item.group.name}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+      <section className="agent-dashboard-history" aria-labelledby="agent-history-title">
+        <div className="agent-history-heading">
+          <h2 id="agent-history-title">H-1 Checklist</h2>
+          <Link to="/agent/checklist">
+            Lihat checklist <Icon icon="arrow_forward" />
+          </Link>
+        </div>
+        <p className="agent-history-description">Kesiapan driver untuk perjalanan hari ini, besok, dan lusa.</p>
+        {groupsQuery.isError || checklistQuery.isError ? (
+          <ErrorState retry={() => void (groupsQuery.isError ? groupsQuery.refetch() : checklistQuery.refetch())} />
+        ) : groupsQuery.isPending || checklistQuery.isPending ? (
+          <LoadingState label="Memuat checklist H-1…" />
         ) : (
-          <DashboardEmptyState
-            icon="route"
-            title="Belum ada aktivitas itinerary"
-            description="Perubahan itinerary terbaru akan dirangkum di sini agar mudah dipantau."
-          />
+          <>
+            <dl className="agent-lifecycle-summary" aria-label="Kesiapan H-1">
+              {[
+                { label: "Perlu perhatian", value: checklist.length - readyCount },
+                { label: "Siap", value: readyCount },
+                { label: "Jadwal", value: checklist.length },
+              ].map((item) => (
+                <div key={item.label}>
+                  <dt>{item.label}</dt>
+                  <dd>{number.format(item.value)}</dd>
+                </div>
+              ))}
+            </dl>
+            {checklist.length ? (
+              <ol className="agent-recent-timeline">
+                {checklist.slice(0, 6).map((item) => (
+                  <li key={item.id}>
+                    <div>
+                      <p>
+                        {item.group.code} · {formatDate(item.tripDate)}
+                        {item.scheduledTime ? ` · ${item.scheduledTime}` : ""}
+                      </p>
+                      <strong>
+                        <Link
+                          to={`/agent/groups/${encodeURIComponent(item.group.code)}`}
+                          state={{ from: "/agent/overview" }}
+                        >
+                          {item.activity} · {item.tripLabel}
+                        </Link>
+                      </strong>
+                      <span>{item.group.name}</span>
+                      <div className="agent-checklist-readiness">
+                        <StatusBadge tone={checklistReady(item) ? "complete" : "attention"}>
+                          {checklistReady(item) ? "Siap" : "Perlu perhatian"}
+                        </StatusBadge>
+                        <span>
+                          {item.verifiedDriverCount}/{item.requiredBusCount} driver terverifikasi
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="agent-history-empty">Tidak ada jadwal checklist untuk hari ini, besok, atau lusa.</p>
+            )}
+          </>
         )}
       </section>
-    </PageLayout>
+      <p className="agent-dashboard-owner">Ruang kerja {agentName}</p>
+    </div>
   );
 }
-
-function DashboardValue({ label, value, icon }: { label: string; value: number; icon: string }) {
+function Icon({ icon }: { icon: string }) {
   return (
-    <div className="flex min-h-32 flex-col justify-between border-b border-outline-variant/30 p-4 even:border-l sm:min-h-40 sm:p-5 lg:border-b-0 lg:border-l lg:first:border-l-0">
-      <span className="material-symbols-outlined text-2xl text-primary" aria-hidden="true">
-        {icon}
+    <span className="material-symbols-outlined" aria-hidden="true">
+      {icon}
+    </span>
+  );
+}
+function Metric({
+  label,
+  value,
+  icon,
+  description,
+}: {
+  label: string;
+  value: number | undefined;
+  icon: string;
+  description: string;
+}) {
+  return (
+    <div className="agent-dashboard-metric">
+      <span className="agent-metric-icon">
+        <Icon icon={icon} />
       </span>
       <div>
-        <dd className="text-3xl font-extrabold leading-none text-on-surface tabular-nums">{number.format(value)}</dd>
-        <dt className="mt-2 text-xs font-bold text-on-surface-variant">{label}</dt>
+        <div className="agent-metric-value">
+          <dd>{value === undefined ? "—" : number.format(value)}</dd>
+          <dt>{label}</dt>
+        </div>
+        <p>{description}</p>
       </div>
     </div>
   );
 }
-
-function DashboardJourneyOrnament() {
+function AgendaJourney({ journey }: { journey: DepartureJourney }) {
+  const date = new Date(`${journey.date}T12:00:00Z`);
+  const shortMonth = new Intl.DateTimeFormat("id-ID", { month: "short", year: "numeric", timeZone: "UTC" }).format(
+    date,
+  );
+  const dayName = new Intl.DateTimeFormat("id-ID", { weekday: "short", timeZone: "UTC" }).format(date);
   return (
-    <div className="hidden min-w-64 items-center self-stretch xl:flex" aria-hidden="true">
-      <div className="relative flex w-full items-center justify-between px-2">
-        <span className="absolute left-8 right-8 top-1/2 border-t-2 border-dashed border-primary/20" />
-        {[
-          ["description", "bg-primary text-on-primary"],
-          ["hotel", "bg-surface-container-high text-primary"],
-          ["flight_takeoff", "bg-primary-container text-on-primary-container"],
-        ].map(([icon, tone]) => (
-          <span
-            key={icon}
-            className={`relative flex h-12 w-12 items-center justify-center rounded-full shadow-sm ${tone}`}
-          >
-            <span className="material-symbols-outlined text-[1.35rem] leading-none">{icon}</span>
+    <li>
+      <Link
+        to={`/agent/groups/${encodeURIComponent(journey.root.code)}`}
+        state={{ from: "/agent/overview" }}
+        className="agent-agenda-journey"
+        aria-label={`Lihat perjalanan ${journey.root.code}, ${journey.root.name}, ${departureDateLabel(journey.date)}${journey.dateSource === "journey" ? ", tanggal awal perjalanan" : ""}`}
+      >
+        <time dateTime={journey.date} className="agent-agenda-date">
+          <strong>{Number(journey.date.slice(8))}</strong>
+          <span>{shortMonth}</span>
+          <span>{dayName}</span>
+        </time>
+        <div className="agent-agenda-details">
+          <span className="agent-agenda-code">{journey.root.code}</span>
+          <strong>{journey.root.name}</strong>
+          <span className="agent-agenda-counts">
+            <span>
+              <Icon icon="groups" />
+              {number.format(journey.pax)} jamaah
+            </span>
+            <span>
+              <Icon icon="groups" />
+              {number.format(journey.members.length)} group
+            </span>
           </span>
-        ))}
-      </div>
-    </div>
+          {journey.dateSource === "journey" ? <span className="agent-date-source">Awal perjalanan</span> : null}
+        </div>
+        <Icon icon="arrow_forward" />
+      </Link>
+    </li>
   );
 }
-
-function OperationalValue({
+function Attention({
   label,
   description,
   value,
   icon,
   to,
+  tone,
 }: {
   label: string;
   description: string;
   value: number;
   icon: string;
-  to?: string;
+  to: string;
+  tone: string;
 }) {
-  const content = (
-    <>
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-primary">
-        <span className="material-symbols-outlined text-xl" aria-hidden="true">
-          {icon}
-        </span>
+  return (
+    <Link to={to} className="agent-attention-row">
+      <span className={`agent-attention-icon ${tone}`}>
+        <Icon icon={icon} />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-on-surface">{label}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-on-surface-variant">{description}</span>
+      <span className="agent-attention-copy">
+        <strong>{label}</strong>
+        <span>{description}</span>
       </span>
-      <strong className="text-2xl font-extrabold text-on-surface tabular-nums">{number.format(value)}</strong>
-      {to ? (
-        <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">
-          arrow_forward
-        </span>
-      ) : null}
-    </>
-  );
-
-  return (
-    <div className="py-1">
-      {to ? (
-        <Link
-          to={to}
-          className="flex min-h-20 items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          {content}
-        </Link>
-      ) : (
-        <div className="flex min-h-20 items-center gap-3 px-2 py-3">{content}</div>
-      )}
-    </div>
-  );
-}
-
-function UpcomingGroup({ group }: { group: GroupSummary }) {
-  return (
-    <li className="flex items-center justify-between gap-4 py-4">
-      <div className="min-w-0">
-        <p className="text-xs font-bold text-primary">{group.code}</p>
-        <p className="mt-1 truncate text-sm font-bold text-on-surface">{group.name}</p>
-        <p className="mt-1 text-xs text-on-surface-variant">
-          {formatDate(group.arrivalDate)} – {formatDate(group.returnDate)}
-        </p>
-        <p className="mt-1 truncate text-xs font-semibold text-on-surface-variant">
-          {group.packageName} · {number.format(group.pax)} jamaah
-        </p>
-      </div>
-      <Link
-        to={`/agent/groups/${encodeURIComponent(group.code)}`}
-        state={{ from: "/agent/overview" }}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary transition hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        aria-label={`Buka itinerary ${group.code}`}
-      >
-        <span className="material-symbols-outlined" aria-hidden="true">
-          arrow_forward
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-function DashboardEmptyState({ icon, title, description }: { icon: string; title: string; description: string }) {
-  return (
-    <div className="mt-5 flex min-h-40 flex-1 flex-col justify-between gap-5 rounded-2xl bg-surface-container-low p-5 sm:flex-row sm:items-end">
-      <div className="max-w-lg">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container-high text-primary">
-          <span className="material-symbols-outlined text-2xl" aria-hidden="true">
-            {icon}
-          </span>
-        </span>
-        <h3 className="mt-4 text-base font-extrabold text-on-surface">{title}</h3>
-        <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">{description}</p>
-      </div>
-      <Link to="/agent/groups" className="serene-btn-secondary min-h-11 shrink-0 justify-center">
-        Lihat Perjalanan
-        <span className="material-symbols-outlined text-lg" aria-hidden="true">
-          arrow_forward
-        </span>
-      </Link>
-    </div>
+      <strong className="agent-attention-value">{number.format(value)}</strong>
+      <Icon icon="arrow_forward" />
+    </Link>
   );
 }

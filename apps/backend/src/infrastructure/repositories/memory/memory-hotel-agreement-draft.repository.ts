@@ -16,6 +16,7 @@ type MemoryHotelAgreementDraft = {
   city: UpsertHotelAgreementDraftDto["city"];
   agentName?: string;
   agentId: string;
+  muassasahId?: string | null;
   groupName: string;
   hotelName: string;
   agreementNumber: string;
@@ -75,8 +76,8 @@ function doesHotelSnapshotMatchDraftIgnoringPax(
   draft: Pick<MemoryHotelAgreementDraft, "id" | "agreementNumber" | "city" | "hotelName">,
 ): boolean {
   const sourceDraftId = readText(h.sourceDraftId);
-  if (sourceDraftId && sourceDraftId === draft.id) {
-    return true;
+  if (sourceDraftId) {
+    return sourceDraftId === draft.id;
   }
 
   const numberMatch =
@@ -176,6 +177,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     return {
       city: payload.city,
       agentId: payload.agentId?.trim() || "agent_gtt_direct",
+      ...(payload.muassasahId !== undefined ? { muassasahId: payload.muassasahId?.trim() || null } : {}),
       agentName: payload.agentId === "agent_gtt_direct" || !payload.agentId ? "GTT Direct" : undefined,
       groupName: payload.groupName?.trim() || "",
       hotelName: payload.hotelName.trim(),
@@ -218,6 +220,7 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
       id: draft.id,
       city: draft.city,
       agentName: draft.agentName,
+      muassasahId: draft.muassasahId ?? null,
       groupName: draft.groupName,
       hotelName: draft.hotelName,
       agreementNumber: draft.agreementNumber,
@@ -238,8 +241,9 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
 
   private async getMemoryDraftRemainingAndGroups(
     draft: MemoryHotelAgreementDraft,
+    groupSnapshots?: GroupSnapshot[],
   ): Promise<{ remainingPax: number; assignedGroups: Array<{ groupCode: string; pax: number }> }> {
-    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
+    const groups = groupSnapshots ?? ((await this.groupsService.findAll()) as GroupSnapshot[]);
     const assignedAgreements: Array<{ groupCode: string; pax: number; stayStart: string; stayEnd: string }> = [];
     
     for (const g of groups) {
@@ -277,6 +281,35 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     };
   }
 
+  private readonly draftLocks = new Map<string, Promise<void>>();
+
+  private async withDraftLock<T>(id: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.draftLocks.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    this.draftLocks.set(id, current);
+    await previous;
+    try { return await action(); }
+    finally { release(); if (this.draftLocks.get(id) === current) this.draftLocks.delete(id); }
+  }
+
+  async findForAgent(agentId: string, query?: string): Promise<unknown[]> {
+    const term = query?.trim().toLowerCase() ?? "";
+    const drafts = this.memoryDrafts.filter((draft) => draft.agentId === agentId &&
+      (!term || `${draft.hotelName} ${draft.agreementNumber} ${draft.groupName}`.toLowerCase().includes(term)));
+    const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
+    const owned = new Set(groups
+      .filter((group) => group.agentId === agentId).map((group) => readText(group.code)));
+    return Promise.all(drafts.map(async (draft) => {
+      const allocation = await this.getMemoryDraftRemainingAndGroups(draft, groups);
+      return {
+        ...this.mapMemoryDraft(draft, allocation.remainingPax,
+          allocation.assignedGroups.filter((item) => owned.has(item.groupCode))),
+        hasAllocations: allocation.assignedGroups.length > 0,
+      };
+    }));
+  }
+
   async findAll(query?: string, rawStatus?: string, agentId?: string): Promise<unknown[]> {
     const status = this.normalizeStatusFilter(rawStatus);
     const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
@@ -288,45 +321,27 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
     }
 
     const groups = (await this.groupsService.findAll()) as GroupSnapshot[];
-    const assignedPaxMap = new Map<string, number>();
-    const assignedGroupsMap = new Map<string, Array<{ groupCode: string; pax: number }>>();
-
-    for (const g of groups) {
-      const code = readText(g.code);
-      if (!code) continue;
-      const agreements = g.visaSetup?.hotelAgreements ?? [];
-      for (const h of agreements) {
-        const key = `${readText(h.city).toUpperCase()}_${readText(h.agreementNumber).trim().toUpperCase()}`;
-        const prevPax = assignedPaxMap.get(key) ?? 0;
-        assignedPaxMap.set(key, prevPax + (readNumber(h.pax) ?? 0));
-
-        const prevGroups = assignedGroupsMap.get(key) ?? [];
-        prevGroups.push({ groupCode: code, pax: readNumber(h.pax) ?? 0 });
-        assignedGroupsMap.set(key, prevGroups);
-      }
-    }
-
+    const drafts = await Promise.all(this.memoryDrafts
+      .filter((draft) => !agentId || draft.agentId === agentId)
+      .map(async (draft) => {
+        const allocation = await this.getMemoryDraftRemainingAndGroups(draft, groups);
+        return this.mapMemoryDraft(draft, allocation.remainingPax, allocation.assignedGroups);
+      }));
     const normalizedQuery = query?.trim().toLowerCase() ?? "";
-    return this.memoryDrafts
+    return drafts
       .filter((draft) => {
-        if (agentId && draft.agentId !== agentId) return false;
-        if (status === "assigned" && !draft.groupCode) {
-          // In memory, draft.groupCode might be checked or we check assignedGroupsMap
-          const key = `${draft.city.toUpperCase()}_${draft.agreementNumber.trim().toUpperCase()}`;
-          const isAssigned = (assignedGroupsMap.get(key) ?? []).length > 0;
+        const assigned = draft.assignedGroups ?? [];
+        const isAssigned = assigned.length > 0;
+        if (status === "assigned") {
           if (!isAssigned) return false;
         }
         if (status === "unassigned") {
-          const key = `${draft.city.toUpperCase()}_${draft.agreementNumber.trim().toUpperCase()}`;
-          const isAssigned = (assignedGroupsMap.get(key) ?? []).length > 0;
-          if (isAssigned) return false;
+          if (draft.status !== AgreementApprovalStatus.REJECTED && isAssigned) return false;
         }
         if (!normalizedQuery) {
           return true;
         }
 
-        const key = `${draft.city.toUpperCase()}_${draft.agreementNumber.trim().toUpperCase()}`;
-        const assigned = assignedGroupsMap.get(key) ?? [];
         const matchGroup = assigned.some((a) => a.groupCode.toLowerCase().includes(normalizedQuery));
 
         return [
@@ -336,13 +351,6 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
           draft.hotelName,
           draft.notes ?? "",
         ].some((value) => value.toLowerCase().includes(normalizedQuery)) || matchGroup;
-      })
-      .map((draft) => {
-        const key = `${draft.city.toUpperCase()}_${draft.agreementNumber.trim().toUpperCase()}`;
-        const assignedPax = assignedPaxMap.get(key) ?? 0;
-        const remainingPax = Math.max(0, draft.pax - assignedPax);
-        const assignedGroups = assignedGroupsMap.get(key) ?? [];
-        return this.mapMemoryDraft(draft, remainingPax, assignedGroups);
       });
   }
 
@@ -362,6 +370,10 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
   }
 
   async update(draftId: string, payload: UpsertHotelAgreementDraftDto): Promise<unknown> {
+    return this.withDraftLock(draftId, () => this.updateUnlocked(draftId, payload));
+  }
+
+  private async updateUnlocked(draftId: string, payload: UpsertHotelAgreementDraftDto): Promise<unknown> {
     const normalizedPayload = this.normalizePayload(payload);
     const draftIndex = this.memoryDrafts.findIndex((item) => item.id === draftId);
     if (draftIndex === -1) {
@@ -412,6 +424,10 @@ export class MemoryHotelAgreementDraftRepository implements HotelAgreementDraftR
   }
 
   async assign(draftId: string, payload: AssignHotelAgreementDraftDto): Promise<unknown> {
+    return this.withDraftLock(draftId, () => this.assignUnlocked(draftId, payload));
+  }
+
+  private async assignUnlocked(draftId: string, payload: AssignHotelAgreementDraftDto): Promise<unknown> {
     const normalizedGroupCode = payload.groupCode.trim().toUpperCase();
     if (!normalizedGroupCode) {
       throw new BadRequestException("Group code is required.");

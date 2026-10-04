@@ -20,11 +20,13 @@ import {
   getInclusiveDays,
 } from "../../../shared/app-domain";
 import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-keys";
+import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
 
 export const draftSchema = z
   .object({
     city: z.enum(["makkah", "madinah"]),
     agentId: z.string().trim().min(1, "Agent wajib dipilih."),
+    muassasahId: z.string().trim().optional(),
     groupName: z.string().trim().min(1, "Nama group wajib diisi."),
     hotelName: z.string().trim().min(1, "Hotel name wajib diisi."),
     agreementNumber: z.string().trim().min(1, "Agreement number wajib diisi."),
@@ -52,6 +54,7 @@ export function createDefaultDraftForm(): HotelAgreementDraftFormState {
   return {
     city: "makkah",
     agentId: "",
+    muassasahId: "",
     groupName: "",
     hotelName: "",
     agreementNumber: "",
@@ -74,6 +77,8 @@ export function useAgreementInbox() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementDraftStatusFilter>("unassigned");
   const [agentFilter, setAgentFilter] = useState("all");
+  const [muassasahFilter, setMuassasahFilter] = useState("all");
+  const muassasahQuery = useMuassasahQuery();
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [remainingPaxOnly, setRemainingPaxOnly] = useState(false);
@@ -102,6 +107,9 @@ export function useAgreementInbox() {
   const filteredDrafts = useMemo(() => {
     let result = drafts;
     if (agentFilter !== "all") result = result.filter((draft) => draft.agentId === agentFilter);
+    if (muassasahFilter !== "all") {
+      result = result.filter((draft) => muassasahFilter === "none" ? !draft.muassasahId : draft.muassasahId === muassasahFilter);
+    }
 
     if (remainingPaxOnly) {
       result = result.filter((draft) => (draft.remainingPax ?? draft.pax) > 0);
@@ -120,14 +128,14 @@ export function useAgreementInbox() {
           return isAssigned;
         }
         if (statusFilter === "unassigned") {
-          return !isAssigned;
+          return draft.status === "Rejected" || !isAssigned;
         }
         return true;
       });
     }
 
     return result;
-  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter, agentFilter, remainingPaxOnly]);
+  }, [drafts, hasDatesSelected, isDateRangeInvalid, statusFilter, startDateFilter, endDateFilter, agentFilter, muassasahFilter, remainingPaxOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDrafts.length / AGREEMENT_DRAFT_PAGE_SIZE));
   const pageStartIndex = (currentPage - 1) * AGREEMENT_DRAFT_PAGE_SIZE;
@@ -234,6 +242,7 @@ export function useAgreementInbox() {
   const buildFormValues = (draft: HotelAgreementDraft): HotelAgreementDraftFormState => ({
     city: draft.city,
     agentId: draft.agentId,
+    muassasahId: draft.muassasahId ?? "",
     groupName: draft.groupName ?? "",
     hotelName: draft.hotelName,
     agreementNumber: draft.agreementNumber,
@@ -379,7 +388,7 @@ export function useAgreementInbox() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter, startDateFilter, endDateFilter, agentFilter, remainingPaxOnly]);
+  }, [query, statusFilter, startDateFilter, endDateFilter, agentFilter, muassasahFilter, remainingPaxOnly]);
 
   useEffect(() => {
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
@@ -392,6 +401,10 @@ export function useAgreementInbox() {
     statusFilter,
     agentFilter,
     setAgentFilter,
+    muassasahFilter,
+    setMuassasahFilter,
+    muassasahQuery,
+    muassasahOptions: muassasahQuery.data ?? [],
     setStatusFilter,
     startDateFilter,
     setStartDateFilter,

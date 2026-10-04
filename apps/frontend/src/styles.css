@@ -1,5 +1,9 @@
 @import "./pages/visa-tracking/components/visa-tracking-rows.css";
 
+@import "./agent/agent-calendar.css";
+@import "./agent/agent-visa-tracking.css";
+@import "./agent/agent-visa-detail.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1484,6 +1488,53 @@ img {
   .base-trip-actions {
     bottom: 1rem;
   }
+}
+
+/* Agent workspace refinements stay local to the portal. */
+.agent-portal .agent-page-layout {
+  padding-bottom: 1.5rem;
+}
+
+.agent-portal .agent-flush-surface {
+  padding: 0;
+}
+
+.agent-portal .serene-page-search {
+  height: 2.75rem;
+  border: 1px solid rgb(var(--color-outline-variant) / 0.45);
+  border-radius: 0.75rem;
+  box-shadow: none;
+}
+
+.agent-portal :where(input, textarea)::placeholder {
+  color: rgb(var(--color-on-surface-variant) / 0.85);
+}
+
+.agent-portal :where(a, button, summary, input, select, textarea):focus-visible,
+.agent-portal .serene-page-search:focus-within {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 3px;
+}
+
+.agent-portal .serene-page-search-input:focus-visible {
+  outline: none;
+}
+
+.agent-portal ::selection {
+  background: rgb(var(--color-primary) / 0.2);
+  color: rgb(var(--color-on-surface));
+}
+
+.agent-portal input {
+  caret-color: rgb(var(--color-primary));
+}
+
+.agent-family > summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-family[open] > summary .agent-disclosure-icon {
+  transform: rotate(180deg);
 }
 
 @media (min-width: 1280px) {

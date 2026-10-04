@@ -1,0 +1,829 @@
+.agent-visa-detail-page {
+  --visa-detail-rule: rgb(var(--color-outline-variant) / 0.5);
+  --visa-detail-paper: rgb(var(--color-surface-container-lowest));
+  --visa-detail-muted: rgb(var(--color-text-secondary));
+  max-width: 1586px;
+  margin: 0 auto;
+  padding: 8px 36px 32px;
+  color: rgb(var(--color-text-primary));
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.agent-visa-detail-page :is(button, a):focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 3px;
+}
+.agent-visa-detail-page ::selection {
+  background: rgb(var(--color-primary) / 0.15);
+}
+.agent-visa-detail-page .material-symbols-outlined {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.visa-detail-back {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 44px;
+  color: rgb(var(--color-primary));
+  font-size: 13px;
+}
+.visa-detail-back:hover,
+.visa-detail-travel-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.visa-detail-header {
+  padding: 0 8px 20px;
+}
+.visa-detail-header h1 {
+  margin: 0;
+  font:
+    800 50px/1.2 Manrope,
+    sans-serif;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.visa-detail-group-name {
+  margin-top: 2px;
+  font:
+    800 28px/1.3 Manrope,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+.visa-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 16px;
+  color: var(--visa-detail-muted);
+}
+.visa-detail-role,
+.visa-detail-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: rgb(var(--color-text-primary) / 0.045);
+  color: var(--visa-detail-muted);
+}
+.visa-detail-readonly .material-symbols-outlined {
+  font-size: 16px;
+}
+.visa-detail-trip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--visa-detail-muted);
+  font-size: 13px;
+}
+.visa-detail-trip .material-symbols-outlined {
+  font-size: 19px;
+}
+.visa-detail-package {
+  padding-left: 12px;
+  border-left: 1px solid var(--visa-detail-rule);
+  overflow-wrap: anywhere;
+}
+.visa-detail-surface {
+  border: 1px solid var(--visa-detail-rule);
+  border-radius: 12px;
+  background: var(--visa-detail-paper);
+}
+.visa-stage-overview {
+  padding: 16px 20px;
+}
+.visa-stage-overview ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 36px;
+}
+.visa-stage-overview li {
+  min-width: 0;
+  position: relative;
+}
+.visa-stage-overview li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -26px;
+  width: 18px;
+  border-top: 1px solid var(--visa-detail-rule);
+}
+.visa-stage-shortcut {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 72px;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-align: left;
+}
+.visa-stage-shortcut.is-current {
+  border-color: rgb(var(--color-text-secondary) / 0.4);
+  background: rgb(var(--color-text-primary) / 0.025);
+}
+.visa-stage-shortcut:hover {
+  background: rgb(var(--color-text-primary) / 0.045);
+}
+.visa-stage-shortcut-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.visa-stage-shortcut-copy strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+.visa-stage-shortcut-copy > span {
+  color: var(--visa-detail-muted);
+  font-size: 13px;
+}
+.visa-stage-marker {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgb(var(--color-text-primary) / 0.055);
+  color: var(--visa-detail-muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.visa-stage-marker[data-tone="complete"],
+.visa-stage-marker[data-tone="in-progress"] {
+  background: rgb(var(--color-secondary) / 0.09);
+  color: rgb(var(--color-secondary));
+}
+.visa-stage-marker[data-tone="attention"] {
+  background: rgb(var(--color-amber-800) / 0.075);
+  color: rgb(var(--color-amber-800));
+}
+.visa-facts {
+  display: flex;
+  margin-top: 20px;
+  padding: 20px 22px;
+  gap: 24px;
+  align-items: stretch;
+}
+.visa-facts dt,
+.visa-detail-pairs dt {
+  color: var(--visa-detail-muted);
+  font-size: 12px;
+}
+.visa-facts dd,
+.visa-detail-pairs dd {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.visa-facts-essential {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 2;
+  gap: 24px;
+}
+.visa-facts-essential > div + div,
+.visa-facts-secondary {
+  border-left: 1px solid var(--visa-detail-rule);
+  padding-left: 24px;
+}
+.visa-facts-secondary {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: 3;
+  min-width: 0;
+}
+.visa-facts-secondary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  flex: 1;
+}
+.visa-facts-secondary dl > div + div {
+  border-left: 1px solid var(--visa-detail-rule);
+  padding-left: 24px;
+}
+.visa-payment-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(var(--color-amber-800) / 0.055);
+  color: var(--visa-detail-muted);
+  font-size: 12px;
+}
+.visa-detail-travel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  color: rgb(var(--color-primary));
+  font-size: 13px;
+}
+.visa-detail-travel-link .material-symbols-outlined {
+  font-size: 20px;
+}
+.visa-facts-disclosure {
+  display: none;
+}
+.visa-process-details {
+  margin-top: 16px;
+  padding: 0 18px;
+}
+.visa-process-row {
+  position: relative;
+  padding: 0;
+}
+.visa-process-row + .visa-process-row {
+  border-top: 1px solid var(--visa-detail-rule);
+}
+.visa-process-row:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 29px;
+  top: 49px;
+  bottom: -20px;
+  border-left: 1px solid var(--visa-detail-rule);
+}
+.visa-process-toggle {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  min-height: 76px;
+  padding: 14px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.visa-process-row.is-current > h2 .visa-process-toggle {
+  background: rgb(var(--color-text-primary) / 0.025);
+}
+.visa-process-toggle:hover {
+  background: rgb(var(--color-text-primary) / 0.045);
+}
+.visa-process-toggle .visa-stage-marker {
+  position: relative;
+  z-index: 1;
+}
+.visa-process-heading {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.visa-process-heading strong {
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.visa-process-heading > span {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--visa-detail-muted);
+}
+.visa-chevron {
+  margin-left: auto;
+  color: var(--visa-detail-muted);
+  transition: transform 180ms ease-out;
+}
+.visa-chevron.is-open {
+  transform: rotate(180deg);
+}
+.visa-process-panel {
+  padding: 0 10px 20px 70px;
+}
+.visa-process-panel[hidden] {
+  display: none;
+}
+.visa-detail-note {
+  color: var(--visa-detail-muted);
+  font-size: 13px;
+  max-width: 75ch;
+}
+.visa-document-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--visa-detail-rule);
+}
+.visa-document-list > li > div {
+  min-width: 0;
+}
+.visa-document-name {
+  overflow-wrap: anywhere;
+  color: var(--visa-detail-muted);
+  margin-top: 3px;
+  font-size: 13px;
+}
+.visa-document-review {
+  color: var(--visa-detail-muted);
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.visa-data-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--visa-detail-muted);
+  font-size: 12px;
+}
+.visa-data-status[data-tone="attention"] {
+  color: rgb(var(--color-amber-800));
+}
+.visa-data-status .material-symbols-outlined {
+  font-size: 18px;
+  color: rgb(var(--color-secondary));
+}
+.visa-hotel-columns,
+.visa-hotel-row {
+  display: grid;
+  grid-template-columns: 0.55fr 1.4fr 1.1fr 1.45fr 0.7fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.visa-hotel-columns {
+  padding: 10px 0;
+  color: var(--visa-detail-muted);
+  font-size: 11px;
+  border-bottom: 1px solid var(--visa-detail-rule);
+}
+.visa-hotel-row {
+  padding: 12px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.visa-hotel-row + .visa-hotel-row,
+.visa-hotel-empty {
+  border-top: 1px solid var(--visa-detail-rule);
+}
+.visa-hotel-city {
+  font-weight: 700;
+}
+.visa-hotel-name {
+  font-weight: 500;
+}
+.visa-hotel-empty {
+  padding: 12px 0;
+  font-size: 13px;
+}
+.visa-hotel-empty p {
+  margin-top: 4px;
+  color: var(--visa-detail-muted);
+}
+.visa-mobile-label {
+  display: none;
+}
+.visa-detail-pairs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+}
+.visa-flight-section {
+  margin-top: 16px;
+  overflow: hidden;
+}
+.visa-flight-section > header {
+  padding: 8px 22px;
+}
+.visa-flight-section h2 {
+  font:
+    800 20px/1.35 Manrope,
+    sans-serif;
+}
+.visa-flight-section > header p {
+  margin-top: 3px;
+  color: var(--visa-detail-muted);
+  font-size: 13px;
+}
+.visa-flight-directions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--visa-detail-rule);
+}
+.visa-flight-direction + .visa-flight-direction {
+  border-left: 1px solid var(--visa-detail-rule);
+}
+.visa-flight-direction > header {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 22px;
+  border-bottom: 1px solid var(--visa-detail-rule);
+}
+.visa-flight-direction h3 {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 700;
+}
+.visa-flight-direction h3 .material-symbols-outlined {
+  color: var(--visa-detail-muted);
+}
+.visa-flight-route-status {
+  font-size: 11px;
+  color: var(--visa-detail-muted);
+  text-align: right;
+}
+.visa-flight-leg {
+  padding: 12px 22px;
+}
+.visa-flight-leg + .visa-flight-leg {
+  border-top: 1px solid var(--visa-detail-rule);
+}
+.visa-flight-leg-data {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  justify-content: space-between;
+}
+.visa-flight-route {
+  min-width: 0;
+}
+.visa-flight-route strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.visa-flight-route .material-symbols-outlined {
+  font-size: 19px;
+  color: var(--visa-detail-muted);
+}
+.visa-flight-route p {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--visa-detail-muted);
+  overflow-wrap: anywhere;
+}
+.visa-flight-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.visa-flight-times > div {
+  min-width: 0;
+}
+.visa-flight-times dt {
+  font-size: 10px;
+  color: var(--visa-detail-muted);
+}
+.visa-flight-times dd {
+  color: var(--visa-detail-muted);
+  margin-top: 3px;
+}
+.visa-flight-segment,
+.visa-flight-remarks,
+.visa-flight-empty {
+  display: block;
+  color: var(--visa-detail-muted);
+  font-size: 12px;
+}
+.visa-flight-segment {
+  margin-bottom: 8px;
+}
+.visa-flight-remarks {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.visa-flight-empty {
+  padding: 16px 22px;
+}
+.visa-flight-mobile-label {
+  display: none;
+}
+@media (min-width: 768px) {
+  .visa-process-row.is-nusuk .visa-process-toggle {
+    min-height: 64px;
+  }
+  .visa-process-row.is-nusuk .visa-process-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+  }
+  .visa-process-row.is-visa .visa-process-toggle {
+    min-height: 68px;
+    padding-block: 10px;
+  }
+  .visa-flight-section {
+    margin-top: 12px;
+  }
+  .visa-flight-section > header {
+    padding-block: 5px;
+  }
+}
+@media (min-width: 1200px) {
+  .agent-calendar-portal:has(.agent-visa-detail-page) {
+    --agent-u: 1.06px;
+  }
+  .agent-calendar-portal:has(.agent-visa-detail-page) .agent-topbar-inner {
+    padding-right: 24px;
+  }
+}
+@media (max-width: 1100px) {
+  .visa-facts {
+    gap: 16px;
+    padding: 16px;
+  }
+  .visa-facts-secondary {
+    gap: 16px;
+    padding-left: 16px;
+    flex: 3.5;
+  }
+  .visa-facts-secondary dl,
+  .visa-facts-essential {
+    gap: 16px;
+  }
+  .visa-facts-essential > div + div,
+  .visa-facts-secondary dl > div + div {
+    padding-left: 16px;
+  }
+  .visa-detail-travel-link {
+    flex-wrap: wrap;
+    max-width: 130px;
+  }
+  .visa-flight-leg-data {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+}
+@media (max-width: 767px) {
+  .agent-visa-detail-page {
+    padding: 14px 16px 24px;
+  }
+  .visa-detail-back {
+    font-size: 12px;
+  }
+  .visa-detail-header {
+    padding: 6px 0 18px;
+  }
+  .visa-detail-header h1 {
+    font-size: clamp(23px, 6.2vw, 32px);
+  }
+  .visa-detail-group-name {
+    font-size: 20px;
+    margin-top: 6px;
+  }
+  .visa-detail-meta {
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .visa-detail-trip {
+    align-items: flex-start;
+    font-size: 12px;
+    gap: 8px;
+  }
+  .visa-detail-trip > span:first-of-type {
+    flex: 1;
+  }
+  .visa-detail-package {
+    flex-basis: 100%;
+    padding-left: 0;
+    border: 0;
+  }
+  .visa-stage-overview {
+    padding: 8px;
+  }
+  .visa-stage-overview ol {
+    gap: 4px;
+  }
+  .visa-stage-overview li::after {
+    display: none;
+  }
+  .visa-stage-shortcut {
+    flex-direction: column;
+    justify-content: flex-start;
+    min-height: 112px;
+    gap: 8px;
+    padding: 8px 2px;
+    text-align: center;
+  }
+  .visa-stage-shortcut-copy {
+    gap: 3px;
+  }
+  .visa-stage-shortcut-copy strong {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .visa-stage-shortcut-copy > span {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .visa-stage-marker {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+  .visa-stage-marker .material-symbols-outlined {
+    font-size: 20px;
+  }
+  .visa-facts {
+    display: block;
+    padding: 0;
+    margin-top: 12px;
+  }
+  .visa-facts-essential {
+    padding: 14px 16px;
+    gap: 16px;
+  }
+  .visa-facts-essential > div + div {
+    padding-left: 16px;
+  }
+  .visa-facts dt {
+    font-size: 11px;
+  }
+  .visa-facts dd {
+    font-size: 13px;
+  }
+  .visa-facts-disclosure {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 70px;
+    border-top: 1px solid var(--visa-detail-rule);
+    padding: 12px 16px;
+    gap: 12px;
+    text-align: left;
+  }
+  .visa-facts-disclosure > span:nth-child(2) {
+    display: grid;
+    gap: 2px;
+  }
+  .visa-facts-disclosure strong {
+    font-size: 14px;
+  }
+  .visa-facts-disclosure > span:nth-child(2) > span {
+    font-size: 12px;
+    color: var(--visa-detail-muted);
+  }
+  .visa-facts-secondary {
+    display: none;
+    border-left: 0;
+    padding: 0 16px 12px;
+  }
+  .visa-facts-secondary.is-open {
+    display: block;
+  }
+  .visa-facts-secondary dl {
+    gap: 16px;
+  }
+  .visa-facts-secondary dl > div + div {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .visa-detail-travel-link {
+    max-width: none;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .visa-process-details {
+    padding: 0 12px;
+    margin-top: 12px;
+  }
+  .visa-process-row::before {
+    display: none;
+  }
+  .visa-process-toggle {
+    padding: 14px 0;
+    min-height: 76px;
+    gap: 12px;
+  }
+  .visa-process-heading strong {
+    font-size: 14px;
+  }
+  .visa-process-heading > span {
+    font-size: 12px;
+  }
+  .visa-process-panel {
+    padding: 0 0 16px;
+  }
+  .visa-document-list > li {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .visa-document-name,
+  .visa-document-review,
+  .visa-detail-note {
+    font-size: 12px;
+  }
+  .visa-hotel-columns {
+    display: none;
+  }
+  .visa-hotel-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+  .visa-hotel-city {
+    font-size: 13px;
+  }
+  .visa-hotel-name {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .visa-hotel-agreement,
+  .visa-hotel-dates {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 2px;
+  }
+  .visa-mobile-label {
+    display: block;
+    font-size: 11px;
+    color: var(--visa-detail-muted);
+  }
+  .visa-hotel-pax {
+    grid-column: 1 / -1;
+  }
+  .visa-hotel-row > .visa-data-status {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .visa-detail-pairs {
+    gap: 12px;
+    font-size: 13px;
+  }
+  .visa-flight-section {
+    margin-top: 12px;
+  }
+  .visa-flight-section > header {
+    padding: 16px;
+  }
+  .visa-flight-section h2 {
+    font-size: 18px;
+  }
+  .visa-flight-section > header p {
+    font-size: 12px;
+  }
+  .visa-flight-directions {
+    grid-template-columns: 1fr;
+  }
+  .visa-flight-direction + .visa-flight-direction {
+    border-left: 0;
+    border-top: 1px solid var(--visa-detail-rule);
+  }
+  .visa-flight-direction > header {
+    padding: 12px 16px;
+  }
+  .visa-flight-direction h3 {
+    font-size: 14px;
+  }
+  .visa-flight-leg,
+  .visa-flight-empty {
+    padding: 14px 16px;
+  }
+  .visa-flight-leg-data {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .visa-flight-route strong {
+    font-size: 18px;
+  }
+  .visa-flight-times {
+    gap: 12px;
+  }
+  .visa-flight-times > div + div {
+    border-left: 1px solid var(--visa-detail-rule);
+    padding-left: 12px;
+  }
+  .visa-flight-times dt {
+    font-size: 11px;
+  }
+  .visa-flight-times dd {
+    font-size: 12px;
+  }
+  .visa-flight-desktop-label {
+    display: none;
+  }
+  .visa-flight-mobile-label {
+    display: inline;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .visa-chevron {
+    transition: none;
+  }
+}

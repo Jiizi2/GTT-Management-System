@@ -24,6 +24,7 @@ function mapItinerary(group: GroupSummary): ItineraryItem[] {
     icon: iconByCategory[item.category.toUpperCase()] ?? "route",
     isoDate: item.isoDate ?? undefined,
     time: item.time ?? undefined,
+    transportMode: item.transportMode ?? undefined,
     flightNumber: item.flightNumber ?? undefined,
     hotelName: item.hotelName ?? undefined,
     fromHotelName: item.fromHotelName ?? undefined,
@@ -65,6 +66,7 @@ export function mapAgentGroup(
   );
   return {
     id: group.id,
+    parentGroupId: group.parentGroupId,
     agentId,
     agent: {
       id: agentId,
@@ -140,7 +142,10 @@ export function mapAgentGroup(
               stayEndIso: hotel.stayEnd?.slice(0, 10) ?? "",
               ownerGroupCode: group.code,
             })),
-          raudhahAppointments: [],
+          makkahHotelWaived: visa.facet.makkahHotelWaived,
+          madinahHotelWaived: visa.facet.madinahHotelWaived,
+          flightLegs: (visa.facet.flightLegs ?? []).map((leg) => ({ ...leg, departureAirportCode: leg.departureAirportCode ?? "", arrivalAirportCode: leg.arrivalAirportCode ?? "", departureDate: normalizeDateOnly(leg.departureDate) ?? "", arrivalDate: normalizeDateOnly(leg.arrivalDate) ?? "", departureTime: leg.departureTime ?? "", arrivalTime: leg.arrivalTime ?? "", carrierCode: leg.carrierCode ?? "", flightNumber: leg.flightNumber ?? "", remarks: "" })),
+          raudhahAppointments: (visa.facet.raudhahAppointments ?? []).map((item) => ({ id: item.id, dateIso: normalizeDateOnly(item.date) ?? "", status: item.status === "AFTER" ? "After" : item.status === "BEFORE" ? "Before" : "Free", tasrehPrinted: item.tasrehPrinted })),
         }
       : undefined,
   };

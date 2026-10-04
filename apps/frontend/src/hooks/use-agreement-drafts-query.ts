@@ -54,16 +54,14 @@ function mapBackendDraft(record: BackendHotelAgreementDraftRecord): HotelAgreeme
 
   const city = readString(record.city).toUpperCase() === "MADINAH" ? "madinah" : "makkah";
   const groupCode = readString(record.groupCode ?? "", "");
-  const isAssigned = readString(record.assignmentStatus).toUpperCase() === "ASSIGNED" || groupCode;
-  const assignmentStatus = isAssigned
-    ? record.remainingPax !== undefined && record.remainingPax > 0
-      ? "Partially Assigned"
-      : "Assigned"
-    : "Unassigned";
+  const isAssigned = readString(record.assignmentStatus).toUpperCase() === "ASSIGNED" || groupCode || Boolean(record.assignedGroups?.length);
+  const assignmentStatus = isAssigned ? "Assigned" : "Unassigned";
 
   return {
     id,
     agentId: readString(record.agentId, "agent_gtt_direct"),
+    muassasahId: readString(record.muassasahId ?? "") || undefined,
+    muassasahName: readString(record.muassasahName ?? "") || undefined,
     city,
     agentName: readString(record.agent?.name ?? record.agentName ?? "", ""),
     groupName: readString(record.groupName ?? "", ""),
@@ -94,6 +92,7 @@ function buildDraftPayload(form: HotelAgreementDraftFormState) {
   return {
     city: form.city === "madinah" ? "MADINAH" : "MAKKAH",
     agentId: form.agentId.trim(),
+    muassasahId: form.muassasahId === undefined ? undefined : form.muassasahId.trim() || null,
     groupName: form.groupName.trim(),
     hotelName: form.hotelName.trim(),
     agreementNumber: form.agreementNumber.trim(),

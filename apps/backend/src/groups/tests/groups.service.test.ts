@@ -919,7 +919,7 @@ describe("GroupsService", () => {
             meta: "SV-827",
             icon: "flight_land",
           }),
-      ).rejects.toThrow(/adalah child group. Silakan edit itinerary pada parent group/i);
+      ).rejects.toThrow(/menggunakan data bersama. Silakan edit itinerary pada group sumber data/i);
 
       await expect(
         async () =>
@@ -935,11 +935,11 @@ describe("GroupsService", () => {
               plateNumber: "B 1234 ABC",
             },
           }),
-      ).rejects.toThrow(/adalah child group. Silakan edit checklist pada parent group/i);
+      ).rejects.toThrow(/menggunakan data bersama. Silakan edit checklist pada group sumber data/i);
 
       await expect(
         async () => service.remove("G-PARENT"),
-      ).rejects.toThrow(/still has child groups and cannot be deleted/i);
+      ).rejects.toThrow(/still has linked groups and cannot be deleted/i);
 
       await service.remove("G-CHILD");
       await service.remove("G-PARENT");

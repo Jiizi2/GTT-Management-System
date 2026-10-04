@@ -4,6 +4,7 @@ import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../
 import { SereneSelect } from "../../../components/serene-select";
 import type { HotelAgreementDraftFormState } from "../../../shared/app-domain";
 import { useAgentsQuery } from "../../../hooks/use-agents-backend";
+import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
 
 export function AgreementDraftFields({
   control,
@@ -19,6 +20,7 @@ export function AgreementDraftFields({
   layout?: "columns" | "stacked";
 }) {
   const agentsQuery = useAgentsQuery();
+  const muassasahQuery = useMuassasahQuery();
   const isStacked = layout === "stacked";
   const fieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-slate-700";
   const inputClassName = "serene-input serene-input-md";
@@ -26,6 +28,7 @@ export function AgreementDraftFields({
   const fieldLayoutClassNames = isStacked
     ? {
         agent: "grid gap-1.5",
+        muassasah: "grid gap-1.5",
         groupName: "grid gap-1.5",
         pax: "grid gap-1.5",
         city: "grid gap-1.5",
@@ -37,16 +40,17 @@ export function AgreementDraftFields({
         notes: fieldClassName,
       }
     : {
-        agent: "order-1 grid gap-1.5 lg:col-span-4",
-        groupName: "order-2 grid gap-1.5 lg:col-span-6",
-        pax: "order-3 grid gap-1.5 lg:col-span-2",
-        city: "order-4 grid gap-1.5 lg:col-span-2",
-        hotelName: "order-5 grid gap-1.5 lg:col-span-5",
-        agreementNumber: "order-6 grid gap-1.5 lg:col-span-5",
-        status: "order-7 grid gap-1.5 lg:col-span-4",
-        stayStart: "order-8 grid gap-1.5 lg:col-span-4",
-        stayEnd: "order-9 grid gap-1.5 lg:col-span-4",
-        notes: `${fieldClassName} order-10 lg:col-span-12`,
+        agent: "order-1 grid gap-1.5 lg:col-span-3",
+        muassasah: "order-2 grid gap-1.5 lg:col-span-3",
+        groupName: "order-3 grid gap-1.5 lg:col-span-4",
+        pax: "order-4 grid gap-1.5 lg:col-span-2",
+        city: "order-5 grid gap-1.5 lg:col-span-2",
+        hotelName: "order-6 grid gap-1.5 lg:col-span-5",
+        agreementNumber: "order-7 grid gap-1.5 lg:col-span-5",
+        status: "order-8 grid gap-1.5 lg:col-span-4",
+        stayStart: "order-9 grid gap-1.5 lg:col-span-4",
+        stayEnd: "order-10 grid gap-1.5 lg:col-span-4",
+        notes: `${fieldClassName} order-11 lg:col-span-12`,
       };
 
   const cityErrorMessage = errors.city?.message;
@@ -89,6 +93,19 @@ export function AgreementDraftFields({
           />
         </label>
         <FieldErrorMessage fieldId={`${idPrefix}-agent`} message={agentIdErrorMessage} />
+      </div>
+
+      <div className={fieldLayoutClassNames.muassasah}>
+        <label className={fieldClassName}>
+          <span>Muassasah <span className="text-xs font-normal text-on-surface-variant">(opsional)</span></span>
+          <Controller control={control} name="muassasahId" render={({ field }) => (
+            <SereneSelect id={`${idPrefix}-muassasah`} className="serene-select" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value)} disabled={muassasahQuery.isLoading || muassasahQuery.isError} aria-label="Muassasah draft">
+              <option value="">Belum dipilih</option>
+              {(muassasahQuery.data ?? []).filter((option) => option.isActive || option.id === field.value).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+            </SereneSelect>
+          )} />
+        </label>
+        {muassasahQuery.isError ? <p className="text-xs font-semibold text-rose-700" role="alert">Data Muassasah belum dapat dimuat. <button type="button" className="underline underline-offset-2" onClick={() => void muassasahQuery.refetch()}>Coba lagi</button></p> : <p className="text-xs text-on-surface-variant">Pilih dari Master Data.</p>}
       </div>
 
       <div className={fieldLayoutClassNames.groupName}>

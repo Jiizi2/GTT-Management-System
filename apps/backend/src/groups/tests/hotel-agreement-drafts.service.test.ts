@@ -13,6 +13,8 @@ import type { CreateGroupDto } from "../dto/create-group.dto";
 import { MemoryGroupRepository } from "../../infrastructure/repositories/memory/memory-group.repository";
 import { GroupMemoryStore } from "../../infrastructure/repositories/memory/group-memory-store";
 import { MemoryHotelAgreementDraftRepository } from "../../infrastructure/repositories/memory/memory-hotel-agreement-draft.repository";
+import { ConfigService } from "@nestjs/config";
+import { DirectoryService } from "../../directory/directory.service";
 
 async function createMemoryServices(): Promise<{
   groupsService: GroupsService;
@@ -71,6 +73,22 @@ function createGroupPayload(
 }
 
 describe("HotelAgreementDrafts", () => {
+  runCase("draft Muassasah follows Master Data, survives omitted updates, and can be cleared", async () => {
+    const { groupsService, draftsRepository, restore } = await createMemoryServices();
+    try {
+      const directory = new DirectoryService(new ConfigService({ DATA_SOURCE: "memory" }), {} as PrismaService);
+      const service = new HotelAgreementDraftsService(draftsRepository, groupsService, undefined, undefined, directory);
+      const muassasah = await directory.createMuassasah({ name: "Directory Muassasah" });
+      const payload = { city: AgreementCity.MAKKAH, hotelName: "Hotel", agreementNumber: "AG-MUASSASAH", pax: 10, stayStart: "2026-10-10", stayEnd: "2026-10-15" };
+      const created = await service.create({ ...payload, muassasahId: muassasah.id }) as { id: string; muassasahId: string; muassasahName: string };
+      expect(created).toMatchObject({ muassasahId: muassasah.id, muassasahName: "Directory Muassasah" });
+      await directory.updateMuassasah(muassasah.id, { name: "Renamed Muassasah" });
+      expect(await service.findAll()).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id, muassasahName: "Renamed Muassasah" })]));
+      expect(await service.update(created.id, { ...payload, status: AgreementApprovalStatus.APPROVED })).toMatchObject({ muassasahId: muassasah.id });
+      expect(await service.update(created.id, { ...payload, muassasahId: null })).toMatchObject({ muassasahId: null, muassasahName: null });
+      await expect(service.create({ ...payload, muassasahId: "missing-muassasah" })).rejects.toThrow("not found");
+    } finally { restore(); }
+  });
   runCase("hotel agreement draft create update delete", async () => {
     const { draftsService, restore } = await createMemoryServices();
 
@@ -347,7 +365,7 @@ describe("HotelAgreementDrafts", () => {
         assignedGroups: Array<{ groupCode: string; pax: number }>;
       };
 
-      expect(assignedA.assignmentStatus).toBe("Partially Assigned"); // Not fully assigned yet
+      expect(assignedA.assignmentStatus).toBe("Assigned");
       expect(assignedA.remainingPax).toBe(7);
       expect(assignedA.assignedGroups.length).toBe(1);
       expect(assignedA.assignedGroups[0].groupCode).toBe("GROUP-A");
@@ -388,7 +406,7 @@ describe("HotelAgreementDrafts", () => {
         assignedGroups: Array<{ groupCode: string; pax: number }>;
       };
 
-      expect(unassignedA.assignmentStatus).toBe("Partially Assigned"); // Back to partially assigned because remaining capacity is > 0 and GROUP-B is still assigned
+      expect(unassignedA.assignmentStatus).toBe("Assigned"); // GROUP-B remains linked.
       expect(unassignedA.remainingPax).toBe(23);
       expect(unassignedA.assignedGroups.length).toBe(1);
       expect(unassignedA.assignedGroups[0].groupCode).toBe("GROUP-B");

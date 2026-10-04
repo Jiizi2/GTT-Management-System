@@ -97,21 +97,20 @@ export function VisaTrackingRowGroup({
   const renderRow = (row: VisaTrackingRow, isFollower = false) => {
     const group = groupByCode.get(row.groupCode);
     const isParent = !isFollower && hasFollowers;
-    const role = isParent ? "Parent" : isFollower || group?.parentGroupId ? "Child" : null;
     const familyToggle = isParent ? (
       <button
         type="button"
         className="visa-compact-toggle serene-focus-ring"
         aria-expanded={expanded}
         aria-controls={linkedId}
-        aria-label={`${expanded ? "Hide" : "Show"} ${rowGroup.followerRows.length} child groups for ${row.groupCode}`}
+        aria-label={`${expanded ? "Hide" : "Show"} ${rowGroup.followerRows.length} linked groups for ${row.groupCode}`}
         onClick={() => onToggleExpand(rowGroupKey)}
       >
         <span className="material-symbols-outlined" aria-hidden="true">
           expand_more
         </span>
         <span>
-          {rowGroup.followerRows.length} child {rowGroup.followerRows.length === 1 ? "group" : "groups"}
+          {rowGroup.followerRows.length} linked {rowGroup.followerRows.length === 1 ? "group" : "groups"}
         </span>
         <span className="visa-compact-family-total">
           · {childPax} Pax · Total {row.pax + childPax} Pax
@@ -159,14 +158,13 @@ export function VisaTrackingRowGroup({
         <div className="visa-compact-identity">
           <div className="visa-compact-number-line">
             <strong className="visa-compact-number">{row.groupCode}</strong>
-            {role ? <span className="visa-compact-role">{role}</span> : null}
           </div>
           <p className="visa-compact-name">{row.groupName}</p>
           {!isMobile ? familyToggle : null}
         </div>
         <section className="visa-compact-summary" aria-label="Visa information">
           <div className="visa-compact-pax">
-            <span className="visa-compact-label">{isParent ? "Parent pax" : "Pax"}</span>
+            <span className="visa-compact-label">Pax</span>
             <strong className="tabular-nums">{row.pax}</strong>
           </div>
           <div className="visa-compact-status" role="group" aria-label="Visa status summary">

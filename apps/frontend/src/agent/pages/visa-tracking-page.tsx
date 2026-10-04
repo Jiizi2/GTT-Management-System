@@ -1,66 +1,91 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { PageHeader } from "../../components/page-header";
-import { PageLayout } from "../../components/page-layout";
-import { SereneSelect } from "../../components/serene-select";
-import { StatusBadge } from "../../components/status-badge";
 import type { GroupData } from "../../shared/app-domain";
-import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState, ErrorState } from "../components/data-state";
 import type { VisaApplication } from "../data/contracts";
+import { validDateOnly } from "../data/departure-calendar";
+import { groupAgentFamilies } from "../data/group-families";
 import { useAgentGroupData } from "../data/use-agent-group-data";
 import { useAgentVisaApplications } from "../data/use-agent-visa-applications";
-import { buildVisaProcessStages, currentVisaProcessStage, visaProcessDefinition, type VisaProcessStage } from "../data/visa-process";
+import {
+  buildVisaProcessStages,
+  currentVisaProcessStage,
+  visaProcessDefinition,
+  type VisaProcessStage,
+} from "../data/visa-process";
 
 type FilterId = "all" | "attention" | "process" | "issued";
 type VisaListItem = {
+  parentGroupId?: string | null;
   id: string;
   identity: string;
   code: string;
   name: string;
   pax: number;
   packageName: string;
+  date: string | null;
+  dateSource: "departure" | "journey";
   currentStage: VisaProcessStage;
   stages: VisaProcessStage[];
   completedStages: number;
   bucket: Exclude<FilterId, "all">;
 };
+type VisaFamily = { root: VisaListItem; members: VisaListItem[] };
+const filters: Array<{ id: FilterId; label: string; icon: string }> = [
+  { id: "all", label: "Semua", icon: "groups" },
+  { id: "attention", label: "Perlu perhatian", icon: "warning" },
+  { id: "process", label: "Diproses", icon: "schedule" },
+  { id: "issued", label: "Visa terbit", icon: "check_circle" },
+];
+const stageLabels = { document: "Dokumen", agreement: "Agreement", nusuk: "Nusuk", visa: "Visa" };
+const compactStatus: Record<string, string> = {
+  "Dokumen terverifikasi": "Terverifikasi",
+  "Dokumen perlu revisi": "Perlu revisi",
+  "Agreement disetujui": "Disetujui",
+  "Upload sedang berlangsung": "Sedang upload",
+  "Data paspor tercatat": "Data tercatat",
+  "Group Nusuk dibuat": "Group dibuat",
+  "Visa issued": "Visa terbit",
+};
+const dateFormatter = new Intl.DateTimeFormat("id-ID", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 function toItem(group: GroupData | null, application: VisaApplication | null): VisaListItem {
   const stages = buildVisaProcessStages(application, group);
-  const currentStage = currentVisaProcessStage(stages);
   const issued = stages.at(-1)?.complete ?? false;
   const attention = stages.some((stage) => stage.tone === "attention") || group?.visaSetup?.visaStatus === "Draft";
+  const departure = validDateOnly(application?.departureDate);
   return {
     id: group?.id ?? application!.id,
+    parentGroupId: group?.parentGroupId,
     identity: group?.code ?? application!.id,
     code: group?.code ?? application!.applicationNumber,
     name: group?.name ?? application!.group?.name ?? application!.packageName,
     pax: group?.pax ?? application!.passengerCount,
     packageName: group?.packageName || application?.packageName || "Belum dicatat",
-    currentStage,
+    date: departure ?? validDateOnly(group?.arrivalDate) ?? null,
+    dateSource: departure ? "departure" : "journey",
+    currentStage: currentVisaProcessStage(stages),
     stages,
     completedStages: stages.filter((stage) => stage.complete).length,
     bucket: issued ? "issued" : attention ? "attention" : "process",
   };
 }
-
 export function buildAgentVisaItems(groups: GroupData[], applications: VisaApplication[]): VisaListItem[] {
-  const applicationsByGroup = new Map(
-    applications.filter((item) => item.groupId).map((item) => [item.groupId as string, item]),
-  );
+  const byGroup = new Map(applications.filter((item) => item.groupId).map((item) => [item.groupId as string, item]));
   const matched = new Set<string>();
   const groupItems = groups.map((group) => {
     const application =
-      (group.id && applicationsByGroup.get(group.id)) ||
-      applications.find((item) => item.group?.code === group.code) ||
-      null;
+      (group.id && byGroup.get(group.id)) || applications.find((item) => item.group?.code === group.code) || null;
     if (application) matched.add(application.id);
     return toItem(group, application);
   });
-  const unlinked = applications.filter((item) => !matched.has(item.id)).map((item) => toItem(null, item));
-  return [...groupItems, ...unlinked];
+  return [...groupItems, ...applications.filter((item) => !matched.has(item.id)).map((item) => toItem(null, item))];
 }
-
 export function AgentVisaTrackingPage({
   principalId,
   agentId,
@@ -73,6 +98,7 @@ export function AgentVisaTrackingPage({
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
+  const [guideOpen, setGuideOpen] = useState(false);
   const groupsQuery = useAgentGroupData({ principalId, agentId, agentName });
   const applicationsQuery = useAgentVisaApplications(principalId);
   const query = params.get("q") ?? "";
@@ -81,23 +107,25 @@ export function AgentVisaTrackingPage({
     () => buildAgentVisaItems(groupsQuery.data ?? [], applicationsQuery.data ?? []),
     [applicationsQuery.data, groupsQuery.data],
   );
-  const visibleItems = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("id-ID");
-    return items.filter(
-      (item) =>
-        (filter === "all" || item.bucket === filter) &&
-        (!needle || `${item.code} ${item.name} ${item.packageName}`.toLocaleLowerCase("id-ID").includes(needle)),
-    );
-  }, [filter, items, query]);
-
+  const needle = query.trim().toLocaleLowerCase("id-ID");
+  const matches = (item: VisaListItem) =>
+    (filter === "all" || item.bucket === filter) &&
+    (!needle || `${item.code} ${item.name} ${item.packageName}`.toLocaleLowerCase("id-ID").includes(needle));
+  const families = groupAgentFamilies(items).filter((family) => family.members.some(matches));
+  const counts = {
+    all: items.length,
+    attention: items.filter((item) => item.bucket === "attention").length,
+    process: items.filter((item) => item.bucket === "process").length,
+    issued: items.filter((item) => item.bucket === "issued").length,
+  };
+  const hasFilters = !!needle || filter !== "all";
   useEffect(() => {
-    if (!(["all", "attention", "process", "issued"] as string[]).includes(filter)) {
+    if (!filters.some((item) => item.id === filter)) {
       const next = new URLSearchParams(params);
       next.delete("status");
       setParams(next, { replace: true });
     }
   }, [filter, params, setParams]);
-
   const updateParam = (key: "q" | "status", value: string) => {
     const next = new URLSearchParams(params);
     if (!value || value === "all") next.delete(key);
@@ -106,121 +134,301 @@ export function AgentVisaTrackingPage({
   };
   const resetFilters = () => setParams({}, { replace: true });
   const retry = () => void Promise.all([groupsQuery.refetch(), applicationsQuery.refetch()]);
-
-  if (groupsQuery.isPending || applicationsQuery.isPending) return <LoadingState label="Memuat Visa Tracking..." />;
-  if (groupsQuery.isError || applicationsQuery.isError) return <ErrorState retry={retry} />;
-
-  const counts = {
-    attention: items.filter((item) => item.bucket === "attention").length,
-    process: items.filter((item) => item.bucket === "process").length,
-    issued: items.filter((item) => item.bucket === "issued").length,
-  };
-  const hasFilters = Boolean(query.trim()) || filter !== "all";
-
+  const onOpen = (item: VisaListItem) =>
+    navigate(`/agent/visa/${encodeURIComponent(item.identity)}`, {
+      state: { from: `${location.pathname}${location.search}` },
+    });
+  const loading = groupsQuery.isPending || applicationsQuery.isPending;
   return (
-    <PageLayout>
-      <PageHeader
-        title="Visa Tracking"
-        description="Pantau posisi setiap group dari pengiriman dokumen hingga visa issued."
-      />
-
-      <ProcessOverview />
-
-      <section className="serene-section p-4 sm:p-5" aria-label="Ringkasan dan filter visa">
-        <dl className="grid gap-3 border-b border-outline-variant/30 pb-4 sm:grid-cols-3">
-          <Summary label="Perlu perhatian" value={counts.attention} />
-          <Summary label="Sedang diproses" value={counts.process} />
-          <Summary label="Visa terbit" value={counts.issued} />
-        </dl>
-        <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-on-surface">Cari group</span>
-            <span className="serene-page-search min-h-11">
-              <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">search</span>
-              <input type="search" className="serene-page-search-input h-full" placeholder="Kode atau nama group" value={query} onChange={(event) => updateParam("q", event.target.value)} />
-            </span>
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-on-surface">Status progres</span>
-            <SereneSelect className="h-11 w-full rounded-xl border border-outline-variant/45 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface" value={filter} onChange={(event) => updateParam("status", event.target.value)}>
-              <option value="all">Semua status ({items.length})</option>
-              <option value="attention">Perlu perhatian ({counts.attention})</option>
-              <option value="process">Sedang diproses ({counts.process})</option>
-              <option value="issued">Visa terbit ({counts.issued})</option>
-            </SereneSelect>
-          </label>
-        </div>
-        <div className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
-          <p className="text-sm text-on-surface-variant" aria-live="polite"><strong className="text-on-surface tabular-nums">{visibleItems.length}</strong> pengajuan ditampilkan</p>
-          {hasFilters && visibleItems.length > 0 ? <button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>Reset filter</button> : null}
-        </div>
-      </section>
-
-      {items.length === 0 ? (
-        <EmptyState title="Belum ada pengajuan visa">Group atau pengajuan yang ditugaskan kepada akun Agent ini akan muncul di sini.</EmptyState>
-      ) : visibleItems.length === 0 ? (
-        <VisaEmpty title="Tidak ada pengajuan yang sesuai" description="Ubah kata pencarian atau filter status untuk melihat pengajuan lainnya." action={<button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>Reset filter</button>} />
-      ) : (
-        <section className="serene-section overflow-hidden p-0" aria-label="Daftar pengajuan visa">
-          <div className="hidden grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,0.8fr)_minmax(13rem,1fr)_auto] gap-4 border-b border-outline-variant/30 bg-surface-container-low px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-on-surface-variant lg:grid">
-            <span>Group</span><span>Tahap saat ini</span><span>Progres proses</span><span className="sr-only">Aksi</span>
-          </div>
-          <div className="divide-y divide-outline-variant/30">
-            {visibleItems.map((item) => <VisaRow key={item.id} item={item} onOpen={() => navigate(`/agent/visa/${encodeURIComponent(item.identity)}`, { state: { from: `${location.pathname}${location.search}` } })} />)}
-          </div>
+    <div className="agent-visa-page">
+      <header className="agent-visa-heading">
+        <h1>Visa Tracking</h1>
+        <p>Pantau progres visa setiap group.</p>
+      </header>
+      {loading ? (
+        <section className="agent-visa-loading" aria-busy="true" aria-label="Memuat Visa Tracking">
+          <p className="sr-only" role="status">
+            Memuat Visa Tracking...
+          </p>
+          <div className="agent-visa-skeleton-toolbar" />
+          <div className="agent-visa-skeleton-family" />
+          <div className="agent-visa-skeleton-family" />
         </section>
+      ) : groupsQuery.isError || applicationsQuery.isError ? (
+        <ErrorState retry={retry} />
+      ) : (
+        <>
+          <section className="agent-visa-toolbar" aria-label="Ringkasan dan filter visa">
+            <div className="agent-visa-filters" role="group" aria-label="Status progres">
+              {filters.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={`agent-visa-filter ${filter === item.id ? "is-selected" : ""}`}
+                  aria-pressed={filter === item.id}
+                  onClick={() => updateParam("status", item.id)}
+                >
+                  <Icon name={item.icon} className={`agent-visa-filter-icon is-${item.id}`} />
+                  <span>{item.label}</span>
+                  <span className="agent-visa-filter-count">{counts[item.id]}</span>
+                </button>
+              ))}
+            </div>
+            <div className="agent-visa-search-row">
+              <label className="agent-visa-search">
+                <span className="sr-only">Cari group</span>
+                <Icon name="search" />
+                <input
+                  type="search"
+                  value={query}
+                  placeholder="Cari nama atau kode group"
+                  onChange={(event) => updateParam("q", event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="agent-visa-guide-button"
+                aria-expanded={guideOpen}
+                aria-controls="agent-visa-guide"
+                onClick={() => setGuideOpen((open) => !open)}
+              >
+                <Icon name="description" />
+                <span>Panduan 4 tahap</span>
+                <Icon name={guideOpen ? "expand_more" : "arrow_forward"} className={guideOpen ? "is-up" : ""} />
+              </button>
+            </div>
+            <p className={hasFilters ? "agent-visa-results" : "sr-only"} aria-live="polite" aria-atomic="true">
+              {items.filter(matches).length} group / pengajuan · {families.length} perjalanan ditampilkan
+            </p>
+            {hasFilters && families.length > 0 && (
+              <button type="button" className="agent-visa-reset" onClick={resetFilters}>
+                Reset filter
+              </button>
+            )}
+          </section>
+          {guideOpen && <ProcessOverview />}
+          {items.length === 0 ? (
+            <EmptyState title="Belum ada pengajuan visa">
+              Group atau pengajuan yang ditugaskan kepada akun Agent ini akan muncul di sini.
+            </EmptyState>
+          ) : families.length === 0 ? (
+            <section className="serene-empty-state">
+              <Icon name="search_off" />
+              <h2>Tidak ada pengajuan yang sesuai</h2>
+              <p>Ubah kata pencarian atau filter status untuk melihat pengajuan lainnya.</p>
+              <button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>
+                Reset filter
+              </button>
+            </section>
+          ) : (
+            <section className="agent-visa-journeys" aria-label="Daftar pengajuan visa">
+              {families.map((family) => (
+                <Journey
+                  key={family.root.id}
+                  family={family}
+                  filtered={hasFilters}
+                  filterKey={`${query}:${filter}`}
+                  matchingMembers={hasFilters ? family.members.filter(matches) : family.members}
+                  onOpen={onOpen}
+                />
+              ))}
+            </section>
+          )}
+        </>
       )}
-    </PageLayout>
+    </div>
   );
 }
-
+function Journey({
+  family: { root, members },
+  matchingMembers,
+  filtered,
+  filterKey,
+  onOpen,
+}: {
+  family: VisaFamily;
+  matchingMembers: VisaListItem[];
+  filtered: boolean;
+  filterKey: string;
+  onOpen: (item: VisaListItem) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    if (filtered) {
+      setExpanded(true);
+      setMoreOpen(true);
+    }
+  }, [filtered, filterKey]);
+  const children = matchingMembers.filter((item) => item !== root);
+  const bodyId = `visa-family-${root.id}`;
+  const titleId = `visa-family-title-${root.id}`;
+  const hasChildren = members.length > 1;
+  return (
+    <article className="agent-visa-journey" aria-labelledby={titleId}>
+      <header className="agent-visa-journey-heading">
+        <span className="agent-visa-avatar">
+          <Icon name="groups" />
+        </span>
+        <div className="agent-visa-journey-identity">
+          <h2 id={titleId}>{root.name}</h2>
+          <p>
+            {root.date ? (
+              <span>
+                {root.dateSource === "departure" ? "Keberangkatan" : "Awal perjalanan"}{" "}
+                <time dateTime={root.date}>{dateFormatter.format(new Date(`${root.date}T12:00:00Z`))}</time>
+              </span>
+            ) : (
+              <span>Jadwal belum tercatat</span>
+            )}
+            <span>{members.length} group</span>
+            <span>{members.reduce((sum, item) => sum + item.pax, 0)} jamaah</span>
+          </p>
+        </div>
+        {members.some((item) => item.bucket === "attention") && (
+          <span className="agent-visa-family-attention">
+            <Icon name="warning" />
+            Perlu perhatian
+          </span>
+        )}
+        <button
+          type="button"
+          className="agent-visa-family-toggle"
+          aria-label={`${expanded ? "Tutup" : "Buka"} progres ${root.name}`}
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          onClick={() => setExpanded((open) => !open)}
+        >
+          <Icon name="expand_more" className={expanded ? "is-up" : ""} />
+        </button>
+      </header>
+      <div id={bodyId} hidden={!expanded} className={`agent-visa-family-body ${hasChildren ? "has-children" : ""}`}>
+        <VisaRow
+          item={root}
+          role={hasChildren ? "Parent" : undefined}
+          context={filtered && !matchingMembers.includes(root)}
+          onOpen={onOpen}
+        />
+        {children[0] && <VisaRow item={children[0]} role="Child" onOpen={onOpen} />}
+        {children.length > 1 && (
+          <>
+            <div id={`${bodyId}-more`} className={`agent-visa-more-children ${moreOpen ? "is-open" : ""}`}>
+              {children.slice(1).map((item) => (
+                <VisaRow key={item.id} item={item} role="Child" onOpen={onOpen} />
+              ))}
+            </div>
+            <button
+              type="button"
+              className="agent-visa-more-button"
+              aria-controls={`${bodyId}-more`}
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              {moreOpen ? "Sembunyikan group lainnya" : `Lihat ${children.length - 1} group lainnya`}
+              <Icon name="expand_more" className={moreOpen ? "is-up" : ""} />
+            </button>
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+function VisaRow({
+  item,
+  role,
+  context = false,
+  onOpen,
+}: {
+  item: VisaListItem;
+  role?: "Parent" | "Child";
+  context?: boolean;
+  onOpen: (item: VisaListItem) => void;
+}) {
+  const attention = item.stages.find((stage) => stage.tone === "attention");
+  return (
+    <section
+      className={`agent-visa-row ${role === "Child" ? "is-child" : ""} ${context ? "is-context" : ""}`}
+      aria-label={`Group ${item.code}`}
+    >
+      <span className="agent-visa-avatar">
+        <Icon name={role === "Parent" || attention ? "groups" : "luggage"} />
+      </span>
+      <div className="agent-visa-group-identity">
+        <h3 title={item.name}>{item.code}</h3>
+        <p>
+          {item.pax} jamaah
+        </p>
+        {context && <span className="agent-visa-context-label">Group terhubung</span>}
+      </div>
+      <ol className="agent-visa-stages" aria-label={`${item.completedStages} dari 4 tahap selesai`}>
+        {item.stages.map((stage, index) => (
+          <li
+            key={stage.id}
+            className={`agent-visa-stage is-${stage.tone} ${stage.id === "agreement" && stage.status === "Menunggu persetujuan" ? "is-approval-waiting" : ""}`}
+          >
+            <span className="agent-visa-stage-marker">
+              {stage.complete ? (
+                <Icon name="check" />
+              ) : stage.tone === "attention" ? (
+                <Icon name="warning" />
+              ) : stage.tone === "in-progress" ? (
+                <Icon name="schedule" />
+              ) : (
+                index + 1
+              )}
+            </span>
+            <div className="agent-visa-stage-copy">
+              <span className="agent-visa-stage-name" title={stage.label}>
+                <span className="agent-visa-stage-number">{index + 1}</span>
+                {stageLabels[stage.id]}
+              </span>
+              <span className="agent-visa-stage-status" title={stage.status}>
+                {compactStatus[stage.status] ?? stage.status}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <button
+        type="button"
+        className="agent-visa-detail"
+        aria-label={`Lihat detail visa ${item.code}`}
+        onClick={() => onOpen(item)}
+      >
+        Lihat detail
+        <Icon name="arrow_forward" />
+      </button>
+      {attention && (
+        <p className="agent-visa-revision">
+          <Icon name="warning" />
+          {attention.status}.
+        </p>
+      )}
+    </section>
+  );
+}
 function ProcessOverview() {
   return (
-    <section className="serene-section p-5 sm:p-6" aria-labelledby="visa-process-title">
-      <h2 id="visa-process-title" className="text-lg font-extrabold text-on-surface">Alur proses visa</h2>
-      <p className="mt-1 max-w-3xl text-sm leading-relaxed text-on-surface-variant">Setiap pengajuan bergerak melalui empat tahap utama berikut.</p>
-      <ol className="mt-5 grid border-y border-outline-variant/30 sm:grid-cols-2 lg:grid-cols-4">
+    <section id="agent-visa-guide" className="agent-visa-guide" aria-labelledby="visa-process-title">
+      <h2 id="visa-process-title">Alur proses visa</h2>
+      <ol>
         {visaProcessDefinition.map((stage, index) => (
-          <li key={stage.label} className="flex gap-3 border-b border-outline-variant/30 py-4 last:border-b-0 sm:border-b-0 sm:px-4 lg:border-r lg:first:pl-0 lg:last:border-r-0">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-extrabold text-primary tabular-nums">{index + 1}</span>
-            <div className="min-w-0"><h3 className="text-sm font-extrabold text-on-surface">{stage.label}</h3><p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{stage.description}</p></div>
+          <li key={stage.label}>
+            <span>{index + 1}</span>
+            <div>
+              <h3>{stage.label}</h3>
+              <p>{stage.description}</p>
+            </div>
           </li>
         ))}
       </ol>
     </section>
   );
 }
-
-function Summary({ label, value }: { label: string; value: number }) {
-  return <div className="flex items-baseline justify-between gap-3 sm:block"><dt className="text-sm text-on-surface-variant">{label}</dt><dd className="mt-1 text-xl font-extrabold text-on-surface tabular-nums">{value}</dd></div>;
-}
-
-function VisaRow({ item, onOpen }: { item: VisaListItem; onOpen: () => void }) {
+function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
-    <article className="grid min-w-0 gap-4 p-5 lg:grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,0.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
-      <div className="min-w-0"><p className="break-all text-sm font-extrabold text-primary">{item.code}</p><h2 className="mt-1 break-words text-base font-extrabold text-on-surface">{item.name}</h2><p className="mt-1 text-sm text-on-surface-variant">{item.pax} jamaah · {item.packageName}</p></div>
-      <LabeledValue label="Tahap saat ini"><p className="mb-2 text-sm font-bold text-on-surface">{item.currentStage.label}</p><StatusBadge tone={item.currentStage.tone}>{item.currentStage.status}</StatusBadge></LabeledValue>
-      <ProcessSummary stages={item.stages} completed={item.completedStages} />
-      <div className="flex items-center lg:justify-end"><button type="button" className="serene-btn-secondary min-h-11 shrink-0" onClick={onOpen} aria-label={`Lihat detail visa ${item.code}`}>Lihat detail<span className="material-symbols-outlined text-lg" aria-hidden="true">arrow_forward</span></button></div>
-    </article>
+    <span className={`material-symbols-outlined ${className}`} aria-hidden="true">
+      {name}
+    </span>
   );
-}
-
-function ProcessSummary({ stages, completed }: { stages: VisaProcessStage[]; completed: number }) {
-  return (
-    <div className="min-w-0" aria-label={`${completed} dari 4 tahap selesai`}>
-      <p className="mb-2 text-xs font-semibold text-on-surface-variant"><span className="lg:sr-only">Progres proses: </span>{completed} dari 4 tahap selesai</p>
-      <ol className="grid grid-cols-4 gap-1" aria-hidden="true">
-        {stages.map((stage) => <li key={stage.id} className={`h-2 rounded-full ${stage.complete ? "bg-primary" : stage.tone === "attention" ? "bg-error" : stage.tone === "in-progress" ? "bg-tertiary" : "bg-outline-variant/45"}`} />)}
-      </ol>
-    </div>
-  );
-}
-
-function LabeledValue({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="min-w-0"><p className="mb-1.5 text-xs font-semibold text-on-surface-variant lg:sr-only">{label}</p>{children}</div>;
-}
-
-function VisaEmpty({ title, description, action }: { title: string; description: string; action: ReactNode }) {
-  return <section className="serene-empty-state"><span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">search_off</span><h2 className="mt-3 text-xl font-bold text-on-surface">{title}</h2><p className="mt-2 max-w-xl text-sm text-on-surface-variant">{description}</p><div className="mt-5">{action}</div></section>;
 }

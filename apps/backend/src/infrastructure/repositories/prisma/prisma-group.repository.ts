@@ -515,7 +515,7 @@ export class PrismaGroupRepository implements GroupRepository {
     });
     if (childCount > 0) {
       throw new ConflictException(
-        `Group '${current.code}' still has child groups and cannot be deleted. Unlink child groups first.`,
+        `Group '${current.code}' still has linked groups and cannot be deleted. Unlink the groups first.`,
       );
     }
 
@@ -532,7 +532,7 @@ export class PrismaGroupRepository implements GroupRepository {
       select: { id: true, code: true, parentGroupId: true, childGroups: { select: { id: true } } },
     });
     if (!group) throw new NotFoundException(`Group '${idOrCode}' not found.`);
-    if (group.parentGroupId) throw new BadRequestException("Reassign Agent harus dilakukan dari parent Group.");
+    if (group.parentGroupId) throw new BadRequestException("Reassign Agent harus dilakukan dari group sumber data bersama.");
     const groupIds = [group.id, ...group.childGroups.map((child) => child.id)];
     await this.prisma.$transaction(async (tx) => {
       const linkedAgreements = await tx.visaHotelAgreement.findMany({
@@ -1384,7 +1384,7 @@ export class PrismaGroupRepository implements GroupRepository {
       (requestedParentGroupId === currentGroup.id ||
         requestedParentGroupId.toUpperCase() === currentGroup.code)
     ) {
-      throw new ConflictException("A group cannot be linked as its own parent.");
+      throw new ConflictException("A group cannot be linked to itself.");
     }
 
     const parentGroup = await this.prisma.group.findFirst({
@@ -1403,17 +1403,17 @@ export class PrismaGroupRepository implements GroupRepository {
     });
 
     if (!parentGroup) {
-      throw new NotFoundException(`Parent group '${requestedParentGroupId}' not found.`);
+      throw new NotFoundException(`Linked group '${requestedParentGroupId}' not found.`);
     }
 
     if (parentGroup.parentGroupId) {
       throw new ConflictException(
-        `Group '${parentGroup.code}' is a child group and cannot be used as parent.`,
+        `Group '${parentGroup.code}' already follows another group and cannot be used as a shared data source.`,
       );
     }
 
     if (input.agentId && parentGroup.agentId && parentGroup.agentId !== input.agentId) {
-      throw new ConflictException("Parent Group dan Child Group harus berasal dari Agent yang sama.");
+      throw new ConflictException("Group yang terhubung harus berasal dari Agent yang sama.");
     }
 
     if (currentGroup) {
@@ -1424,7 +1424,7 @@ export class PrismaGroupRepository implements GroupRepository {
       });
       if (childCount > 0) {
         throw new ConflictException(
-          `Group '${currentGroup.code}' already has child groups and cannot become a child group.`,
+          `Group '${currentGroup.code}' already has linked groups and cannot follow another group.`,
         );
       }
     }
@@ -1444,7 +1444,7 @@ export class PrismaGroupRepository implements GroupRepository {
     });
     if (group && group.parentGroupId) {
       throw new BadRequestException(
-        `Grup '${group.code}' adalah child group. Silakan edit ${operation} pada parent group.`,
+        `Grup '${group.code}' menggunakan data bersama. Silakan edit ${operation} pada group sumber data.`,
       );
     }
   }

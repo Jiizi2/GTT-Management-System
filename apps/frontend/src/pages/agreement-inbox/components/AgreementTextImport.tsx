@@ -3,10 +3,12 @@ import { Button } from "../../../components/button";
 import { DatePickerInput } from "../../../components/date-time-pickers";
 import { SereneSelect } from "../../../components/serene-select";
 import { useAgentsQuery } from "../../../hooks/use-agents-backend";
+import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
 import type { AgreementApprovalStatus, HotelAgreementDraftFormState } from "../../../shared/app-domain";
 import { parseAgreementText, type ParsedAgreementTextItem } from "../../../shared/agreement-text-parser";
 
 type ImportError = { message: string } | null;
+type ImportItem = ParsedAgreementTextItem & { muassasahId?: string };
 
 const SAMPLE_TEXT = `Agreement Kayan Alraia Hotel
 15762600997977714
@@ -27,8 +29,9 @@ export function AgreementTextImport({
   onComplete: () => void;
 }) {
   const agentsQuery = useAgentsQuery();
+  const muassasahQuery = useMuassasahQuery();
   const [sourceText, setSourceText] = useState("");
-  const [items, setItems] = useState<ParsedAgreementTextItem[]>([]);
+  const [items, setItems] = useState<ImportItem[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [agentId, setAgentId] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -44,10 +47,10 @@ export function AgreementTextImport({
     setSourceEditorOpen(result.items.length === 0);
   };
 
-  const updateItem = <Key extends keyof ParsedAgreementTextItem>(
+  const updateItem = <Key extends keyof ImportItem>(
     index: number,
     key: Key,
-    value: ParsedAgreementTextItem[Key],
+    value: ImportItem[Key],
   ) => {
     setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
   };
@@ -79,6 +82,7 @@ export function AgreementTextImport({
       const saved = await onSaveDraft({
         city: item.city,
         agentId,
+        muassasahId: item.muassasahId ?? "",
         groupName: groupName.trim(),
         hotelName: item.hotelName.trim(),
         agreementNumber: item.agreementNumber.trim(),
@@ -182,6 +186,14 @@ export function AgreementTextImport({
                     <span>Agreement Number</span>
                     <input className="serene-input serene-input-md tabular-nums" value={item.agreementNumber} onChange={(event) => updateItem(index, "agreementNumber", event.target.value)} />
                   </label>
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                    <span>Muassasah <span className="text-xs font-normal text-on-surface-variant">(opsional)</span></span>
+                    <SereneSelect className="serene-select" value={item.muassasahId ?? ""} onChange={(event) => updateItem(index, "muassasahId", event.target.value)} disabled={muassasahQuery.isLoading || muassasahQuery.isError} aria-label={`Muassasah agreement ${index + 1}`}>
+                      <option value="">Belum dipilih</option>
+                      {(muassasahQuery.data ?? []).filter((option) => option.isActive).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                    </SereneSelect>
+                  </label>
+                  {muassasahQuery.isError ? <p className="text-xs font-semibold text-rose-700" role="alert">Data Muassasah belum dapat dimuat. <button type="button" className="underline underline-offset-2" onClick={() => void muassasahQuery.refetch()}>Coba lagi</button></p> : null}
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     <span>Approval Status</span>
                     <SereneSelect className="serene-select" value={item.status} onChange={(event) => updateItem(index, "status", event.target.value as AgreementApprovalStatus)}>

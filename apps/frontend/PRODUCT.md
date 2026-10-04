@@ -22,6 +22,8 @@ Master Data mencakup opsi sistem yang digunakan oleh fitur lain, termasuk data t
 
 ## Capabilities and Constraints
 
+Portal Agent memungkinkan Agent membaca keluarga parent–child dan informasi perjalanan miliknya, mengunduh itinerary yang dibatasi sesuai kepemilikan, serta melihat dan memantau agreement hotel miliknya yang dikelola Admin. Visa dan hotel tetap milik tiap group; informasi operasional bersama mengikuti parent yang dapat diakses. Pembuatan, revisi, approval, alokasi agreement, dan pengelolaan relasi group dilakukan Admin. Agreement Inbox Agent hanya menyediakan pencarian, filter, informasi agreement, dan detail alokasi; Agent tidak dapat membuat atau merevisi agreement pada status apa pun. Catatan internal tidak dibagikan.
+
 - Admin dapat membuat dan mengedit draft agreement.
 - Admin dapat mengubah status approval secara langsung: Waiting for Approval, Approved, atau Rejected.
 - Satu agreement dapat dibagi ke beberapa group hingga kapasitas pax habis.

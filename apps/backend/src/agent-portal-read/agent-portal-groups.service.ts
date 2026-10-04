@@ -66,10 +66,23 @@ type TransportSource = {
   trainDepartureTime?: string | null;
   stationPickupTime?: string | null;
   status?: string;
-  drivers?: Array<{ isVerified?: boolean }>;
+  drivers?: Array<{ slotNumber?: number; name?: string; phone?: string; plateNumber?: string; isVerified?: boolean }>;
 };
 
+const itinerarySelection = {
+  id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
+  isoDate: true, time: true, transportMode: true, flightNumber: true, hotelName: true, fromHotelName: true,
+  fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
+  transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true, hotelPickupRequestTime: true,
+} satisfies Prisma.ItineraryItemSelect;
+const parentSelection = {
+  id: true, code: true, name: true, agentId: true,
+  musyrif: { select: { name: true, phone: true, avatar: true } },
+  itinerary: { orderBy: { sortOrder: "asc" }, select: itinerarySelection },
+} satisfies Prisma.GroupSelect;
+
 type OverviewGroup = Parameters<typeof summary>[0] & {
+  parentGroupId?: string | null;
   packageName?: string;
   totalBuses?: number | null;
   musyrif?: { name: string; phone: string; avatar: string } | null;
@@ -96,6 +109,7 @@ export class AgentPortalGroupsService {
         ...this.overviewSummary({ ...group, lifecycleStatus: lifecycleOf(group) }),
         totalBuses: group.totalBuses ?? null,
         durationDays: group.durationDays,
+        familyGroups: this.memoryFamily(agentId, group).map((item) => this.overviewSummary({ ...item, lifecycleStatus: lifecycleOf(item) })),
       };
     }
     const group = await this.prisma.group.findFirst({
@@ -103,11 +117,12 @@ export class AgentPortalGroupsService {
       select: {
         id: true, code: true, name: true, lifecycleStatus: true, arrivalDate: true,
         returnDate: true, pax: true, packageName: true, totalBuses: true, durationDays: true,
+        parentGroupId: true, parentGroup: { select: parentSelection },
         musyrif: { select: { name: true, phone: true, avatar: true } },
         notes: { orderBy: { sortOrder: "asc" }, select: { id: true, sortOrder: true, text: true, pinned: true } },
         itinerary: { orderBy: { sortOrder: "asc" }, select: {
           id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
-          isoDate: true, time: true, flightNumber: true, hotelName: true, fromHotelName: true,
+          isoDate: true, time: true, transportMode: true, flightNumber: true, hotelName: true, fromHotelName: true,
           fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
           transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true,
           hotelPickupRequestTime: true,
@@ -115,10 +130,20 @@ export class AgentPortalGroupsService {
       },
     });
     if (!group) throw notFound();
-    return { ...this.overviewSummary(group), totalBuses: group.totalBuses, durationDays: group.durationDays };
+    const effective = this.inheritPrisma(group, agentId);
+    const rootId = effective.parentGroupId ?? group.id;
+    const family = await this.prisma.group.findMany({
+      where: { agentId, OR: [{ id: rootId }, { parentGroupId: rootId }] },
+      orderBy: [{ code: "asc" }, { id: "asc" }],
+      select: { id: true, code: true, name: true, lifecycleStatus: true, arrivalDate: true, returnDate: true, pax: true, packageName: true, parentGroupId: true },
+    });
+    return { ...this.overviewSummary(effective), totalBuses: group.totalBuses, durationDays: group.durationDays,
+      familyGroups: family.map((item) => this.overviewSummary(item)) };
+
   }
 
   async itinerary(agentId: string, idOrCode: string) {
+    if (this.dataSource === "prisma") idOrCode = await this.scheduleIdentity(agentId, idOrCode);
     if (this.dataSource === "memory") {
       return (this.findMemory(agentId, idOrCode).itinerary ?? [])
         .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -128,7 +153,7 @@ export class AgentPortalGroupsService {
       where: this.ownedIdentity(agentId, idOrCode),
       select: { itinerary: { orderBy: { sortOrder: "asc" }, select: {
         id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
-        isoDate: true, time: true, flightNumber: true, hotelName: true, fromHotelName: true,
+        isoDate: true, time: true, transportMode: true, flightNumber: true, hotelName: true, fromHotelName: true,
         fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
         transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true,
         hotelPickupRequestTime: true,
@@ -139,6 +164,7 @@ export class AgentPortalGroupsService {
   }
 
   async timeline(agentId: string, idOrCode: string) {
+    if (this.dataSource === "prisma") idOrCode = await this.scheduleIdentity(agentId, idOrCode);
     if (this.dataSource === "memory") {
       return (this.findMemory(agentId, idOrCode).timeline ?? [])
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -161,11 +187,17 @@ export class AgentPortalGroupsService {
         syarikah: visa.syarikah,
         busStatus: visa.busStatus ?? null,
         paymentStatus: visa.paymentStatus,
+        makkahHotelWaived: visa.makkahHotelWaived ?? false, madinahHotelWaived: visa.madinahHotelWaived ?? false,
+        raudhahAppointments: (visa.raudhahAppointments ?? []).map((item) => ({ id: item.id, date: toIso(item.date), status: item.status, tasrehPrinted: item.tasrehPrinted ?? false })),
+        flightLegs: (visa.flightLegs ?? []).map((item) => ({ id: item.id, direction: item.direction, sortOrder: item.sortOrder, departureAirportCode: item.departureAirportCode ?? null, arrivalAirportCode: item.arrivalAirportCode ?? null, departureDate: toIso(item.departureDate), departureTime: item.departureTime ?? null, arrivalDate: toIso(item.arrivalDate), arrivalTime: item.arrivalTime ?? null, carrierCode: item.carrierCode ?? null, flightNumber: item.flightNumber ?? null })),
       } : { status: null, issuedDate: null, syarikah: null, busStatus: null, paymentStatus: null };
     }
     const group = await this.prisma.group.findFirst({
       where: this.ownedIdentity(agentId, idOrCode),
-      select: { visaSetup: { select: { visaStatus: true, issuedDate: true, syarikah: true, busStatus: true, paymentStatus: true } } },
+      select: { visaSetup: { select: { visaStatus: true, issuedDate: true, syarikah: true, busStatus: true, paymentStatus: true, makkahHotelWaived: true, madinahHotelWaived: true,
+        raudhahAppointments: { orderBy: { date: "asc" }, select: { id: true, date: true, status: true, tasrehPrinted: true } },
+        flightLegs: { orderBy: [{ direction: "asc" }, { sortOrder: "asc" }], select: { id: true, direction: true, sortOrder: true, departureAirportCode: true, arrivalAirportCode: true, departureDate: true, departureTime: true, arrivalDate: true, arrivalTime: true, carrierCode: true, flightNumber: true } },
+      } } },
     });
     if (!group) throw notFound();
     return {
@@ -174,6 +206,10 @@ export class AgentPortalGroupsService {
       syarikah: group.visaSetup?.syarikah ?? null,
       busStatus: group.visaSetup?.busStatus ?? null,
       paymentStatus: group.visaSetup?.paymentStatus ?? null,
+      makkahHotelWaived: group.visaSetup?.makkahHotelWaived ?? false,
+      madinahHotelWaived: group.visaSetup?.madinahHotelWaived ?? false,
+      raudhahAppointments: (group.visaSetup?.raudhahAppointments ?? []).map((item) => ({ ...item, date: toIso(item.date) })),
+      flightLegs: (group.visaSetup?.flightLegs ?? []).map((item) => ({ ...item, departureDate: toIso(item.departureDate), arrivalDate: toIso(item.arrivalDate) })),
     };
   }
 
@@ -195,6 +231,7 @@ export class AgentPortalGroupsService {
   }
 
   async transportation(agentId: string, idOrCode: string) {
+    if (this.dataSource === "prisma") idOrCode = await this.scheduleIdentity(agentId, idOrCode);
     if (this.dataSource === "memory") {
       return (this.findMemory(agentId, idOrCode).checklistAssignments ?? []).map((item) => this.projectTransport(item));
     }
@@ -204,7 +241,7 @@ export class AgentPortalGroupsService {
         id: true, tripDate: true, activity: true, tripLabel: true, requiredBusCount: true,
         scheduledTime: true, transferByTrain: true, trainDepartureTime: true,
         stationPickupTime: true, status: true,
-        drivers: { select: { isVerified: true } },
+        drivers: { select: { slotNumber: true, name: true, phone: true, plateNumber: true, isVerified: true } },
       } } },
     });
     if (!group) throw notFound();
@@ -225,11 +262,12 @@ export class AgentPortalGroupsService {
         select: {
           id: true, code: true, name: true, lifecycleStatus: true, arrivalDate: true, returnDate: true,
           pax: true, packageName: true, totalBuses: true,
+          parentGroupId: true, parentGroup: { select: parentSelection },
           musyrif: { select: { name: true, phone: true, avatar: true } },
           notes: { orderBy: { sortOrder: "asc" }, select: { id: true, sortOrder: true, text: true, pinned: true } },
           itinerary: { orderBy: { sortOrder: "asc" }, select: {
             id: true, sortOrder: true, dateLabel: true, yearLabel: true, category: true, title: true,
-            isoDate: true, time: true, flightNumber: true, hotelName: true, fromHotelName: true,
+            isoDate: true, time: true, transportMode: true, flightNumber: true, hotelName: true, fromHotelName: true,
             fromLocation: true, toLocation: true, cityTourCity: true, requiresBus: true, busCount: true,
             transferByTrain: true, trainDepartureTime: true, destinationPickupTime: true,
             hotelPickupRequestTime: true,
@@ -237,7 +275,7 @@ export class AgentPortalGroupsService {
         },
       }),
     ]);
-    return { items: rows.map((group) => this.overviewSummary(group)), total, page, pageSize };
+    return { items: rows.map((group) => this.overviewSummary(this.inheritPrisma(group, agentId))), total, page, pageSize };
   }
 
   private listMemory(agentId: string, query: AgentPortalGroupQueryDto) {
@@ -257,7 +295,7 @@ export class AgentPortalGroupsService {
     const pageSize = query.pageSize ?? 20;
     return {
       items: filtered.slice((page - 1) * pageSize, page * pageSize)
-        .map((group) => this.overviewSummary({ ...group, lifecycleStatus: lifecycleOf(group) })),
+        .map((group) => this.overviewSummary({ ...this.findMemory(agentId, group.id), lifecycleStatus: lifecycleOf(group) })),
       total: filtered.length, page, pageSize,
     };
   }
@@ -286,7 +324,27 @@ export class AgentPortalGroupsService {
     const normalized = idOrCode.trim().toUpperCase();
     const found = this.store.groups.find((group) => group.agentId === agentId && (group.id === idOrCode || group.code === normalized));
     if (!found) throw notFound();
-    return found;
+    const parent = found.parentGroupId ? this.store.groups.find((item) => item.id === found.parentGroupId && item.agentId === agentId) : null;
+    return { ...found, parentGroupId: parent?.id ?? null,
+      ...(parent ? { itinerary: parent.itinerary, timeline: parent.timeline, musyrif: parent.musyrif, checklistAssignments: parent.checklistAssignments } : {}) };
+  }
+
+  private memoryFamily(agentId: string, group: MemoryGroupRecord) {
+    const rootId = group.parentGroupId ?? group.id;
+    return this.store.groups.filter((item) => item.agentId === agentId && (item.id === rootId || item.parentGroupId === rootId));
+  }
+
+  private inheritPrisma<T extends OverviewGroup & { parentGroup?: { id: string; agentId: string; musyrif?: OverviewGroup["musyrif"]; itinerary?: ItinerarySource[] } | null }>(group: T, agentId: string) {
+    const parent = group.parentGroup?.agentId === agentId ? group.parentGroup : null;
+    return { ...group, parentGroupId: parent?.id ?? null,
+      ...(parent ? { itinerary: parent.itinerary, musyrif: parent.musyrif } : {}) };
+  }
+
+  private async scheduleIdentity(agentId: string, identity: string): Promise<string> {
+    const group = await this.prisma.group.findFirst({ where: this.ownedIdentity(agentId, identity),
+      select: { id: true, parentGroup: { select: { id: true, agentId: true } } } });
+    if (!group) throw notFound();
+    return group.parentGroup?.agentId === agentId ? group.parentGroup.id : group.id;
   }
 
   private projectItinerary(item: ItinerarySource) {
@@ -309,6 +367,7 @@ export class AgentPortalGroupsService {
   private overviewSummary(group: OverviewGroup) {
     return {
       ...summary(group),
+      parentGroupId: group.parentGroupId ?? null,
       packageName: group.packageName ?? "",
       totalBuses: group.totalBuses ?? null,
       musyrif: group.musyrif
@@ -328,6 +387,7 @@ export class AgentPortalGroupsService {
       requiredBusCount: item.requiredBusCount, scheduledTime: item.scheduledTime,
       transferByTrain: item.transferByTrain ?? false, trainDepartureTime: item.trainDepartureTime ?? null,
       stationPickupTime: item.stationPickupTime ?? null, status: item.status,
+      drivers: drivers.map((driver) => ({ slotNumber: driver.slotNumber ?? null, name: driver.name ?? "", phone: driver.phone ?? "", plateNumber: driver.plateNumber ?? "", isVerified: driver.isVerified ?? false })),
       assignedDriverCount: drivers.length,
       verifiedDriverCount: drivers.filter((driver: { isVerified?: boolean }) => driver.isVerified).length,
     };

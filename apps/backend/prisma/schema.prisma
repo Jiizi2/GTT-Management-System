@@ -226,6 +226,7 @@ model Muassasah {
   updatedAt DateTime  @updatedAt
   drivers   Driver[]
   vehicles  Vehicle[]
+  hotelAgreementDrafts HotelAgreementDraft[]
 
   @@index([isActive])
 }
@@ -667,6 +668,7 @@ model HotelAgreementDraft {
   id              String                  @id @default(cuid())
   city            AgreementCity
   agentId         String
+  muassasahId     String?
   groupName       String                  @default("")
   hotelName       String
   agreementNumber String
@@ -679,10 +681,12 @@ model HotelAgreementDraft {
   updatedAt       DateTime                @updatedAt
   linkedHotelAgreements VisaHotelAgreement[]
   agent           Agent                   @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  muassasah       Muassasah?               @relation(fields: [muassasahId], references: [id], onDelete: SetNull)
 
   @@index([agreementNumber])
   @@index([city, stayStart])
   @@index([agentId, city, stayStart])
+  @@index([muassasahId])
 }
 
 model RaudhahAppointment {

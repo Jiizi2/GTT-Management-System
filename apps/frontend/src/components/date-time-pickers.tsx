@@ -147,7 +147,7 @@ function computePopoverStyle(
   };
 }
 
-function useFloatingPopoverStyle(
+export function useFloatingPopoverStyle(
   isOpen: boolean,
   anchorRef: RefObject<HTMLDivElement | null>,
   preferredWidth: number,

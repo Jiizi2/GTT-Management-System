@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["build-meta/", "dist/", "node_modules/", "public/", "test-results/", "test-results-*/"],
+    ignores: [".impeccable/", "build-meta/", "dist/", "node_modules/", "public/", "test-results/", "test-results-*/"],
   },
   {
     ...js.configs.recommended,

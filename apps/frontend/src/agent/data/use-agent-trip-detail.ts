@@ -8,6 +8,7 @@ import { agentQueryKeys } from "../query/agent-query-boundary";
 export type AgentTripDetail = {
   group: GroupData;
   transportation: TransportationItem[];
+  familyGroups?: GroupData[];
 };
 
 export function useAgentTripDetail({
@@ -35,6 +36,7 @@ export function useAgentTripDetail({
       return {
         group: mapAgentGroup(group, agentId, agentName, { facet, hotels }),
         transportation,
+        familyGroups: (group.familyGroups ?? [group]).map((member) => mapAgentGroup(member, agentId, agentName)),
       };
     },
     enabled: Boolean(identity),

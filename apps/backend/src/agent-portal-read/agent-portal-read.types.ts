@@ -2,6 +2,7 @@ import type { GroupLifecycleStatus } from "@prisma/client";
 
 export type AgentPortalDashboard = {
   groups: {
+    journeys: number;
     total: number;
     active: number;
     completed: number;

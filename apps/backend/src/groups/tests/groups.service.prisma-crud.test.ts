@@ -233,7 +233,7 @@ describe("GroupsServicePrismaCrud", () => {
                 parentGroupId: "GRP-CHILD-PARENT",
               }),
             ),
-        ).rejects.toThrow(/cannot be used as parent/i);
+        ).rejects.toThrow(/cannot be used as a shared data source/i);
         expect(transactionCalls).toBe(0);
       } finally {
         restore();
@@ -684,7 +684,7 @@ describe("GroupsServicePrismaCrud", () => {
             service.update("GRP-PARENT", {
               parentGroupId: "GRP-OTHER-PARENT",
             }),
-        ).rejects.toThrow(/already has child groups/i);
+        ).rejects.toThrow(/already has linked groups/i);
         expect(updateCalls).toBe(0);
       } finally {
         restore();
@@ -825,7 +825,7 @@ describe("GroupsServicePrismaCrud", () => {
       try {
         await expect(
           () => service.remove("GRP-PARENT"),
-        ).rejects.toThrow(/still has child groups/i);
+        ).rejects.toThrow(/still has linked groups/i);
         expect(deleteCalls).toBe(0);
       } finally {
         restore();

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ConfigService } from "@nestjs/config";
 import type { PrismaService } from "../prisma/prisma.service";
 import { DirectoryService } from "./directory.service";
@@ -9,6 +9,13 @@ function makeService(): DirectoryService {
 }
 
 describe("DirectoryService (memory)", () => {
+  it("resolves only linked Muassasah names, including inactive links", async () => {
+    const service = makeService();
+    const own = await service.createMuassasah({ name: "Own" });
+    await service.createMuassasah({ name: "Unrelated" });
+    await service.updateMuassasah(own.id, { name: "Current", isActive: false });
+    expect(await service.resolveMuassasahNames([own.id, own.id, "missing"])).toEqual(new Map([[own.id, "Current"]]));
+  });
   it("creates and lists muassasah, rejecting duplicates", async () => {
     const service = makeService();
     const created = await service.createMuassasah({ name: " Daleel Maalem " });
@@ -78,5 +85,17 @@ describe("DirectoryService (memory)", () => {
 
     expect((await service.listDrivers())[0]).toMatchObject({ muassasahId: null, muassasahName: null });
     expect((await service.listVehicles())[0]).toMatchObject({ muassasahId: null, muassasahName: null });
+  });
+});
+
+describe("DirectoryService scoped Prisma names", () => {
+  it("fetches IDs and names for deduplicated references without querying the full directory", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ id: "own", name: "Current" }]);
+    const config = { get: () => "prisma" } as unknown as ConfigService;
+    const service = new DirectoryService(config, { muassasah: { findMany } } as unknown as PrismaService);
+    expect(await service.resolveMuassasahNames([])).toEqual(new Map());
+    expect(findMany).not.toHaveBeenCalled();
+    expect(await service.resolveMuassasahNames(["own", "own"])).toEqual(new Map([["own", "Current"]]));
+    expect(findMany).toHaveBeenCalledExactlyOnceWith({ where: { id: { in: ["own"] } }, select: { id: true, name: true } });
   });
 });
