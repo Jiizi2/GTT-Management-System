@@ -74,7 +74,10 @@ export function AgreementDraftSummary({
       </div>
       <div className="min-w-0">
         <p className="text-[11px] font-semibold text-on-surface-variant">{labels.agreement}</p>
-        <p className="mt-1 truncate text-sm font-bold tabular-nums text-on-surface" title={agreementNumber}>
+        <p
+          className="mt-1 whitespace-normal text-sm font-bold tabular-nums text-on-surface [overflow-wrap:anywhere]"
+          title={agreementNumber}
+        >
           {agreementNumber}
         </p>
         <p className="mt-1.5 flex min-w-0 items-baseline gap-1" title={muassasahName || "Belum dipilih"}>
