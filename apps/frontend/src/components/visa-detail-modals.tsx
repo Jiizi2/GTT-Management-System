@@ -6,6 +6,7 @@ import * as z from "zod/v4";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "./form-accessibility";
 import { SereneSelect } from "./serene-select";
+import { FlightAirportField } from "./flight-airport-field";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
 import type { AgentOption } from "../hooks/use-agents-backend";
 import type {
@@ -662,11 +663,22 @@ export function FlightDetailsModal({
                     />
                     <FieldErrorMessage fieldId={`flight-leg-${index}-departure-date`} message={legErrors?.departureDate?.message} className={modalErrorClassName} />
                   </label>
-                  <label className={`${modalFieldClassName} lg:col-span-2`}>
-                    <span>From</span>
-                    <input className={`${modalInputClassName} uppercase`} maxLength={3} placeholder="CGK" {...register(`flightLegs.${index}.departureAirportCode`)} />
-                    <FieldErrorMessage fieldId={`flight-leg-${index}-from`} message={legErrors?.departureAirportCode?.message} className={modalErrorClassName} />
-                  </label>
+                  <Controller
+                    control={control}
+                    name={`flightLegs.${index}.departureAirportCode`}
+                    render={({ field }) => (
+                      <FlightAirportField
+                        id={`flight-leg-${index}-from`}
+                        label="From"
+                        accessibleLabel={`From ${title} segmen ${position + 1}`}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        inputRef={field.ref}
+                        errorMessage={legErrors?.departureAirportCode?.message}
+                      />
+                    )}
+                  />
                   <label className={`${modalFieldClassName} lg:col-span-2`}>
                     <span>ETD</span>
                     <Controller
@@ -707,11 +719,22 @@ export function FlightDetailsModal({
                     />
                     <FieldErrorMessage fieldId={`flight-leg-${index}-arrival-date`} message={legErrors?.arrivalDate?.message} className={modalErrorClassName} />
                   </label>
-                  <label className={`${modalFieldClassName} lg:col-span-2`}>
-                    <span>To</span>
-                    <input className={`${modalInputClassName} uppercase`} maxLength={3} placeholder="JED" {...register(`flightLegs.${index}.arrivalAirportCode`)} />
-                    <FieldErrorMessage fieldId={`flight-leg-${index}-to`} message={legErrors?.arrivalAirportCode?.message} className={modalErrorClassName} />
-                  </label>
+                  <Controller
+                    control={control}
+                    name={`flightLegs.${index}.arrivalAirportCode`}
+                    render={({ field }) => (
+                      <FlightAirportField
+                        id={`flight-leg-${index}-to`}
+                        label="To"
+                        accessibleLabel={`To ${title} segmen ${position + 1}`}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        inputRef={field.ref}
+                        errorMessage={legErrors?.arrivalAirportCode?.message}
+                      />
+                    )}
+                  />
                   <label className={`${modalFieldClassName} lg:col-span-2`}>
                     <span>ETA</span>
                     <Controller
@@ -775,7 +798,7 @@ export function FlightDetailsModal({
         <p className="flex items-start gap-2 text-sm font-medium leading-relaxed text-slate-600">
           <span className="material-symbols-outlined mt-0.5 text-base text-brand-primary" aria-hidden="true">info</span>
           <span>
-            Gunakan kode bandara IATA, misalnya <strong>CGK → JED</strong>. Untuk transit, tambahkan satu segmen untuk setiap penerbangan.
+            Pilih bandara Saudi atau pilih <strong>Bandara lain / transit</strong> untuk mengetik kode IATA seperti CGK, DOH, DXB, atau AUH. Tambahkan satu segmen untuk setiap penerbangan transit.
           </span>
         </p>
         {renderDirection("ONWARD", "Onward", "Penerbangan dari Indonesia menuju Arab Saudi.")}

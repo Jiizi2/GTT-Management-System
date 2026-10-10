@@ -159,7 +159,6 @@ function AgreementInboxDraftAssignmentList({
     return drafts
       .filter((draft) => {
         if (draft.city !== city) return false;
-        if (draft.assignmentStatus === "Assigned") return false;
 
         const draftStart = (draft.stayStartIso ?? "").trim();
         const draftEnd = (draft.stayEndIso ?? "").trim();

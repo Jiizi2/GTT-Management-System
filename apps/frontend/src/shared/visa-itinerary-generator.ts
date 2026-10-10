@@ -6,10 +6,12 @@ import { getScheduleTypeOption, getTransportModeIcon, sortInputItineraryItems } 
  * the arrival/departure legs without requiring a full itinerary to exist first.
  */
 export type VisaFlightInput = {
+  arrivalAirportCity?: string;
   arrivalFlightNumber?: string;
   arrivalFlightDate?: string;
   arrivalTime?: string;
   departureFlightNumber?: string;
+  departureAirportCity?: string;
   departureFlightDate?: string;
   departureTime?: string;
 };
@@ -176,7 +178,7 @@ export function buildItineraryFromVisaData(input: VisaItineraryInput): InputItin
       id: nextId("arrival"),
       dateIso: arrivalDate,
       categoryKey: "arrival",
-      from: "",
+      from: input.flight?.arrivalAirportCity?.trim() ?? "",
       to: firstStay?.cityLabel ?? "",
       hotelName: firstStay?.hotelName ?? "",
       flightNumber: input.flight?.arrivalFlightNumber?.trim() ?? "",
@@ -213,7 +215,7 @@ export function buildItineraryFromVisaData(input: VisaItineraryInput): InputItin
       dateIso: returnDate,
       categoryKey: "departure",
       from: lastStay?.cityLabel ?? "",
-      to: "",
+      to: input.flight?.departureAirportCity?.trim() ?? "",
       hotelName: lastStay?.hotelName ?? "",
       flightNumber: input.flight?.departureFlightNumber?.trim() ?? "",
       time: input.flight?.departureTime?.trim() ?? "",

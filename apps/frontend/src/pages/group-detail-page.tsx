@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { Button } from "../components/button";
 import type { GroupData } from "../shared/app-domain";
+import { resolveGroupFlightSummary } from "../shared/group-flight-summary";
 import { GroupDetailContext } from "./group-detail/context/GroupDetailContext";
 import { GroupDetailHeader } from "./group-detail/components/GroupDetailHeader";
 import { GroupTimelineTab } from "./group-detail/components/GroupTimelineTab";
@@ -83,6 +84,13 @@ export function GroupDetail({
     onPatchGroup,
   });
   const contextValue = { ...dashboard, readOnly };
+  const flightSummary = resolveGroupFlightSummary(group);
+  const editedFlight = dashboard.editScheduleForm?.category === "arrival" ? flightSummary.arrival
+    : dashboard.editScheduleForm?.category === "departure" ? flightSummary.departure : undefined;
+  const editedDirection = dashboard.editScheduleForm?.category === "arrival" ? "ONWARD" : "RETURN";
+  const flightAirportCity = editedFlight?.source === "legs" && group.visaSetup?.flightLegs?.some((leg) =>
+    leg.direction === editedDirection && (leg.departureAirportCode || leg.arrivalAirportCode),
+  ) ? editedFlight.city : undefined;
 
   const {
     hasOpenModal,
@@ -220,6 +228,7 @@ export function GroupDetail({
             {isEditModalOpen && editScheduleForm ? (
               <LazyEditScheduleModal
                 form={editScheduleForm}
+                flightAirportCity={flightAirportCity}
                 isSaveDisabled={isEditSaveDisabled}
                 showFridayCityTourWarning={showEditFridayCityTourWarning}
                 onChange={handleEditFieldChange}

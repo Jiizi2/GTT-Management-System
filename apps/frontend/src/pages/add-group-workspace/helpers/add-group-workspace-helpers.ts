@@ -496,6 +496,7 @@ export function buildItineraryFromInputItems(sortedItems: InputItineraryItem[]):
       year: formattedDate.year,
       category: item.category,
       categoryKey: item.categoryKey,
+      ...(item.transportMode ? { transportMode: item.transportMode } : {}),
       title: formatRouteSummary(item.categoryKey, item.from, item.to, item.cityTourCity),
       meta: metaSegments.join(" | "),
       icon: item.icon,

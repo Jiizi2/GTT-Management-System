@@ -10,6 +10,7 @@ import { buildRaudhahReminderTemplate } from "../../../shared/raudhah-reminder-t
 import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-keys";
 import { useModalFocusTrap } from "../../../components/use-modal-focus-trap";
 import { reassignGroupAgentInBackend } from "../../../hooks/groups-backend-api";
+import { selectGroupForFlightCopy } from "../../../shared/group-flight-summary";
 import type {
   GroupAgreementHotel,
   GroupData,
@@ -701,7 +702,7 @@ export function useVisaTrackingDetail({
   };
 
   const handleCopyWhatsapp = async (format: "general" | "muassasah-hijazi") => {
-    const copyGroup = operationalGroup ?? group ?? undefined;
+    const copyGroup = selectGroupForFlightCopy(group, operationalGroup);
     const text = format === "general"
       ? generateWhatsappCopyText(copyGroup, familyGroups)
       : generateMuassasahHijaziWhatsappCopyText(copyGroup, familyGroups);

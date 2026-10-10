@@ -1,3 +1,4 @@
+import { synchronizeItineraryFlightCities } from "./group-flight-summary";
 import {
   buildVisaAgreementNumber,
   formatVisaDateWithYear,
@@ -414,7 +415,7 @@ function buildOverviewSnapshotFromItinerary(
 }
 
 export function normalizeGroupStatus(group: GroupData): GroupData {
-  const normalizedItinerary = expandTransferTrainItineraryItems(group.itinerary);
+  const normalizedItinerary = expandTransferTrainItineraryItems(synchronizeItineraryFlightCities(group).itinerary);
   const { earliestIsoDate, latestIsoDate } = resolveItineraryBoundaryIsoDates(normalizedItinerary);
   const currentArrivalDate = group.arrivalDate?.trim() ?? "";
   const currentReturnDate = group.returnDate?.trim() ?? "";
