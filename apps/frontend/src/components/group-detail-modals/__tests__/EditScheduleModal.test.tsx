@@ -55,6 +55,21 @@ describe('EditScheduleModal', () => {
     vi.clearAllMocks();
   });
 
+  it('shows the synchronized landing airport as read-only while leaving the ground destination editable', () => {
+    render(<EditScheduleModal {...defaultProps} flightAirportCity="Madinah" />, { wrapper: createWrapper() });
+    const airport = screen.getByRole('textbox', { name: 'Landing Airport City' });
+    expect(airport).toHaveValue('Madinah');
+    expect(airport).toHaveAttribute('readonly');
+    expect(screen.getByText('Tersinkron dari Detail Penerbangan di Visa Tracking.')).toBeInTheDocument();
+    expect(document.querySelector('button[aria-haspopup="listbox"]')).not.toHaveAttribute('disabled');
+  });
+
+  it('shows the synchronized return airport as read-only', () => {
+    render(<EditScheduleModal {...defaultProps} form={{ ...defaultProps.form, category: 'departure' }} flightAirportCity="Jeddah" />, { wrapper: createWrapper() });
+    expect(screen.getByRole('textbox', { name: 'Destination Airport City' })).toHaveValue('Jeddah');
+    expect(screen.getByRole('textbox', { name: 'Destination Airport City' })).toHaveAttribute('readonly');
+  });
+
   describe('component structure', () => {
     it('should export EditScheduleModal function', () => {
       expect(typeof EditScheduleModal).toBe('function');

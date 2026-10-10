@@ -1,5 +1,5 @@
 .agent-visa-detail-page {
-  --visa-detail-rule: rgb(var(--color-outline-variant) / 0.5);
+  --visa-detail-rule: var(--serene-soft-divider-color);
   --visa-detail-paper: rgb(var(--color-surface-container-lowest));
   --visa-detail-muted: rgb(var(--color-text-secondary));
   max-width: 1586px;
@@ -70,8 +70,12 @@
   padding: 3px 10px;
   font-size: 12px;
   border-radius: 6px;
-  background: rgb(var(--color-text-primary) / 0.045);
+  background: rgb(var(--color-background));
   color: var(--visa-detail-muted);
+}
+.visa-detail-readonly {
+  background: rgb(var(--color-primary) / 0.1);
+  color: rgb(var(--color-primary));
 }
 .visa-detail-readonly .material-symbols-outlined {
   font-size: 16px;
@@ -94,7 +98,7 @@
   overflow-wrap: anywhere;
 }
 .visa-detail-surface {
-  border: 1px solid var(--visa-detail-rule);
+  border: 1px solid var(--serene-frame-border-color);
   border-radius: 12px;
   background: var(--visa-detail-paper);
 }
@@ -130,11 +134,11 @@
   text-align: left;
 }
 .visa-stage-shortcut.is-current {
-  border-color: rgb(var(--color-text-secondary) / 0.4);
-  background: rgb(var(--color-text-primary) / 0.025);
+  border-color: rgb(var(--color-primary) / 0.4);
+  background: rgb(var(--color-primary) / 0.06);
 }
 .visa-stage-shortcut:hover {
-  background: rgb(var(--color-text-primary) / 0.045);
+  background: rgb(var(--color-primary) / 0.06);
 }
 .visa-stage-shortcut-copy {
   display: grid;
@@ -157,18 +161,33 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgb(var(--color-text-primary) / 0.055);
+  background: rgb(var(--color-background-deep));
   color: var(--visa-detail-muted);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.visa-stage-marker[data-tone="complete"],
+.visa-stage-marker[data-tone="complete"] {
+  background: rgb(var(--color-emerald-100));
+  color: rgb(var(--color-emerald-800));
+}
 .visa-stage-marker[data-tone="in-progress"] {
-  background: rgb(var(--color-secondary) / 0.09);
-  color: rgb(var(--color-secondary));
+  background: rgb(var(--color-sky-100) / 0.6);
+  color: rgb(var(--color-sky-800));
 }
 .visa-stage-marker[data-tone="attention"] {
-  background: rgb(var(--color-amber-800) / 0.075);
+  background: rgb(var(--color-amber-100) / 0.6);
+  color: rgb(var(--color-amber-800));
+}
+.visa-stage-shortcut:has([data-tone="complete"]) .visa-stage-shortcut-copy > span,
+.visa-process-toggle:has([data-tone="complete"]) .visa-process-heading > span {
+  color: rgb(var(--color-emerald-800));
+}
+.visa-stage-shortcut:has([data-tone="in-progress"]) .visa-stage-shortcut-copy > span,
+.visa-process-toggle:has([data-tone="in-progress"]) .visa-process-heading > span {
+  color: rgb(var(--color-sky-800));
+}
+.visa-stage-shortcut:has([data-tone="attention"]) .visa-stage-shortcut-copy > span,
+.visa-process-toggle:has([data-tone="attention"]) .visa-process-heading > span {
   color: rgb(var(--color-amber-800));
 }
 .visa-facts {
@@ -220,9 +239,17 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 6px;
-  background: rgb(var(--color-amber-800) / 0.055);
+  background: rgb(var(--color-background));
   color: var(--visa-detail-muted);
   font-size: 12px;
+}
+.visa-payment-status[data-tone="complete"] {
+  background: rgb(var(--color-emerald-100));
+  color: rgb(var(--color-emerald-800));
+}
+.visa-payment-status[data-tone="waiting"] {
+  background: rgb(var(--color-amber-100));
+  color: rgb(var(--color-amber-800));
 }
 .visa-detail-travel-link {
   display: inline-flex;
@@ -268,10 +295,10 @@
   text-align: left;
 }
 .visa-process-row.is-current > h2 .visa-process-toggle {
-  background: rgb(var(--color-text-primary) / 0.025);
+  background: rgb(var(--color-primary) / 0.06);
 }
 .visa-process-toggle:hover {
-  background: rgb(var(--color-text-primary) / 0.045);
+  background: rgb(var(--color-primary) / 0.06);
 }
 .visa-process-toggle .visa-stage-marker {
   position: relative;
@@ -345,9 +372,18 @@
 .visa-data-status[data-tone="attention"] {
   color: rgb(var(--color-amber-800));
 }
+.visa-data-status[data-tone="complete"] {
+  color: rgb(var(--color-emerald-800));
+}
+.visa-hotel-row .visa-data-status[data-tone="attention"] {
+  color: rgb(var(--color-rose-800));
+}
+.visa-hotel-row .visa-data-status[data-tone="waiting"] {
+  color: rgb(var(--color-amber-800));
+}
 .visa-data-status .material-symbols-outlined {
   font-size: 18px;
-  color: rgb(var(--color-secondary));
+  color: inherit;
 }
 .visa-hotel-columns,
 .visa-hotel-row {
@@ -433,7 +469,7 @@
   font-weight: 700;
 }
 .visa-flight-direction h3 .material-symbols-outlined {
-  color: var(--visa-detail-muted);
+  color: rgb(var(--color-primary));
 }
 .visa-flight-route-status {
   font-size: 11px;

@@ -349,8 +349,8 @@ function testGenerateWhatsappCopyText(): void {
   
   assert.equal(copiedText.includes("*NEED MOFA VISA ONLY GROUP CODE*"), true);
   assert.equal(copiedText.includes("902133273 *( 05 PAX )*"), true);
-  assert.equal(copiedText.includes("DOH / QR1190 / 07.30 / 22 MAR 2026"), true);
-  assert.equal(copiedText.includes("CGK / SV822 / 12.55 / 14 APR 2026"), true);
+  assert.equal(copiedText.includes("JEDDAH / QR1190 / 07.30 / 22 MAR 2026"), true);
+  assert.equal(copiedText.includes("JEDDAH / SV822 / 12.55 / 14 APR 2026"), true);
   assert.equal(copiedText.includes("🏨 *BRN MAKKAH*\n*Swissotel*\n📅 28/03/2026 - 31/03/2026\n└─ 902133273: 18014399405337794 (40 PAX)"), true);
   assert.equal(copiedText.includes("🏨 *BRN MADINAH*\n*Burj Almarjan*\n📅 23/03/2026 - 28/03/2026\n└─ 902133273: 15762599591351269 (40 PAX)"), true);
 
@@ -538,6 +538,43 @@ describe("visa-domain", () => {
   runCase("provider and action requirement helpers", testProviderAndActionRequirementHelpers);
   runCase("generate whatsapp copy text template", testGenerateWhatsappCopyText);
   runCase("filter agreement drafts in Add Hotel modal", testFilterAgreementDrafts);
+  runCase("assigned agreement drafts remain available while remaining pax is sufficient", () => {
+    const assignedDraft: HotelAgreementDraft = {
+      id: "shared-draft",
+      agentId: "agent-1",
+      city: "makkah",
+      agentName: "Agent A",
+      hotelName: "Shared Hotel",
+      agreementNumber: "AG-SHARED",
+      pax: 30,
+      remainingPax: 7,
+      assignedGroups: [{ groupCode: "GROUP-A", pax: 23 }],
+      status: "Approved",
+      stayStartIso: "2026-06-24",
+      stayEndIso: "2026-07-02",
+      notes: "",
+      assignmentStatus: "Assigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
+    };
+    const params = {
+      groupArrivalDate: assignedDraft.stayStartIso,
+      groupReturnDate: assignedDraft.stayEndIso,
+      totalPax: 7,
+      connectedAgreementKeys: new Set<string>(),
+    };
+
+    for (const city of ["makkah", "madinah"] as const) {
+      const draft = { ...assignedDraft, city };
+      assert.deepEqual(filterAgreementDrafts([draft], params)[city], [draft]);
+      assert.deepEqual(filterAgreementDrafts([draft], { ...params, totalPax: 8 })[city], []);
+      assert.deepEqual(filterAgreementDrafts([{ ...draft, remainingPax: 0 }], params)[city], []);
+      assert.deepEqual(filterAgreementDrafts([draft], {
+        ...params,
+        connectedAgreementKeys: new Set([`${city}:${draft.agreementNumber}`]),
+      })[city], []);
+    }
+  });
   runCase("inclusive days counting helper", testGetInclusiveDays);
 });
 

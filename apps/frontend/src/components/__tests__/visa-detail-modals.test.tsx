@@ -8,6 +8,7 @@ import {
   SyarikahModal,
   VisaTypeModal,
 } from '../visa-detail-modals';
+import { createEmptyFlightLeg } from '../../shared/flight-plan';
 
 // Mock useModalFocusTrap
 vi.mock('../use-modal-focus-trap', () => ({
@@ -15,6 +16,38 @@ vi.mock('../use-modal-focus-trap', () => ({
 }));
 
 describe('FlightDetailsModal', () => {
+  it('saves Saudi dropdown changes as IATA codes and keeps manual international airports', async () => {
+    const onSave = vi.fn();
+    render(<FlightDetailsModal
+      initialValue={{ flightLegs: [{ ...createEmptyFlightLeg('ONWARD'), departureAirportCode: 'CGK', arrivalAirportCode: 'JED', flightNumber: 'GA-980' }] }}
+      onClose={vi.fn()}
+      onSave={onSave}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: 'To Onward segmen 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'MED · Madinah' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Kode IATA From Onward segmen 1' }), { target: { value: 'doh' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({
+      flightLegs: [expect.objectContaining({ arrivalAirportCode: 'MED', departureAirportCode: 'DOH', flightNumber: 'GA-980' })],
+    }));
+  });
+
+  it('allows an international transit code after choosing the manual airport option', async () => {
+    const onSave = vi.fn();
+    render(<FlightDetailsModal
+      initialValue={{ flightLegs: [{ ...createEmptyFlightLeg('ONWARD'), departureAirportCode: 'CGK', arrivalAirportCode: 'JED' }] }}
+      onClose={vi.fn()}
+      onSave={onSave}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: 'To Onward segmen 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Bandara lain / transit' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Kode IATA To Onward segmen 1' }), { target: { value: 'dxb' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({
+      flightLegs: [expect.objectContaining({ arrivalAirportCode: 'DXB', departureAirportCode: 'CGK' })],
+    }));
+  });
+
   it('prefills and saves direct onward and return legs', async () => {
     const onSave = vi.fn();
     render(

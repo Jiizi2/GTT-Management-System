@@ -11,6 +11,7 @@ import {
   sortInputItineraryItems,
 } from "../../shared/app-domain";
 import { deriveLegacyFlightSummary, normalizeFlightLegs } from "../../shared/flight-plan";
+import { resolveGroupFlightSummary, type FlightSummaryOptions } from "../../shared/group-flight-summary";
 import {
   buildItineraryFromInputItems,
   buildTimelineAndNextActivity,
@@ -66,19 +67,22 @@ function itineraryItemToInput(item: ItineraryItem, index: number): InputItinerar
  * non-base item (city tours, ziarah, manual entries). Returns the group patch to
  * apply, or an empty object when there is not enough visa data to build.
  */
-export function buildVisaItineraryPatch(group: GroupData, visaSetup: GroupVisaSetup): Partial<GroupData> {
+export function buildVisaItineraryPatch(group: GroupData, visaSetup: GroupVisaSetup, options: FlightSummaryOptions = {}): Partial<GroupData> {
+  const flightSummary = resolveGroupFlightSummary({ ...group, visaSetup }, options);
   const generatedBaseItems = buildItineraryFromVisaData({
     arrivalDateIso: group.arrivalDate,
     returnDateIso: group.returnDate,
     makkahAgreements: visaSetup.makkahHotels,
     madinahAgreements: visaSetup.madinahHotels,
     flight: {
-      arrivalFlightNumber: visaSetup.arrivalFlightNumber,
-      arrivalFlightDate: visaSetup.arrivalFlightDate,
-      arrivalTime: visaSetup.arrivalTime,
-      departureFlightNumber: visaSetup.departureFlightNumber,
-      departureFlightDate: visaSetup.departureFlightDate,
-      departureTime: visaSetup.departureTime,
+      arrivalAirportCity: flightSummary.arrival?.city,
+      arrivalFlightNumber: flightSummary.arrival?.flightNumber,
+      arrivalFlightDate: flightSummary.arrival?.date,
+      arrivalTime: flightSummary.arrival?.time,
+      departureAirportCity: flightSummary.departure?.city,
+      departureFlightNumber: flightSummary.departure?.flightNumber,
+      departureFlightDate: flightSummary.departure?.date,
+      departureTime: flightSummary.departure?.time,
     },
   });
 
@@ -90,7 +94,37 @@ export function buildVisaItineraryPatch(group: GroupData, visaSetup: GroupVisaSe
     .filter((item) => !BASE_TRIP_CATEGORY_KEYS.has(inferCategoryKey(item)))
     .map((item, index) => itineraryItemToInput(item, index));
 
-  const mergedItems = sortInputItineraryItems([...preservedItems, ...generatedBaseItems]);
+  const baseItems = generatedBaseItems.map((generated) => {
+    // Airport cities and flight timing come from the flight source. Keep the
+    // ground destinations, notes and pickup/bus arrangements entered in Overview.
+    const previous = group.itinerary?.find((item) =>
+      inferCategoryKey(item) === generated.categoryKey &&
+      (generated.categoryKey !== "transfer" || (item.from === generated.from && item.to === generated.to)),
+    );
+    if (!previous) return generated;
+    const existing = itineraryItemToInput(previous, 0);
+    return {
+      ...existing,
+      ...generated,
+      ...(generated.categoryKey === "arrival" ? { to: generated.to || existing.to } : {}),
+      ...(generated.categoryKey === "departure" ? { from: generated.from || existing.from } : {}),
+      ...(generated.categoryKey === "transfer" ? {
+        time: existing.time,
+        transportMode: existing.transportMode,
+        icon: existing.icon,
+        transferByTrain: existing.transferByTrain,
+        trainDepartureTime: existing.trainDepartureTime,
+        destinationPickupTime: existing.destinationPickupTime,
+      } : {}),
+      hotelName: generated.hotelName || existing.hotelName,
+      fromHotelName: generated.fromHotelName || existing.fromHotelName,
+      notes: existing.notes,
+      busCount: existing.busCount,
+      requiresBus: existing.requiresBus,
+      hotelPickupRequestTime: existing.hotelPickupRequestTime,
+    };
+  });
+  const mergedItems = sortInputItineraryItems([...preservedItems, ...baseItems]);
   const timelineAndNext = buildTimelineAndNextActivity(mergedItems, group.returnDate);
 
   return {
@@ -344,7 +378,13 @@ export function useVisaMutations({
       // stays a single source. Merges the fresh base legs into the existing
       // itinerary (preserving city tours etc.); only patches when there is enough
       // data to build the structure, otherwise it just persists the flight.
-      const itineraryPatch = buildVisaItineraryPatch(currentGroup, nextVisaSetup);
+      const previousLegs = currentVisaSetup.flightLegs ?? [];
+      const itineraryPatch = buildVisaItineraryPatch(currentGroup, nextVisaSetup, {
+        allowItineraryFallback: {
+          ONWARD: !previousLegs.some((leg) => leg.direction === "ONWARD" && (leg.departureAirportCode || leg.arrivalAirportCode)),
+          RETURN: !previousLegs.some((leg) => leg.direction === "RETURN" && (leg.departureAirportCode || leg.arrivalAirportCode)),
+        },
+      });
       const didRegenerate = Object.keys(itineraryPatch).length > 0;
 
       const nextGroup = normalizeGroupStatus({

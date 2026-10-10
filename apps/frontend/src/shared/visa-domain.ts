@@ -1,5 +1,6 @@
 import type { GroupAgreementHotel, GroupData, VisaTrackingRow } from "./app-domain.js";
 import type { HotelAgreementDraft } from "./app-domain-types.js";
+import { resolveGroupFlightSummary, type ResolvedGroupFlight } from "./group-flight-summary";
 
 function formatLocalIsoDate(date: Date): string {
   const year = date.getFullYear();
@@ -264,17 +265,7 @@ export function generateWhatsappCopyText(
   lines.push("");
 
   lines.push("✈️ *Flight Detail*");
-  const flightItems = (group.itinerary || []).filter((item) => {
-    const category = item.category?.toLowerCase();
-    const isArrivalOrDeparture = category === "arrival" || category === "departure";
-    if (!isArrivalOrDeparture) {
-      return false;
-    }
-    // Arrivals/departures can now be by land (bus) instead of flight. Only real
-    // flights belong in the flight manifest; legacy items without a mode default
-    // to flight for backward compatibility.
-    return item.transportMode ? item.transportMode === "flight" : true;
-  });
+  const flightSummary = resolveGroupFlightSummary(group);
 
   const formatFlightDate = (isoDateStr?: string, dateStr?: string, yearStr?: string) => {
     if (isoDateStr) {
@@ -293,40 +284,15 @@ export function generateWhatsappCopyText(
     return "[FLIGHT_DATE]";
   };
 
-  const formatFlightLine = (item: any) => {
-    const mapCityToAirport = (val: string): string => {
-      const lower = val.trim().toLowerCase();
-      if (lower === "madinah") return "MED";
-      if (lower === "jeddah") return "JED";
-      if (lower === "makkah") return "JED";
-      return val;
-    };
-
-    const category = (item.category || "").toLowerCase();
-    let rawAirport = "";
-    if (category === "arrival") {
-      rawAirport = item.from?.trim() || "[DEP]";
-    } else if (category === "departure") {
-      rawAirport = item.to?.trim() || "[ARR]";
-    } else {
-      rawAirport = item.from?.trim() || "[DEP]";
-    }
-
-    const airport = mapCityToAirport(rawAirport);
-    const flightNo = item.flightNumber?.trim() || "[FLIGHT_NO]";
-    const time = item.time?.trim() ? item.time.trim().replace(/:/g, ".") : "[FLIGHT_TIME]";
-    const dateFormatted = formatFlightDate(item.isoDate, item.date, item.year);
-    return `${airport} / ${flightNo} / ${time} / ${dateFormatted}`;
+  const formatFlightLine = (flight: ResolvedGroupFlight | undefined) => {
+    const city = flight?.city.toUpperCase() || "[AIRPORT]";
+    const flightNo = flight?.flightNumber || "[FLIGHT_NO]";
+    const time = flight?.time ? flight.time.replace(/:/g, ".") : "[FLIGHT_TIME]";
+    const dateFormatted = formatFlightDate(flight?.date, flight?.displayDate, flight?.year);
+    return `${city} / ${flightNo} / ${time} / ${dateFormatted}`;
   };
-
-  if (flightItems.length > 0) {
-    flightItems.forEach((item) => {
-      lines.push(formatFlightLine(item));
-    });
-  } else {
-    lines.push("[AIRPORT] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
-    lines.push("[AIRPORT] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]");
-  }
+  lines.push(formatFlightLine(flightSummary.arrival));
+  lines.push(formatFlightLine(flightSummary.departure));
   lines.push("");
 
   const formatBrnDate = (isoDateStr?: string) => {
@@ -512,53 +478,21 @@ export function generateMuassasahHijaziWhatsappCopyText(
   printHotels("MADEENA", allGroups.map((item) => item.visaSetup?.madinahHotels ?? []));
   lines.push("");
 
-  const arrivalItinerary = allGroups
-    .flatMap((item) => item.itinerary ?? [])
-    .find((item) => item.category?.toLowerCase() === "arrival" && (!item.transportMode || item.transportMode === "flight"));
-  const departureItinerary = allGroups
-    .flatMap((item) => item.itinerary ?? [])
-    .find((item) => item.category?.toLowerCase() === "departure" && (!item.transportMode || item.transportMode === "flight"));
-
-  const onwardLeg = allGroups
-    .flatMap((item) => item.visaSetup?.flightLegs ?? [])
-    .find((leg) => leg.direction === "ONWARD");
-  const returnLeg = allGroups
-    .flatMap((item) => item.visaSetup?.flightLegs ?? [])
-    .find((leg) => leg.direction === "RETURN");
-
-  const visaSetups = allGroups.map((item) => item.visaSetup);
-  const arrivalNumber = firstNonEmpty(
-    ...visaSetups.map((setup) => setup?.arrivalFlightNumber),
-    onwardLeg?.flightNumber,
-    arrivalItinerary?.flightNumber,
-  );
-  const departureNumber = firstNonEmpty(
-    ...visaSetups.map((setup) => setup?.departureFlightNumber),
-    returnLeg?.flightNumber,
-    departureItinerary?.flightNumber,
-  );
+  const { arrival, departure } = resolveGroupFlightSummary(group);
+  const arrivalNumber = arrival?.flightNumber;
+  const departureNumber = departure?.flightNumber;
   const arrivalDate = formatHijaziDate(
-    firstNonEmpty(...visaSetups.map((setup) => setup?.arrivalFlightDate), onwardLeg?.arrivalDate, onwardLeg?.departureDate, arrivalItinerary?.isoDate, group.arrivalDate),
-    arrivalItinerary?.date,
-    arrivalItinerary?.year,
+    firstNonEmpty(arrival?.date, group.arrivalDate),
+    arrival?.displayDate,
+    arrival?.year,
   );
   const departureDate = formatHijaziDate(
-    firstNonEmpty(...visaSetups.map((setup) => setup?.departureFlightDate), returnLeg?.departureDate, returnLeg?.arrivalDate, departureItinerary?.isoDate, group.returnDate),
-    departureItinerary?.date,
-    departureItinerary?.year,
+    firstNonEmpty(departure?.date, group.returnDate),
+    departure?.displayDate,
+    departure?.year,
   );
-  const arrivalTime = firstNonEmpty(
-    ...visaSetups.map((setup) => setup?.arrivalTime),
-    onwardLeg?.arrivalTime,
-    onwardLeg?.departureTime,
-    arrivalItinerary?.time,
-  );
-  const departureTime = firstNonEmpty(
-    ...visaSetups.map((setup) => setup?.departureTime),
-    returnLeg?.departureTime,
-    returnLeg?.arrivalTime,
-    departureItinerary?.time,
-  );
+  const arrivalTime = arrival?.time ?? "";
+  const departureTime = departure?.time ?? "";
 
   lines.push(`ENTRY DATE WITH FLIGHT NO : ${arrivalNumber || "[FLIGHT NO]"}`);
   lines.push(`Date: ${arrivalDate} (${formatHijaziTime(arrivalTime)})`);
@@ -589,10 +523,6 @@ export function filterAgreementDrafts(
   const groupReturn = (params.groupReturnDate ?? "").trim() || (params.rowReturnIso ?? "").trim();
 
   for (const draft of drafts) {
-    if (draft.assignmentStatus === "Assigned") {
-      continue;
-    }
-
     const draftKey = `${draft.city}:${draft.agreementNumber.trim().toUpperCase()}`;
     if (params.connectedAgreementKeys.has(draftKey)) {
       continue;
@@ -609,7 +539,7 @@ export function filterAgreementDrafts(
       }
     }
 
-    // 2. Pax Sufficiency Filtering
+    // Linked drafts can serve other groups while their remaining pax is sufficient.
     const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
     if (availablePax < params.totalPax) {
       continue;

@@ -1,3 +1,4 @@
+import { synchronizeItineraryFlightCities } from "../shared/group-flight-summary";
 import {
   formatScheduleDate,
   formatScheduleTime,
@@ -554,7 +555,7 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
     [],
   );
 
-  return {
+  return synchronizeItineraryFlightCities({
     id: group.id,
     agentId: readString(group.agentId, "agent_gtt_direct"),
     agent: group.agent ? {
@@ -586,5 +587,5 @@ export function mapBackendGroupToFrontend(group: BackendGroupRecord): GroupData 
     visaSetup: mappedVisaSetup,
     checklistAssignments: mappedChecklistAssignments,
     parentGroupId: group.parentGroupId || undefined,
-  };
+  });
 }

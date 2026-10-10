@@ -244,6 +244,9 @@ Setelah domain siap, set:
 
 ## Step 7: Update Aplikasi
 
+Untuk update sinkronisasi penerbangan, itinerary, dan assignment hotel agreement,
+ikuti [panduan update VPS 11 Oktober 2026](operations/update-vps-visa-flight-agreement-20261011.md).
+
 Untuk rilis Portal Agent dan pembuatan satu akun percobaan pada Partner Agent
 dengan grup terbanyak, ikuti [panduan update VPS dan seed akun uji](operations/update-vps-agent-portal-20261004.md).
 

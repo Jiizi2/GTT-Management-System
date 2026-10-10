@@ -42,6 +42,7 @@ const modalChoiceButtonClassName =
 type EditScheduleModalProps = {
   /** State form untuk itinerary schedule yang sedang diedit */
   form: EditScheduleFormState;
+  flightAirportCity?: string;
   /** Apakah tombol save dinonaktifkan */
   isSaveDisabled: boolean;
   /** Apakah akan menampilkan warning city tour pada hari Jumat */
@@ -79,6 +80,7 @@ type EditScheduleModalProps = {
  */
 export function EditScheduleModal({
   form,
+  flightAirportCity,
   isSaveDisabled,
   showFridayCityTourWarning,
   onChange,
@@ -317,7 +319,12 @@ export function EditScheduleModal({
             <div className={modalGridClassName}>
               <label className={modalFieldClassName}>
                 <span>{routeFieldConfig.fromLabel}</span>
-                {shouldUseSaudiCityDropdown(form.category, "from") ? (
+                {flightAirportCity && form.category === "arrival" && form.transportMode === "flight" ? (
+                  <>
+                    <input className={modalInputClassName} value={flightAirportCity} readOnly aria-label={routeFieldConfig.fromLabel} />
+                    <span className="text-xs text-slate-600">Tersinkron dari Detail Penerbangan di Visa Tracking.</span>
+                  </>
+                ) : shouldUseSaudiCityDropdown(form.category, "from") ? (
                   <div className="relative">
                     <span
                       className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"
@@ -351,7 +358,12 @@ export function EditScheduleModal({
 
               <label className={modalFieldClassName}>
                 <span>{routeFieldConfig.toLabel}</span>
-                {shouldUseSaudiCityDropdown(form.category, "to") ? (
+                {flightAirportCity && form.category === "departure" && form.transportMode === "flight" ? (
+                  <>
+                    <input className={modalInputClassName} value={flightAirportCity} readOnly aria-label={routeFieldConfig.toLabel} />
+                    <span className="text-xs text-slate-600">Tersinkron dari Detail Penerbangan di Visa Tracking.</span>
+                  </>
+                ) : shouldUseSaudiCityDropdown(form.category, "to") ? (
                   <div className="relative">
                     <span
                       className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500"

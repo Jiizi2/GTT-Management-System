@@ -240,6 +240,13 @@ function VisaFacts({ application, group }: { application: VisaApplication | null
   const [open, setOpen] = useState(false);
   const visa = group?.visaSetup;
   const payment = paymentLabel(visa?.paymentStatus, application?.paymentStatus);
+  const paymentState = application?.paymentStatus ?? visa?.paymentStatus;
+  const paymentTone =
+    paymentState === "COMPLETED" || paymentState === "Paid"
+      ? "complete"
+      : paymentState === "WAITING_PAYMENT" || paymentState === "Unpaid" || paymentState === "Partial"
+        ? "waiting"
+        : "neutral";
   const travelLink = group ? (
     <Link
       className="visa-detail-travel-link"
@@ -273,7 +280,14 @@ function VisaFacts({ application, group }: { application: VisaApplication | null
       </button>
       <div id="visa-secondary-facts" className={`visa-facts-secondary${open ? " is-open" : ""}`}>
         <dl>
-          <DetailValue label="Pembayaran" value={<span className="visa-payment-status">{payment}</span>} />
+          <DetailValue
+            label="Pembayaran"
+            value={
+              <span className="visa-payment-status" data-tone={paymentTone}>
+                {payment}
+              </span>
+            }
+          />
           <DetailValue label="Tanggal terbit" value={formatVisaDate(visa?.issuedDate)} />
         </dl>
         {travelLink}
