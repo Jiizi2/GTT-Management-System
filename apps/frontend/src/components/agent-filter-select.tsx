@@ -52,6 +52,8 @@ export function AgentFilterSelect({
           Agent
         </span>
         <SereneSelect
+          searchable
+          searchPlaceholder="Cari nama agent..."
           className={`serene-select w-full bg-surface-container-lowest font-medium text-on-surface-variant ${
             compact ? "h-8 rounded-lg px-2.5 pr-8 text-xs" : "rounded-xl text-sm"
           }`}
@@ -69,6 +71,8 @@ export function AgentFilterSelect({
     return (
       <div className={`relative min-w-[10.5rem] ${className}`.trim()}>
         <SereneSelect
+          searchable
+          searchPlaceholder="Cari nama agent..."
           className={`serene-select-pill w-full pl-3 pr-9 normal-case tracking-normal ${compact ? "h-8 text-xs" : "h-9"}`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -92,6 +96,8 @@ export function AgentFilterSelect({
           </span>
         ) : null}
         <SereneSelect
+          searchable
+          searchPlaceholder="Cari nama agent..."
           className={`h-11 w-full bg-transparent pr-9 text-left text-sm font-semibold text-on-surface-variant outline-none transition hover:text-on-surface sm:h-8 sm:text-xs ${leadingIcon ? "pl-10" : "pl-3"}`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -116,6 +122,8 @@ export function AgentFilterSelect({
           Agent
         </span>
         <SereneSelect
+          searchable
+          searchPlaceholder="Cari nama agent..."
           className="mt-1 h-6 w-full bg-transparent pr-6 text-left text-sm font-bold leading-none text-on-surface outline-none"
           value={value}
           onChange={(event) => onChange(event.target.value)}

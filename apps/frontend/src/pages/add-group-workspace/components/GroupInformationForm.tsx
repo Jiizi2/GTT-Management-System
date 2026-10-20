@@ -57,7 +57,7 @@ export function GroupInformationForm({
               name="agentId"
               control={control}
               render={({ field }) => (
-                <SereneSelect className={selectClassName} value={field.value ?? ""} onChange={field.onChange}>
+                <SereneSelect searchable searchPlaceholder="Cari nama agent..." className={selectClassName} value={field.value ?? ""} onChange={field.onChange}>
                   <option value="" disabled>{agentsQuery.isLoading ? "Loading agents..." : "Select Agent"}</option>
                   {(agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE").map((agent) => (
                     <option key={agent.id} value={agent.id}>{agent.name} ({agent.code})</option>
