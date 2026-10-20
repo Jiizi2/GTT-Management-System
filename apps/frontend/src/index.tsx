@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { App } from "./app";
 import { initializeThemeMode } from "./theme/theme-mode";
 import { ThemeProvider } from "./theme/theme-provider";
@@ -26,14 +26,19 @@ const queryClient = new QueryClient({
   },
 });
 
+const router = createBrowserRouter([
+  {
+    path: "*",
+    element: <App />,
+  },
+]);
+
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter unstable_useTransitions={false}>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <RouterProvider router={router} useTransitions={false} />
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

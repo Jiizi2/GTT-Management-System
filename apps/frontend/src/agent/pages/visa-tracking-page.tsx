@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Button, IconButton } from "../../components/button";
+import { GroupIdentity } from "../../components/group-identity";
+import { Icon } from "../../components/icon";
+import { ListToolbar, ResultSummary } from "../../components/list-toolbar";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
+import { SearchField } from "../../components/search-field";
+import { SectionHeader } from "../../components/section-header";
+import { StatusBadge } from "../../components/status-badge";
 import type { GroupData } from "../../shared/app-domain";
 import { EmptyState, ErrorState } from "../components/data-state";
 import type { VisaApplication } from "../data/contracts";
@@ -137,14 +146,12 @@ export function AgentVisaTrackingPage({
   const onOpen = (item: VisaListItem) =>
     navigate(`/agent/visa/${encodeURIComponent(item.identity)}`, {
       state: { from: `${location.pathname}${location.search}` },
+      viewTransition: true,
     });
   const loading = groupsQuery.isPending || applicationsQuery.isPending;
   return (
-    <div className="agent-visa-page">
-      <header className="agent-visa-heading">
-        <h1>Visa Tracking</h1>
-        <p>Pantau progres visa setiap group.</p>
-      </header>
+    <PageLayout width="workspace" className="agent-visa-page agent-page-layout">
+      <PageHeader variant="compact" title="Visa Tracking" description="Pantau progres visa setiap group." />
       {loading ? (
         <section className="agent-visa-loading" aria-busy="true" aria-label="Memuat Visa Tracking">
           <p className="sr-only" role="status">
@@ -158,11 +165,18 @@ export function AgentVisaTrackingPage({
         <ErrorState retry={retry} />
       ) : (
         <>
-          <section className="agent-visa-toolbar" aria-label="Ringkasan dan filter visa">
+          <ListToolbar
+            ariaLabel="Ringkasan dan filter visa"
+            footer={
+              <ResultSummary onReset={hasFilters && families.length > 0 ? resetFilters : undefined}>
+                {items.filter(matches).length} group / pengajuan · {families.length} perjalanan ditampilkan
+              </ResultSummary>
+            }
+          >
             <div className="agent-visa-filters" role="group" aria-label="Status progres">
               {filters.map((item) => (
-                <button
-                  type="button"
+                <Button
+                  variant={filter === item.id ? "primary" : "secondary"}
                   key={item.id}
                   className={`agent-visa-filter ${filter === item.id ? "is-selected" : ""}`}
                   aria-pressed={filter === item.id}
@@ -171,22 +185,18 @@ export function AgentVisaTrackingPage({
                   <Icon name={item.icon} className={`agent-visa-filter-icon is-${item.id}`} />
                   <span>{item.label}</span>
                   <span className="agent-visa-filter-count">{counts[item.id]}</span>
-                </button>
+                </Button>
               ))}
             </div>
             <div className="agent-visa-search-row">
-              <label className="agent-visa-search">
-                <span className="sr-only">Cari group</span>
-                <Icon name="search" />
-                <input
-                  type="search"
-                  value={query}
-                  placeholder="Cari nama atau kode group"
-                  onChange={(event) => updateParam("q", event.target.value)}
-                />
-              </label>
-              <button
-                type="button"
+              <SearchField
+                label="Cari group"
+                value={query}
+                placeholder="Cari nama atau kode group"
+                onChange={(value) => updateParam("q", value)}
+              />
+              <Button
+                variant="tertiary"
                 className="agent-visa-guide-button"
                 aria-expanded={guideOpen}
                 aria-controls="agent-visa-guide"
@@ -195,31 +205,25 @@ export function AgentVisaTrackingPage({
                 <Icon name="description" />
                 <span>Panduan 4 tahap</span>
                 <Icon name={guideOpen ? "expand_more" : "arrow_forward"} className={guideOpen ? "is-up" : ""} />
-              </button>
+              </Button>
             </div>
-            <p className={hasFilters ? "agent-visa-results" : "sr-only"} aria-live="polite" aria-atomic="true">
-              {items.filter(matches).length} group / pengajuan · {families.length} perjalanan ditampilkan
-            </p>
-            {hasFilters && families.length > 0 && (
-              <button type="button" className="agent-visa-reset" onClick={resetFilters}>
-                Reset filter
-              </button>
-            )}
-          </section>
+          </ListToolbar>
           {guideOpen && <ProcessOverview />}
           {items.length === 0 ? (
             <EmptyState title="Belum ada pengajuan visa">
               Group atau pengajuan yang ditugaskan kepada akun Agent ini akan muncul di sini.
             </EmptyState>
           ) : families.length === 0 ? (
-            <section className="serene-empty-state">
-              <Icon name="search_off" />
-              <h2>Tidak ada pengajuan yang sesuai</h2>
-              <p>Ubah kata pencarian atau filter status untuk melihat pengajuan lainnya.</p>
-              <button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>
-                Reset filter
-              </button>
-            </section>
+            <EmptyState
+              icon="search_off"
+              title="Tidak ada pengajuan yang sesuai"
+              description="Ubah kata pencarian atau filter status untuk melihat pengajuan lainnya."
+              action={
+                <Button variant="secondary" onClick={resetFilters}>
+                  Reset filter
+                </Button>
+              }
+            />
           ) : (
             <section className="agent-visa-journeys" aria-label="Daftar pengajuan visa">
               {families.map((family) => (
@@ -236,7 +240,7 @@ export function AgentVisaTrackingPage({
           )}
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }
 function Journey({
@@ -286,21 +290,19 @@ function Journey({
           </p>
         </div>
         {members.some((item) => item.bucket === "attention") && (
-          <span className="agent-visa-family-attention">
-            <Icon name="warning" />
+          <StatusBadge tone="waiting" icon="warning" className="agent-visa-family-attention">
             Perlu perhatian
-          </span>
+          </StatusBadge>
         )}
-        <button
-          type="button"
+        <IconButton
+          icon="expand_more"
+          iconClassName={expanded ? "is-up" : ""}
           className="agent-visa-family-toggle"
           aria-label={`${expanded ? "Tutup" : "Buka"} progres ${root.name}`}
           aria-expanded={expanded}
           aria-controls={bodyId}
           onClick={() => setExpanded((open) => !open)}
-        >
-          <Icon name="expand_more" className={expanded ? "is-up" : ""} />
-        </button>
+        />
       </header>
       <div id={bodyId} hidden={!expanded} className={`agent-visa-family-body ${hasChildren ? "has-children" : ""}`}>
         <VisaRow
@@ -317,8 +319,8 @@ function Journey({
                 <VisaRow key={item.id} item={item} role="Child" onOpen={onOpen} />
               ))}
             </div>
-            <button
-              type="button"
+            <Button
+              variant="tertiary"
               className="agent-visa-more-button"
               aria-controls={`${bodyId}-more`}
               aria-expanded={moreOpen}
@@ -326,7 +328,7 @@ function Journey({
             >
               {moreOpen ? "Sembunyikan group lainnya" : `Lihat ${children.length - 1} group lainnya`}
               <Icon name="expand_more" className={moreOpen ? "is-up" : ""} />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -353,13 +355,15 @@ function VisaRow({
       <span className="agent-visa-avatar">
         <Icon name={role === "Parent" || attention ? "groups" : "luggage"} />
       </span>
-      <div className="agent-visa-group-identity">
-        <h3 title={item.name}>{item.code}</h3>
-        <p>
-          {item.pax} jamaah
-        </p>
-        {context && <span className="agent-visa-context-label">Group terhubung</span>}
-      </div>
+      <GroupIdentity
+        className="agent-visa-group-identity"
+        code={item.code}
+        metadata={
+          <>
+            {item.pax} jamaah{context && <span className="agent-visa-context-label">Group terhubung</span>}
+          </>
+        }
+      />
       <ol className="agent-visa-stages" aria-label={`${item.completedStages} dari 4 tahap selesai`}>
         {item.stages.map((stage, index) => (
           <li
@@ -389,15 +393,15 @@ function VisaRow({
           </li>
         ))}
       </ol>
-      <button
-        type="button"
+      <Button
+        variant="tertiary"
         className="agent-visa-detail"
         aria-label={`Lihat detail visa ${item.code}`}
         onClick={() => onOpen(item)}
       >
         Lihat detail
         <Icon name="arrow_forward" />
-      </button>
+      </Button>
       {attention && (
         <p className="agent-visa-revision">
           <Icon name="warning" />
@@ -410,7 +414,7 @@ function VisaRow({
 function ProcessOverview() {
   return (
     <section id="agent-visa-guide" className="agent-visa-guide" aria-labelledby="visa-process-title">
-      <h2 id="visa-process-title">Alur proses visa</h2>
+      <SectionHeader id="visa-process-title" title="Alur proses visa" />
       <ol>
         {visaProcessDefinition.map((stage, index) => (
           <li key={stage.label}>
@@ -423,12 +427,5 @@ function ProcessOverview() {
         ))}
       </ol>
     </section>
-  );
-}
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return (
-    <span className={`material-symbols-outlined ${className}`} aria-hidden="true">
-      {name}
-    </span>
   );
 }

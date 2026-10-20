@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AgreementDraftTable } from "../../pages/agreement-inbox/components/AgreementDraftTable";
 import type { HotelAgreementDraft } from "../../shared/app-domain";
@@ -32,6 +32,7 @@ const madinahDraft: HotelAgreementDraft = {
 
 describe("AgreementDraftTable", () => {
   it("keeps linked groups closed by default and lets the user toggle it", () => {
+    vi.useFakeTimers();
     render(
       <AgreementDraftTable
         drafts={[draft]}
@@ -56,7 +57,13 @@ describe("AgreementDraftTable", () => {
     expect(screen.getByText("Linked Groups (0)")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Tutup detail AGR-001" }));
+    expect(screen.getByText("Linked Groups (0)").closest(".serene-disclosure-grid")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    act(() => vi.advanceTimersByTime(380));
     expect(screen.queryByText("Linked Groups (0)")).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("uses different city icons for Makkah and Madinah", () => {

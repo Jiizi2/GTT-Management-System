@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Controller } from "react-hook-form";
 import { SereneSelect } from "../../../components/serene-select";
+import { useMotionPresence } from "../../../hooks/use-motion";
 import { useManageRoleContext } from "../context/ManageRoleContext";
 
 function UserManagementModalPortal({ children }: { children: ReactNode }) {
@@ -41,20 +42,24 @@ export function ManageRoleModals() {
     handleConfirmDeleteUser,
     handleSubmitManagedUserPassword,
   } = useManageRoleContext();
+  const createDrawerPresence = useMotionPresence(isCreateDrawerOpen, 280);
 
   return (
     <>
-      {isCreateDrawerOpen ? (
+      {createDrawerPresence.isPresent ? (
         <UserManagementModalPortal>
           <div
             className="serene-modal-overlay fixed inset-0 z-[160] flex items-stretch justify-end"
-            onClick={closeCreateDrawer}
+            data-motion-state={createDrawerPresence.motionState}
+            aria-hidden={!isCreateDrawerOpen}
+            onClick={isCreateDrawerOpen ? closeCreateDrawer : undefined}
           >
             <section
-              className="ml-auto flex h-full w-full max-w-2xl flex-col border-l border-outline-variant/35 bg-surface-container-lowest shadow-float"
+              className="serene-drawer-shell ml-auto flex h-full w-full max-w-2xl flex-col border-l border-outline-variant/35 bg-surface-container-lowest shadow-float"
               role="dialog"
               aria-modal="true"
               aria-label="Tambah user baru"
+              inert={!isCreateDrawerOpen ? true : undefined}
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4 border-b border-outline-variant/25 px-5 py-5 sm:px-6">

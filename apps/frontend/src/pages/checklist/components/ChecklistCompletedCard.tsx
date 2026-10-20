@@ -42,17 +42,21 @@ export function ChecklistCompletedCard({
       : "";
 
   const codes = item.groupCodes && item.groupCodes.length > 0 ? item.groupCodes : [item.groupCode];
-  const displayCodes = codes.length > 2 ? codes.slice(0, 2) : codes;
-  const codesText = displayCodes.join(" - ");
-  const codesFontSizeClass = codes.length > 1
-    ? "text-[1.35rem] sm:text-[1.5rem] leading-snug"
-    : "text-2xl sm:text-3xl leading-none";
+  const codesText = codes.join(" - ");
+  const codesFontSizeClass =
+    codes.length > 4
+      ? "text-sm leading-snug sm:text-base"
+      : codes.length > 2
+        ? "text-base leading-snug sm:text-lg"
+        : codes.length > 1
+          ? "text-[1.35rem] sm:text-[1.5rem] leading-snug"
+          : "text-2xl sm:text-3xl leading-none";
 
   return (
     <article className="checklist-complete-card rounded-2xl px-4 py-3">
       <div className="grid items-center gap-3 lg:grid-cols-[1.35fr_0.9fr_1.3fr_auto_auto]">
         <div className="min-w-0">
-          <p className={`truncate font-extrabold tracking-tight text-on-surface ${codesFontSizeClass}`}>
+          <p className={`min-w-0 max-w-full whitespace-normal break-words font-extrabold tracking-tight text-on-surface ${codesFontSizeClass}`}>
             {codesText}
           </p>
           <p className="mt-0.5 truncate text-sm font-semibold text-on-surface">{item.groupName}</p>

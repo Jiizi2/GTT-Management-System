@@ -44,10 +44,15 @@ export function ChecklistNeedAttentionCard({
       : formatScheduleTime(item.scheduledTime || "");
 
   const codes = item.groupCodes && item.groupCodes.length > 0 ? item.groupCodes : [item.groupCode];
-  const displayCodes = codes.length > 2 ? codes.slice(0, 2) : codes;
-  const codesText = displayCodes.join(" - ");
+  const codesText = codes.join(" - ");
   const codesFontSizeClass =
-    codes.length > 1 ? "text-xl leading-snug sm:text-[1.35rem]" : "text-2xl leading-none sm:text-[2rem]";
+    codes.length > 4
+      ? "text-sm leading-snug sm:text-base"
+      : codes.length > 2
+        ? "text-base leading-snug sm:text-lg"
+        : codes.length > 1
+          ? "text-xl leading-snug sm:text-[1.35rem]"
+          : "text-2xl leading-none sm:text-[2rem]";
 
   return (
     <article
@@ -58,7 +63,7 @@ export function ChecklistNeedAttentionCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-900">Group No</p>
-              <p className={`mt-2 min-w-0 max-w-full break-all font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
+              <p className={`mt-2 min-w-0 max-w-full whitespace-normal break-words font-extrabold tracking-tight text-slate-900 ${codesFontSizeClass}`}>
                 {codesText}
               </p>
             </div>

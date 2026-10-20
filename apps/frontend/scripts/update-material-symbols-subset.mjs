@@ -287,6 +287,19 @@ function extractIconNamesFromJsx(sourceFile, iconNames) {
       collectIconNamesFromChildren(node.children);
     }
 
+    // Shared Icon calls carry the glyph in a prop rather than a span's children.
+    if (
+      (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) &&
+      node.tagName.getText(sourceFile) === "Icon"
+    ) {
+      const nameAttribute = node.attributes.properties.find(
+        (attribute) => ts.isJsxAttribute(attribute) && attribute.name.text === "name",
+      );
+      const initializer = nameAttribute?.initializer;
+      const expression = initializer && ts.isJsxExpression(initializer) ? initializer.expression : initializer;
+      if (expression) collectIconNamesFromChildExpression(expression);
+    }
+
     ts.forEachChild(node, visit);
   }
 

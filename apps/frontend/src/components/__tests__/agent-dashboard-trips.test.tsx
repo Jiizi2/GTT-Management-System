@@ -324,11 +324,37 @@ describe("Agent Dashboard and Perjalanan", () => {
       screen.getByText((_, element) => element?.textContent === "19 perjalanan ditemukan", { selector: "p" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toBeInTheDocument();
-    expect(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toHaveTextContent("19 perjalanan · 19 group");
+    const summary = within(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah"));
+    expect(summary.getByText("19", { exact: true })).toBeInTheDocument();
+    expect(summary.getByText("19 group · 9 aktif · 760 jamaah")).toBeInTheDocument();
     expect(screen.getAllByText("Musyrif")).toHaveLength(6);
     expect(screen.getAllByText("Belum ditugaskan")).toHaveLength(6);
     expect(screen.getAllByRole("button", { name: /Lihat itinerary/i })).toHaveLength(6);
-    expect(screen.getByRole("navigation", { name: "perjalanan pagination" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Navigasi halaman perjalanan" })).toBeInTheDocument();
+  });
+
+  it("resets pagination when search changes and clearing search preserves other URL filters", async () => {
+    getAllAgentGroupsMock.mockResolvedValue(Array.from({ length: 19 }, (_, index) => group(index + 1)));
+    renderPage(
+      <>
+        <TripsPage principalId="portal-1" />
+        <LocationProbe />
+      </>,
+      "/agent/groups?active=1&source=calendar",
+    );
+
+    await screen.findByRole("heading", { name: "Perjalanan" });
+    fireEvent.click(screen.getByRole("button", { name: "Halaman berikutnya" }));
+    expect(screen.getByRole("button", { name: "Ke halaman 2" })).toHaveAttribute("aria-current", "page");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Cari perjalanan" }), { target: { value: "GTT-002" } });
+    expect(screen.getByTestId("location")).toHaveTextContent("active=1&source=calendar&q=GTT-002");
+    fireEvent.click(screen.getByRole("button", { name: "Hapus pencarian" }));
+
+    expect(screen.getByRole("searchbox", { name: "Cari perjalanan" })).toHaveFocus();
+    expect(screen.getByRole("searchbox", { name: "Cari perjalanan" })).toHaveValue("");
+    expect(screen.getByTestId("location")).toHaveTextContent("/agent/groups?active=1&source=calendar");
+    expect(screen.getByRole("button", { name: "Ke halaman 1" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Halaman sebelumnya" })).toBeDisabled();
   });
 
   it("distinguishes an empty filter result from an account with no assigned groups", async () => {
@@ -351,7 +377,9 @@ describe("Agent Dashboard and Perjalanan", () => {
     const view = renderPage(<TripsPage principalId="portal-1" />, "/agent/groups?q=GTT-002");
 
     expect(await screen.findByRole("heading", { name: "Perjalanan" })).toBeInTheDocument();
-    expect(screen.getByLabelText("1 perjalanan, 1 aktif, 30 jamaah")).toHaveTextContent("1 perjalanan · 2 group");
+    expect(
+      within(screen.getByLabelText("1 perjalanan, 1 aktif, 30 jamaah")).getByText("2 group · 1 aktif · 30 jamaah"),
+    ).toBeInTheDocument();
     expect(view.container.querySelector("details")).toHaveAttribute("open");
     expect(screen.getByRole("button", { name: /GTT-002/ })).toBeInTheDocument();
     expect(screen.queryByText(/^(Parent|Child)$/)).not.toBeInTheDocument();
@@ -414,7 +442,7 @@ describe("Agent Dashboard and Perjalanan", () => {
     expect(screen.queryByRole("heading", { name: "Kesiapan transportasi dan H-1" })).not.toBeInTheDocument();
     expect(screen.getByText("Hotel Makkah", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Pastikan jamaah berkumpul tiga jam sebelum keberangkatan.")).toBeInTheDocument();
-    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(screen.getByText("Hanya lihat")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Edit|Delete|Save/i })).not.toBeInTheDocument();
   });
 

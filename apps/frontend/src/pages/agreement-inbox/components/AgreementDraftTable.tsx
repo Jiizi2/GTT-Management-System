@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { Button } from "../../../components/button";
 import { SereneSelect } from "../../../components/serene-select";
 import { Badge, type BadgeStatus } from "../../../components/badge";
+import { useMotionPresence } from "../../../hooks/use-motion";
 import type { HotelAgreementDraft, AgreementApprovalStatus } from "../../../shared/app-domain";
 import { AgreementDraftSummary } from "./AgreementDraftSummary";
 
@@ -86,6 +87,30 @@ function ExpandedGroups({ draft, linkedGroupCode, assignmentGroupCode, onAssignm
   );
 }
 
+function AnimatedExpandedGroups({
+  expanded,
+  ...props
+}: ComponentProps<typeof ExpandedGroups> & { expanded: boolean }) {
+  const { isPresent } = useMotionPresence(expanded, 380);
+
+  if (!isPresent) {
+    return null;
+  }
+
+  return (
+    <div
+      className="serene-disclosure-grid"
+      data-open={expanded ? "true" : "false"}
+      aria-hidden={!expanded}
+      inert={!expanded ? true : undefined}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <ExpandedGroups {...props} />
+      </div>
+    </div>
+  );
+}
+
 export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCodes, onAssignmentGroupCodeChange, onAssignToGroup, onUnassignFromGroup, onStartEdit, onDeleteRequest, onStatusChange, statusChangePending, deleteDraftMutationPending, assignDraftMutationPending, unassignDraftMutationPending }: { drafts: HotelAgreementDraft[]; linkedGroupCode: string; assignmentGroupCodes: Record<string, string>; onAssignmentGroupCodeChange: (draftId: string, groupCode: string) => void; onAssignToGroup: (draft: HotelAgreementDraft) => void; onUnassignFromGroup: (draft: HotelAgreementDraft, groupCode?: string) => void; onStartEdit: (draft: HotelAgreementDraft) => void; onDeleteRequest: (draft: HotelAgreementDraft) => void; onStatusChange: (draft: HotelAgreementDraft, next: AgreementApprovalStatus) => void; statusChangePending: boolean; deleteDraftMutationPending: boolean; assignDraftMutationPending: boolean; unassignDraftMutationPending: boolean }) {
   const [expandedDraftId, setExpandedDraftId] = useState<string | null>(null);
 
@@ -100,7 +125,7 @@ export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCo
   }
 
   return (
-    <div className="grid gap-3 rounded-2xl lg:block lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm">
+    <div className="serene-data-reveal grid gap-3 rounded-2xl lg:block lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm">
       {drafts.map((draft, index) => {
         const expanded = expandedDraftId === draft.id;
         const isFirstDraft = index === 0;
@@ -115,7 +140,7 @@ export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCo
               assignment={<Badge status={assignmentBadgeStatus(draft)}>{draft.assignmentStatus}</Badge>}
               actions={<RowActions draft={draft} expanded={expanded} onToggle={() => setExpandedDraftId(expanded ? null : draft.id)} onEdit={onStartEdit} onDelete={onDeleteRequest} deletePending={deleteDraftMutationPending} />}
             />
-            {expanded ? <ExpandedGroups draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? ""} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} isLastDraft={isLastDraft} /> : null}
+            <AnimatedExpandedGroups expanded={expanded} draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? ""} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} isLastDraft={isLastDraft} />
           </article>
         );
       })}

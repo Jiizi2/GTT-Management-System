@@ -629,7 +629,91 @@ function testBuildChecklistItemsMergesLinkedGroups(): void {
   assert.equal(checklistItems.length, 1);
   assert.equal(checklistItems[0].groupCode, "PARENT-GP");
   assert.equal(checklistItems[0].groupPax, 45);
+  assert.equal(checklistItems[0].requiredBusCount, 1);
   assert.deepEqual(checklistItems[0].groupCodes, ["PARENT-GP", "CHILD-GP"]);
+}
+
+function testBuildChecklistItemsKeepsSharedTripBusCount(): void {
+  const [todayIso] = getChecklistRangeDates();
+
+  for (const busCount of [0, 1, 2, 3]) {
+    for (const groupCount of [1, 2, 5, 10]) {
+      const parent = createBaseGroup({
+        id: "shared-parent-id",
+        code: "SHARED-PARENT",
+        pax: 10,
+        totalBuses: 20,
+        itinerary: [createBaseItineraryItem({
+          isoDate: todayIso,
+          time: "08:00",
+          busCount,
+          requiresBus: busCount > 0,
+        })],
+      });
+
+      for (const parentReference of [parent.id, parent.code]) {
+        const children = Array.from({ length: groupCount - 1 }, (_, index) => createBaseGroup({
+          code: `SHARED-CHILD-${index}`,
+          pax: 5,
+          parentGroupId: parentReference,
+          itinerary: [],
+        }));
+
+        for (const groups of [[parent, ...children], [...children, parent]]) {
+          const items = buildChecklistItemsFromGroups(groups);
+          assert.equal(items.length, 1);
+          assert.equal(items[0].requiredBusCount, busCount, `${groupCount} linked groups sharing ${busCount} buses`);
+          assert.equal(items[0].groupPax, 10 + children.length * 5);
+          assert.equal(items[0].groupCodes?.length, groupCount);
+          assert.equal(items[0].groupCodes?.[0], parent.code);
+        }
+      }
+    }
+  }
+}
+
+function testBuildChecklistItemsKeepsSeparateTripBusCounts(): void {
+  const [todayIso, tomorrowIso] = getChecklistRangeDates();
+  const arrival = createBaseItineraryItem({
+    category: "Arrival",
+    categoryKey: "arrival",
+    isoDate: todayIso,
+    time: "08:00",
+    busCount: 1,
+    requiresBus: true,
+  });
+  const parent = createBaseGroup({
+    id: "separate-parent-id",
+    code: "SEPARATE-PARENT",
+    pax: 20,
+    itinerary: [arrival, createBaseItineraryItem({
+      category: "Departure",
+      categoryKey: "departure",
+      isoDate: tomorrowIso,
+      time: "18:00",
+      busCount: 2,
+      requiresBus: true,
+    })],
+  });
+  const child = createBaseGroup({
+    code: "SEPARATE-CHILD",
+    pax: 10,
+    parentGroupId: parent.id,
+    itinerary: [{ ...arrival, busCount: 9 }],
+  });
+  const independent = createBaseGroup({
+    code: "INDEPENDENT-GROUP",
+    pax: 30,
+    itinerary: [{ ...arrival, busCount: 3 }],
+  });
+
+  const items = buildChecklistItemsFromGroups([child, independent, parent]);
+  assert.equal(items.length, 3);
+  assert.equal(items.find((item) => item.groupCode === parent.code && item.activity === "Arrival")?.requiredBusCount, 1);
+  assert.equal(items.find((item) => item.groupCode === parent.code && item.activity === "Departure")?.requiredBusCount, 2);
+  const independentItem = items.find((item) => item.groupCode === independent.code);
+  assert.equal(independentItem?.requiredBusCount, 3);
+  assert.deepEqual(independentItem?.groupCodes, [independent.code]);
 }
 
 function testOverviewAndStatusNormalizationHelpers(): void {
@@ -1442,6 +1526,8 @@ describe("app-domain", () => {
   runCase("checklist keeps visa only window items", testBuildChecklistItemsKeepsVisaOnlyGroupInsideWindow);
   runCase("checklist keeps trips without bus", testBuildChecklistItemsKeepsTripsWithoutBusInsideWindow);
   runCase("checklist merges linked groups", testBuildChecklistItemsMergesLinkedGroups);
+  runCase("checklist counts shared trip buses once", testBuildChecklistItemsKeepsSharedTripBusCount);
+  runCase("checklist keeps separate trip bus counts", testBuildChecklistItemsKeepsSeparateTripBusCounts);
   runCase("overview/status helpers", testOverviewAndStatusNormalizationHelpers);
   runCase("form/category helpers", testFormFactoryAndCategoryHelpers);
   runCase("schedule editing helpers", testScheduleEditingAndCityInferenceHelpers);

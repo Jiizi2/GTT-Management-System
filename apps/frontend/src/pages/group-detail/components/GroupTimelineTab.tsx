@@ -57,6 +57,7 @@ export function GroupTimelineTab() {
                 <div className="flex items-center gap-1.5 lg:border-l lg:border-on-tertiary-fixed-variant/15 lg:pl-3">
                   {shouldShowLinkAgreementAction ? (
                     <Link
+                      viewTransition
                       to={`/agreement-inbox?groupCode=${encodeURIComponent(group.code)}`}
                       className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-on-tertiary-fixed-variant/20 bg-surface-container-lowest px-2.5 text-xs font-bold text-brand-primary transition hover:bg-surface-container-low"
                     >
@@ -69,6 +70,7 @@ export function GroupTimelineTab() {
 
                   {shouldShowCreateItineraryAction ? (
                     <Link
+                      viewTransition
                       to={buildGroupItineraryBuilderPath(group.code)}
                       className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-2.5 text-xs font-bold text-on-primary transition hover:bg-primary-container"
                     >

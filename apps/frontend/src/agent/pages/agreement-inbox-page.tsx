@@ -6,13 +6,16 @@ import { PageLayout } from "../../components/page-layout";
 import { StatusBadge } from "../../components/status-badge";
 import { PaginationControls } from "../../components/pagination-controls";
 import { Badge } from "../../components/badge";
+import { Button } from "../../components/button";
+import { Icon } from "../../components/icon";
+import { ResultSummary } from "../../components/list-toolbar";
 import { AgreementDraftSummary } from "../../pages/agreement-inbox/components/AgreementDraftSummary";
 import { AgreementInboxFilters } from "../../pages/agreement-inbox/components/AgreementInboxFilters";
 import type { AgreementDraftStatusFilter } from "../../hooks/use-agreement-drafts-query";
 import { portalGet } from "../data/portal-query";
 import { formatDate } from "../data/format";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
 
 export type AgentAgreementDraft = {
   muassasahId?: string | null;
@@ -126,13 +129,13 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
   return (
     <PageLayout width="workspace" className="agent-page-layout agreement-inbox-screen">
       <PageHeader
-        variant="hero"
-        className="[&_h1]:text-2xl sm:[&_h1]:text-3xl lg:[&_h1]:text-4xl"
+        variant="compact"
         title="Agreement Inbox"
         description="Review and track hotel agreements for your groups."
       />
       <AgreementInboxFilters
         idPrefix="agent-filter"
+        searchClearLabel="Hapus pencarian"
         query={search}
         setQuery={(value) => updateParam("q", value)}
         statusFilter={assigned}
@@ -150,37 +153,35 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
         hasActiveFilters={hasFilters}
         clearFilters={() => setParams({})}
       />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-on-surface-variant" aria-live="polite">
-          {drafts.length} agreements
-        </p>
-        <button
-          type="button"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-40"
-          disabled={query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          <span className="material-symbols-outlined text-lg" aria-hidden="true">
-            sync
-          </span>
-          {query.isFetching ? "Loading..." : "Refresh"}
-        </button>
-      </div>
+      <ResultSummary
+        actions={
+          <Button
+            variant="tertiary"
+            disabled={query.isFetching}
+            aria-busy={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            <Icon name="sync" className="text-lg" />
+            {query.isFetching ? "Loading..." : "Refresh"}
+          </Button>
+        }
+      >
+        {drafts.length} agreements
+      </ResultSummary>
       {query.isPending ? (
         <LoadingState label="Loading agreement drafts..." />
       ) : query.isError ? (
         <ErrorState retry={() => void query.refetch()} />
       ) : drafts.length === 0 ? (
-        <section className="serene-empty-state">
-          <h2 className="text-lg font-bold">
-            {query.data.length === 0 ? "Belum ada agreement" : "No matching agreements"}
-          </h2>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            {query.data.length === 0
+        <EmptyState
+          title={query.data.length === 0 ? "Belum ada agreement" : "No matching agreements"}
+          icon={query.data.length === 0 ? "inventory_2" : "search_off"}
+          description={
+            query.data.length === 0
               ? "Agreement drafts created by Admin will appear here."
-              : "Change your search or clear the filters to view other agreements."}
-          </p>
-        </section>
+              : "Change your search or clear the filters to view other agreements."
+          }
+        />
       ) : (
         <section
           className="grid gap-3 rounded-2xl lg:block lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm"
@@ -239,8 +240,8 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
                   }
                   actions={
                     <div className="flex w-full items-center justify-end gap-1">
-                      <button
-                        type="button"
+                      <Button
+                        variant="tertiary"
                         className={actionClass}
                         aria-label={`${expanded ? "Tutup" : "Buka"} detail ${draft.agreementNumber}`}
                         aria-expanded={expanded}
@@ -253,7 +254,7 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
                         >
                           expand_more
                         </span>
-                      </button>
+                      </Button>
                     </div>
                   }
                 />
@@ -283,6 +284,7 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
                             className="min-w-0 border-t border-outline-variant/25"
                           >
                             <Link
+                              viewTransition
                               className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2 text-sm font-semibold text-primary"
                               aria-label={group.groupCode}
                               to={`/agent/groups/${encodeURIComponent(group.groupCode)}`}
@@ -322,6 +324,7 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
           itemLabel="agreements"
           onPageChange={setPage}
           touchSafe
+          locale="id"
         />
       ) : null}
     </PageLayout>

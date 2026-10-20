@@ -171,6 +171,13 @@ async function fixture(page: Page) {
       };
     else if (pathname === "/auth/logout") {
       status = 204;
+    } else if (pathname === "/dashboard") {
+      data = {
+        groups: { journeys: 1, total: 2, active: 2, completed: 0, archived: 0, upcoming: 1, totalPax: 30 },
+        attention: { visaGroups: 1, hotelGroups: 1 },
+        upcomingGroups: [],
+        recentTimeline: [],
+      };
     } else if (pathname.startsWith("/agreement-drafts")) {
       if (request.method() === "POST" || request.method() === "PATCH") {
         const body = request.postDataJSON();
@@ -216,6 +223,92 @@ async function capture(page: Page, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: path.join(captureDir, `${name}.png`), fullPage: true, animations: "disabled" });
 }
+test("Agent topbar keeps its position across Dashboard and Visa navigation", async ({ page }) => {
+  await fixture(page);
+  await page.goto(`${baseUrl}/agent/overview`);
+  await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+
+  const topbar = page.locator(
+    ".agent-topbar, .agent-topbar-inner, .agent-brand, .agent-top-navigation, .agent-top-link, .agent-account",
+  );
+  const positions = () =>
+    topbar.evaluateAll((elements) =>
+      elements.map((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { x, y, width, height };
+      }),
+    );
+  const initial = await positions();
+  const expectStable = async () => {
+    const current = await positions();
+    expect(current).toHaveLength(initial.length);
+    for (const [index, position] of current.entries()) {
+      for (const dimension of ["x", "y", "width", "height"] as const) {
+        expect(position[dimension], `Topbar element ${index} ${dimension} at ${page.url()}`).toBeCloseTo(
+          initial[index][dimension],
+          1,
+        );
+      }
+    }
+  };
+
+  const navigation = page.getByRole("navigation", { name: "Primary navigation" });
+  await navigation.getByRole("link", { name: "Visa Tracking", exact: true }).click();
+  await expect(page.locator(".agent-visa-page")).toBeVisible();
+  await expectStable();
+  await navigation.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+  await expectStable();
+  await page.goto(`${baseUrl}/agent/visa/${child.code}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(child.code);
+  await page.evaluate(() => document.fonts.ready);
+  await expectStable();
+});
+
+test("Shared search controls preserve filters and focus across Agent lists", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const writes = await fixture(page);
+  await page.route("**/api/agent/profile", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        account: { displayName: "Operator Agent" },
+        agent: { code: "AGENT-A", name: "Agent Umrah" },
+      }),
+    }),
+  );
+  for (const route of ["groups", "visa", "agreement-inbox", "checklist"]) {
+    await page.goto(`${baseUrl}/agent/${route}?source=consistency`);
+    const search = page.getByRole("searchbox");
+    await expect(search).toBeVisible();
+    await expect(page.locator(".serene-search-field")).toHaveCSS("height", "44px");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+    await search.fill("pencarian-tanpa-hasil");
+    await expect(page.locator(".serene-empty-state")).toBeVisible();
+    await page.getByRole("button", { name: "Hapus pencarian" }).click();
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
+    const params = new URL(page.url()).searchParams;
+    expect(params.get("source")).toBe("consistency");
+    expect(params.has("q")).toBe(false);
+  }
+  await page.goto(`${baseUrl}/agent/overview`);
+  await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Lihat checklist/ })).toBeVisible();
+  await capture(page, "dashboard-shared-components");
+  await page.goto(`${baseUrl}/agent/profile`);
+  await expect(page.getByText("Hanya lihat")).toBeVisible();
+  await expect(page.getByText("Operator Agent", { exact: true }).last()).toBeVisible();
+  await page.goto(`${baseUrl}/agent/visa/${child.code}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(child.code);
+  await expect(page.getByText("Hanya lihat")).toBeVisible();
+  await capture(page, "visa-detail-shared-components");
+  expect(writes).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test("Agreement Inbox read-only and Muassasah desktop", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

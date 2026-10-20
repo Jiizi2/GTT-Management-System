@@ -1,5 +1,7 @@
 import type { GroupVisaSetup } from "../../shared/app-domain-types";
 import { formatDate } from "../data/format";
+import { DetailItem } from "../../components/detail-list";
+import { SectionHeader } from "../../components/section-header";
 
 export function TravelVisaFacts({ visa }: { visa: GroupVisaSetup | undefined }) {
   const flights = visa?.flightLegs ?? [];
@@ -7,9 +9,7 @@ export function TravelVisaFacts({ visa }: { visa: GroupVisaSetup | undefined }) 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <section className="serene-section p-5 sm:p-6" aria-labelledby="agent-flights-title">
-        <h2 id="agent-flights-title" className="text-lg font-extrabold">
-          Penerbangan dan transit
-        </h2>
+        <SectionHeader id="agent-flights-title" title="Penerbangan dan transit" />
         {flights.length === 0 ? (
           <p className="mt-3 text-sm text-on-surface-variant">
             Rincian penerbangan belum dicatat. Jadwal yang tersedia dapat dilihat pada itinerary.
@@ -45,9 +45,7 @@ export function TravelVisaFacts({ visa }: { visa: GroupVisaSetup | undefined }) 
         )}
       </section>
       <section className="serene-section p-5 sm:p-6" aria-labelledby="agent-raudhah-title">
-        <h2 id="agent-raudhah-title" className="text-lg font-extrabold">
-          Raudhah dan tasreh
-        </h2>
+        <SectionHeader id="agent-raudhah-title" title="Raudhah dan tasreh" />
         {appointments.length === 0 ? (
           <p className="mt-3 text-sm text-on-surface-variant">Jadwal Raudhah belum dicatat untuk group ini.</p>
         ) : (
@@ -68,10 +66,5 @@ export function TravelVisaFacts({ visa }: { visa: GroupVisaSetup | undefined }) 
   );
 }
 function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-on-surface-variant">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold">{value}</dd>
-    </div>
-  );
+  return <DetailItem stacked label={label} value={value} />;
 }

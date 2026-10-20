@@ -54,7 +54,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
 
   if (checklistItems.length === 0) {
     return (
-      <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+      <div className="serene-data-reveal mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
         <header className="serene-card rounded-3xl p-5">
           <h2 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">H-1 Checklist</h2>
           <p className="mt-2 text-sm text-on-surface-variant">
@@ -104,7 +104,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
       : `${pendingItems.length} trips need driver assignment.`;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+    <div className="serene-data-reveal mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
       <section className="serene-page-toolbar" aria-label="Search checklist items">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label className="serene-page-search">
@@ -181,7 +181,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
             </div>
 
             {pendingItems.length > 0 ? (
-              <div className="space-y-4">
+              <div className="serene-data-reveal space-y-4">
                 {paginatedPendingItems.map((item) => {
                   const draft = driverDrafts[item.id] ?? { name: "", phone: "", plateNumber: "" };
                   const requiredDriverCount = getRequiredDriverCount(item);
@@ -241,7 +241,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
               <span className="checklist-section-divider hidden h-px flex-1 sm:block" aria-hidden="true" />
             </div>
 
-            <div className="space-y-3">
+            <div className="serene-data-reveal space-y-3">
               {paginatedCompletedItems.map((item) => {
                 const assignment = confirmedDrivers[item.id];
                 if (!assignment) {

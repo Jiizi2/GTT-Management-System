@@ -108,7 +108,7 @@ export function CreateInvoiceWorkspace({
   return (
     <FormProvider {...methods}>
       <div
-        className="mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8"
+        className="serene-data-reveal mx-auto max-w-[88rem] space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8"
         aria-busy={isWorkspaceBusy ? "true" : "false"}
       >
         <section className="space-y-3">

@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Icon } from "./icon";
 
 export type ButtonVariant = "primary" | "secondary" | "tertiary" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -18,7 +19,8 @@ export function Button({
   ...props
 }: ButtonProps) {
   // Base classes mapping to GTT design system
-  const baseClass = "inline-flex items-center justify-center gap-1.5 font-semibold transition active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-45 serene-focus-ring";
+  const baseClass =
+    "inline-flex items-center justify-center gap-1.5 font-semibold transition active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-45 serene-focus-ring";
 
   // Variant classes utilizing existing serene styling rules
   const variantClasses: Record<ButtonVariant, string> = {
@@ -41,5 +43,27 @@ export function Button({
     <button type={type} className={resolvedClass} {...props}>
       {children}
     </button>
+  );
+}
+
+export interface IconButtonProps extends Omit<ButtonProps, "children"> {
+  icon: string;
+  iconClassName?: string;
+  "aria-label": string;
+}
+
+export function IconButton({
+  icon,
+  iconClassName,
+  size = "md",
+  variant = "tertiary",
+  className = "",
+  ...props
+}: IconButtonProps) {
+  const width = size === "sm" ? "w-8" : size === "lg" ? "w-12" : "w-11";
+  return (
+    <Button size={size} variant={variant} className={`${width} shrink-0 px-0 ${className}`.trim()} {...props}>
+      <Icon name={icon} className={iconClassName} />
+    </Button>
   );
 }

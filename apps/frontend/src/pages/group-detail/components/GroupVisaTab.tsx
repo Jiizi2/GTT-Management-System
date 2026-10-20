@@ -94,6 +94,7 @@ export function GroupVisaTab() {
             </p>
           </div>
           <Link
+            viewTransition
             to={readOnly ? `/agent/visa/${encodeURIComponent(group.code)}` : buildVisaDetailPath(group.code)}
             className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.08em] text-brand-primary transition hover:text-brand-primary/75"
           >

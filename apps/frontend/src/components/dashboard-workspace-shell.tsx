@@ -81,7 +81,7 @@ export function DashboardWorkspaceShell({
       ) : null}
 
       <main
-        className={`relative px-4 pt-0 transition-[margin] duration-200 sm:px-5 xl:px-8 xl:pb-8 xl:pt-0 ${
+        className={`serene-shell-offset relative px-4 pt-0 sm:px-5 xl:px-8 xl:pb-8 xl:pt-0 ${
           controller.isSidebarCollapsed ? "xl:ml-[104px]" : "xl:ml-[280px]"
         } ${shouldShowMobileNav ? "pb-28" : "pb-10"}`}
       >
@@ -113,7 +113,7 @@ export function DashboardWorkspaceShell({
       {syncFeedback ? (
         <div className="fixed bottom-24 left-4 right-4 z-[90] xl:bottom-6 xl:left-auto xl:right-6 xl:w-full xl:max-w-sm">
           <div
-            className={`flex items-start gap-3 rounded-2xl px-4 py-3 shadow-float backdrop-blur-serene ${syncFeedbackToneClassMap[syncFeedback.tone]} animate-slide-down`}
+            className={`serene-feedback-toast flex items-start gap-3 rounded-2xl px-4 py-3 shadow-float backdrop-blur-serene ${syncFeedbackToneClassMap[syncFeedback.tone]}`}
             role="status"
             aria-live="polite"
           >

@@ -102,7 +102,7 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
         }
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan metrik">
+      <section className="serene-data-reveal grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan metrik">
         <MetricCard
           icon="groups"
           tone="primary"
