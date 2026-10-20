@@ -7,6 +7,7 @@ export function PageHeader({
   description,
   toolbar,
   actions,
+  children,
   className = "",
 }: {
   variant?: "hero" | "compact" | "detail";
@@ -15,6 +16,7 @@ export function PageHeader({
   description?: ReactNode;
   toolbar?: ReactNode;
   actions?: ReactNode;
+  children?: ReactNode;
   className?: string;
 }) {
   const compact = variant === "compact";
@@ -39,6 +41,7 @@ export function PageHeader({
               {description}
             </div>
           ) : null}
+          {children}
         </div>
         {actions ? (
           <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">{actions}</div>

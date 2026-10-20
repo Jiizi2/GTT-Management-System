@@ -18,6 +18,11 @@ import { agentQueryKeys } from "../query/agent-query-boundary";
 import { ErrorState, LoadingState } from "../components/data-state";
 import { DepartureMonthPicker } from "../components/departure-month-picker";
 import { StatusBadge } from "../../components/status-badge";
+import { GroupIdentity } from "../../components/group-identity";
+import { Icon } from "../../components/icon";
+import { MetricCard } from "../../components/metric-card";
+import { PageHeader } from "../../components/page-header";
+import { PageLayout } from "../../components/page-layout";
 import { formatDate } from "../data/format";
 import { checklistDateRange, checklistInRange, checklistReady, getAgentChecklist } from "../data/h1-checklist";
 const number = new Intl.NumberFormat("id-ID");
@@ -63,15 +68,14 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
   if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
   const dashboard = query.data;
   return (
-    <div className="agent-calendar-dashboard">
-      <div className="agent-dashboard-heading">
-        <div>
-          <h1>Dashboard</h1>
-          <p>Ringkasan perjalanan dan jadwal keberangkatan Anda.</p>
-        </div>
-        <p className="agent-dashboard-period">{monthLabel(month)}</p>
-      </div>
-      <dl className="agent-dashboard-stats" aria-label="Ringkasan statistik">
+    <PageLayout width="workspace" className="agent-calendar-dashboard agent-page-layout">
+      <PageHeader
+        variant="compact"
+        title="Dashboard"
+        description="Ringkasan perjalanan dan jadwal keberangkatan Anda."
+        actions={<span className="font-display text-lg font-extrabold text-on-surface">{monthLabel(month)}</span>}
+      />
+      <div className="agent-dashboard-stats" aria-label="Ringkasan statistik">
         <Metric
           label="perjalanan"
           value={
@@ -87,7 +91,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
           icon="groups"
           description="Total jamaah di seluruh group."
         />
-      </dl>
+      </div>
       <div className="agent-dashboard-workspace">
         <section className="agent-calendar-panel" aria-labelledby="departure-calendar-title">
           <div className="agent-calendar-header">
@@ -103,7 +107,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                 disabled={month === "1000-01"}
                 onClick={() => chooseMonth(shiftCalendarMonth(month, -1))}
               >
-                <Icon icon="chevron_left" />
+                <Icon name="chevron_left" />
               </button>
               <DepartureMonthPicker value={month} currentMonth={today.slice(0, 7)} onChange={chooseMonth} />
               <button
@@ -113,7 +117,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                 disabled={month === "9999-12"}
                 onClick={() => chooseMonth(shiftCalendarMonth(month, 1))}
               >
-                <Icon icon="chevron_right" />
+                <Icon name="chevron_right" />
               </button>
             </div>
           </div>
@@ -159,6 +163,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                                   <div className="agent-calendar-events">
                                     {events.slice(0, 2).map((journey) => (
                                       <Link
+                                        viewTransition
                                         key={journey.root.id}
                                         to={`/agent/groups/${encodeURIComponent(journey.root.code)}`}
                                         state={{ from: "/agent/overview" }}
@@ -226,13 +231,13 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
               </ul>
             ) : (
               <div className="agent-agenda-empty">
-                <Icon icon="event_upcoming" />
+                <Icon name="event_upcoming" />
                 <h3>{selectedDate ? "Tidak ada keberangkatan" : "Jadwal berikutnya belum tersedia"}</h3>
                 <p>
                   Belum ada keberangkatan pada {selectedDate ? departureDateLabel(selectedDate) : monthLabel(month)}.
                 </p>
-                <Link to="/agent/groups">
-                  Lihat Perjalanan <Icon icon="arrow_forward" />
+                <Link viewTransition to="/agent/groups">
+                  Lihat Perjalanan <Icon name="arrow_forward" />
                 </Link>
               </div>
             )}
@@ -262,8 +267,8 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
       <section className="agent-dashboard-history" aria-labelledby="agent-history-title">
         <div className="agent-history-heading">
           <h2 id="agent-history-title">H-1 Checklist</h2>
-          <Link to="/agent/checklist">
-            Lihat checklist <Icon icon="arrow_forward" />
+          <Link viewTransition to="/agent/checklist">
+            Lihat checklist <Icon name="arrow_forward" />
           </Link>
         </div>
         <p className="agent-history-description">Kesiapan driver untuk perjalanan hari ini, besok, dan lusa.</p>
@@ -296,6 +301,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                       </p>
                       <strong>
                         <Link
+                          viewTransition
                           to={`/agent/groups/${encodeURIComponent(item.group.code)}`}
                           state={{ from: "/agent/overview" }}
                         >
@@ -322,14 +328,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
         )}
       </section>
       <p className="agent-dashboard-owner">Ruang kerja {agentName}</p>
-    </div>
-  );
-}
-function Icon({ icon }: { icon: string }) {
-  return (
-    <span className="material-symbols-outlined" aria-hidden="true">
-      {icon}
-    </span>
+    </PageLayout>
   );
 }
 function Metric({
@@ -344,18 +343,14 @@ function Metric({
   description: string;
 }) {
   return (
-    <div className="agent-dashboard-metric">
-      <span className="agent-metric-icon">
-        <Icon icon={icon} />
-      </span>
-      <div>
-        <div className="agent-metric-value">
-          <dd>{value === undefined ? "—" : number.format(value)}</dd>
-          <dt>{label}</dt>
-        </div>
-        <p>{description}</p>
-      </div>
-    </div>
+    <MetricCard
+      variant="compact"
+      className="agent-dashboard-metric"
+      label={label}
+      value={value === undefined ? "—" : number.format(value)}
+      icon={icon}
+      supportingText={description}
+    />
   );
 }
 function AgendaJourney({ journey }: { journey: DepartureJourney }) {
@@ -367,6 +362,7 @@ function AgendaJourney({ journey }: { journey: DepartureJourney }) {
   return (
     <li>
       <Link
+        viewTransition
         to={`/agent/groups/${encodeURIComponent(journey.root.code)}`}
         state={{ from: "/agent/overview" }}
         className="agent-agenda-journey"
@@ -378,21 +374,20 @@ function AgendaJourney({ journey }: { journey: DepartureJourney }) {
           <span>{dayName}</span>
         </time>
         <div className="agent-agenda-details">
-          <span className="agent-agenda-code">{journey.root.code}</span>
-          <strong>{journey.root.name}</strong>
+          <GroupIdentity code={journey.root.code} name={journey.root.name} />
           <span className="agent-agenda-counts">
             <span>
-              <Icon icon="groups" />
+              <Icon name="groups" />
               {number.format(journey.pax)} jamaah
             </span>
             <span>
-              <Icon icon="groups" />
+              <Icon name="groups" />
               {number.format(journey.members.length)} group
             </span>
           </span>
           {journey.dateSource === "journey" ? <span className="agent-date-source">Awal perjalanan</span> : null}
         </div>
-        <Icon icon="arrow_forward" />
+        <Icon name="arrow_forward" />
       </Link>
     </li>
   );
@@ -413,16 +408,16 @@ function Attention({
   tone: string;
 }) {
   return (
-    <Link to={to} className="agent-attention-row">
+    <Link viewTransition to={to} className="agent-attention-row">
       <span className={`agent-attention-icon ${tone}`}>
-        <Icon icon={icon} />
+        <Icon name={icon} />
       </span>
       <span className="agent-attention-copy">
         <strong>{label}</strong>
         <span>{description}</span>
       </span>
       <strong className="agent-attention-value">{number.format(value)}</strong>
-      <Icon icon="arrow_forward" />
+      <Icon name="arrow_forward" />
     </Link>
   );
 }

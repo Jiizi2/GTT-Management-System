@@ -1,7 +1,19 @@
 import type { ReactNode } from "react";
 
-export function FilterPanel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`serene-filter-panel ${className}`.trim()}>{children}</section>;
+export function FilterPanel({
+  children,
+  className = "",
+  ariaLabel,
+}: {
+  children: ReactNode;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  return (
+    <section className={`serene-filter-panel ${className}`.trim()} aria-label={ariaLabel}>
+      {children}
+    </section>
+  );
 }
 
 export function FilterField({
@@ -15,9 +27,7 @@ export function FilterField({
 }) {
   return (
     <label className={`space-y-1.5 ${className}`.trim()}>
-      <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">
-        {label}
-      </span>
+      <span className="serene-field-label block">{label}</span>
       {children}
     </label>
   );

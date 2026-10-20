@@ -62,7 +62,7 @@ export function MobileNav({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 xl:hidden"
+      className="serene-mobile-navigation fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2 xl:hidden"
       aria-label="Mobile navigation"
     >
       <div className="mx-auto max-w-md">

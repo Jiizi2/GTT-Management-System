@@ -33,4 +33,14 @@ describe("AgentFilterSelect", () => {
 
     expect(onChange).toHaveBeenCalledWith("agent-b");
   });
+
+  it.each(["toolbar", "field", "pill", "inline"] as const)("searches agent names in the %s variant", (variant) => {
+    const onChange = vi.fn();
+    render(<AgentFilterSelect value="all" onChange={onChange} variant={variant} />);
+    fireEvent.click(screen.getByRole("button", { name: "Filter by Agent" }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "bEt" } });
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("option", { name: "Agent Beta" }));
+    expect(onChange).toHaveBeenCalledWith("agent-b");
+  });
 });

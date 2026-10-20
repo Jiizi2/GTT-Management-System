@@ -173,7 +173,7 @@ export function InvoiceCardList({
   hideAmounts?: boolean;
 }) {
   return (
-    <section className="space-y-3 lg:hidden" aria-label="Invoice cards">
+    <section className="serene-data-reveal space-y-3 lg:hidden" aria-label="Invoice cards">
       {rows.map((row) => (
         <article
           key={row.id}
@@ -347,7 +347,7 @@ export function InvoiceTable({
             <div className="text-right">Actions</div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          <div className="serene-data-reveal divide-y divide-slate-100">
             {rows.map((row) => (
               <article
                 key={row.id}

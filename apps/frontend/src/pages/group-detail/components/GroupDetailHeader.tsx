@@ -40,6 +40,7 @@ export function GroupDetailHeader() {
 
       <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         <Link
+          viewTransition
           to={readOnly ? `/agent/visa/${encodeURIComponent(group.code)}` : buildVisaDetailPath(group.code)}
           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary sm:w-auto"
         >

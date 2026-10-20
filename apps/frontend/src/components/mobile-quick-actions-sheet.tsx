@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, type ReactNode } from "react";
 import type { NavId } from "../shared/app-domain";
 import type { SessionAccessTier } from "../shared/app-domain";
+import { useMotionPresence } from "../hooks/use-motion";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
 
 type QuickAction = {
@@ -74,6 +75,7 @@ export function MobileQuickActionsSheet({
   onClose: () => void;
   onSelectAction: (navId: NavId) => void;
 }) {
+  const { isPresent, motionState } = useMotionPresence(open, 280);
   const dialogRef = useModalFocusTrap<HTMLElement>({
     isActive: open,
     onClose,
@@ -103,7 +105,7 @@ export function MobileQuickActionsSheet({
     };
   }, [open, onClose]);
 
-  if (!open || typeof document === "undefined") {
+  if (!isPresent || typeof document === "undefined") {
     return null;
   }
 
@@ -111,16 +113,19 @@ export function MobileQuickActionsSheet({
     <ModalPortal>
       <div
         className="serene-modal-overlay z-[100] flex items-end justify-center px-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3"
-        onClick={onClose}
+        data-motion-state={motionState}
+        aria-hidden={!open}
+        onClick={open ? onClose : undefined}
         role="presentation"
       >
         <section
           ref={dialogRef}
-          className="flex max-h-[calc(100dvh-0.75rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-outline-variant/70 bg-surface-container-lowest shadow-float"
+          className="serene-bottom-sheet flex max-h-[calc(100dvh-0.75rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-outline-variant/70 bg-surface-container-lowest shadow-float"
           role="dialog"
           aria-modal="true"
           aria-labelledby="mobile-quick-actions-title"
           tabIndex={-1}
+          inert={!open ? true : undefined}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="px-5 pt-4">

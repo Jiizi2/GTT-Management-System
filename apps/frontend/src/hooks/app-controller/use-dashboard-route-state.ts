@@ -23,7 +23,7 @@ export function useDashboardRouteState(sessionAccessTier: SessionAccessTier) {
       return;
     }
 
-    navigate(routeState.canonicalPath, { replace: true, flushSync: true });
+    navigate(routeState.canonicalPath, { replace: true, flushSync: true, viewTransition: true });
   }, [location.pathname, navigate, routeState.canonicalPath]);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export function useDashboardRouteState(sessionAccessTier: SessionAccessTier) {
     }
 
     if (sessionAccessTier !== "super-admin") {
-      navigate(buildDashboardPath("overview"), { replace: true, flushSync: true });
+      navigate(buildDashboardPath("overview"), { replace: true, flushSync: true, viewTransition: true });
       scrollToTop();
     }
   }, [navigate, routeState.activeNav, sessionAccessTier]);
@@ -44,7 +44,7 @@ export function useDashboardRouteState(sessionAccessTier: SessionAccessTier) {
         return;
       }
 
-      navigate(normalizedNextPath, { replace, flushSync: true });
+      navigate(normalizedNextPath, { replace, flushSync: true, viewTransition: true });
       scrollToTop();
     },
     [location.pathname, navigate],

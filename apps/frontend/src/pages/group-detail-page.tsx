@@ -138,7 +138,7 @@ export function GroupDetail({
 
   return (
     <GroupDetailContext.Provider value={contextValue}>
-      <div className="mx-auto max-w-7xl space-y-6 px-4 pb-24 pt-4 sm:px-6 lg:px-8">
+      <div className="serene-data-reveal mx-auto max-w-7xl space-y-6 px-4 pb-24 pt-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="sm" onClick={onBack}>
             <span className="material-symbols-outlined text-base" aria-hidden="true">

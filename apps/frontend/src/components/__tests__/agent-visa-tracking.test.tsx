@@ -229,7 +229,7 @@ describe("Portal Agent Visa Tracking", () => {
     expect(screen.getByText("Halaman identitas kurang jelas.", { exact: false })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Alur proses visa" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Pengiriman dokumen/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /^Agreement hotel/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Agreement hotel Agreement disetujui/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Upload paspor ke Nusuk/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Visa issued/ })).toBeInTheDocument();
     expect(screen.getByText("Agreement disetujui")).toBeInTheDocument();
@@ -254,6 +254,10 @@ describe("Portal Agent Visa Tracking", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /^Pengiriman dokumen Belum tercatat/ }));
     expect(screen.getByText("Pengajuan dokumen belum tercatat.", { exact: false })).toBeVisible();
+    expect(screen.getByLabelText("Ringkasan kesiapan dokumen")).toHaveTextContent(
+      /0 terverifikasi\s*\u00b7\s*0 perlu revisi\s*\u00b7\s*4 belum siap/,
+    );
+    expect(screen.getAllByText("Belum tersedia")).toHaveLength(4);
     expect(screen.queryByText("Terverifikasi")).not.toBeInTheDocument();
   });
 
@@ -302,7 +306,9 @@ describe("Portal Agent Visa Tracking", () => {
     expect(screen.getByRole("navigation", { name: "Empat tahap visa" }).querySelectorAll("button")).toHaveLength(4);
     const nusuk = screen.getByRole("button", { name: /^Upload paspor ke Nusuk Data paspor tercatat/ });
     expect(nusuk).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(screen.getByRole("button", { name: /^Lihat tahap 3:/ }));
+    const nusukShortcut = screen.getByRole("button", { name: /^Lihat tahap 3:/ });
+    expect(nusukShortcut).toHaveAttribute("aria-controls", "visa-panel-nusuk");
+    fireEvent.click(nusukShortcut);
     expect(nusuk).toHaveAttribute("aria-expanded", "true");
     expect(nusuk).toHaveFocus();
     fireEvent.click(nusuk);

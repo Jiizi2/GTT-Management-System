@@ -77,7 +77,7 @@ export function VisaTrackingDetailScreen({
 
   return (
     <VisaDetailContext.Provider value={detailState}>
-      <div className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
+      <div className="serene-data-reveal mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
         <VisaDetailHeader />
         <VisaStatusSection />
         <FlightDetailsSection />

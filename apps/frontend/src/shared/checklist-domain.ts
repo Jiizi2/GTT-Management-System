@@ -202,7 +202,6 @@ export function buildChecklistItemsFromGroups(
     const parentCode = rootGroup ? rootGroup.code : firstItem.groupCode;
     const parentName = rootGroup ? rootGroup.name : firstItem.groupName;
     const totalPax = items.reduce((sum, item) => sum + item.groupPax, 0);
-    const requiredBusCount = items.reduce((sum, item) => sum + item.requiredBusCount, 0);
 
     const uniqueCodes = Array.from(new Set(items.map((item) => item.groupCode)));
     const otherCodes = uniqueCodes.filter((code) => code !== parentCode).sort();
@@ -211,11 +210,11 @@ export function buildChecklistItemsFromGroups(
     const primaryItem = items.find((item) => item.groupCode === parentCode) || firstItem;
 
     result.push({
+      // Linked groups share this itinerary trip, including its bus requirement.
       ...primaryItem,
       groupCode: parentCode,
       groupName: parentName,
       groupPax: totalPax,
-      requiredBusCount,
       groupCodes,
     });
   });

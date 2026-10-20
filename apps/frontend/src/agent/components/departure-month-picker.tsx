@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFloatingPopoverStyle } from "../../components/date-time-pickers";
+import { Icon } from "../../components/icon";
 import { monthLabel } from "../data/departure-calendar";
 
 const months = [
@@ -94,7 +95,7 @@ export function DepartureMonthPicker({
         }}
       >
         <span id={`${id}-value`}>{monthLabel(value)}</span>
-        <Icon icon="expand_more" />
+        <Icon name="expand_more" />
       </button>
       {open && style
         ? createPortal(
@@ -113,7 +114,7 @@ export function DepartureMonthPicker({
                   disabled={year === 1000}
                   onClick={() => setYear(year - 1)}
                 >
-                  <Icon icon="chevron_left" />
+                  <Icon name="chevron_left" />
                 </button>
                 <strong aria-live="polite">{year}</strong>
                 <button
@@ -122,7 +123,7 @@ export function DepartureMonthPicker({
                   disabled={year === 9999}
                   onClick={() => setYear(year + 1)}
                 >
-                  <Icon icon="chevron_right" />
+                  <Icon name="chevron_right" />
                 </button>
               </div>
               <div className="agent-month-options" role="group" aria-label="Daftar bulan">
@@ -165,13 +166,5 @@ export function DepartureMonthPicker({
           )
         : null}
     </div>
-  );
-}
-
-function Icon({ icon }: { icon: string }) {
-  return (
-    <span className="material-symbols-outlined" aria-hidden="true">
-      {icon}
-    </span>
   );
 }

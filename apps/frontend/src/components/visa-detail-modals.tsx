@@ -884,6 +884,8 @@ export function AgentAssignmentModal({
                 value={field.value}
                 onChange={(event) => field.onChange(event.target.value)}
                 disabled={isLoading}
+                searchable
+                searchPlaceholder="Cari nama agent..."
                 aria-invalid={getFieldAriaInvalid(agentErrorMessage)}
                 aria-describedby={getFieldDescribedBy("visa-agent", { errorMessage: agentErrorMessage })}
               >

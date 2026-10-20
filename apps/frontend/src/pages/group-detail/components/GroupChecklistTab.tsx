@@ -110,7 +110,11 @@ export function GroupChecklistTab() {
                     .map((g, index) => (
                       <span key={g.code} className="inline-flex items-center gap-0.5">
                         {index > 0 && <span className="mr-1.5 text-slate-300">,</span>}
-                        <Link to={`/groups/${g.code}`} className="break-all font-bold text-slate-900 hover:underline">
+                        <Link
+                          viewTransition
+                          to={`/groups/${g.code}`}
+                          className="break-all font-bold text-slate-900 hover:underline"
+                        >
                           {g.code}
                         </Link>
                         {!readOnly ? (

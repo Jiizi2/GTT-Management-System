@@ -11,9 +11,15 @@ import {
 import { jakartaToday } from "../data/departure-calendar";
 import { getAllAgentGroups } from "../data/all-groups-query";
 import { formatDate } from "../data/format";
-import { ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
 import { PageLayout } from "../../components/page-layout";
 import { PageHeader } from "../../components/page-header";
+import { Button } from "../../components/button";
+import { GroupIdentity } from "../../components/group-identity";
+import { ListToolbar, ResultSummary } from "../../components/list-toolbar";
+import { SearchField } from "../../components/search-field";
+import { SectionHeader } from "../../components/section-header";
+import { StatusBadge } from "../../components/status-badge";
 
 export function ChecklistPage({ principalId }: { principalId: string }) {
   const client = useQueryClient();
@@ -43,27 +49,42 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
   return (
     <PageLayout width="standard">
       <PageHeader
-        eyebrow="Departure Readiness"
+        variant="compact"
         title="H-1 Checklist"
         description="Kesiapan driver untuk perjalanan hari ini, besok, dan lusa."
-        toolbar={
-          <label className="serene-page-search max-w-xl">
-            <span className="material-symbols-outlined text-on-surface-variant/70">search</span>
-            <input
-              className="serene-page-search-input"
-              placeholder="Search group number, e.g. 901794508"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-        }
       />
+      <ListToolbar
+        ariaLabel="Filter checklist"
+        footer={
+          <ResultSummary onReset={search.trim() && rows.length > 0 ? () => setSearch("") : undefined}>
+            {rows.length} aktivitas ditemukan
+          </ResultSummary>
+        }
+      >
+        <SearchField
+          label="Cari group checklist"
+          placeholder="Search group number, e.g. 901794508"
+          value={search}
+          onChange={setSearch}
+        />
+      </ListToolbar>
       {rows.length === 0 ? (
-        <article className="serene-empty-state">
-          <span className="material-symbols-outlined text-4xl">event_busy</span>
-          <h2 className="mt-3 text-xl font-bold">Tidak ada perjalanan dalam 3 hari ke depan</h2>
-          <p className="mt-2 text-sm">Belum ada itinerary untuk hari ini, besok, atau lusa.</p>
-        </article>
+        <EmptyState
+          icon={search.trim() ? "search_off" : "event_busy"}
+          title={search.trim() ? "Tidak ada checklist yang sesuai" : "Tidak ada perjalanan dalam 3 hari ke depan"}
+          description={
+            search.trim()
+              ? "Ubah kata pencarian untuk melihat checklist lainnya."
+              : "Belum ada itinerary untuk hari ini, besok, atau lusa."
+          }
+          action={
+            search.trim() ? (
+              <Button variant="secondary" onClick={() => setSearch("")}>
+                Reset filter
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           {incomplete.length === 0 ? (
@@ -76,25 +97,19 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
             </section>
           ) : null}
           <section className="space-y-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-extrabold uppercase tracking-[.16em] text-rose-700">Need Attention</h2>
-              <span className="rounded-lg bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
-                {incomplete.length} Actions Required
-              </span>
-              <span className="h-px flex-1 bg-outline-variant/30" />
-            </div>
+            <SectionHeader
+              title="Need Attention"
+              actions={<StatusBadge tone="attention">{incomplete.length} Actions Required</StatusBadge>}
+            />
             {incomplete.map((row) => (
               <ChecklistCard key={row.id} row={row} attention />
             ))}
           </section>
           <section className="space-y-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-extrabold uppercase tracking-[.16em] text-emerald-700">Completed</h2>
-              <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-                {complete.length} Ready
-              </span>
-              <span className="h-px flex-1 bg-outline-variant/30" />
-            </div>
+            <SectionHeader
+              title="Completed"
+              actions={<StatusBadge tone="complete">{complete.length} Ready</StatusBadge>}
+            />
             {complete.map((row) => (
               <ChecklistCard key={row.id} row={row} />
             ))}
@@ -117,11 +132,10 @@ function ChecklistCard({ row, attention = false }: { row: ChecklistRow; attentio
           <span className="material-symbols-outlined">{attention ? "pending_actions" : "check_circle"}</span>
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-black uppercase tracking-wider text-primary">{row.group.code}</p>
+          <GroupIdentity code={row.group.code} name={row.group.name} />
           <h3 className="mt-1 font-bold">
             {row.activity} · {row.tripLabel}
           </h3>
-          <p className="mt-1 text-sm text-on-surface-variant">{row.group.name}</p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs sm:min-w-64">
           <span className="rounded-xl bg-surface-container-lowest p-3">

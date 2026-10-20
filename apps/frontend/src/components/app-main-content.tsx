@@ -64,6 +64,7 @@ function ScreenLoadingFallback() {
 
 export function AppMainContent({ controller }: { controller: AppController }) {
   const location = useLocation();
+  const routeDepth = location.pathname.split("/").filter(Boolean).length > 1 ? "detail" : "root";
   const requiresDetailedGroupRecords =
     controller.selectedGroupCode !== null ||
     controller.selectedVisaGroupCode !== null ||
@@ -89,7 +90,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
     // Reset the revealed route boundary on navigation so lazy-loaded screens
     // do not keep the previous page visible while the next chunk is loading.
     <Suspense key={`${location.pathname}${location.search}`} fallback={<ScreenLoadingFallback />}>
-      <div className="animate-page-fade-in">
+      <div className="serene-route-surface" data-route-depth={routeDepth}>
         <Routes>
           <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
           <Route

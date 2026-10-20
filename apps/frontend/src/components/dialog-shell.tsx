@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useMotionPresence } from "../hooks/use-motion";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
 
 export type DialogSize = "sm" | "md" | "lg";
@@ -19,13 +20,14 @@ export function DialogShell({
   size = "md",
   children,
 }: DialogShellProps) {
+  const { isPresent, motionState } = useMotionPresence(isOpen);
   // Use existing workspace modal focus trap hook for accessibility
   const dialogRef = useModalFocusTrap<HTMLDivElement>({
     isActive: isOpen,
     onClose,
   });
 
-  if (!isOpen) {
+  if (!isPresent) {
     return null;
   }
 
@@ -40,7 +42,12 @@ export function DialogShell({
   const shellClass = `serene-modal-shell w-full ${sizeClasses[size]}`;
 
   return createPortal(
-    <div className={overlayClass} onClick={onClose}>
+    <div
+      className={overlayClass}
+      data-motion-state={motionState}
+      aria-hidden={!isOpen}
+      onClick={isOpen ? onClose : undefined}
+    >
       <div
         ref={dialogRef}
         className={shellClass}
@@ -48,6 +55,7 @@ export function DialogShell({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
+        inert={!isOpen ? true : undefined}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">

@@ -144,7 +144,7 @@ export function OverviewScreen({
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_1fr_1fr]" aria-label="Weekly summary">
+      <section className="serene-data-reveal grid gap-4 md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_1fr_1fr]" aria-label="Weekly summary">
         <article className="serene-card flex min-h-[7rem] flex-col justify-between p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -271,7 +271,7 @@ export function OverviewScreen({
       </section>
 
       <section
-        className="grid grid-cols-1 gap-6 sm:gap-7 md:grid-cols-2 lg:grid-cols-3"
+        className="serene-data-reveal grid grid-cols-1 gap-6 sm:gap-7 md:grid-cols-2 lg:grid-cols-3"
         style={{ columnGap: "1.5rem", rowGap: "1.5rem" }}
         aria-label="Group itinerary cards"
       >

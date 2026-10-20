@@ -1,15 +1,26 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../../components/page-header";
 import { PageLayout } from "../../components/page-layout";
 import { PaginationControls } from "../../components/pagination-controls";
 import { SereneSelect } from "../../components/serene-select";
+import { Button } from "../../components/button";
+import { DetailItem } from "../../components/detail-list";
+import { ExpandableSection } from "../../components/expandable-section";
+import { FilterField } from "../../components/filter-panel";
+import { GroupIdentity } from "../../components/group-identity";
+import { Icon } from "../../components/icon";
+import { ListToolbar, ResultSummary } from "../../components/list-toolbar";
+import { MetricCard } from "../../components/metric-card";
+import { SearchField } from "../../components/search-field";
+import { SectionHeader } from "../../components/section-header";
+import { StatusBadge } from "../../components/status-badge";
 import type { GroupSummary, LifecycleStatus } from "../data/contracts";
 import { formatDate } from "../data/format";
 import { getAllAgentGroups } from "../data/all-groups-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
 
 import { groupAgentFamilies } from "../data/group-families";
 
@@ -88,6 +99,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
   const openDetail = (groupCode: string) => {
     navigate(`/agent/groups/${encodeURIComponent(groupCode)}`, {
       state: { from: `${location.pathname}${location.search}` },
+      viewTransition: true,
     });
   };
 
@@ -110,84 +122,68 @@ export function TripsPage({ principalId }: { principalId: string }) {
         }
       />
 
-      <section className="serene-section p-4 sm:p-5" aria-label="Filter perjalanan">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_13rem_auto] lg:items-end">
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-on-surface">Cari perjalanan</span>
-            <span className="serene-page-search min-h-11">
-              <span className="material-symbols-outlined text-on-surface-variant/70" aria-hidden="true">
-                search
-              </span>
-              <input
-                type="search"
-                className="serene-page-search-input h-full"
-                placeholder="Kode atau nama group"
-                value={search}
-                onChange={(event) => updateFilter("q", event.target.value)}
-              />
-            </span>
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-on-surface">Bulan keberangkatan</span>
-            <SereneSelect
-              className="h-11 w-full rounded-xl border border-outline-variant/45 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface"
-              value={month}
-              onChange={(event) => updateFilter("month", event.target.value)}
-              aria-label="Filter bulan keberangkatan"
-            >
-              {monthOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </SereneSelect>
-          </label>
-
-          <button
-            type="button"
-            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition ${
-              activeOnly
-                ? "bg-primary text-on-primary"
-                : "bg-surface-container-high text-on-surface-variant hover:bg-primary/10 hover:text-primary"
-            }`}
-            aria-pressed={activeOnly}
-            onClick={() => updateFilter("active", activeOnly ? null : "1")}
-          >
-            <span className="material-symbols-outlined text-lg" aria-hidden="true">
-              filter_alt
-            </span>
-            Hanya aktif
-          </button>
-        </div>
-
-        <div className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
-          <p className="text-sm text-on-surface-variant" aria-live="polite">
+      <ListToolbar
+        ariaLabel="Filter perjalanan"
+        controlsClassName="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem_auto] lg:items-end"
+        footer={
+          <ResultSummary onReset={hasFilters ? resetFilters : undefined}>
             <strong className="text-on-surface tabular-nums">{filteredGroups.length}</strong> perjalanan ditemukan
-          </p>
-          {hasFilters ? (
-            <button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>
-              Reset filter
-            </button>
-          ) : null}
-        </div>
-      </section>
+          </ResultSummary>
+        }
+      >
+        <SearchField
+          label="Cari perjalanan"
+          labelHidden={false}
+          placeholder="Kode atau nama group"
+          value={search}
+          onChange={(value) => updateFilter("q", value)}
+        />
+
+        <FilterField label="Bulan keberangkatan">
+          <SereneSelect
+            className="h-11 w-full rounded-xl border border-outline-variant/45 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface"
+            value={month}
+            onChange={(event) => updateFilter("month", event.target.value)}
+            aria-label="Filter bulan keberangkatan"
+          >
+            {monthOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </SereneSelect>
+        </FilterField>
+
+        <Button
+          variant={activeOnly ? "primary" : "secondary"}
+          className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition ${
+            activeOnly
+              ? "bg-primary text-on-primary"
+              : "bg-surface-container-high text-on-surface-variant hover:bg-primary/10 hover:text-primary"
+          }`}
+          aria-pressed={activeOnly}
+          onClick={() => updateFilter("active", activeOnly ? null : "1")}
+        >
+          <Icon name="filter_alt" className="text-lg" />
+          Hanya aktif
+        </Button>
+      </ListToolbar>
 
       {groups.length === 0 ? (
-        <EmptyTrips
+        <EmptyState
           icon="luggage"
           title="Belum ada perjalanan yang ditugaskan"
           description="Group yang ditugaskan kepada akun Agent ini akan muncul di halaman Perjalanan."
         />
       ) : filteredGroups.length === 0 ? (
-        <EmptyTrips
+        <EmptyState
           icon="search_off"
           title="Tidak ada perjalanan yang sesuai"
           description="Ubah kata pencarian atau filter untuk melihat perjalanan lainnya."
           action={
-            <button type="button" className="serene-btn-secondary min-h-11" onClick={resetFilters}>
+            <Button variant="secondary" onClick={resetFilters}>
               Reset filter
-            </button>
+            </Button>
           }
         />
       ) : (
@@ -213,6 +209,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
             itemLabel="perjalanan"
             onPageChange={setCurrentPage}
             touchSafe
+            locale="id"
           />
         </>
       )}
@@ -255,45 +252,43 @@ function TripCard({
             <strong className="text-2xl font-extrabold leading-none tabular-nums">{departure.day}</strong>
             <span className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em]">{departure.month}</span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-extrabold text-primary">{group.code}</p>
-              <span className="shrink-0 rounded-lg bg-surface-container-lowest/80 px-2.5 py-1 text-xs font-bold text-primary">
+          <GroupIdentity
+            className="flex-1"
+            code={group.code}
+            name={group.name}
+            headingLevel={2}
+            badge={
+              <StatusBadge tone={group.lifecycleStatus === "ACTIVE" ? "in-progress" : "neutral"}>
                 {lifecycleLabels[group.lifecycleStatus]}
-              </span>
-            </div>
-            <h2 className="mt-2 line-clamp-2 text-lg font-extrabold leading-snug text-on-surface">{group.name}</h2>
-          </div>
+              </StatusBadge>
+            }
+          />
         </div>
       </div>
 
       <div className="flex flex-1 flex-col p-5">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-outline-variant/30 pb-4 text-sm">
-          <TripValue label="Kembali" value={formatDate(group.returnDate)} />
-          <TripValue
+          <DetailItem stacked label="Kembali" value={formatDate(group.returnDate)} />
+          <DetailItem
+            stacked
             label={members.length > 1 ? "Total jamaah" : "Jamaah"}
             value={`${members.reduce((total, member) => total + member.pax, 0)} pax`}
           />
-          <TripValue label="Paket" value={group.packageName || "Belum tersedia"} />
-          <TripValue label="Armada" value={group.totalBuses ? `${group.totalBuses} bus` : "Belum tersedia"} />
+          <DetailItem stacked label="Paket" value={group.packageName || "Belum tersedia"} />
+          <DetailItem stacked label="Armada" value={group.totalBuses ? `${group.totalBuses} bus` : "Belum tersedia"} />
         </dl>
 
         {members.length > 1 ? (
-          <details
+          <ExpandableSection
             className="agent-family mt-4 border-b border-outline-variant/30 pb-3"
             open={expandFamily || undefined}
-          >
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-primary">
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">
-                  groups
-                </span>
+            summary={
+              <>
+                <Icon name="groups" className="text-lg" />
                 {members.length} group terhubung
-              </span>
-              <span className="agent-disclosure-icon material-symbols-outlined text-lg" aria-hidden="true">
-                expand_more
-              </span>
-            </summary>
+              </>
+            }
+          >
             <ul className="mt-2 divide-y divide-outline-variant/30">
               {members.map((member) => (
                 <li key={member.id}>
@@ -302,12 +297,7 @@ function TripCard({
                     className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left transition hover:bg-surface-container-low"
                     onClick={() => onOpenMember(member.code)}
                   >
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <strong className="break-all text-sm text-primary">{member.code}</strong>
-                      </span>
-                      <span className="mt-1 block break-words text-xs text-on-surface-variant">{member.name}</span>
-                    </span>
+                    <GroupIdentity code={member.code} name={member.name} />
                     <span className="shrink-0 text-xs font-semibold text-on-surface tabular-nums">
                       {member.pax} pax
                     </span>
@@ -315,13 +305,16 @@ function TripCard({
                 </li>
               ))}
             </ul>
-          </details>
+          </ExpandableSection>
         ) : null}
         <section className="mt-5 flex-1" aria-label={`Ringkasan itinerary ${group.code}`}>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-extrabold text-on-surface">Itinerary terdekat</h3>
-            <span className="text-xs font-semibold text-on-surface-variant">{formatDate(group.arrivalDate)}</span>
-          </div>
+          <SectionHeader
+            level={3}
+            title="Itinerary terdekat"
+            actions={
+              <span className="text-xs font-semibold text-on-surface-variant">{formatDate(group.arrivalDate)}</span>
+            }
+          />
           {preview.length > 0 ? (
             <ol className="mt-3 space-y-3">
               {preview.map((item, index) => (
@@ -375,12 +368,12 @@ function TripCard({
           </div>
         </div>
 
-        <button type="button" className="serene-btn-secondary mt-5 min-h-11 w-full justify-center" onClick={onOpen}>
+        <Button variant="secondary" className="mt-5 w-full" onClick={onOpen}>
           Lihat itinerary
           <span className="material-symbols-outlined text-lg" aria-hidden="true">
             arrow_forward
           </span>
-        </button>
+        </Button>
       </div>
     </article>
   );
@@ -399,55 +392,17 @@ function TripHeaderSummary({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3" aria-label={`${total} perjalanan, ${active} aktif, ${pax} jamaah`}>
-      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-primary">
-        <span className="material-symbols-outlined text-2xl" aria-hidden="true">
-          luggage
-        </span>
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm font-extrabold text-on-surface">
-          {total} perjalanan <span className="font-medium text-on-surface-variant">· {groups} group</span>
-        </p>
-        <p className="mt-1 text-sm text-on-surface-variant">
-          <strong className="text-primary tabular-nums">{active}</strong> aktif · {pax} jamaah
-        </p>
-      </div>
+      <MetricCard
+        variant="compact"
+        icon="luggage"
+        label="perjalanan"
+        value={total}
+        supportingText={
+          <>
+            {groups} group · {active} aktif · {pax} jamaah
+          </>
+        }
+      />
     </div>
-  );
-}
-
-function TripValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs font-semibold text-on-surface-variant">{label}</dt>
-      <dd className="mt-1 truncate font-bold text-on-surface" title={value}>
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function EmptyTrips({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
-  return (
-    <section className="serene-empty-state" aria-labelledby="empty-trips-title">
-      <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
-        {icon}
-      </span>
-      <h2 id="empty-trips-title" className="mt-3 text-xl font-bold text-on-surface">
-        {title}
-      </h2>
-      <p className="mt-2 max-w-xl text-sm text-on-surface-variant">{description}</p>
-      {action ? <div className="mt-5">{action}</div> : null}
-    </section>
   );
 }

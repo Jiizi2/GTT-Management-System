@@ -99,8 +99,12 @@ export function AgreementInboxScreen() {
         isDateRangeInvalid={isDateRangeInvalid} hasActiveFilters={hasActiveFilters} clearFilters={clearFilters}
       />
 
-      <section className={`mt-2 rounded-2xl transition-opacity duration-200 lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm ${draftsQuery.isFetching ? "opacity-60" : ""}`}>
-        {draftsQuery.isLoading ? <div className="rounded-2xl border border-outline-variant/35 bg-surface-container-lowest px-4 py-10 text-sm font-semibold text-on-surface-variant shadow-sm lg:rounded-none lg:border-0 lg:shadow-none">Loading agreement drafts...</div> : (
+      <section
+        className="serene-data-region mt-2 rounded-2xl lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm"
+        data-refreshing={draftsQuery.isFetching && !draftsQuery.isLoading ? "true" : "false"}
+        aria-busy={draftsQuery.isFetching}
+      >
+        {draftsQuery.isLoading ? <div className="serene-list-skeleton rounded-2xl border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-sm lg:rounded-none lg:border-0 lg:shadow-none" role="status" aria-label="Loading agreement drafts"><span className="sr-only">Loading agreement drafts...</span>{Array.from({ length: 5 }, (_, index) => <div key={index} className="serene-list-skeleton-row" aria-hidden="true"><span /><span /><span /><span /></div>)}</div> : (
           <AgreementDraftTable drafts={paginatedDrafts} linkedGroupCode={linkedGroupCode} assignmentGroupCodes={assignmentGroupCodes} onAssignmentGroupCodeChange={updateAssignmentGroupCode} onAssignToGroup={(draft) => void assignDraftToGroup(draft)} onUnassignFromGroup={(draft, groupCode) => void unassignDraftFromGroup(draft, groupCode)} onStartEdit={startEditDraft} onDeleteRequest={requestDeleteDraft} onStatusChange={(draft, next) => void updateDraftStatus(draft, next)} statusChangePending={isSaving} deleteDraftMutationPending={deleteDraftMutationPending} assignDraftMutationPending={assignDraftMutationPending} unassignDraftMutationPending={unassignDraftMutationPending} />
         )}
       </section>

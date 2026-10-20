@@ -74,6 +74,8 @@ export function AgreementDraftFields({
             render={({ field }) => (
               <SereneSelect
                 id={`${idPrefix}-agent`}
+                searchable
+                searchPlaceholder="Cari nama agent..."
                 className="serene-select"
                 value={field.value}
                 onChange={(event) => field.onChange(event.target.value)}

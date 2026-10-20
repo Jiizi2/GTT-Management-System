@@ -152,7 +152,7 @@ export function AgreementTextImport({
           <div className="grid gap-3">
             <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
               <span>Agent</span>
-              <SereneSelect value={agentId} onChange={(event) => setAgentId(event.target.value)} className="serene-select">
+              <SereneSelect searchable searchPlaceholder="Cari nama agent..." value={agentId} onChange={(event) => setAgentId(event.target.value)} className="serene-select">
                 <option value="" disabled>Select Agent</option>
                 {(agentsQuery.data ?? []).filter((agent) => agent.status === "ACTIVE").map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
               </SereneSelect>

@@ -93,6 +93,7 @@ export function VisaDetailHeader() {
 
           <div className="order-3 flex w-full flex-col items-stretch gap-1.5 self-start md:col-start-2 md:row-start-1 md:w-auto md:shrink-0">
             <Link
+              viewTransition
               to={`/groups/${encodeURIComponent(activeGroupCode)}`}
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 text-sm font-bold text-on-primary transition hover:bg-primary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary md:w-auto"
               aria-label={`Buka Group Detail ${activeGroupCode}`}
@@ -227,6 +228,7 @@ export function VisaDetailHeader() {
             {shouldShowLinkAgreementAction ? (
               <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
                 <Link
+                  viewTransition
                   to={`/agreement-inbox?groupCode=${encodeURIComponent(row.groupCode)}`}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-on-tertiary-fixed-variant/20 bg-surface-container-lowest px-3 text-sm font-bold text-brand-primary transition hover:bg-surface-container-low"
                 >

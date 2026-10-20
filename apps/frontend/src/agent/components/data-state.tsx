@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { StatePanel } from "../../components/state-panel";
 import { StatusBadge } from "../../components/status-badge";
+import { Button } from "../../components/button";
 import { AgentApiError } from "../auth/agent-api";
 
 export function LoadingState({ label = "Memuat data…" }: { label?: string }) {
@@ -14,9 +15,9 @@ export function ErrorState({ retry }: { retry?: () => void }) {
       description="Silakan coba kembali."
       action={
         retry ? (
-          <button className="serene-btn-secondary" onClick={retry}>
+          <Button variant="secondary" onClick={retry}>
             Coba lagi
-          </button>
+          </Button>
         ) : undefined
       }
     />
@@ -36,8 +37,20 @@ export function ResourceErrorState({ error, retry }: { error: unknown; retry?: (
   return <ErrorState retry={retry} />;
 }
 
-export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
-  return <StatePanel state="empty" title={title} description={children} />;
+export function EmptyState({
+  title,
+  children,
+  description,
+  icon,
+  action,
+}: {
+  title: string;
+  children?: ReactNode;
+  description?: ReactNode;
+  icon?: string;
+  action?: ReactNode;
+}) {
+  return <StatePanel state="empty" title={title} description={description ?? children} icon={icon} action={action} />;
 }
 
 export function StatusChip({ value }: { value: string }) {

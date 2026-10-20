@@ -6,6 +6,7 @@ import * as z from "zod/v4";
 import { SereneSelect } from "../../../components/serene-select";
 import { DialogShell } from "../../../components/dialog-shell";
 import { useModalFocusTrap } from "../../../components/use-modal-focus-trap";
+import { useMotionPresence } from "../../../hooks/use-motion";
 import type { MasterDataCategoryKey, MasterDataOption } from "../../../hooks/use-master-data-backend";
 
 // ==========================================
@@ -159,10 +160,11 @@ export function MasterDataFormDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { isPresent, motionState } = useMotionPresence(isOpen, 280);
   const drawerRef = useModalFocusTrap<HTMLElement>({ isActive: isOpen, onClose });
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isPresent) {
       return undefined;
     }
 
@@ -171,21 +173,27 @@ export function MasterDataFormDrawer({
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen]);
+  }, [isPresent]);
 
-  if (!isOpen || typeof document === "undefined") {
+  if (!isPresent || typeof document === "undefined") {
     return null;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[180] bg-scrim/35 backdrop-blur-[2px]" onMouseDown={onClose}>
+    <div
+      className="serene-modal-overlay fixed inset-0 z-[180] bg-scrim/35 backdrop-blur-[2px]"
+      data-motion-state={motionState}
+      aria-hidden={!isOpen}
+      onMouseDown={isOpen ? onClose : undefined}
+    >
       <aside
         ref={drawerRef}
-        className="ml-auto flex h-full w-full max-w-xl flex-col border-l border-outline-variant/40 bg-surface-container-lowest shadow-float animate-page-fade-in"
+        className="serene-drawer-shell ml-auto flex h-full w-full max-w-xl flex-col border-l border-outline-variant/40 bg-surface-container-lowest shadow-float"
         role="dialog"
         aria-modal="true"
         aria-labelledby="master-data-drawer-title"
         tabIndex={-1}
+        inert={!isOpen ? true : undefined}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-outline-variant/30 px-5 py-5 sm:px-6">
@@ -651,7 +659,7 @@ export function MasterDataOptionTable({
   return (
     <>
       {/* MOBILE LIST */}
-      <div className="space-y-2 p-2 md:hidden">
+      <div className="serene-data-reveal space-y-2 p-2 md:hidden">
         {options.map((option) => (
           <article
             key={`${option.id}-mobile`}
@@ -735,7 +743,7 @@ export function MasterDataOptionTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-outline-variant/20">
+          <tbody className="serene-data-reveal divide-y divide-outline-variant/20">
             {options.map((option) => (
               <tr key={option.id} className="align-middle transition hover:bg-primary/5">
                 <td className="break-all px-4 py-3 font-mono text-[11px] text-on-surface-variant">{option.value}</td>

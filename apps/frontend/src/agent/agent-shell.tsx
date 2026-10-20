@@ -95,6 +95,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                viewTransition
                 aria-label={item.label}
                 className={({ isActive }) => "agent-top-link" + (isActive ? " is-active" : "")}
               >
@@ -135,7 +136,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
                   </span>
                 </p>
                 {profileAllowed ? (
-                  <NavLink to="/agent/profile" onClick={() => setAccountOpen(false)} className="agent-account-action">
+                  <NavLink viewTransition to="/agent/profile" onClick={() => setAccountOpen(false)} className="agent-account-action">
                     <span className="material-symbols-outlined" aria-hidden="true">
                       account_circle
                     </span>
@@ -170,6 +171,11 @@ export function AgentShell({ session }: { session: AgentSession }) {
         className="agent-main focus:outline-none"
       >
         <Suspense fallback={<LoadingState label="Memuat halaman..." />}>
+          <div
+            key={`${location.pathname}${location.search}`}
+            className="serene-route-surface"
+            data-route-depth={location.pathname.split("/").filter(Boolean).length > 2 ? "detail" : "root"}
+          >
           <Routes>
             <Route index element={<Navigate to="/agent/overview" replace />} />
             <Route
@@ -212,6 +218,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
             <Route path="profile" element={<ProfilePage principalId={principalId} />} />
             <Route path="*" element={<Navigate to="/agent/overview" replace />} />
           </Routes>
+          </div>
         </Suspense>
       </main>
       <nav className="agent-mobile-navigation" aria-label="Mobile navigation">
@@ -220,6 +227,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
             <NavLink
               key={item.to}
               to={item.to}
+              viewTransition
               aria-label={item.label}
               className={({ isActive }) => "agent-mobile-link" + (isActive ? " is-active" : "")}
             >

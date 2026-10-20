@@ -18,10 +18,10 @@ export function ProfilePage({ principalId }: { principalId: string }) {
   return (
     <PageLayout width="standard">
       <PageHeader
-        eyebrow="Akun Partner"
+        variant="compact"
         title="Profile"
         description="Informasi akun dan identitas Partner yang terhubung dengan portal Agent."
-        actions={<ReadOnlyIndicator />}
+        actions={<ReadOnlyIndicator label="Hanya lihat" />}
       />
       {query.isPending ? <LoadingState label="Memuat profil…" /> : null}
       {query.isError ? <ErrorState retry={() => void query.refetch()} /> : null}

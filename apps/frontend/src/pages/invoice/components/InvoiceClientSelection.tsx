@@ -38,7 +38,7 @@ export function InvoiceClientSelection({
         <label className="space-y-1">
           <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant/70">Agent</span>
           <Controller name="agentId" control={control} render={({ field }) => (
-            <SereneSelect className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold" value={field.value} onChange={(event) => {
+            <SereneSelect searchable searchPlaceholder="Cari nama agent..." className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold" value={field.value} onChange={(event) => {
               field.onChange(event.target.value); setValue("selectedGroupCode", "", { shouldDirty: true });
             }}>
               <option value="" disabled>Select Agent</option>
@@ -56,6 +56,8 @@ export function InvoiceClientSelection({
             render={({ field }) => (
               <SereneSelect
                 id="invoice-client"
+                searchable
+                searchPlaceholder="Cari nama client..."
                 className="serene-select h-10 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface"
                 value={field.value}
                 onChange={(event) => {
