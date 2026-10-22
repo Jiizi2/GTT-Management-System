@@ -4,9 +4,11 @@ import { createPortal } from "react-dom";
 
 interface DetailOverflowMenuProps {
   children: ReactNode;
+  label?: string;
+  triggerClassName?: string;
 }
 
-export function DetailOverflowMenu({ children }: DetailOverflowMenuProps) {
+export function DetailOverflowMenu({ children, label = "More actions", triggerClassName }: DetailOverflowMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -84,8 +86,11 @@ export function DetailOverflowMenu({ children }: DetailOverflowMenuProps) {
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
         aria-haspopup="true"
-        aria-label="More actions"
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-low hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+        aria-label={label}
+        className={
+          triggerClassName ??
+          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-low hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+        }
         onClick={() => setIsOpen((open) => !open)}
       >
         <span className="material-symbols-outlined text-lg" aria-hidden="true">
@@ -100,7 +105,7 @@ export function DetailOverflowMenu({ children }: DetailOverflowMenuProps) {
               id={menuId}
               style={menuStyle}
               role="group"
-              aria-label="More actions"
+              aria-label={label}
               className="fixed z-[100] overflow-y-auto rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-1.5 shadow-ambient"
               onClick={() => {
                 setIsOpen(false);

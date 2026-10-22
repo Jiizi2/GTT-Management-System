@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AgreementDraftTable } from "../../pages/agreement-inbox/components/AgreementDraftTable";
 import type { HotelAgreementDraft } from "../../shared/app-domain";
@@ -31,6 +32,62 @@ const madinahDraft: HotelAgreementDraft = {
 };
 
 describe("AgreementDraftTable", () => {
+  function renderActions(overrides: Partial<HotelAgreementDraft> = {}, deletePending = false) {
+    const currentDraft = { ...draft, ...overrides };
+    const onDeleteRequest = vi.fn();
+    render(
+      <AgreementDraftTable
+        drafts={[currentDraft]}
+        linkedGroupCode=""
+        assignmentGroupCodes={{}}
+        onAssignmentGroupCodeChange={vi.fn()}
+        onAssignToGroup={vi.fn()}
+        onUnassignFromGroup={vi.fn()}
+        onStartEdit={vi.fn()}
+        onDeleteRequest={onDeleteRequest}
+        onStatusChange={vi.fn()}
+        statusChangePending={false}
+        deleteDraftMutationPending={deletePending}
+        assignDraftMutationPending={false}
+        unassignDraftMutationPending={false}
+      />,
+    );
+    return { currentDraft, onDeleteRequest };
+  }
+
+  it("opens delete actions outside the row, closes after selection, and passes the original draft", async () => {
+    const user = userEvent.setup();
+    const { currentDraft, onDeleteRequest } = renderActions();
+    const trigger = screen.getByRole("button", { name: "Tindakan lain untuk agreement AGR-001" });
+    await user.click(trigger);
+    const menu = screen.getByRole("group", { name: "Tindakan lain untuk agreement AGR-001" });
+    expect(menu.parentElement).toBe(document.body);
+    await user.click(screen.getByRole("button", { name: "Delete draft" }));
+    expect(onDeleteRequest).toHaveBeenCalledExactlyOnceWith(currentDraft);
+    expect(menu).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it.each(["Assigned", "Partially Assigned"] as const)(
+    "keeps deletion disabled for %s agreements",
+    async (assignmentStatus) => {
+      const user = userEvent.setup();
+      const { onDeleteRequest } = renderActions({ assignmentStatus });
+      await user.click(screen.getByRole("button", { name: "Tindakan lain untuk agreement AGR-001" }));
+      const deleteButton = screen.getByRole("button", { name: "Delete draft" });
+      expect(deleteButton).toBeDisabled();
+      expect(deleteButton).toHaveAttribute("title", "Lepas agreement dari group sebelum menghapus.");
+      await user.click(deleteButton);
+      expect(onDeleteRequest).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps deletion disabled while a delete request is pending", async () => {
+    renderActions({}, true);
+    await userEvent.click(screen.getByRole("button", { name: "Tindakan lain untuk agreement AGR-001" }));
+    expect(screen.getByRole("button", { name: "Delete draft" })).toBeDisabled();
+  });
+
   it("keeps linked groups closed by default and lets the user toggle it", () => {
     vi.useFakeTimers();
     render(
@@ -86,6 +143,10 @@ describe("AgreementDraftTable", () => {
     );
 
     expect(container.querySelector(".material-symbols-outlined")?.textContent).toBe("location_on");
-    expect(Array.from(container.querySelectorAll(".material-symbols-outlined")).some((icon) => icon.textContent === "mosque")).toBe(true);
+    expect(
+      Array.from(container.querySelectorAll(".material-symbols-outlined")).some(
+        (icon) => icon.textContent === "mosque",
+      ),
+    ).toBe(true);
   });
 });

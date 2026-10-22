@@ -232,10 +232,10 @@ export function VisaDetailModals() {
         </Suspense>
       ) : null}
 
-      {deleteAgreementDraft ? (
+      {deleteAgreementDraft ? createPortal(
         <div
           ref={deleteAgreementDialogRef}
-          className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
+          className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-agreement-title"
@@ -293,13 +293,14 @@ export function VisaDetailModals() {
               </button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
 
-      {isClearRaudhahConfirmOpen ? (
+      {isClearRaudhahConfirmOpen ? createPortal(
         <div
           ref={clearRaudhahDialogRef}
-          className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto bg-slate-950/55 p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
+          className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
           role="dialog"
           aria-modal="true"
           aria-labelledby="clear-raudhah-title"
@@ -346,7 +347,8 @@ export function VisaDetailModals() {
               </button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </>
   );

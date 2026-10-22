@@ -4,6 +4,7 @@ import { SereneSelect } from "../../../components/serene-select";
 import { Button } from "../../../components/button";
 import { ListToolbar } from "../../../components/list-toolbar";
 import { SearchField } from "../../../components/search-field";
+import { ResponsiveDisclosure } from "../../../components/responsive-disclosure";
 import type { AgreementDraftStatusFilter } from "../../../hooks/use-agreement-drafts-query";
 
 type Props = {
@@ -107,58 +108,60 @@ export function AgreementInboxFilters({
             <option value="none">Belum dipilih</option>
           </SereneSelect>
         </label>
-        <details className="group relative">
-          <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl border border-outline-variant/45 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface [&::-webkit-details-marker]:hidden">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg text-on-surface-variant" aria-hidden="true">
-                calendar_month
+        <ResponsiveDisclosure
+          label="Stay period filters"
+          summary={
+            <>
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg text-on-surface-variant" aria-hidden="true">
+                  calendar_month
+                </span>
+                <span>{startDateFilter || endDateFilter ? "Period selected" : "Stay Period"}</span>
               </span>
-              <span>{startDateFilter || endDateFilter ? "Period selected" : "Stay Period"}</span>
-            </span>
-            <span
-              className="material-symbols-outlined text-lg text-on-surface-variant transition-transform group-open:rotate-180"
-              aria-hidden="true"
-            >
-              expand_more
-            </span>
-          </summary>
-          <div className="z-20 mt-2 grid gap-3 rounded-xl border border-outline-variant/35 bg-surface-container-lowest p-3 shadow-float xl:absolute xl:right-0 xl:w-72">
-            <label className="sr-only" htmlFor={`${idPrefix}-start-date`}>
-              Start Date
-            </label>
-            <DatePickerInput
-              id={`${idPrefix}-start-date`}
-              inputClassName="serene-input serene-input-sm w-full"
-              value={startDateFilter}
-              onChange={setStartDateFilter}
-              placeholder="Start Date"
-            />
-            <label className="sr-only" htmlFor={`${idPrefix}-end-date`}>
-              End Date
-            </label>
-            <DatePickerInput
-              id={`${idPrefix}-end-date`}
-              inputClassName="serene-input serene-input-sm w-full"
-              value={endDateFilter}
-              onChange={setEndDateFilter}
-              placeholder="End Date"
-            />
-            {isDateRangeInvalid ? (
-              <p className="text-xs font-semibold text-rose-600">End Date tidak boleh sebelum Start Date.</p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setRemainingPaxOnly(!remainingPaxOnly)}
-              aria-pressed={remainingPaxOnly}
-              className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition ${remainingPaxOnly ? "border-brand-primary/30 bg-brand-primary/10 text-brand-primary" : "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant hover:border-brand-primary/30 hover:text-brand-primary"}`}
-            >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">
-                {remainingPaxOnly ? "check_box" : "check_box_outline_blank"}
+              <span
+                className="material-symbols-outlined text-lg text-on-surface-variant transition-transform group-open:rotate-180"
+                aria-hidden="true"
+              >
+                expand_more
               </span>
-              <span>Only agreements with remaining pax</span>
-            </button>
-          </div>
-        </details>
+            </>
+          }
+        >
+          <label className="sr-only" htmlFor={`${idPrefix}-start-date`}>
+            Start Date
+          </label>
+          <DatePickerInput
+            id={`${idPrefix}-start-date`}
+            inputClassName="serene-input serene-input-sm w-full"
+            value={startDateFilter}
+            onChange={setStartDateFilter}
+            placeholder="Start Date"
+          />
+          <label className="sr-only" htmlFor={`${idPrefix}-end-date`}>
+            End Date
+          </label>
+          <DatePickerInput
+            id={`${idPrefix}-end-date`}
+            inputClassName="serene-input serene-input-sm w-full"
+            value={endDateFilter}
+            onChange={setEndDateFilter}
+            placeholder="End Date"
+          />
+          {isDateRangeInvalid ? (
+            <p className="text-xs font-semibold text-rose-600">End Date tidak boleh sebelum Start Date.</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setRemainingPaxOnly(!remainingPaxOnly)}
+            aria-pressed={remainingPaxOnly}
+            className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition ${remainingPaxOnly ? "border-brand-primary/30 bg-brand-primary/10 text-brand-primary" : "border-outline-variant/45 bg-surface-container-lowest text-on-surface-variant hover:border-brand-primary/30 hover:text-brand-primary"}`}
+          >
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">
+              {remainingPaxOnly ? "check_box" : "check_box_outline_blank"}
+            </span>
+            <span>Only agreements with remaining pax</span>
+          </button>
+        </ResponsiveDisclosure>
         <Button
           variant="tertiary"
           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-40"

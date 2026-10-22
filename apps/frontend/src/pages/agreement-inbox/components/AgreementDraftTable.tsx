@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps } from "react";
 import { Button } from "../../../components/button";
+import { DetailOverflowMenu } from "../../../components/detail-overflow-menu";
 import { SereneSelect } from "../../../components/serene-select";
 import { Badge, type BadgeStatus } from "../../../components/badge";
 import { useMotionPresence } from "../../../hooks/use-motion";
@@ -38,16 +39,11 @@ function RowActions({ draft, expanded, onToggle, onEdit, onDelete, deletePending
   return (
     <div className="flex w-full items-center justify-end gap-1">
       <button type="button" className={iconButtonClass} aria-label={`Edit agreement ${draft.agreementNumber}`} onClick={() => onEdit(draft)}><span className="material-symbols-outlined text-lg" aria-hidden="true">edit</span></button>
-      <details className="group relative">
-        <summary className={`${iconButtonClass} cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden`} aria-label={`Tindakan lain untuk agreement ${draft.agreementNumber}`}>
-          <span className="material-symbols-outlined select-none text-lg" aria-hidden="true">more_vert</span>
-        </summary>
-        <div className="absolute right-0 top-10 z-20 min-w-36 rounded-xl border border-outline-variant/35 bg-surface-container-lowest p-1.5 shadow-float">
-          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-35" title={isAssigned ? "Lepas agreement dari group sebelum menghapus." : undefined} onClick={() => onDelete(draft)} disabled={deletePending || isAssigned}>
-            <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>Delete draft
-          </button>
-        </div>
-      </details>
+      <DetailOverflowMenu label={`Tindakan lain untuk agreement ${draft.agreementNumber}`} triggerClassName={iconButtonClass}>
+        <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-35" title={isAssigned ? "Lepas agreement dari group sebelum menghapus." : undefined} onClick={() => onDelete(draft)} disabled={deletePending || isAssigned}>
+          <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>Delete draft
+        </button>
+      </DetailOverflowMenu>
       <button type="button" className={iconButtonClass} aria-label={expanded ? `Tutup detail ${draft.agreementNumber}` : `Buka detail ${draft.agreementNumber}`} aria-expanded={expanded} onClick={onToggle}>
         <span className={`material-symbols-outlined text-xl transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} aria-hidden="true">expand_more</span>
       </button>
