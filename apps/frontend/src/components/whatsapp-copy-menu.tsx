@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 export type WhatsappCopyFormat = "general" | "muassasah-hijazi";
 
@@ -12,12 +14,50 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+
+  // Escape header stacking contexts and clipping without losing the trigger anchor.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      if (!triggerRef.current || !menuRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const padding = 8;
+      const gap = 6;
+      const width = Math.min(208, window.innerWidth - padding * 2);
+      const below = Math.max(0, window.innerHeight - rect.bottom - gap - padding);
+      const above = Math.max(0, rect.top - gap - padding);
+      const height = menuRef.current.scrollHeight;
+      const openBelow = below >= height || below >= above;
+      const maxHeight = openBelow ? below : above;
+
+      setMenuStyle({
+        width,
+        left: Math.max(padding, Math.min(rect.right - width, window.innerWidth - width - padding)),
+        top: openBelow ? rect.bottom + gap : Math.max(padding, rect.top - gap - Math.min(height, maxHeight)),
+        maxHeight,
+      });
+    };
+
+    updatePosition();
+    menuRef.current?.querySelector("button")?.focus({ preventScroll: true });
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -35,6 +75,7 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
 
   const copy = (format: WhatsappCopyFormat) => {
     setIsOpen(false);
+    triggerRef.current?.focus();
     void onCopy(format);
   };
 
@@ -43,7 +84,8 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
       ref={containerRef}
       className={`relative ${className}`}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsOpen(false);
+        const target = event.relatedTarget as Node | null;
+        if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false);
       }}
     >
       <button
@@ -55,6 +97,7 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
         onClick={() => setIsOpen((open) => !open)}
         aria-haspopup="true"
         aria-expanded={isOpen}
+        aria-controls={isOpen ? menuId : undefined}
         aria-label="Copy WhatsApp details"
       >
         <span className="material-symbols-outlined text-base" aria-hidden="true">
@@ -67,28 +110,34 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
         </span>
       </button>
 
-      {isOpen ? (
-        <div
-          className="absolute right-0 top-full z-30 mt-1.5 min-w-52 rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-1.5 shadow-ambient"
-          role="group"
-          aria-label="WhatsApp copy format"
-        >
-          <button
-            type="button"
-            className="inline-flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
-            onClick={() => copy("general")}
-          >
-            General
-          </button>
-          <button
-            type="button"
-            className="inline-flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
-            onClick={() => copy("muassasah-hijazi")}
-          >
-            Muassasah Hijazi
-          </button>
-        </div>
-      ) : null}
+      {isOpen
+        ? createPortal(
+            <div
+              ref={menuRef}
+              id={menuId}
+              style={menuStyle}
+              className="fixed z-[100] overflow-y-auto rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-1.5 shadow-ambient"
+              role="group"
+              aria-label="WhatsApp copy format"
+            >
+              <button
+                type="button"
+                className="inline-flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                onClick={() => copy("general")}
+              >
+                General
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                onClick={() => copy("muassasah-hijazi")}
+              >
+                Muassasah Hijazi
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
