@@ -128,14 +128,14 @@ function computePopoverStyle(
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
-  const width = Math.min(preferredWidth, Math.max(240, viewportWidth - viewportPadding * 2));
+  const width = Math.min(preferredWidth, Math.max(0, viewportWidth - viewportPadding * 2));
   const maxLeft = Math.max(viewportPadding, viewportWidth - width - viewportPadding);
   const left = Math.min(Math.max(viewportPadding, rect.left), maxLeft);
 
   const availableBelow = Math.max(0, viewportHeight - rect.bottom - viewportPadding - gap);
   const availableAbove = Math.max(0, rect.top - viewportPadding - gap);
   const openBelow = availableBelow >= estimatedHeight || availableBelow >= availableAbove;
-  const maxHeight = Math.max(120, Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove));
+  const maxHeight = Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove);
 
   const top = openBelow ? rect.bottom + gap : Math.max(viewportPadding, rect.top - gap - maxHeight);
 

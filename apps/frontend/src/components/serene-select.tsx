@@ -113,7 +113,7 @@ function computeDropdownStyle(
   const availableBelow = Math.max(0, viewportHeight - rect.bottom - viewportPadding - gap);
   const availableAbove = Math.max(0, rect.top - viewportPadding - gap);
   const openBelow = availableBelow >= estimatedHeight || availableBelow >= availableAbove;
-  const maxHeight = Math.max(128, Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove));
+  const maxHeight = Math.min(estimatedHeight, openBelow ? availableBelow : availableAbove);
 
   if (openBelow) {
     return {
