@@ -188,7 +188,7 @@ export function AgreementDraftEditModal({
   return (
     <ModalPortal>
       <div
-        className="serene-modal-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
+        className="serene-modal-overlay agreement-draft-edit-overlay z-[130] flex items-start justify-center overflow-y-auto p-3 pt-10 pb-10 sm:p-4 sm:pt-20 sm:pb-20"
         onClick={onClose}
       >
         <section
@@ -239,7 +239,7 @@ export function AgreementDraftEditModal({
               register={register}
               errors={errors}
               idPrefix={`agreement-draft-edit-${draft.id}`}
-              layout="stacked"
+              layout="two-columns"
             />
 
             <div className="flex flex-col-reverse gap-2 border-t border-outline-variant/25 pt-4 sm:flex-row sm:justify-end">

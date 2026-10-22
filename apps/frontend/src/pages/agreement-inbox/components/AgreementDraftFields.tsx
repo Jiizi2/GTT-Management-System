@@ -17,15 +17,16 @@ export function AgreementDraftFields({
   register: UseFormRegister<HotelAgreementDraftFormState>;
   errors: FieldErrors<HotelAgreementDraftFormState>;
   idPrefix: string;
-  layout?: "columns" | "stacked";
+  layout?: "columns" | "stacked" | "two-columns";
 }) {
   const agentsQuery = useAgentsQuery();
   const muassasahQuery = useMuassasahQuery();
   const isStacked = layout === "stacked";
+  const isTwoColumns = layout === "two-columns";
   const fieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-slate-700";
   const inputClassName = "serene-input serene-input-md";
   const textareaClassName = "serene-textarea min-h-24";
-  const fieldLayoutClassNames = isStacked
+  const fieldLayoutClassNames = isStacked || isTwoColumns
     ? {
         agent: "grid gap-1.5",
         muassasah: "grid gap-1.5",
@@ -37,7 +38,7 @@ export function AgreementDraftFields({
         status: "grid gap-1.5",
         stayStart: "grid gap-1.5",
         stayEnd: "grid gap-1.5",
-        notes: fieldClassName,
+        notes: `${fieldClassName}${isTwoColumns ? " lg:col-span-2" : ""}`,
       }
     : {
         agent: "order-1 grid gap-1.5 lg:col-span-3",
@@ -64,7 +65,7 @@ export function AgreementDraftFields({
   const stayEndErrorMessage = errors.stayEndIso?.message;
 
   return (
-    <div className={isStacked ? "grid gap-4" : "grid gap-4 lg:grid-cols-12"}>
+    <div className={isTwoColumns ? "grid gap-4 lg:grid-cols-2" : isStacked ? "grid gap-4" : "grid gap-4 lg:grid-cols-12"}>
       <div className={fieldLayoutClassNames.agent}>
         <label className={fieldClassName}>
           <span>Agent</span>

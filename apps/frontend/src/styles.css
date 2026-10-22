@@ -1073,6 +1073,14 @@ img {
     animation: serene-dialog-in 380ms var(--motion-ease-out) both;
   }
 
+  .agreement-draft-edit-overlay {
+    animation-duration: var(--motion-instant);
+  }
+
+  .agreement-draft-edit-overlay .serene-modal-shell {
+    animation: serene-fade-in var(--motion-instant) var(--motion-ease-out) both;
+  }
+
   .serene-modal-overlay[data-motion-state="closed"] {
     pointer-events: none;
     animation: serene-overlay-out 220ms var(--motion-ease-in) both;
