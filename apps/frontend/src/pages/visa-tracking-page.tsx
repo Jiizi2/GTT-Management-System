@@ -10,6 +10,8 @@ import { useThemeMode } from "../theme/theme-provider";
 import { useVisaTracking, desktopTableGridTemplate, getVisaRowGroupKey } from "./visa-tracking/hooks/use-visa-tracking";
 import { VisaTrackingStats } from "./visa-tracking/components/VisaTrackingStats";
 import { VisaTrackingRowGroup } from "./visa-tracking/components/VisaTrackingRowGroup";
+import { DataBoundary, type DataQueryState } from "../components/data-boundary";
+import { ListSkeleton, MetricsSkeleton } from "../components/skeleton";
 
 export function VisaTrackingScreen({
   groups,
@@ -18,6 +20,7 @@ export function VisaTrackingScreen({
   readOnly = false,
   fixedAgentName,
   showThemeToggle = true,
+  dataState,
 }: {
   groups: GroupData[];
   onOpenDetail: (row: VisaTrackingRow) => void;
@@ -25,6 +28,7 @@ export function VisaTrackingScreen({
   readOnly?: boolean;
   fixedAgentName?: string;
   showThemeToggle?: boolean;
+  dataState?: DataQueryState;
 }) {
   const { theme } = useThemeMode();
   const isDarkMode = theme === "dark";
@@ -120,13 +124,14 @@ export function VisaTrackingScreen({
         }
       />
 
-      <VisaTrackingStats
+      {dataState?.isPending && dataState.data === undefined ? <MetricsSkeleton count={4} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" /> : <VisaTrackingStats
+        dataUnavailable={dataState?.isError && dataState.data === undefined}
         actionRequiredCount={actionRequiredCount}
         visaRowsCount={visaRows.length}
         issuedStatistics={issuedStatistics}
         selectedMonthLabel={selectedIssuedMonthLabel}
         unpaidCount={unpaidCount}
-      />
+      />}
 
       <section
         className="visa-filter-bar"
@@ -182,6 +187,7 @@ export function VisaTrackingScreen({
 
       </section>
 
+      <DataBoundary query={dataState} skeleton={<ListSkeleton columns={8} label="Memuat group dan visa…" />}>
       {filteredGroupedRows.length === 0 ? (
         <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
@@ -268,6 +274,7 @@ export function VisaTrackingScreen({
         itemLabel="groups"
         onPageChange={(nextPage) => setCurrentPage(Math.max(1, Math.min(totalPages, nextPage)))}
       />
+      </DataBoundary>
     </div>
   );
 }

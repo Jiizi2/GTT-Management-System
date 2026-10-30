@@ -1,10 +1,12 @@
+import { DataBoundary } from "../../../components/data-boundary";
+import { ListSkeleton } from "../../../components/skeleton";
 import { Button } from "../../../components/button";
 import { useManageRoleContext } from "../context/ManageRoleContext";
 
 export function UserAccountsTable() {
   const {
     users,
-    managedUsersLoading,
+    managedUsersQuery,
     totalSuperAdmin,
     totalUsersWithoutPassword,
     roleCatalogById,
@@ -27,11 +29,8 @@ export function UserAccountsTable() {
       </div>
 
       <div className="mt-5 rounded-2xl border border-outline-variant/35 bg-surface-container-low">
-        {managedUsersLoading ? (
-          <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
-            Memuat data user dari backend...
-          </div>
-        ) : users.length === 0 ? (
+        <DataBoundary query={managedUsersQuery} skeleton={<ListSkeleton columns={4} label="Memuat data user dari backend..." />}>
+        {users.length === 0 ? (
           <div className="px-4 py-6 text-sm font-medium text-on-surface-variant">
             Belum ada data user pada backend.
           </div>
@@ -113,6 +112,7 @@ export function UserAccountsTable() {
             );
           })
         )}
+        </DataBoundary>
       </div>
     </div>
   );

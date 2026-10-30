@@ -15,7 +15,8 @@ import {
 } from "../data/departure-calendar";
 import { portalGet } from "../data/portal-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { ErrorState, LoadingState } from "../components/data-state";
+import { DataBoundary } from "../../components/data-boundary";
+import { CalendarSkeleton, ChecklistSkeleton, ListSkeleton, MetricsSkeleton } from "../../components/skeleton";
 import { DepartureMonthPicker } from "../components/departure-month-picker";
 import { StatusBadge } from "../../components/status-badge";
 import { GroupIdentity } from "../../components/group-identity";
@@ -34,17 +35,17 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const query = useQuery({
     queryKey: agentQueryKeys.dashboard(principalId),
-    queryFn: () => portalGet<Dashboard>(client, "/dashboard"),
+    queryFn: ({ signal }) => portalGet<Dashboard>(client, "/dashboard", signal),
     staleTime: 30_000,
   });
   const groupsQuery = useQuery({
     queryKey: agentQueryKeys.groups(principalId, "departure-calendar"),
-    queryFn: () => getAllAgentGroups(client),
+    queryFn: ({ signal }) => getAllAgentGroups(client, "asc", signal),
     staleTime: 30_000,
   });
   const checklistQuery = useQuery({
     queryKey: agentQueryKeys.checklist(principalId),
-    queryFn: () => getAgentChecklist(client, groupsQuery.data ?? []),
+    queryFn: ({ signal }) => getAgentChecklist(client, groupsQuery.data ?? [], signal),
     enabled: groupsQuery.isSuccess,
     staleTime: 30_000,
   });
@@ -64,8 +65,6 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
     setSelectedDate(null);
   };
   const selectDate = (date: string) => setSelectedDate((selected) => (selected === date ? null : date));
-  if (query.isPending) return <LoadingState label="Memuat dashboard..." />;
-  if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
   const dashboard = query.data;
   return (
     <PageLayout width="workspace" className="agent-calendar-dashboard agent-page-layout">
@@ -75,23 +74,25 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
         description="Ringkasan perjalanan dan jadwal keberangkatan Anda."
         actions={<span className="font-display text-lg font-extrabold text-on-surface">{monthLabel(month)}</span>}
       />
+      <DataBoundary query={query} skeleton={<MetricsSkeleton className="agent-dashboard-stats" variant="compact" metricClassName="agent-dashboard-metric" />} >
       <div className="agent-dashboard-stats" aria-label="Ringkasan statistik">
         <Metric
           label="perjalanan"
           value={
-            dashboard.groups.journeys ?? (groupsQuery.data ? groupAgentFamilies(groupsQuery.data).length : undefined)
+            dashboard?.groups.journeys ?? (groupsQuery.data ? groupAgentFamilies(groupsQuery.data).length : undefined)
           }
           icon="luggage"
           description="Total perjalanan Anda."
         />
-        <Metric label="group" value={dashboard.groups.total} icon="groups" description="Total group yang ditangani." />
+        <Metric label="group" value={dashboard?.groups.total} icon="groups" description="Total group yang ditangani." />
         <Metric
           label="jamaah"
-          value={dashboard.groups.totalPax}
+          value={dashboard?.groups.totalPax}
           icon="groups"
           description="Total jamaah di seluruh group."
         />
       </div>
+      </DataBoundary>
       <div className="agent-dashboard-workspace">
         <section className="agent-calendar-panel" aria-labelledby="departure-calendar-title">
           <div className="agent-calendar-header">
@@ -121,11 +122,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
               </button>
             </div>
           </div>
-          {groupsQuery.isPending ? (
-            <LoadingState label="Memuat jadwal keberangkatan…" />
-          ) : groupsQuery.isError ? (
-            <ErrorState retry={() => void groupsQuery.refetch()} />
-          ) : (
+          <DataBoundary query={groupsQuery} skeleton={<CalendarSkeleton weeks={days.length / 7} />}>
             <>
               <div className="agent-calendar-grid">
                 <table aria-label={`Kalender keberangkatan ${monthLabel(month)}`}>
@@ -206,7 +203,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                 <p className="agent-calendar-note">Belum ada jadwal pada {monthLabel(month)}.</p>
               ) : null}
             </>
-          )}
+          </DataBoundary>
         </section>
         <div className="agent-dashboard-sidebar">
           <section className="agent-agenda-panel" aria-labelledby="departure-agenda-title">
@@ -219,11 +216,8 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                 </button>
               ) : null}
             </div>
-            {groupsQuery.isPending ? (
-              <LoadingState label="Memuat agenda…" />
-            ) : groupsQuery.isError ? (
-              <p className="agent-calendar-note">Jadwal belum dapat dimuat. Coba kembali melalui kalender.</p>
-            ) : agenda.length ? (
+            <DataBoundary query={groupsQuery} skeleton={<ListSkeleton rows={3} columns={2} label="Memuat agenda…" />}>
+            {agenda.length ? (
               <ul className="agent-departure-agenda" key={`${month}:${selectedDate ?? "all"}`}>
                 {agenda.map((journey) => (
                   <AgendaJourney key={journey.root.id} journey={journey} />
@@ -241,14 +235,16 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
                 </Link>
               </div>
             )}
+            </DataBoundary>
           </section>
           <section className="agent-attention-panel" aria-labelledby="agent-attention-title">
             <h2 id="agent-attention-title">Perlu perhatian</h2>
             <p>Group yang perlu ditindaklanjuti berdasarkan data operasional.</p>
+            <DataBoundary query={query} skeleton={<ListSkeleton rows={2} columns={2} label="Memuat tindak lanjut…" />}>
             <Attention
               label="Group perlu perhatian visa"
               description="Periksa progres dan kelengkapan dokumen."
-              value={dashboard.attention.visaGroups}
+              value={dashboard?.attention.visaGroups ?? 0}
               icon="description"
               to="/agent/visa"
               tone="visa"
@@ -256,11 +252,12 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
             <Attention
               label="Group perlu perhatian hotel"
               description="Tinjau kesiapan agreement perjalanan."
-              value={dashboard.attention.hotelGroups}
+              value={dashboard?.attention.hotelGroups ?? 0}
               icon="hotel"
               to="/agent/groups"
               tone="hotel"
             />
+            </DataBoundary>
           </section>
         </div>
       </div>
@@ -272,11 +269,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
           </Link>
         </div>
         <p className="agent-history-description">Kesiapan driver untuk perjalanan hari ini, besok, dan lusa.</p>
-        {groupsQuery.isError || checklistQuery.isError ? (
-          <ErrorState retry={() => void (groupsQuery.isError ? groupsQuery.refetch() : checklistQuery.refetch())} />
-        ) : groupsQuery.isPending || checklistQuery.isPending ? (
-          <LoadingState label="Memuat checklist H-1…" />
-        ) : (
+        <DataBoundary query={checklistQuery.data !== undefined ? checklistQuery : groupsQuery.isError ? { ...groupsQuery, data: undefined } : checklistQuery} skeleton={<ChecklistSkeleton rows={2} />}>
           <>
             <dl className="agent-lifecycle-summary" aria-label="Kesiapan H-1">
               {[
@@ -325,7 +318,7 @@ export function DashboardPage({ principalId, agentName }: { principalId: string;
               <p className="agent-history-empty">Tidak ada jadwal checklist untuk hari ini, besok, atau lusa.</p>
             )}
           </>
-        )}
+        </DataBoundary>
       </section>
       <p className="agent-dashboard-owner">Ruang kerja {agentName}</p>
     </PageLayout>

@@ -18,13 +18,13 @@ export function useAgentGroupData({
   const client = useQueryClient();
   return useQuery<GroupData[]>({
     queryKey: [...agentQueryKeys.groups(principalId, "ops-shared-view"), agentId],
-    queryFn: async () => {
-      const groups = await getAllAgentGroups(client, "asc");
+    queryFn: async ({ signal }) => {
+      const groups = await getAllAgentGroups(client, "asc", signal);
       return Promise.all(
         groups.map(async (group) => {
           const [facet, hotels] = await Promise.all([
-            portalGet<VisaFacet>(client, `/groups/${encodeURIComponent(group.code)}/visa`),
-            portalGet<HotelAgreement[]>(client, `/groups/${encodeURIComponent(group.code)}/hotel-agreements`),
+            portalGet<VisaFacet>(client, `/groups/${encodeURIComponent(group.code)}/visa`, signal),
+            portalGet<HotelAgreement[]>(client, `/groups/${encodeURIComponent(group.code)}/hotel-agreements`, signal),
           ]);
           return mapAgentGroup(group, agentId, agentName, { facet, hotels });
         }),

@@ -15,6 +15,7 @@ import type {
   GroupFetchProjection,
   GroupIdentityDraftPayload,
 } from "../use-app-controller-backend";
+import type { DataQueryState } from "../../components/data-boundary";
 
 export type OverviewStatCard = {
   label: string;
@@ -38,6 +39,8 @@ export type SyncFeedback = {
 export type AppController = {
   groupRecords: GroupData[];
   isGroupRecordsLoading: boolean;
+  groupDataState?: DataQueryState;
+  groupSearchState?: DataQueryState;
   sessionAccessTier: SessionAccessTier;
   activeNav: NavId;
   isItineraryBuilder: boolean;

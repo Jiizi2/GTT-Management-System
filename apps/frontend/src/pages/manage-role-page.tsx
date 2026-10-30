@@ -1,3 +1,4 @@
+import { Skeleton, SkeletonRegion } from "../components/skeleton";
 import { PageHeroSection } from "../components/page-hero-section";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { ManageRoleContext } from "./manage-role/context/ManageRoleContext";
@@ -12,6 +13,8 @@ export function UserManagementScreen() {
     users,
     userRoleOptions,
     managedUsersLoading,
+    managedUsersQuery,
+    userRoleOptionsQuery,
     notice,
     totalUsersWithoutPassword,
     hasActiveRoleOptions,
@@ -73,24 +76,24 @@ export function UserManagementScreen() {
                 <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Total User</p>
                   <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
-                    {managedUsersLoading ? "..." : users.length}
+                    {managedUsersLoading ? <SkeletonRegion as="span" label="Memuat jumlah user..."><Skeleton className="h-9 w-12" /></SkeletonRegion> : managedUsersQuery.data === undefined ? "—" : users.length}
                   </p>
                 </article>
 
                 <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Tanpa Password</p>
                   <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">
-                    {managedUsersLoading ? "..." : totalUsersWithoutPassword}
+                    {managedUsersLoading ? <SkeletonRegion as="span" label="Memuat status akun..."><Skeleton className="h-9 w-12" /></SkeletonRegion> : managedUsersQuery.data === undefined ? "—" : totalUsersWithoutPassword}
                   </p>
                 </article>
 
                 <article className="rounded-2xl border border-outline-variant/35 bg-surface-container-low px-4 py-3.5">
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Role Aktif</p>
-                  <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">{userRoleOptions.length}</p>
+                  <p className="mt-2 text-3xl font-black tracking-tight text-on-surface">{userRoleOptionsQuery.isPending && userRoleOptionsQuery.data === undefined ? <SkeletonRegion as="span" label="Memuat role aktif..."><Skeleton className="h-9 w-12" /></SkeletonRegion> : userRoleOptionsQuery.data === undefined ? "—" : userRoleOptions.length}</p>
                 </article>
               </div>
             </div>
-            {!hasActiveRoleOptions ? (
+            {!hasActiveRoleOptions && userRoleOptionsQuery.isSuccess ? (
               <p className="mt-3 text-xs font-semibold text-error">
                 Belum ada role aktif. Aktifkan kategori <strong>User Role</strong> di Master Data sebelum menambah user.
               </p>

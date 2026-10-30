@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   buildVisaTrackingRowsFromGroups,
@@ -115,8 +115,7 @@ export function useDashboardGroupRecords({
   const queryClient = useQueryClient();
   const [groupRecords, setGroupRecords] = useState<GroupData[]>(groups);
   const [groupRecordsProjection, setGroupRecordsProjection] = useState<GroupFetchProjection>("detail");
-  const deferredQuery = useDeferredValue(query);
-  const normalizedQuery = deferredQuery.trim().toLowerCase();
+  const normalizedQuery = query.trim().toLowerCase();
   const groupRecordsRef = useRef(groupRecords);
   const groupRecordsProjectionRef = useRef(groupRecordsProjection);
   const handledGroupsQueryErrorRef = useRef(0);
@@ -273,11 +272,15 @@ export function useDashboardGroupRecords({
       return;
     }
 
-    syncGroupRecords([], requestedProjection);
-    showSyncFeedback("error", "Backend tidak terhubung. Data tidak bisa dimuat dari database.");
+    // A failed refresh must not erase the last successful snapshot or turn the
+    // failed query into a synthetic successful, empty result.
+    showSyncFeedback("error", groupsQuery.data !== undefined
+      ? "Gagal memperbarui data group. Data terakhir tetap ditampilkan."
+      : "Backend tidak terhubung. Data tidak bisa dimuat dari database.");
   }, [
     allowLocalFallback,
     groupsQuery.error,
+    groupsQuery.data,
     groupsQuery.errorUpdatedAt,
     groupsQuery.isError,
     requestedProjection,
@@ -381,11 +384,11 @@ export function useDashboardGroupRecords({
     [allowLocalFallback, queryClient, showSyncFeedback, syncGroupsFromBackendOrRestore],
   );
 
-  const isWaitingForDetailedRecords =
-    usesGroupRecords && requestedProjection === "detail" && groupRecordsProjection !== "detail";
+  const isWaitingForDetailedRecords = usesGroupRecords && groupsQuery.data === undefined &&
+    (requestedProjection === "detail" && groupRecordsProjection !== "detail" || groupRecords.length === 0);
   const visibleGroupRecords = useMemo(
-    () => (isWaitingForDetailedRecords ? [] : groupRecords),
-    [groupRecords, isWaitingForDetailedRecords],
+    () => groupsQuery.data ?? (isWaitingForDetailedRecords ? [] : groupRecords),
+    [groupsQuery.data, groupRecords, isWaitingForDetailedRecords],
   );
   const remoteSearchMatches = normalizedQuery && shouldUseRemoteSearch ? (searchQuery.data ?? null) : null;
 
@@ -739,7 +742,21 @@ export function useDashboardGroupRecords({
 
   return {
     groupRecords: visibleGroupRecords,
-    isGroupRecordsLoading: isWaitingForDetailedRecords,
+    isGroupRecordsLoading: isWaitingForDetailedRecords && groupsQuery.isPending,
+    groupDataState: {
+      data: groupsQuery.data ?? (isWaitingForDetailedRecords ? undefined : visibleGroupRecords),
+      isPending: groupsQuery.isPending,
+      isFetching: groupsQuery.isFetching,
+      isError: groupsQuery.isError,
+      refetch: groupsQuery.refetch,
+    },
+    groupSearchState: normalizedQuery && shouldUseRemoteSearch ? {
+      data: searchQuery.data,
+      isPending: searchQuery.isPending,
+      isFetching: searchQuery.isFetching,
+      isError: searchQuery.isError,
+      refetch: searchQuery.refetch,
+    } : undefined,
     filteredGroups,
     overviewMonthOptions,
     statCards,

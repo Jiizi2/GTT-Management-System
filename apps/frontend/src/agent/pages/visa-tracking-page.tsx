@@ -10,7 +10,9 @@ import { SearchField } from "../../components/search-field";
 import { SectionHeader } from "../../components/section-header";
 import { StatusBadge } from "../../components/status-badge";
 import type { GroupData } from "../../shared/app-domain";
-import { EmptyState, ErrorState } from "../components/data-state";
+import { EmptyState } from "../components/data-state";
+import { DataBoundary, combineQueryStates } from "../../components/data-boundary";
+import { ListSkeleton, Skeleton } from "../../components/skeleton";
 import type { VisaApplication } from "../data/contracts";
 import { validDateOnly } from "../data/departure-calendar";
 import { groupAgentFamilies } from "../data/group-families";
@@ -142,29 +144,16 @@ export function AgentVisaTrackingPage({
     setParams(next, { replace: true });
   };
   const resetFilters = () => setParams({}, { replace: true });
-  const retry = () => void Promise.all([groupsQuery.refetch(), applicationsQuery.refetch()]);
   const onOpen = (item: VisaListItem) =>
     navigate(`/agent/visa/${encodeURIComponent(item.identity)}`, {
       state: { from: `${location.pathname}${location.search}` },
       viewTransition: true,
     });
-  const loading = groupsQuery.isPending || applicationsQuery.isPending;
+  const dataState = combineQueryStates(groupsQuery, applicationsQuery);
+  const loading = dataState.data === undefined && dataState.isPending;
   return (
     <PageLayout width="workspace" className="agent-visa-page agent-page-layout">
       <PageHeader variant="compact" title="Visa Tracking" description="Pantau progres visa setiap group." />
-      {loading ? (
-        <section className="agent-visa-loading" aria-busy="true" aria-label="Memuat Visa Tracking">
-          <p className="sr-only" role="status">
-            Memuat Visa Tracking...
-          </p>
-          <div className="agent-visa-skeleton-toolbar" />
-          <div className="agent-visa-skeleton-family" />
-          <div className="agent-visa-skeleton-family" />
-        </section>
-      ) : groupsQuery.isError || applicationsQuery.isError ? (
-        <ErrorState retry={retry} />
-      ) : (
-        <>
           <ListToolbar
             ariaLabel="Ringkasan dan filter visa"
             footer={
@@ -184,7 +173,7 @@ export function AgentVisaTrackingPage({
                 >
                   <Icon name={item.icon} className={`agent-visa-filter-icon is-${item.id}`} />
                   <span>{item.label}</span>
-                  <span className="agent-visa-filter-count">{counts[item.id]}</span>
+                  <span className="agent-visa-filter-count">{loading ? <Skeleton className="h-4 w-4" /> : counts[item.id]}</span>
                 </Button>
               ))}
             </div>
@@ -209,6 +198,7 @@ export function AgentVisaTrackingPage({
             </div>
           </ListToolbar>
           {guideOpen && <ProcessOverview />}
+          <DataBoundary query={dataState} skeleton={<ListSkeleton rows={4} columns={5} label="Memuat Visa Tracking" />}>
           {items.length === 0 ? (
             <EmptyState title="Belum ada pengajuan visa">
               Group atau pengajuan yang ditugaskan kepada akun Agent ini akan muncul di sini.
@@ -238,8 +228,7 @@ export function AgentVisaTrackingPage({
               ))}
             </section>
           )}
-        </>
-      )}
+          </DataBoundary>
     </PageLayout>
   );
 }

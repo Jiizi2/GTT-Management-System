@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
   createInvoiceInBackend,
   deleteInvoiceInBackend,
@@ -23,6 +24,10 @@ type InvoiceDashboardData = {
 // Invoice is edited from multiple browsers/devices, so keep this dashboard fresh.
 const INVOICE_DASHBOARD_REFRESH_INTERVAL_MS = 15_000;
 
+function sortInvoiceClients(clients: BackendInvoiceClient[]): BackendInvoiceClient[] {
+  return [...clients].sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
 function sortInvoiceRows(rows: BackendInvoiceRow[]): BackendInvoiceRow[] {
   return [...rows].sort((left, right) => {
     const dueDateDiff = right.dueDateIso.localeCompare(left.dueDateIso);
@@ -43,12 +48,23 @@ if (typeof window !== "undefined") {
 }
 
 export function useInvoiceDashboardQuery() {
-  return useQuery({
+  // Client options belong to the invoice form. A slow options request must not
+  // hold the invoice list and revenue summary behind their loading state.
+  const clientsQuery = useQuery({
+    queryKey: [...invoiceQueryKeys.all, "clients"],
+    queryFn: ({ signal }) => fetchInvoiceClientsFromBackend({ signal }),
+    select: sortInvoiceClients,
+    retry: false,
+    staleTime: 15_000,
+    refetchInterval: INVOICE_DASHBOARD_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+  const dashboardQuery = useQuery({
     queryKey: invoiceQueryKeys.dashboard,
     queryFn: async ({ signal }): Promise<InvoiceDashboardData> => {
-      const [dataSource, clients, rows] = await Promise.all([
+      const [dataSource, rows] = await Promise.all([
         fetchInvoiceBackendDataSource({ signal }),
-        fetchInvoiceClientsFromBackend({ signal }),
         fetchInvoicesFromBackend({ signal }),
       ]);
 
@@ -56,7 +72,7 @@ export function useInvoiceDashboardQuery() {
 
       const data = {
         dataSource,
-        clients: [...clients].sort((left, right) => left.sortOrder - right.sortOrder),
+        clients: [],
         rows: sortInvoiceRows(rawRows),
       };
 
@@ -84,6 +100,11 @@ export function useInvoiceDashboardQuery() {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
+  const data = useMemo(() => dashboardQuery.data === undefined ? undefined : {
+    ...dashboardQuery.data,
+    clients: clientsQuery.data ?? dashboardQuery.data.clients,
+  }, [dashboardQuery.data, clientsQuery.data]);
+  return { ...dashboardQuery, data, clientsQuery };
 }
 
 export function useCreateInvoiceMutation() {

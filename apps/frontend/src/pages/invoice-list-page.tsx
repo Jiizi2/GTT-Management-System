@@ -9,6 +9,8 @@ import { useInvoiceDashboardQuery, useDeleteInvoiceMutation } from "../hooks/use
 import { useMasterDataOptionsQuery } from "../hooks/use-master-data-query";
 import { useThemeMode } from "../theme/theme-provider";
 import { Button } from "../components/button";
+import { DataBoundary } from "../components/data-boundary";
+import { ListSkeleton, PageSkeleton, Skeleton, SkeletonRegion } from "../components/skeleton";
 import { InvoiceListFilters, InvoiceCardList, InvoiceTable } from "./invoice/components/InvoiceListComponents";
 import {
   createInvoiceWorkspaceInitialData,
@@ -48,22 +50,7 @@ type DueMonthOption = {
 };
 
 function InvoiceWorkspaceFallback() {
-  return (
-    <div className="mx-auto max-w-[88rem] space-y-4 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
-      <section
-        className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-800 shadow-ambient"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="flex items-start gap-3">
-          <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
-            sync
-          </span>
-          <p className="text-sm font-semibold">Loading invoice workspace...</p>
-        </div>
-      </section>
-    </div>
-  );
+  return <PageSkeleton form />;
 }
 
 export function InvoiceScreen({
@@ -121,7 +108,7 @@ export function InvoiceScreen({
     [invoiceClientNameOptionsQuery.data],
   );
   const isInvoiceBackendAvailable = invoiceDashboardQuery.data?.dataSource === "prisma";
-  const isInvoiceDataLoading = invoiceDashboardQuery.isLoading;
+  const isInvoiceDataLoading = invoiceDashboardQuery.isPending && invoiceDashboardQuery.data === undefined;
   const invoiceClients = useMemo<InvoiceClientOption[]>(
     () =>
       isInvoiceBackendAvailable
@@ -145,7 +132,7 @@ export function InvoiceScreen({
     );
   }
   const systemFeedback = useMemo(() => {
-    if (invoiceDashboardQuery.error) {
+    if (invoiceDashboardQuery.error && invoiceDashboardQuery.data === undefined) {
       return "Backend invoice/database belum terhubung. Data invoice tidak bisa di-load dari database dan Generate Invoice dinonaktifkan.";
     }
 
@@ -153,12 +140,12 @@ export function InvoiceScreen({
       return "Backend invoice terhubung tetapi masih DATA_SOURCE=memory. Ubah ke DATA_SOURCE=prisma agar Save Draft dan Generate Invoice tersimpan ke database.";
     }
 
-    if (isInvoiceBackendAvailable && invoiceClients.length === 0) {
+    if (isInvoiceBackendAvailable && invoiceDashboardQuery.clientsQuery.data !== undefined && invoiceClients.length === 0) {
       return "Backend invoice terhubung, tetapi daftar client invoice masih kosong. Jalankan seed database lalu refresh halaman.";
     }
 
     return null;
-  }, [invoiceClients.length, invoiceDashboardQuery.data, invoiceDashboardQuery.error, isInvoiceBackendAvailable]);
+  }, [invoiceClients.length, invoiceDashboardQuery.data, invoiceDashboardQuery.error, invoiceDashboardQuery.clientsQuery.data, isInvoiceBackendAvailable]);
   const visibleFeedback = actionFeedback ?? systemFeedback;
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -392,19 +379,6 @@ export function InvoiceScreen({
           <p className="text-sm font-semibold">{visibleFeedback}</p>
         </section>
       ) : null}
-      {isInvoiceDataLoading ? (
-        <section
-          className="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-800 shadow-ambient"
-          role="status"
-          aria-live="polite"
-        >
-          <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
-            sync
-          </span>
-          <p className="text-sm font-semibold">Loading invoice data...</p>
-        </section>
-      ) : null}
-
       <header className="serene-page-toolbar">
         <div className="flex min-w-0 flex-1 max-w-xl items-center gap-3">
           <label className="serene-page-search" aria-label="Search invoices">
@@ -438,7 +412,7 @@ export function InvoiceScreen({
             variant="primary"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2"
             aria-label="Create new invoice"
-            disabled={!isInvoiceBackendAvailable}
+            disabled={!isInvoiceBackendAvailable || invoiceDashboardQuery.clientsQuery.data === undefined}
             onClick={() => {
               setEditingInvoice(null);
               setDraftSourceInvoice(null);
@@ -458,6 +432,7 @@ export function InvoiceScreen({
         }
       />
 
+      <DataBoundary query={invoiceDashboardQuery.clientsQuery} skeleton={null} errorTitle="Pilihan client invoice belum dapat dimuat">{null}</DataBoundary>
       <section className="grid items-start gap-4 xl:grid-cols-[1.8fr_1fr]">
         <article className="serene-filter-panel self-start">
           <div className="grid gap-4 xl:grid-cols-[0.7fr_2.3fr] xl:items-end">
@@ -492,12 +467,12 @@ export function InvoiceScreen({
               <span className="hidden sm:inline">Total Monthly Revenue</span>
             </p>
             <strong className="mt-2 block truncate text-2xl font-extrabold leading-tight sm:text-3xl">
-              {formatIdr(totalRevenue)}
+              {isInvoiceDataLoading ? <SkeletonRegion as="span" label="Memuat nominal invoice..."><Skeleton className="h-8 w-48" /></SkeletonRegion> : invoiceDashboardQuery.data === undefined ? "—" : formatIdr(totalRevenue)}
             </strong>
           </div>
           <div className="relative z-10 shrink-0 text-right">
             <p className="inline-flex rounded-lg bg-surface-container-lowest/20 px-2 py-1 text-xs font-bold">
-              {monthlyGrowthLabel}
+              {isInvoiceDataLoading ? <Skeleton className="h-4 w-12" /> : invoiceDashboardQuery.data === undefined ? "—" : monthlyGrowthLabel}
             </p>
             <p className="mt-1 text-[11px] text-on-primary/80">vs last month</p>
           </div>
@@ -510,6 +485,7 @@ export function InvoiceScreen({
         </article>
       </section>
 
+      <DataBoundary query={invoiceDashboardQuery} skeleton={<ListSkeleton columns={6} label="Memuat invoice..." />} >
       {filteredRows.length === 0 ? (
         <article className="serene-empty-state">
           <span className="material-symbols-outlined text-4xl text-slate-400" aria-hidden="true">
@@ -554,6 +530,7 @@ export function InvoiceScreen({
         itemLabel="invoices"
         onPageChange={(nextPage) => setCurrentPage(Math.max(1, Math.min(totalPages, nextPage)))}
       />
+      </DataBoundary>
     </div>
   );
 }

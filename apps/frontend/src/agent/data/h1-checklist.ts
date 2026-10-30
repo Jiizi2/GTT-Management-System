@@ -6,10 +6,10 @@ import { portalGet } from "./portal-query";
 
 export type ChecklistRow = TransportationItem & { group: GroupSummary };
 
-export async function getAgentChecklist(client: QueryClient, groups: GroupSummary[]): Promise<ChecklistRow[]> {
+export async function getAgentChecklist(client: QueryClient, groups: GroupSummary[], signal?: AbortSignal): Promise<ChecklistRow[]> {
   const rows = await Promise.all(
     groupAgentFamilies(groups).map(async ({ root: group }) =>
-      (await portalGet<TransportationItem[]>(client, `/groups/${encodeURIComponent(group.code)}/transportation`)).map(
+      (await portalGet<TransportationItem[]>(client, `/groups/${encodeURIComponent(group.code)}/transportation`, signal)).map(
         (item) => ({ ...item, group }),
       ),
     ),

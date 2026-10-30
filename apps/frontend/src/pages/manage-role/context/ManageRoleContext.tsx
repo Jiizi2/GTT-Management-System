@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { DataQueryState } from "../../../components/data-boundary";
 import type { UseFormReturn } from "react-hook-form";
 import type { UserAccount, UserRoleOption, RoleCatalogItem } from "../manage-role-types";
 import type { CreateManagedUserFormValues, ManagedUserFormValues, ResetManagedUserPasswordFormValues } from "../hooks/use-manage-role";
@@ -10,6 +11,9 @@ export interface ManageRoleContextType {
   roleCatalogItems: RoleCatalogItem[];
   roleCatalogById: Map<string, RoleCatalogItem>;
   managedUsersLoading: boolean;
+  managedUsersQuery?: DataQueryState;
+  roleCatalogQuery?: DataQueryState;
+  userRoleOptionsQuery?: DataQueryState;
   
   // UI States
   notice: { tone: "success" | "error"; message: string } | null;

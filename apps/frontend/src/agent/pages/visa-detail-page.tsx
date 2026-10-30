@@ -8,7 +8,9 @@ import { Icon } from "../../components/icon";
 import { ReadOnlyIndicator } from "../../components/read-only-indicator";
 import { StatusBadge } from "../../components/status-badge";
 import type { GroupAgreementHotel, GroupData } from "../../shared/app-domain";
-import { ErrorState, LoadingState } from "../components/data-state";
+import { DataBoundary, combineQueryStates, type DataQueryState } from "../../components/data-boundary";
+import { DetailDataState } from "../../components/detail-data-state";
+import { DetailSkeleton, ListSkeleton, MetricsSkeleton } from "../../components/skeleton";
 import type { VisaApplication, VisaApplicationDocument } from "../data/contracts";
 import { useAgentGroupData } from "../data/use-agent-group-data";
 import { useAgentVisaApplications } from "../data/use-agent-visa-applications";
@@ -68,9 +70,8 @@ export function AgentVisaDetailPage({
     if (number) document.title = `${number} | Visa Tracking Portal Agent`;
   }, [number]);
 
-  const retry = () => void Promise.all([groupsQuery.refetch(), applicationsQuery.refetch()]);
-  if (groupsQuery.isPending || applicationsQuery.isPending) return <LoadingState label="Memuat detail visa..." />;
-  if (groupsQuery.isError || applicationsQuery.isError) return <ErrorState retry={retry} />;
+  const dataState = combineQueryStates(groupsQuery, applicationsQuery);
+  if (!group && !application && (dataState.isPending || dataState.isError)) return <DetailDataState query={dataState} kind="visa" title="Detail visa" onBack={() => navigate(backTarget)} backLabel="Kembali ke Visa Tracking" />;
   if (!group && !application) {
     return (
       <PageLayout>
@@ -137,12 +138,13 @@ export function AgentVisaDetailPage({
           <span>{group?.packageName || application?.packageName || "Paket belum tercatat"}</span>
         </div>
       </PageHeader>
-      <VisaWorkflow key={group?.id ?? application?.id ?? identity} application={application} group={group} />
+      <VisaWorkflow key={group?.id ?? application?.id ?? identity} application={application} group={group} groupState={groupsQuery} applicationState={applicationsQuery} />
     </PageLayout>
   );
 }
 
-function VisaWorkflow({ application, group }: { application: VisaApplication | null; group: GroupData | null }) {
+function VisaWorkflow({ application, group, groupState, applicationState }: { application: VisaApplication | null; group: GroupData | null; groupState: DataQueryState; applicationState: DataQueryState }) {
+  const dataState = combineQueryStates(groupState, applicationState);
   const stages = buildVisaProcessStages(application, group);
   const current = currentVisaProcessStage(stages);
   const [expanded, setExpanded] = useState<string[]>(() => (current.id === "nusuk" ? [] : [current.id]));
@@ -156,8 +158,9 @@ function VisaWorkflow({ application, group }: { application: VisaApplication | n
   };
   return (
     <>
-      <DocumentAttention application={application} />
+      {applicationState.data !== undefined && <DocumentAttention application={application} />}
 
+      <DataBoundary query={dataState} skeleton={<MetricsSkeleton count={4} className="grid grid-cols-2 gap-3 xl:grid-cols-4" label="Memuat progres visa…" />}>
       <nav className="visa-stage-overview visa-status-grid" aria-label="Empat tahap visa">
         <ol>
           {stages.map((stage, index) => (
@@ -181,20 +184,22 @@ function VisaWorkflow({ application, group }: { application: VisaApplication | n
           ))}
         </ol>
       </nav>
+      </DataBoundary>
 
       <div className="visa-overview-grid">
-        <DocumentReadiness application={application} />
-        <VisaFacts application={application} group={group} />
+        <DataBoundary query={applicationState} skeleton={<DetailSkeleton kind="profile" label="Memuat dokumen…" />}><DocumentReadiness application={application} /></DataBoundary>
+        <DataBoundary query={dataState} skeleton={<DetailSkeleton kind="profile" label="Memuat informasi visa…" />}><VisaFacts application={application} group={group} /></DataBoundary>
       </div>
 
-      <AgentVisaFlights visa={group?.visaSetup} />
+      <DataBoundary query={groupState} skeleton={<DetailSkeleton kind="profile" label="Memuat penerbangan…" />}><AgentVisaFlights visa={group?.visaSetup} /></DataBoundary>
 
       <section className="visa-agreement-summary" aria-labelledby="visa-agreement-title">
         <h2 id="visa-agreement-title" className="sr-only">
           Agreement hotel
         </h2>
-        <HotelData group={group} />
+        <DataBoundary query={groupState} skeleton={<ListSkeleton rows={2} label="Memuat hotel agreement…" />}><HotelData group={group} /></DataBoundary>
       </section>
+      <DataBoundary query={dataState} skeleton={<ListSkeleton rows={4} label="Memuat rincian proses…" />}>
       <section className="visa-process-details visa-detail-surface" aria-label="Alur proses visa">
         <header className="visa-section-header visa-process-details-header">
           <div>
@@ -276,6 +281,7 @@ function VisaWorkflow({ application, group }: { application: VisaApplication | n
           })}
         </ol>
       </section>
+      </DataBoundary>
     </>
   );
 }

@@ -571,9 +571,10 @@ test("shows loading state instead of keeping the previous screen during lazy rou
 
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeVisible();
 
-  await page.getByRole("button", { name: "H-1 Checklist" }).click();
+  await page.getByRole("link", { name: "H-1 Checklist", exact: true }).click();
 
-  await expect(page.getByText("Loading screen...")).toBeVisible();
+  await expect(page.locator(".serene-skeleton").first()).toBeVisible();
+  await expect(page.getByText("Loading screen...")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Itinerary Overview" })).toBeHidden();
   await expect(page.getByRole("heading", { name: "H-1 Checklist" })).toBeVisible();
 });

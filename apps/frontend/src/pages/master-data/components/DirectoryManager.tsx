@@ -1,3 +1,5 @@
+import { DataBoundary } from "../../../components/data-boundary";
+import { ListSkeleton } from "../../../components/skeleton";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { SereneSelect } from "../../../components/serene-select";
@@ -106,7 +108,7 @@ export function DirectoryManager({ section, mode, onModeChange }: { section: Dir
 
   const sectionTitle = section === "muassasah" ? "Muassasah" : section === "drivers" ? "Supir" : "Kendaraan";
   const items = section === "muassasah" ? muassasah : section === "drivers" ? drivers : vehicles;
-  const loading = section === "muassasah" ? muassasahQuery.isLoading : section === "drivers" ? driversQuery.isLoading : vehiclesQuery.isLoading;
+  const dataQuery = section === "muassasah" ? muassasahQuery : section === "drivers" ? driversQuery : vehiclesQuery;
   const closeCreate = () => { setError(null); onModeChange("list"); };
 
   const renderCreateForm = () => {
@@ -219,7 +221,8 @@ export function DirectoryManager({ section, mode, onModeChange }: { section: Dir
             <button type="button" className="serene-btn-primary serene-focus-ring inline-flex min-h-11 items-center gap-2 px-4 text-xs" onClick={() => onModeChange("create")}><span className="material-symbols-outlined text-lg">add</span>Tambah data</button>
           </div>
           <div className="mt-5 overflow-hidden rounded-xl border border-outline-variant/35">
-            {loading ? <p className="p-8 text-center text-sm text-on-surface-variant">Memuat data...</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-on-surface-variant">Belum ada data {sectionTitle.toLocaleLowerCase("id-ID")}.</p> : (
+            <DataBoundary query={dataQuery} skeleton={<ListSkeleton columns={3} label={`Memuat ${sectionTitle}...`} />}>
+            {items.length === 0 ? <p className="p-8 text-center text-sm text-on-surface-variant">Belum ada data {sectionTitle.toLocaleLowerCase("id-ID")}.</p> : (
               <ul className="divide-y divide-outline-variant/25">
                 {items.map((item) => {
                   const title = "plateNumber" in item ? item.plateNumber : item.name;
@@ -228,6 +231,7 @@ export function DirectoryManager({ section, mode, onModeChange }: { section: Dir
                 })}
               </ul>
             )}
+            </DataBoundary>
           </div>
         </section>
       )}

@@ -11,7 +11,10 @@ import { Icon } from "../../components/icon";
 import { SectionHeader } from "../../components/section-header";
 import { resolveItineraryBusCount } from "../../shared/app-domain";
 import type { GroupAgreementHotel, GroupData, ItineraryItem } from "../../shared/app-domain";
-import { LoadingState, ResourceErrorState } from "../components/data-state";
+import { ResourceErrorState } from "../components/data-state";
+import { DataBoundary, DataStatus, type DataQueryState } from "../../components/data-boundary";
+import { DetailDataState } from "../../components/detail-data-state";
+import { DetailSkeleton, ListSkeleton, Skeleton, SkeletonRegion } from "../../components/skeleton";
 import type { TransportationItem } from "../data/contracts";
 import { formatDate } from "../data/format";
 import { useAgentTripDetail } from "../data/use-agent-trip-detail";
@@ -59,13 +62,16 @@ export function GroupDetailPage({
     if (query.data?.group.code) document.title = `${query.data.group.code} | Perjalanan Portal Agent`;
   }, [query.data?.group.code]);
 
-  if (query.isPending) return <LoadingState label="Memuat detail perjalanan..." />;
-  if (query.isError) return <ResourceErrorState error={query.error} retry={() => void query.refetch()} />;
+  if (!query.data) return query.isError
+    ? <PageLayout><PageHeader title="Detail perjalanan" /><ResourceErrorState error={query.error} retry={() => void query.refetch()} /><Button variant="secondary" onClick={() => navigate(backTarget)}>Kembali ke Perjalanan</Button></PageLayout>
+    : <DetailDataState query={query} title="Detail perjalanan" onBack={() => navigate(backTarget)} backLabel="Kembali ke Perjalanan" />;
 
   const { group, transportation } = query.data;
   const familyGroups = query.data.familyGroups ?? [group];
+  const exportDataReady = [query.visaQuery, query.hotelQuery, query.transportationQuery]
+    .every((resource) => !resource || resource.data !== undefined);
   const exportPdf = async () => {
-    if (exporting) return;
+    if (exporting || !exportDataReady) return;
     setExporting(true);
     setExportError("");
     try {
@@ -105,7 +111,7 @@ export function GroupDetailPage({
             <ReadOnlyIndicator label="Hanya lihat" />
             <Button
               variant="secondary"
-              disabled={exporting || group.itinerary.length === 0}
+              disabled={exporting || !exportDataReady || group.itinerary.length === 0}
               aria-busy={exporting}
               onClick={() => void exportPdf()}
             >
@@ -121,6 +127,7 @@ export function GroupDetailPage({
           {exportError}
         </p>
       ) : null}
+      <DataStatus query={query} />
       {familyGroups.length > 1 ? (
         <section className="serene-section p-5 sm:p-6" aria-label="Group terhubung">
           <SectionHeader title="Group terhubung" />
@@ -157,12 +164,12 @@ export function GroupDetailPage({
           <ItineraryTimeline items={group.itinerary} />
         </ExpandableSection>
       ) : null}
-      <ItinerarySection items={group.itinerary} transportation={transportation} />
+      <ItinerarySection items={group.itinerary} transportation={transportation} transportationState={query.transportationQuery} />
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.55fr)]">
-        <VisaAndHotelSection group={group} />
+        <VisaAndHotelSection group={group} visaState={query.visaQuery} hotelState={query.hotelQuery} />
         <NotesSection notes={group.notes} />
       </div>
-      <TravelVisaFacts visa={group.visaSetup} />
+      <DataBoundary query={query.visaQuery} skeleton={<DetailSkeleton kind="profile" label="Memuat penerbangan dan Raudhah…" />}><TravelVisaFacts visa={group.visaSetup} /></DataBoundary>
     </PageLayout>
   );
 }
@@ -305,7 +312,7 @@ function DatePoint({
   );
 }
 
-function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; transportation: TransportationItem[] }) {
+function ItinerarySection({ items, transportation, transportationState }: { items: ItineraryItem[]; transportation: TransportationItem[]; transportationState?: DataQueryState }) {
   const matches = matchTransportation(items, transportation);
   const focusStates = getItineraryFocusStates(items);
   return (
@@ -341,6 +348,7 @@ function ItinerarySection({ items, transportation }: { items: ItineraryItem[]; t
                 isLast={index === items.length - 1}
                 focus={focusStates[index]}
                 transportation={matches[index] ?? null}
+                transportationState={transportationState}
               />
             ))}
           </ol>
@@ -359,12 +367,14 @@ function ItineraryRow({
   isLast,
   focus,
   transportation,
+  transportationState,
 }: {
   item: ItineraryItem;
   index: number;
   isLast: boolean;
   focus: ItineraryFocus;
   transportation: TransportationItem | null;
+  transportationState?: DataQueryState;
 }) {
   const busCount = resolveItineraryBusCount(item);
   const facts = [
@@ -433,7 +443,7 @@ function ItineraryRow({
             </div>
           </div>
         </div>
-        {busCount > 0 || transportation ? <DriverColumns row={transportation} /> : null}
+        {busCount > 0 || transportation ? <DataBoundary query={transportationState} skeleton={<ListSkeleton rows={1} columns={3} label="Memuat driver dan armada…" />}><DriverColumns row={transportation} /></DataBoundary> : null}
       </div>
     </li>
   );
@@ -543,7 +553,7 @@ function matchTransportation(items: ItineraryItem[], rows: TransportationItem[])
   });
 }
 
-function VisaAndHotelSection({ group }: { group: GroupData }) {
+function VisaAndHotelSection({ group, visaState, hotelState }: { group: GroupData; visaState?: DataQueryState; hotelState?: DataQueryState }) {
   const visa = group.visaSetup;
   const visaTone: Tone =
     visa?.visaStatus === "Issued" ? "complete" : visa?.visaStatus === "Pending" ? "in-progress" : "waiting";
@@ -555,7 +565,7 @@ function VisaAndHotelSection({ group }: { group: GroupData }) {
         description="Fakta pendukung yang sudah tersedia untuk perjalanan ini."
         className="bg-surface-container-high p-5 sm:p-6"
         actions={
-          visa ? (
+          visaState?.data === undefined && visaState?.isPending ? <SkeletonRegion label="Memuat status visa…"><Skeleton className="h-6 w-24" /></SkeletonRegion> : (!visaState || visaState.data !== undefined) && visa ? (
             <StatusBadge tone={visaTone}>
               {visa.visaStatus === "Issued"
                 ? "Visa terbit"
@@ -566,6 +576,7 @@ function VisaAndHotelSection({ group }: { group: GroupData }) {
           ) : undefined
         }
       />
+      <DataBoundary query={visaState} skeleton={<DetailSkeleton kind="profile" label="Memuat visa…" />}>
       {!visa ? (
         <div className="p-5 sm:p-6">
           <MissingPanel icon="approval" text="Data visa belum dicatat untuk perjalanan ini." />
@@ -583,12 +594,15 @@ function VisaAndHotelSection({ group }: { group: GroupData }) {
               icon="payments"
             />
           </dl>
-          <div className="mt-6 grid border-t border-outline-variant/30 lg:grid-cols-2 lg:divide-x lg:divide-outline-variant/30">
-            <HotelSummary city="Makkah" hotels={visa.makkahHotels} waived={visa.makkahHotelWaived} />
-            <HotelSummary city="Madinah" hotels={visa.madinahHotels} waived={visa.madinahHotelWaived} />
-          </div>
         </div>
       )}
+      </DataBoundary>
+      <DataBoundary query={hotelState} skeleton={<ListSkeleton rows={2} columns={2} label="Memuat hotel agreement…" />}>
+          <div className="grid border-t border-outline-variant/30 px-5 lg:grid-cols-2 lg:divide-x lg:divide-outline-variant/30">
+            <HotelSummary city="Makkah" hotels={visa?.makkahHotels ?? []} waived={visa?.makkahHotelWaived} />
+            <HotelSummary city="Madinah" hotels={visa?.madinahHotels ?? []} waived={visa?.madinahHotelWaived} />
+          </div>
+      </DataBoundary>
     </section>
   );
 }

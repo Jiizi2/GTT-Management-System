@@ -192,7 +192,7 @@ describe("Agent Dashboard and Perjalanan", () => {
     renderPage(<DashboardPage principalId="portal-1" agentName="Agent A" />);
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Ringkasan statistik")).getByText("19")).toBeInTheDocument();
+    expect(within(await screen.findByLabelText("Ringkasan statistik")).getByText("19")).toBeInTheDocument();
     expect(within(screen.getByLabelText("Ringkasan statistik")).getByText("14")).toBeInTheDocument();
     expect(screen.getByText("721")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Perlu perhatian" })).toBeInTheDocument();
@@ -282,7 +282,7 @@ describe("Agent Dashboard and Perjalanan", () => {
         screen.queryByText(/Aktivitas lama September|Jadwal terlalu jauh|Jadwal tanpa tanggal/),
       ).not.toBeInTheDocument();
       expect(portalGetMock.mock.calls.filter(([, path]) => path.endsWith("/transportation"))).toHaveLength(1);
-      expect(portalGetMock).toHaveBeenCalledWith(expect.anything(), "/groups/GTT-001/transportation");
+      expect(portalGetMock).toHaveBeenCalledWith(expect.anything(), "/groups/GTT-001/transportation", expect.any(AbortSignal));
       if (surface === "dashboard") {
         const summary = within(screen.getByLabelText("Kesiapan H-1"));
         expect(summary.getByText("Perlu perhatian").nextElementSibling).toHaveTextContent("2");
@@ -321,10 +321,10 @@ describe("Agent Dashboard and Perjalanan", () => {
 
     expect(await screen.findByRole("heading", { name: "Perjalanan" })).toBeInTheDocument();
     expect(
-      screen.getByText((_, element) => element?.textContent === "19 perjalanan ditemukan", { selector: "p" }),
+      await screen.findByText((_, element) => element?.textContent === "19 perjalanan ditemukan", { selector: "p" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toBeInTheDocument();
-    const summary = within(screen.getByLabelText("19 perjalanan, 9 aktif, 760 jamaah"));
+    expect(await screen.findByLabelText("19 perjalanan, 9 aktif, 760 jamaah")).toBeInTheDocument();
+    const summary = within(await screen.findByLabelText("19 perjalanan, 9 aktif, 760 jamaah"));
     expect(summary.getByText("19", { exact: true })).toBeInTheDocument();
     expect(summary.getByText("19 group · 9 aktif · 760 jamaah")).toBeInTheDocument();
     expect(screen.getAllByText("Musyrif")).toHaveLength(6);
@@ -344,7 +344,7 @@ describe("Agent Dashboard and Perjalanan", () => {
     );
 
     await screen.findByRole("heading", { name: "Perjalanan" });
-    fireEvent.click(screen.getByRole("button", { name: "Halaman berikutnya" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Halaman berikutnya" }));
     expect(screen.getByRole("button", { name: "Ke halaman 2" })).toHaveAttribute("aria-current", "page");
     fireEvent.change(screen.getByRole("searchbox", { name: "Cari perjalanan" }), { target: { value: "GTT-002" } });
     expect(screen.getByTestId("location")).toHaveTextContent("active=1&source=calendar&q=GTT-002");
@@ -378,7 +378,7 @@ describe("Agent Dashboard and Perjalanan", () => {
 
     expect(await screen.findByRole("heading", { name: "Perjalanan" })).toBeInTheDocument();
     expect(
-      within(screen.getByLabelText("1 perjalanan, 1 aktif, 30 jamaah")).getByText("2 group · 1 aktif · 30 jamaah"),
+      within(await screen.findByLabelText("1 perjalanan, 1 aktif, 30 jamaah")).getByText("2 group · 1 aktif · 30 jamaah"),
     ).toBeInTheDocument();
     expect(view.container.querySelector("details")).toHaveAttribute("open");
     expect(screen.getByRole("button", { name: /GTT-002/ })).toBeInTheDocument();

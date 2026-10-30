@@ -23,23 +23,57 @@ export function useAgentTripDetail({
   identity: string;
 }) {
   const client = useQueryClient();
-  return useQuery<AgentTripDetail>({
-    queryKey: agentQueryKeys.group(principalId, identity),
-    queryFn: async () => {
-      const encodedIdentity = encodeURIComponent(identity);
-      const [group, facet, hotels, transportation] = await Promise.all([
-        portalGet<GroupDetail>(client, `/groups/${encodedIdentity}`),
-        portalGet<VisaFacet>(client, `/groups/${encodedIdentity}/visa`),
-        portalGet<HotelAgreement[]>(client, `/groups/${encodedIdentity}/hotel-agreements`),
-        portalGet<TransportationItem[]>(client, `/groups/${encodedIdentity}/transportation`),
-      ]);
-      return {
-        group: mapAgentGroup(group, agentId, agentName, { facet, hotels }),
-        transportation,
-        familyGroups: (group.familyGroups ?? [group]).map((member) => mapAgentGroup(member, agentId, agentName)),
-      };
-    },
+  const encodedIdentity = encodeURIComponent(identity);
+  const resourceKey = agentQueryKeys.group(principalId, identity);
+  const query = useQuery({
+    queryKey: [...resourceKey, "identity"],
+    queryFn: ({ signal }) => portalGet<GroupDetail>(client, `/groups/${encodedIdentity}`, signal),
     enabled: Boolean(identity),
     staleTime: 30_000,
   });
+  const visaQuery = useQuery({
+    queryKey: [...resourceKey, "visa"],
+    queryFn: ({ signal }) => portalGet<VisaFacet>(client, `/groups/${encodedIdentity}/visa`, signal),
+    enabled: Boolean(identity),
+    staleTime: 30_000,
+  });
+  const hotelQuery = useQuery({
+    queryKey: [...resourceKey, "hotels"],
+    queryFn: ({ signal }) => portalGet<HotelAgreement[]>(client, `/groups/${encodedIdentity}/hotel-agreements`, signal),
+    enabled: Boolean(identity),
+    staleTime: 30_000,
+  });
+  const transportationQuery = useQuery({
+    queryKey: [...resourceKey, "transportation"],
+    queryFn: ({ signal }) =>
+      portalGet<TransportationItem[]>(client, `/groups/${encodedIdentity}/transportation`, signal),
+    enabled: Boolean(identity),
+    staleTime: 30_000,
+  });
+  const data: AgentTripDetail | undefined = query.data
+    ? {
+        group: mapAgentGroup(
+          query.data,
+          agentId,
+          agentName,
+          visaQuery.data || hotelQuery.data
+            ? {
+                facet: visaQuery.data ?? {
+                  status: null,
+                  issuedDate: null,
+                  syarikah: null,
+                  busStatus: null,
+                  paymentStatus: null,
+                },
+                hotels: hotelQuery.data ?? [],
+              }
+            : undefined,
+        ),
+        transportation: transportationQuery.data ?? [],
+        familyGroups: (query.data.familyGroups ?? [query.data]).map((member) =>
+          mapAgentGroup(member, agentId, agentName),
+        ),
+      }
+    : undefined;
+  return { ...query, data, visaQuery, hotelQuery, transportationQuery };
 }

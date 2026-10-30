@@ -1,3 +1,5 @@
+import { DataBoundary } from "../../components/data-boundary";
+import { ChartSkeleton, ListSkeleton, MetricSkeleton, SkeletonRegion } from "../../components/skeleton";
 import { useState, type ReactNode } from "react";
 import { PageHeroSection } from "../../components/page-hero-section";
 import { ThemeToggleButton } from "../../components/theme-toggle-button";
@@ -103,6 +105,7 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
       />
 
       <section className="serene-data-reveal grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan metrik">
+        {operational.isPending && operational.data === undefined ? <SkeletonRegion label="Memuat metrik operasional..." className="contents"><div className="contents"><MetricSkeleton /><MetricSkeleton /></div></SkeletonRegion> : <>
         <MetricCard
           icon="groups"
           tone="primary"
@@ -117,6 +120,8 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
           value={totals ? formatNumber(totals.activeGroups) : "—"}
           supportingText={totals ? `${formatNumber(totals.completedGroups)} selesai` : undefined}
         />
+        </>}
+        {visa.isPending && visa.data === undefined ? <SkeletonRegion label="Memuat metrik visa..." className="contents"><div className="contents"><MetricSkeleton /><MetricSkeleton /></div></SkeletonRegion> : <>
         <MetricCard
           icon="verified"
           tone="primary"
@@ -133,6 +138,7 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
           value={visaTotals ? formatNumber(visaTotals.notIssuedPax) : "—"}
           supportingText={visaTotals ? `dari total ${formatNumber(visaTotals.totalPax)} jamaah` : undefined}
         />
+        </>}
       </section>
 
       <SectionCard
@@ -140,24 +146,19 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
         subtitle="Jumlah jamaah (bar) dan grup (garis) per bulan keberangkatan"
         icon="insights"
       >
-        {operational.isPending ? (
-          <StatePanel icon="hourglass_top" message="Memuat data operasional…" />
-        ) : operational.isError ? (
-          <StatePanel icon="error" message="Gagal memuat data operasional." />
-        ) : operational.data && operational.data.totals.groups > 0 ? (
+        <DataBoundary query={operational} skeleton={<ChartSkeleton />}>
+        {operational.data && operational.data.totals.groups > 0 ? (
           <OperationalTrendChart data={operational.data.monthly} />
         ) : (
           <StatePanel icon="bar_chart" message="Belum ada grup pada rentang ini." />
         )}
+        </DataBoundary>
       </SectionCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard title="Tren Visa Terbit" subtitle="Jumlah jamaah yang visanya terbit per bulan (tanggal terbit)" icon="description">
-          {visa.isPending ? (
-            <StatePanel icon="hourglass_top" message="Memuat data visa…" />
-          ) : visa.isError ? (
-            <StatePanel icon="error" message="Gagal memuat data visa." />
-          ) : visa.data && visa.data.totals.totalPax > 0 ? (
+          <DataBoundary query={visa} skeleton={<ChartSkeleton />}>
+        {visa.data && visa.data.totals.totalPax > 0 ? (
             <>
               <VisaTrendChart data={visa.data.monthly} />
               {visa.data.totals.missingIssuedDatePax > 0 ? (
@@ -170,27 +171,23 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
           ) : (
             <StatePanel icon="bar_chart" message="Belum ada data visa pada rentang ini." />
           )}
+        </DataBoundary>
         </SectionCard>
 
         <SectionCard title="Status Visa" subtitle="Sebaran jamaah berdasarkan status visa" icon="filter_alt">
-          {visa.isPending ? (
-            <StatePanel icon="hourglass_top" message="Memuat status visa…" />
-          ) : visa.isError ? (
-            <StatePanel icon="error" message="Gagal memuat status visa." />
-          ) : visa.data && visa.data.totals.totalPax > 0 ? (
+          <DataBoundary query={visa} skeleton={<ChartSkeleton horizontal />}>
+        {visa.data && visa.data.totals.totalPax > 0 ? (
             <VisaFunnelChart data={visa.data.funnel} />
           ) : (
             <StatePanel icon="bar_chart" message="Belum ada data visa pada rentang ini." />
           )}
+        </DataBoundary>
         </SectionCard>
       </div>
 
       <SectionCard title="Performa Agent" subtitle="Kontribusi grup, jamaah, dan penerbitan visa per agent" icon="business">
-        {agents.isPending ? (
-          <StatePanel icon="hourglass_top" message="Memuat performa agent…" />
-        ) : agents.isError ? (
-          <StatePanel icon="error" message="Gagal memuat performa agent." />
-        ) : agents.data && agents.data.agents.length > 0 ? (
+        <DataBoundary query={agents} skeleton={<ListSkeleton columns={5} label="Memuat performa agent..." />}>
+        {agents.data && agents.data.agents.length > 0 ? (
           <div
             className="overflow-x-auto"
             role="region"
@@ -236,6 +233,7 @@ export function StatisticsScreen({ showThemeToggle = true }: { showThemeToggle?:
         ) : (
           <StatePanel icon="business" message="Belum ada data agent." />
         )}
+        </DataBoundary>
       </SectionCard>
     </div>
   );
