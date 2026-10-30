@@ -15,7 +15,9 @@ import type { AgreementDraftStatusFilter } from "../../hooks/use-agreement-draft
 import { portalGet } from "../data/portal-query";
 import { formatDate } from "../data/format";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState } from "../components/data-state";
+import { DataBoundary } from "../../components/data-boundary";
+import { Skeleton, ListSkeleton } from "../../components/skeleton";
 
 export type AgentAgreementDraft = {
   muassasahId?: string | null;
@@ -54,7 +56,7 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
   const [expandedDraftId, setExpandedDraftId] = useState<string | null>(null);
   const query = useQuery({
     queryKey: agentQueryKeys.agreements(principalId),
-    queryFn: () => portalGet<AgentAgreementDraft[]>(client, "/agreement-drafts"),
+    queryFn: ({ signal }) => portalGet<AgentAgreementDraft[]>(client, "/agreement-drafts", signal),
     staleTime: 30_000,
   });
   const muassasahOptions = useMemo(
@@ -166,18 +168,15 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
           </Button>
         }
       >
-        {drafts.length} agreements
+        {query.data === undefined ? query.isPending ? <Skeleton className="h-4 w-6" /> : "—" : drafts.length} agreements
       </ResultSummary>
-      {query.isPending ? (
-        <LoadingState label="Loading agreement drafts..." />
-      ) : query.isError ? (
-        <ErrorState retry={() => void query.refetch()} />
-      ) : drafts.length === 0 ? (
+      <DataBoundary query={query} skeleton={<ListSkeleton label="Loading agreement drafts..." />} >
+      {drafts.length === 0 ? (
         <EmptyState
-          title={query.data.length === 0 ? "Belum ada agreement" : "No matching agreements"}
-          icon={query.data.length === 0 ? "inventory_2" : "search_off"}
+          title={query.data?.length === 0 ? "Belum ada agreement" : "No matching agreements"}
+          icon={query.data?.length === 0 ? "inventory_2" : "search_off"}
           description={
-            query.data.length === 0
+            query.data?.length === 0
               ? "Agreement drafts created by Admin will appear here."
               : "Change your search or clear the filters to view other agreements."
           }
@@ -327,6 +326,7 @@ export function AgreementInboxPage({ principalId }: { principalId: string }) {
           locale="id"
         />
       ) : null}
+      </DataBoundary>
     </PageLayout>
   );
 }

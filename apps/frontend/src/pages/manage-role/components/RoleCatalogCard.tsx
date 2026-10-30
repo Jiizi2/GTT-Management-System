@@ -1,11 +1,14 @@
 import { useManageRoleContext } from "../context/ManageRoleContext";
+import { DataBoundary } from "../../../components/data-boundary";
+import { ListSkeleton } from "../../../components/skeleton";
 
 export function RoleCatalogCard() {
-  const { roleCatalogItems, resolveRoleToneClass } = useManageRoleContext();
+  const { roleCatalogItems, resolveRoleToneClass, roleCatalogQuery } = useManageRoleContext();
 
   return (
     <div className="p-5 sm:p-7 lg:p-9">
       <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Role Catalog</h2>
+      <DataBoundary query={roleCatalogQuery} skeleton={<ListSkeleton columns={2} rows={3} label="Memuat role…" />}>
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
         {roleCatalogItems.length === 0 ? (
           <div className="rounded-2xl border border-outline-variant/35 bg-surface-container-low p-5 text-sm font-medium text-on-surface-variant">
@@ -44,6 +47,7 @@ export function RoleCatalogCard() {
           ))
         )}
       </div>
+      </DataBoundary>
     </div>
   );
 }

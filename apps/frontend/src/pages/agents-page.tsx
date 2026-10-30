@@ -1,3 +1,5 @@
+import { DataBoundary } from "../components/data-boundary";
+import { ListSkeleton } from "../components/skeleton";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -305,11 +307,8 @@ export function AgentsScreen({
       ) : null}
 
       {!isCreateOpen ? <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
-        {agentsQuery.isLoading ? (
-          <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">Memuat Agent...</div>
-        ) : agentsQuery.isError ? (
-          <div className="px-4 py-8 text-center text-sm font-medium text-error">Agent gagal dimuat dari backend.</div>
-        ) : agents.length === 0 ? (
+        <DataBoundary query={agentsQuery} skeleton={<ListSkeleton columns={5} label="Memuat Agent..." />}>
+        {agents.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">Belum ada Agent.</div>
         ) : (
           <>
@@ -442,6 +441,7 @@ export function AgentsScreen({
             </div>
           </>
         )}
+        </DataBoundary>
       </div> : null}
 
       <MasterDataFormDrawer

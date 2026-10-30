@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { Button } from "../components/button";
+import { DataStatus, type DataQueryState } from "../components/data-boundary";
 import type { GroupData } from "../shared/app-domain";
 import { resolveGroupFlightSummary } from "../shared/group-flight-summary";
 import { GroupDetailContext } from "./group-detail/context/GroupDetailContext";
@@ -65,6 +66,7 @@ export function GroupDetail({
   onPatchGroup,
   readOnly = false,
   showThemeToggle = true,
+  dataState,
 }: {
   group: GroupData;
   groups?: GroupData[];
@@ -74,6 +76,7 @@ export function GroupDetail({
   onPatchGroup: (group: GroupData, sourceGroupCode?: string) => { ok: true } | { ok: false; message: string };
   readOnly?: boolean;
   showThemeToggle?: boolean;
+  dataState?: DataQueryState;
 }) {
   const dashboard = useGroupDetailDashboard({
     group,
@@ -168,6 +171,7 @@ export function GroupDetail({
         )}
 
         <GroupDetailHeader />
+        <DataStatus query={dataState} />
 
         <div className="space-y-6">
           {/* Grid atas: Group Info (Kiri) & Musyrif / Hotel Agreement (Kanan) */}

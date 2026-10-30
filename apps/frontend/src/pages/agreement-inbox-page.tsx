@@ -1,3 +1,5 @@
+import { DataBoundary } from "../components/data-boundary";
+import { ListSkeleton } from "../components/skeleton";
 import { Button } from "../components/button";
 import { useAgreementInbox } from "./agreement-inbox/hooks/use-agreement-inbox";
 import { AgreementInboxFilters } from "./agreement-inbox/components/AgreementInboxFilters";
@@ -101,12 +103,11 @@ export function AgreementInboxScreen() {
 
       <section
         className="serene-data-region mt-2 rounded-2xl lg:border lg:border-outline-variant/35 lg:bg-surface-container-lowest lg:shadow-sm"
-        data-refreshing={draftsQuery.isFetching && !draftsQuery.isLoading ? "true" : "false"}
         aria-busy={draftsQuery.isFetching}
       >
-        {draftsQuery.isLoading ? <div className="serene-list-skeleton rounded-2xl border border-outline-variant/35 bg-surface-container-lowest p-4 shadow-sm lg:rounded-none lg:border-0 lg:shadow-none" role="status" aria-label="Loading agreement drafts"><span className="sr-only">Loading agreement drafts...</span>{Array.from({ length: 5 }, (_, index) => <div key={index} className="serene-list-skeleton-row" aria-hidden="true"><span /><span /><span /><span /></div>)}</div> : (
+        <DataBoundary query={draftsQuery} skeleton={<ListSkeleton label="Loading agreement drafts" />}>
           <AgreementDraftTable drafts={paginatedDrafts} linkedGroupCode={linkedGroupCode} assignmentGroupCodes={assignmentGroupCodes} onAssignmentGroupCodeChange={updateAssignmentGroupCode} onAssignToGroup={(draft) => void assignDraftToGroup(draft)} onUnassignFromGroup={(draft, groupCode) => void unassignDraftFromGroup(draft, groupCode)} onStartEdit={startEditDraft} onDeleteRequest={requestDeleteDraft} onStatusChange={(draft, next) => void updateDraftStatus(draft, next)} statusChangePending={isSaving} deleteDraftMutationPending={deleteDraftMutationPending} assignDraftMutationPending={assignDraftMutationPending} unassignDraftMutationPending={unassignDraftMutationPending} />
-        )}
+        </DataBoundary>
       </section>
 
       <PaginationControls

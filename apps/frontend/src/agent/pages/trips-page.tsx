@@ -20,7 +20,9 @@ import type { GroupSummary, LifecycleStatus } from "../data/contracts";
 import { formatDate } from "../data/format";
 import { getAllAgentGroups } from "../data/all-groups-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState } from "../components/data-state";
+import { DataBoundary } from "../../components/data-boundary";
+import { Skeleton, CardsSkeleton, MetricsSkeleton } from "../../components/skeleton";
 
 import { groupAgentFamilies } from "../data/group-families";
 
@@ -55,7 +57,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
 
   const query = useQuery({
     queryKey: agentQueryKeys.groups(principalId, "trip-index"),
-    queryFn: () => getAllAgentGroups(client, "asc"),
+    queryFn: ({ signal }) => getAllAgentGroups(client, "asc", signal),
     staleTime: 30_000,
   });
 
@@ -103,8 +105,6 @@ export function TripsPage({ principalId }: { principalId: string }) {
     });
   };
 
-  if (query.isPending) return <LoadingState label="Memuat perjalanan..." />;
-  if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
 
   const activeGroupCount = families.filter((family) =>
     family.members.some((group) => group.lifecycleStatus === "ACTIVE"),
@@ -118,7 +118,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
         title="Perjalanan"
         description="Temukan group yang ditugaskan dan buka itinerary perjalanannya."
         actions={
-          <TripHeaderSummary total={families.length} groups={groups.length} active={activeGroupCount} pax={totalPax} />
+          query.data === undefined && !query.isPending ? null : query.isPending && query.data === undefined ? <MetricsSkeleton count={1} className="w-64 max-w-full" variant="compact" /> : <TripHeaderSummary total={families.length} groups={groups.length} active={activeGroupCount} pax={totalPax} />
         }
       />
 
@@ -127,7 +127,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
         controlsClassName="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem_auto] lg:items-end"
         footer={
           <ResultSummary onReset={hasFilters ? resetFilters : undefined}>
-            <strong className="text-on-surface tabular-nums">{filteredGroups.length}</strong> perjalanan ditemukan
+            <strong className="text-on-surface tabular-nums">{query.data === undefined ? query.isPending ? <Skeleton className="h-4 w-6" /> : "—" : filteredGroups.length}</strong> perjalanan ditemukan
           </ResultSummary>
         }
       >
@@ -169,6 +169,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
         </Button>
       </ListToolbar>
 
+      <DataBoundary query={query} skeleton={<CardsSkeleton family />}>
       {groups.length === 0 ? (
         <EmptyState
           icon="luggage"
@@ -213,6 +214,7 @@ export function TripsPage({ principalId }: { principalId: string }) {
           />
         </>
       )}
+      </DataBoundary>
     </PageLayout>
   );
 }

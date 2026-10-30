@@ -18,10 +18,11 @@ function buildAnalyticsPath(resource: string, filters: AnalyticsFilters): string
   return `/analytics/${resource}?${buildAnalyticsQueryString(filters.months, filters.agentId)}`;
 }
 
-async function fetchAnalytics<T>(resource: string, filters: AnalyticsFilters): Promise<T> {
+async function fetchAnalytics<T>(resource: string, filters: AnalyticsFilters, signal?: AbortSignal): Promise<T> {
   const { response, payload, responseText } = await fetchBackendParsed(buildAnalyticsPath(resource, filters), {
     method: "GET",
     cache: "no-store",
+    signal,
   });
   if (!response.ok) {
     throw new Error(
@@ -34,7 +35,7 @@ async function fetchAnalytics<T>(resource: string, filters: AnalyticsFilters): P
 export function useOperationalAnalyticsQuery(filters: AnalyticsFilters) {
   return useQuery({
     queryKey: ["analytics", "operational", filters.months, filters.agentId ?? "all"],
-    queryFn: () => fetchAnalytics<OperationalAnalytics>("operational", filters),
+    queryFn: ({ signal }) => fetchAnalytics<OperationalAnalytics>("operational", filters, signal),
     staleTime: 60_000,
   });
 }
@@ -42,7 +43,7 @@ export function useOperationalAnalyticsQuery(filters: AnalyticsFilters) {
 export function useVisaAnalyticsQuery(filters: AnalyticsFilters) {
   return useQuery({
     queryKey: ["analytics", "visa", filters.months, filters.agentId ?? "all"],
-    queryFn: () => fetchAnalytics<VisaAnalytics>("visa", filters),
+    queryFn: ({ signal }) => fetchAnalytics<VisaAnalytics>("visa", filters, signal),
     staleTime: 60_000,
   });
 }
@@ -50,7 +51,7 @@ export function useVisaAnalyticsQuery(filters: AnalyticsFilters) {
 export function useAgentAnalyticsQuery(filters: AnalyticsFilters) {
   return useQuery({
     queryKey: ["analytics", "agents", filters.months, filters.agentId ?? "all"],
-    queryFn: () => fetchAnalytics<AgentAnalytics>("agents", filters),
+    queryFn: ({ signal }) => fetchAnalytics<AgentAnalytics>("agents", filters, signal),
     staleTime: 60_000,
   });
 }

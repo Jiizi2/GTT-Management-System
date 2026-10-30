@@ -135,21 +135,21 @@ describe('AppMainContent', () => {
     vi.clearAllMocks();
   });
 
-  it('renders loading fallback when loading and requires detailed records', async () => {
+  it('uses skeletons while the page module loads', async () => {
     const controller = createMockController({
       isGroupRecordsLoading: true,
       activeNav: 'visa',
     });
 
-    render(
+    const view = render(
       <MemoryRouter initialEntries={['/visa']}>
         <AppMainContent controller={controller} />
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Loading screen...')).toBeInTheDocument();
-    });
+    expect(view.container.querySelector('.serene-skeleton')).not.toBeNull();
+    expect(screen.queryByText('Loading screen...')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('visa-tracking-screen')).toBeInTheDocument();
   });
 
   it('renders overview screen on /overview route', async () => {

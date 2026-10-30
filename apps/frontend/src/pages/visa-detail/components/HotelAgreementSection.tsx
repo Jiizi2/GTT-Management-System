@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { DataBoundary, type DataQueryState } from "../../../components/data-boundary";
+import { ListSkeleton } from "../../../components/skeleton";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
 import { DatePickerInput } from "../../../components/date-time-pickers";
 import type { GroupAgreementHotel, HotelAgreementDraft, GroupData } from "../../../shared/app-domain";
@@ -106,6 +108,7 @@ interface AgreementInboxDraftAssignmentListProps {
   group: GroupData | null;
   isLoading: boolean;
   isError: boolean;
+  queryState?: DataQueryState;
   assigningDraftId: string | null;
   onAssignDraft: (draft: HotelAgreementDraft, selectedStart: string, selectedEnd: string) => void;
   coverageStartIso: string;
@@ -120,6 +123,7 @@ function AgreementInboxDraftAssignmentList({
   group,
   isLoading,
   isError,
+  queryState,
   assigningDraftId,
   onAssignDraft,
   coverageStartIso,
@@ -337,26 +341,16 @@ function AgreementInboxDraftAssignmentList({
         </div>
       </div>
 
-      {isLoading ? (
-        <p className="mt-3 rounded-xl bg-surface-container-low px-3 py-2 text-xs font-semibold text-slate-600">
-          Loading agreement inbox...
-        </p>
-      ) : null}
-
-      {isError ? (
-        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
-          Agreement inbox belum berhasil dimuat.
-        </p>
-      ) : null}
-
-      {!isLoading && eligibleDrafts.length === 0 ? (
+      <DataBoundary query={queryState ?? { data: isLoading || isError ? undefined : drafts, isPending: isLoading, isError }} skeleton={<ListSkeleton rows={2} label="Loading agreement inbox..." />} errorTitle="Agreement inbox belum berhasil dimuat.">
+      {eligibleDrafts.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500">
           Tidak ada draft {cityLabel} yang cocok dengan periode dan kapasitas yang dicari.
         </p>
       ) : null}
 
-      {!isLoading && fullCoverageDrafts.length > 0 ? renderDraftList(fullCoverageDrafts, "Full") : null}
-      {!isLoading && partialCoverageDrafts.length > 0 ? renderDraftList(partialCoverageDrafts, "Partial") : null}
+      {fullCoverageDrafts.length > 0 ? renderDraftList(fullCoverageDrafts, "Full") : null}
+      {partialCoverageDrafts.length > 0 ? renderDraftList(partialCoverageDrafts, "Partial") : null}
+      </DataBoundary>
     </section>
   );
 }
@@ -427,6 +421,7 @@ export function HotelAgreementSection() {
     cancelAddHotelInline,
     agreementDraftsQueryLoading,
     agreementDraftsQueryError,
+    agreementDraftsQueryState,
   } = useVisaDetailContext();
 
   const makkahAgreementIdSet = useMemo(() => new Set(makkahAgreements.map((agreement) => agreement.id)), [makkahAgreements]);
@@ -577,6 +572,7 @@ export function HotelAgreementSection() {
             group={group}
             isLoading={agreementDraftsQueryLoading ?? false}
             isError={agreementDraftsQueryError ?? false}
+            queryState={agreementDraftsQueryState}
             assigningDraftId={assigningAgreementDraftId}
             onAssignDraft={(draft, selectedStart, selectedEnd) =>
               void assignAgreementDraft(draft, selectedStart, selectedEnd)
@@ -745,6 +741,7 @@ export function HotelAgreementSection() {
             group={group}
             isLoading={agreementDraftsQueryLoading ?? false}
             isError={agreementDraftsQueryError ?? false}
+            queryState={agreementDraftsQueryState}
             assigningDraftId={assigningAgreementDraftId}
             onAssignDraft={(draft, selectedStart, selectedEnd) =>
               void assignAgreementDraft(draft, selectedStart, selectedEnd)

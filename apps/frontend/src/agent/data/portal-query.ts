@@ -2,9 +2,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import { agentGet, AgentApiError } from "../auth/agent-api";
 import { clearAgentPortalCache } from "../query/agent-query-boundary";
 
-export async function portalGet<T>(client: QueryClient, path: string): Promise<T> {
+export async function portalGet<T>(client: QueryClient, path: string, signal?: AbortSignal): Promise<T> {
   try {
-    return await agentGet<T>(path);
+    return await agentGet<T>(path, signal);
   } catch (error) {
     if (error instanceof AgentApiError && error.status === 401) {
       await clearAgentPortalCache(client);

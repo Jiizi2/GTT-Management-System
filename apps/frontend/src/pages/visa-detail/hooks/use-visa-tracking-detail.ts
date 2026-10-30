@@ -829,6 +829,7 @@ export function useVisaTrackingDetail({
     isWhatsappCopied,
     agreementDraftsQueryLoading: agreementDraftsQuery.isLoading,
     agreementDraftsQueryError: agreementDraftsQuery.isError,
+    agreementDraftsQueryState: agreementDraftsQuery,
     
     // Computed values
     totalPax,

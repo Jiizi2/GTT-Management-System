@@ -1,4 +1,5 @@
 import { VisaDetailContext } from "./visa-detail/context/VisaDetailContext";
+import { DataStatus, type DataQueryState } from "../components/data-boundary";
 import { useVisaTrackingDetail } from "./visa-detail/hooks/use-visa-tracking-detail";
 import { VisaDetailHeader } from "./visa-detail/components/VisaDetailHeader";
 import { VisaStatusSection } from "./visa-detail/components/VisaStatusSection";
@@ -33,8 +34,10 @@ export function VisaTrackingDetailScreen({
   onSyncVisaItinerary,
   onUpdateRaudhahAppointment,
   onClearRaudhahAppointment,
+  dataState,
 }: {
   row: VisaTrackingRow;
+  dataState?: DataQueryState;
   groups: GroupData[];
   onBack: () => void;
   onDeleteGroup: (groupCode: string) => void;
@@ -79,6 +82,7 @@ export function VisaTrackingDetailScreen({
     <VisaDetailContext.Provider value={detailState}>
       <div className="serene-data-reveal mx-auto max-w-7xl space-y-6 overflow-x-hidden px-3 pb-20 pt-4 sm:px-6 lg:px-8">
         <VisaDetailHeader />
+        <DataStatus query={dataState} />
         <VisaStatusSection />
         <FlightDetailsSection />
         <HotelAgreementSection />

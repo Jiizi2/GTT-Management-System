@@ -108,6 +108,8 @@ export function useAppController(sessionAccessTier: SessionAccessTier): AppContr
   return {
     groupRecords: groupRecordsState.groupRecords,
     isGroupRecordsLoading: groupRecordsState.isGroupRecordsLoading,
+    groupDataState: groupRecordsState.groupDataState,
+    groupSearchState: groupRecordsState.groupSearchState,
     sessionAccessTier,
     activeNav: routeState.activeNav,
     isItineraryBuilder: routeState.isItineraryBuilder,

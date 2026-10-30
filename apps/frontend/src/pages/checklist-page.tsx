@@ -7,8 +7,10 @@ import { ChecklistNeedAttentionCard } from "./checklist/components/ChecklistNeed
 import { ChecklistCompletedCard } from "./checklist/components/ChecklistCompletedCard";
 import { ChecklistCancelModal } from "./checklist/components/ChecklistCancelModal";
 import { AgentFilterSelect } from "../components/agent-filter-select";
+import { DataBoundary, DataStatus, type DataQueryState } from "../components/data-boundary";
+import { ChecklistSkeleton } from "../components/skeleton";
 
-export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
+export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; dataState?: DataQueryState }) {
   const state = useChecklistWorkspace({ groups });
 
   const {
@@ -52,6 +54,14 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
     handleConfirmCancelAssignment,
   } = state;
 
+  if (dataState && dataState.data === undefined) return (
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+      <header className="serene-card p-5"><h1 className="text-2xl font-bold text-on-surface">H-1 Checklist</h1><p className="mt-2 text-sm text-on-surface-variant">Monitor every trip and driver readiness for today, tomorrow, and the day after tomorrow.</p></header>
+      <div className="serene-page-toolbar"><input className="serene-input w-full sm:max-w-xl" aria-label="Search checklist items" placeholder="Search group number" value={groupCodeQuery} onChange={(event) => setGroupCodeQuery(event.target.value)} /><AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" /></div>
+      <DataBoundary query={dataState} skeleton={<ChecklistSkeleton />}>{null}</DataBoundary>
+    </div>
+  );
+
   if (checklistItems.length === 0) {
     return (
       <div className="serene-data-reveal mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
@@ -65,6 +75,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
           </p>
         </header>
 
+        <DataStatus query={dataState} />
         <article className="serene-card rounded-3xl border border-dashed border-outline-variant/45 p-10 text-center">
           <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">
             event_busy
@@ -136,6 +147,7 @@ export function ChecklistScreen({ groups }: { groups: GroupData[] }) {
         <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" className="w-full sm:w-56" />
       </header>
 
+      <DataStatus query={dataState} />
       {hasGroupCodeQuery && searchedChecklistItems.length === 0 ? (
         <article className="serene-card rounded-3xl border border-dashed border-outline-variant/45 p-10 text-center">
           <span className="material-symbols-outlined text-4xl text-on-surface-variant/60" aria-hidden="true">

@@ -5,15 +5,16 @@ import { portalGet } from "./portal-query";
 export async function getAllAgentGroups(
   client: QueryClient,
   direction: "asc" | "desc" = "asc",
+  signal?: AbortSignal,
 ): Promise<GroupSummary[]> {
   const pageSize = 50;
   const path = (page: number) =>
     `/groups?page=${page}&pageSize=${pageSize}&sortBy=arrivalDate&sortDirection=${direction}`;
-  const first = await portalGet<Page<GroupSummary>>(client, path(1));
+  const first = await portalGet<Page<GroupSummary>>(client, path(1), signal);
   const pageCount = Math.ceil(first.total / pageSize);
   if (pageCount <= 1) return first.items;
   const rest = await Promise.all(
-    Array.from({ length: pageCount - 1 }, (_, index) => portalGet<Page<GroupSummary>>(client, path(index + 2))),
+    Array.from({ length: pageCount - 1 }, (_, index) => portalGet<Page<GroupSummary>>(client, path(index + 2), signal)),
   );
   return [first, ...rest].flatMap((page) => page.items);
 }

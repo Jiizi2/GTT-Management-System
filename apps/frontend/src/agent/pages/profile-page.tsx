@@ -6,13 +6,14 @@ import { ReadOnlyIndicator } from "../../components/read-only-indicator";
 import type { Profile } from "../data/contracts";
 import { portalGet } from "../data/portal-query";
 import { agentQueryKeys } from "../query/agent-query-boundary";
-import { ErrorState, LoadingState } from "../components/data-state";
+import { DataBoundary } from "../../components/data-boundary";
+import { DetailSkeleton } from "../../components/skeleton";
 
 export function ProfilePage({ principalId }: { principalId: string }) {
   const client = useQueryClient();
   const query = useQuery({
     queryKey: agentQueryKeys.profile(principalId),
-    queryFn: () => portalGet<Profile>(client, "/profile"),
+    queryFn: ({ signal }) => portalGet<Profile>(client, "/profile", signal),
     staleTime: 60_000,
   });
   return (
@@ -23,8 +24,7 @@ export function ProfilePage({ principalId }: { principalId: string }) {
         description="Informasi akun dan identitas Partner yang terhubung dengan portal Agent."
         actions={<ReadOnlyIndicator label="Hanya lihat" />}
       />
-      {query.isPending ? <LoadingState label="Memuat profil…" /> : null}
-      {query.isError ? <ErrorState retry={() => void query.refetch()} /> : null}
+      <DataBoundary query={query} skeleton={<DetailSkeleton kind="profile" label="Memuat profil…" />}>
       {query.data ? (
         <section className="serene-section">
           <DetailList>
@@ -37,6 +37,7 @@ export function ProfilePage({ principalId }: { principalId: string }) {
           </p>
         </section>
       ) : null}
+      </DataBoundary>
     </PageLayout>
   );
 }

@@ -33,7 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const agentWrite = <T>(path: string, method: "POST" | "PATCH", payload: unknown): Promise<T> => request<T>(path, {
   method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
 });
-export const agentGet = <T>(path: string): Promise<T> => request<T>(path);
+export const agentGet = <T>(path: string, signal?: AbortSignal): Promise<T> => request<T>(path, { signal });
 export const getAgentSession = (): Promise<AgentSession> => request("/auth/session");
 export const loginAgent = (identifier: string, password: string): Promise<AgentSession> =>
   request("/auth/login", {

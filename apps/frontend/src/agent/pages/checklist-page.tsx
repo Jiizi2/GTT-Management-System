@@ -11,7 +11,9 @@ import {
 import { jakartaToday } from "../data/departure-calendar";
 import { getAllAgentGroups } from "../data/all-groups-query";
 import { formatDate } from "../data/format";
-import { EmptyState, ErrorState, LoadingState } from "../components/data-state";
+import { EmptyState } from "../components/data-state";
+import { DataBoundary } from "../../components/data-boundary";
+import { Skeleton, ChecklistSkeleton } from "../../components/skeleton";
 import { PageLayout } from "../../components/page-layout";
 import { PageHeader } from "../../components/page-header";
 import { Button } from "../../components/button";
@@ -26,9 +28,9 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
   const [search, setSearch] = useState("");
   const query = useQuery({
     queryKey: agentQueryKeys.checklist(principalId),
-    queryFn: async () => {
-      const groups = await getAllAgentGroups(client, "asc");
-      return getAgentChecklist(client, groups);
+    queryFn: async ({ signal }) => {
+      const groups = await getAllAgentGroups(client, "asc", signal);
+      return getAgentChecklist(client, groups, signal);
     },
     staleTime: 30_000,
   });
@@ -44,8 +46,6 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
   );
   const incomplete = rows.filter((row) => !checklistReady(row));
   const complete = rows.filter(checklistReady);
-  if (query.isPending) return <LoadingState label="Memuat checklist H-1..." />;
-  if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
   return (
     <PageLayout width="standard">
       <PageHeader
@@ -57,7 +57,7 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
         ariaLabel="Filter checklist"
         footer={
           <ResultSummary onReset={search.trim() && rows.length > 0 ? () => setSearch("") : undefined}>
-            {rows.length} aktivitas ditemukan
+            {query.data === undefined ? query.isPending ? <Skeleton className="h-4 w-6" /> : "—" : rows.length} aktivitas ditemukan
           </ResultSummary>
         }
       >
@@ -68,6 +68,7 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
           onChange={setSearch}
         />
       </ListToolbar>
+      <DataBoundary query={query} skeleton={<ChecklistSkeleton />}>
       {rows.length === 0 ? (
         <EmptyState
           icon={search.trim() ? "search_off" : "event_busy"}
@@ -116,6 +117,7 @@ export function ChecklistPage({ principalId }: { principalId: string }) {
           </section>
         </>
       )}
+      </DataBoundary>
     </PageLayout>
   );
 }

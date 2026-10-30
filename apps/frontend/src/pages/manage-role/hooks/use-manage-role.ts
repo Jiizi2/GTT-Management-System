@@ -663,7 +663,10 @@ export function useManageRole() {
     userRoleOptions,
     roleCatalogItems,
     roleCatalogById,
-    managedUsersLoading: managedUsersQuery.isLoading,
+    managedUsersLoading: managedUsersQuery.isPending && managedUsersQuery.data === undefined,
+    managedUsersQuery,
+    userRoleOptionsQuery,
+    roleCatalogQuery,
     
     notice,
     setNotice,

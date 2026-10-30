@@ -244,6 +244,9 @@ Setelah domain siap, set:
 
 ## Step 7: Update Aplikasi
 
+Untuk rilis skeleton loading GTT Ops dan Portal Agent, ikuti
+[panduan update VPS skeleton loading](operations/update-vps-skeleton-loading-20261030.md).
+
 Untuk update sinkronisasi penerbangan, itinerary, dan assignment hotel agreement,
 ikuti [panduan update VPS 11 Oktober 2026](operations/update-vps-visa-flight-agreement-20261011.md).
 

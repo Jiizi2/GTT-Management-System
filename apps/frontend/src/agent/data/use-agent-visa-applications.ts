@@ -7,7 +7,7 @@ export function useAgentVisaApplications(principalId: string) {
   const client = useQueryClient();
   return useQuery<VisaApplication[]>({
     queryKey: agentQueryKeys.visaApplications(principalId),
-    queryFn: () => portalGet<VisaApplication[]>(client, "/visa-applications"),
+    queryFn: ({ signal }) => portalGet<VisaApplication[]>(client, "/visa-applications", signal),
     staleTime: 30_000,
   });
 }

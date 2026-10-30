@@ -45,7 +45,7 @@ describe("Agent Agreement Inbox", () => {
   it("reads Admin agreements without creation or revision controls", async () => {
     renderPage();
     await screen.findByRole("heading", { name: "Hotel Agent" });
-    expect(get).toHaveBeenCalledWith(expect.anything(), "/agreement-drafts");
+    expect(get).toHaveBeenCalledWith(expect.anything(), "/agreement-drafts", expect.any(AbortSignal));
     expect(screen.queryByRole("button", { name: "Kirim draft" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /revisi/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Nama hotel")).not.toBeInTheDocument();

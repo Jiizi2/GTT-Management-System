@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { DataQueryState } from "../../../components/data-boundary";
 import type {
   GroupData,
   VisaTrackingRow,
@@ -67,6 +68,7 @@ export interface VisaDetailContextType {
   isWhatsappCopied: boolean;
   agreementDraftsQueryLoading?: boolean;
   agreementDraftsQueryError?: boolean;
+  agreementDraftsQueryState?: DataQueryState;
   
   // Computed values
   totalPax: number;

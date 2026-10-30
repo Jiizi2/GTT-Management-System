@@ -9,6 +9,8 @@ import { SereneSelect } from "../components/serene-select";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { MetricCard } from "../components/metric-card";
 import { AgentFilterSelect } from "../components/agent-filter-select";
+import { DataBoundary, type DataQueryState } from "../components/data-boundary";
+import { CardsSkeleton, MetricSkeleton, Skeleton, SkeletonRegion } from "../components/skeleton";
 
 const { OVERVIEW_PAGE_SIZE } = Domain;
 
@@ -26,6 +28,8 @@ export function OverviewScreen({
   groups = [],
   fixedAgentName,
   showThemeToggle = true,
+  dataState,
+  searchState,
 }: {
   query: string;
   filteredGroups: GroupData[];
@@ -49,6 +53,8 @@ export function OverviewScreen({
   groups?: GroupData[];
   fixedAgentName?: string;
   showThemeToggle?: boolean;
+  dataState?: DataQueryState;
+  searchState?: DataQueryState;
 }) {
   const hasQuery = query.trim().length > 0;
   const [currentPage, setCurrentPage] = useState(1);
@@ -173,12 +179,12 @@ export function OverviewScreen({
           </div>
         </article>
 
-        {statCards.map((card) => (
+        {dataState?.isPending && dataState.data === undefined ? <SkeletonRegion label="Memuat ringkasan…" className="contents"><div className="contents">{[0, 1, 2].map((i) => <MetricSkeleton key={i} />)}</div></SkeletonRegion> : statCards.map((card) => (
           <MetricCard
             key={card.label}
             icon={card.icon}
             label={card.label}
-            value={card.value}
+            value={dataState?.isError && dataState.data === undefined ? "—" : card.value}
             supportingText={card.subtitle}
             tone="primary"
           />
@@ -187,7 +193,7 @@ export function OverviewScreen({
 
       <section className="serene-summary-strip" aria-label="Search results summary">
         <div className="flex items-end gap-2 text-sm text-on-surface-variant">
-          <strong className="text-2xl font-bold leading-none text-on-surface">{agentFilteredGroups.length}</strong>
+          <strong className="text-2xl font-bold leading-none text-on-surface">{dataState?.data === undefined && dataState?.isPending || searchState?.data === undefined && searchState?.isPending ? <Skeleton className="h-6 w-8" /> : agentFilteredGroups.length}</strong>
           <span className="sm:hidden">{agentFilteredGroups.length === 1 ? "group" : "groups"}</span>
           <span className="hidden sm:inline">
             {agentFilteredGroups.length === 1 ? "group displayed" : "groups displayed"}
@@ -270,6 +276,8 @@ export function OverviewScreen({
         </div>
       </section>
 
+      <DataBoundary query={dataState} skeleton={<CardsSkeleton label="Memuat group…" />}>
+      <DataBoundary query={searchState} skeleton={<CardsSkeleton label="Mencari group…" />}>
       <section
         className="serene-data-reveal grid grid-cols-1 gap-6 sm:gap-7 md:grid-cols-2 lg:grid-cols-3"
         style={{ columnGap: "1.5rem", rowGap: "1.5rem" }}
@@ -301,6 +309,8 @@ export function OverviewScreen({
         itemLabel="groups"
         onPageChange={(nextPage) => setCurrentPage(Math.max(1, Math.min(totalPages, nextPage)))}
       />
+      </DataBoundary>
+      </DataBoundary>
     </div>
   );
 }

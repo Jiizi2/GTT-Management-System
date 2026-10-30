@@ -9,7 +9,7 @@ import { GroupDetailPage } from "./pages/group-detail-page";
 import { ProfilePage } from "./pages/profile-page";
 import { AgentVisaDetailPage } from "./pages/visa-detail-page";
 import { AgentVisaTrackingPage } from "./pages/visa-tracking-page";
-import { LoadingState } from "./components/data-state";
+import { PageSkeleton } from "../components/skeleton";
 const AgreementInboxPage = lazy(() =>
   import("./pages/agreement-inbox-page").then(({ AgreementInboxPage: Page }) => ({ default: Page })),
 );
@@ -170,7 +170,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
         aria-label="Konten utama"
         className="agent-main focus:outline-none"
       >
-        <Suspense fallback={<LoadingState label="Memuat halaman..." />}>
+        <Suspense key={location.pathname} fallback={<PageSkeleton pathname={location.pathname} />}>
           <div
             key={location.pathname}
             className="serene-route-surface"

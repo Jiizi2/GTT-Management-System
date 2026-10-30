@@ -3,6 +3,8 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { buildVisaTrackingRowsFromGroups } from "../shared/app-domain";
 import { buildDashboardPath } from "../shared/app-route";
 import type { AppController } from "../hooks/use-app-controller";
+import { DetailDataState } from "./detail-data-state";
+import { PageSkeleton } from "./skeleton";
 
 const LazyAddGroupWorkspaceScreen = lazy(async () => ({
   default: (await import("../pages/new-group-screen")).AddGroupWorkspaceScreen,
@@ -47,31 +49,13 @@ const LazyVisaTrackingScreen = lazy(async () => ({
   default: (await import("../pages/visa-tracking-page")).VisaTrackingScreen,
 }));
 
-function ScreenLoadingFallback() {
-  return (
-    <section
-      className="mx-auto flex max-w-7xl items-center gap-3 rounded-2xl bg-surface-container-lowest px-5 py-4 text-on-surface-variant shadow-ambient"
-      role="status"
-      aria-live="polite"
-    >
-      <span className="material-symbols-outlined animate-pulse text-brand-primary" aria-hidden="true">
-        hourglass_top
-      </span>
-      <p className="text-sm font-semibold">Loading screen...</p>
-    </section>
-  );
-}
-
 export function AppMainContent({ controller }: { controller: AppController }) {
   const location = useLocation();
   const routeDepth = location.pathname.split("/").filter(Boolean).length > 1 ? "detail" : "root";
-  const requiresDetailedGroupRecords =
-    controller.selectedGroupCode !== null ||
-    controller.selectedVisaGroupCode !== null ||
-    controller.activeNav === "checklist" ||
-    controller.activeNav === "visa" ||
-    controller.activeNav === "invoice" ||
-    controller.activeNav === "raudhah-reminder";
+  const groupDataState = controller.groupDataState ?? {
+    data: controller.isGroupRecordsLoading ? undefined : controller.groupRecords,
+    isPending: controller.isGroupRecordsLoading,
+  };
   const freshSelectedVisaRow = useMemo(
     () =>
       controller.selectedVisaRow
@@ -82,14 +66,10 @@ export function AppMainContent({ controller }: { controller: AppController }) {
     [controller.groupRecords, controller.selectedVisaRow],
   );
 
-  if (controller.isGroupRecordsLoading && requiresDetailedGroupRecords) {
-    return <ScreenLoadingFallback />;
-  }
-
   return (
     // Reset the revealed route boundary on navigation so lazy-loaded screens
     // do not keep the previous page visible while the next chunk is loading.
-    <Suspense key={`${location.pathname}${location.search}`} fallback={<ScreenLoadingFallback />}>
+    <Suspense key={`${location.pathname}${location.search}`} fallback={<PageSkeleton pathname={location.pathname} />}>
       <div className="serene-route-surface" data-route-depth={routeDepth}>
         <Routes>
           <Route path="/" element={<Navigate to={buildDashboardPath("overview")} replace />} />
@@ -108,6 +88,8 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                 onOverviewMonthFilterChange={controller.handleOverviewMonthFilterChange}
                 onOpenDetail={controller.handleOpenDetail}
                 groups={controller.groupRecords}
+                dataState={groupDataState}
+                searchState={controller.groupSearchState}
               />
             }
           />
@@ -116,6 +98,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
             element={
               controller.selectedGroup ? (
                 <LazyGroupDetail
+                  dataState={groupDataState}
                   group={controller.selectedGroup}
                   groups={controller.groupRecords}
                   onBack={controller.handleBackToOverview}
@@ -124,12 +107,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                   onPatchGroup={controller.handlePatchGroupDetail}
                 />
               ) : (
-                <LazyPlaceholderScreen
-                  eyebrow="Group Detail"
-                  title="Group belum ditemukan"
-                  description="Endpoint group detail sedang dibuka, tapi data group-nya belum tersedia di browser saat ini."
-                  icon="travel_explore"
-                />
+                groupDataState.data === undefined ? <DetailDataState query={groupDataState} title="Detail Group" onBack={controller.handleBackToOverview} /> : <LazyPlaceholderScreen eyebrow="Group Detail" title="Group belum ditemukan" description="Data group belum tersedia atau sudah dihapus." icon="travel_explore" />
               )
             }
           />
@@ -164,13 +142,14 @@ export function AppMainContent({ controller }: { controller: AppController }) {
           />
           <Route path="/statistics" element={<LazyStatisticsScreen />} />
           <Route path="/input" element={<Navigate to={buildDashboardPath("new-group")} replace />} />
-          <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} />} />
+          <Route path="/checklist" element={<LazyChecklistScreen groups={controller.groupRecords} dataState={groupDataState} />} />
           <Route path="/agreement-inbox" element={<LazyAgreementInboxScreen />} />
           <Route path="/agents" element={<Navigate to="/master-data" replace />} />
           <Route
             path="/visa"
             element={
               <LazyVisaTrackingScreen
+                dataState={groupDataState}
                 groups={controller.groupRecords}
                 onOpenDetail={controller.handleOpenVisaDetail}
                 onUpdateAgreementStatus={controller.handleUpdateAgreementStatus}
@@ -182,6 +161,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
             element={
               freshSelectedVisaRow ? (
                 <LazyVisaTrackingDetailScreen
+                  dataState={groupDataState}
                   row={freshSelectedVisaRow}
                   groups={controller.groupRecords}
                   onBack={controller.handleBackToVisaTracking}
@@ -200,12 +180,7 @@ export function AppMainContent({ controller }: { controller: AppController }) {
                   onClearRaudhahAppointment={controller.handleClearRaudhahAppointment}
                 />
               ) : (
-                <LazyPlaceholderScreen
-                  eyebrow="Visa Detail"
-                  title="Visa detail belum ditemukan"
-                  description="Endpoint visa detail sedang dibuka, tapi data visa group-nya belum tersedia di browser saat ini."
-                  icon="fact_check"
-                />
+                groupDataState.data === undefined ? <DetailDataState query={groupDataState} kind="visa" title="Detail Visa" onBack={controller.handleBackToVisaTracking} /> : <LazyPlaceholderScreen eyebrow="Visa Detail" title="Visa detail belum ditemukan" description="Data visa group belum tersedia atau sudah dihapus." icon="fact_check" />
               )
             }
           />

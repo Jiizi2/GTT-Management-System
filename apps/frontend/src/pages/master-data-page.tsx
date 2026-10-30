@@ -1,3 +1,5 @@
+import { DataBoundary, DataStatus } from "../components/data-boundary";
+import { ListSkeleton, Skeleton, SkeletonRegion } from "../components/skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { SereneSelect } from "../components/serene-select";
@@ -511,6 +513,8 @@ export function MasterDataScreen() {
         </div>
       ) : null}
 
+      <DataStatus query={categoriesQuery} />
+      {categoriesQuery.isError && categoriesQuery.data === undefined && activeCategoryKey !== null ? <DataBoundary query={categoriesQuery} skeleton={null}>{null}</DataBoundary> : null}
       <section className="overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient">
         <div className="grid gap-3 border-b border-outline-variant/30 px-4 py-4 sm:grid-cols-[auto_minmax(0,18rem)_1fr] sm:items-center sm:px-6">
           <label className="text-sm font-bold text-on-surface" htmlFor="master-data-category-workspace">
@@ -530,10 +534,11 @@ export function MasterDataScreen() {
             ))}
           </SereneSelect>
           <p className="text-xs leading-relaxed text-on-surface-variant sm:text-right">
-            {selectedCategory?.description ?? (categoriesQuery.isLoading ? "Memuat kategori..." : "Pilih kategori data.")}
+            {categoriesQuery.isPending && categoriesQuery.data === undefined ? <SkeletonRegion as="span" label="Memuat kategori..."><Skeleton className="h-4 w-48" /></SkeletonRegion> : selectedCategory?.description ?? "Pilih kategori data."}
           </p>
         </div>
 
+        <DataBoundary query={activeCategoryKey === null ? categoriesQuery : undefined} skeleton={<ListSkeleton label="Memuat kategori master data..." />}>
         {activeCategoryKey === "muassasah" || activeCategoryKey === "drivers" || activeCategoryKey === "vehicles" ? (
           <DirectoryManager
             section={activeCategoryKey}
@@ -713,11 +718,8 @@ export function MasterDataScreen() {
             </div>
 
             <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-outline-variant/35 bg-surface-container-lowest sm:mx-5">
-              {optionsQuery.isLoading ? (
-                <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
-                  Memuat option...
-                </div>
-              ) : filteredOptions.length === 0 ? (
+              <DataBoundary query={optionsQuery} skeleton={<ListSkeleton columns={5} label="Memuat option..." />}>
+              {filteredOptions.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm font-medium text-on-surface-variant">
                   {options.length === 0
                     ? "Belum ada data untuk kategori ini."
@@ -742,9 +744,11 @@ export function MasterDataScreen() {
                   }}
                 />
               )}
+              </DataBoundary>
             </div>
           </article>
         )}
+        </DataBoundary>
       </section>
 
       <MasterDataDeleteConfirmModal
