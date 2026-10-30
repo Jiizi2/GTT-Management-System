@@ -16,6 +16,26 @@ vi.mock('../use-modal-focus-trap', () => ({
 }));
 
 describe('FlightDetailsModal', () => {
+  it('uses the latest airport and keeps typed data when adding or removing transit legs', async () => {
+    const onSave = vi.fn();
+    render(<FlightDetailsModal
+      initialValue={{ flightLegs: [{ ...createEmptyFlightLeg('ONWARD'), departureAirportCode: 'CGK', arrivalAirportCode: 'JED' }] }}
+      onClose={vi.fn()}
+      onSave={onSave}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: 'To Onward segmen 1' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'MED · Madinah' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah transit' }));
+    expect(screen.getByRole('button', { name: 'From Onward segmen 2' })).toHaveTextContent('MED · Madinah');
+    fireEvent.change(screen.getAllByPlaceholderText('Opsional')[1], { target: { value: 'Catatan transit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Hapus segmen 1 Onward' }));
+    expect(screen.getByRole('button', { name: 'From Onward segmen 1' })).toHaveTextContent('MED · Madinah');
+    fireEvent.click(screen.getByText('Save Changes'));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({
+      flightLegs: [expect.objectContaining({ departureAirportCode: 'MED', remarks: 'Catatan transit' })],
+    }));
+  });
+
   it('saves Saudi dropdown changes as IATA codes and keeps manual international airports', async () => {
     const onSave = vi.fn();
     render(<FlightDetailsModal

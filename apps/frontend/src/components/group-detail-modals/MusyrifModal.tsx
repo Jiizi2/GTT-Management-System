@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../form-accessibility";
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { musyrifModalSchema } from "./schemas";
 import { ModalPortal, ModalShell, ModalHeader, ModalFooter, ModalFooterButton } from "./shared";
 import type { MusyrifFormState } from "../../shared/app-domain";
@@ -44,7 +43,6 @@ type MusyrifModalProps = {
  * @returns {JSX.Element} Modal dengan form musyrif
  */
 export function MusyrifModal({ initialValues, onClose, onSave }: MusyrifModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const {
     register,
     handleSubmit,
@@ -65,7 +63,7 @@ export function MusyrifModal({ initialValues, onClose, onSave }: MusyrifModalPro
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="edit-musyrif-title" size="2xl">
-        <div ref={dialogRef}>
+        <div>
           <ModalHeader titleId="edit-musyrif-title" title="Edit Musyrif" onClose={onClose} centered />
 
           <form className={modalBodyClassName} onSubmit={handleSubmit((values) => void onSave(values))}>

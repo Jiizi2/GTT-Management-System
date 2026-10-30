@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import {
   Children,
   isValidElement,
+  memo,
   useCallback,
   useEffect,
   useId,
@@ -19,6 +20,10 @@ type SelectOption = {
   searchText: string;
   disabled: boolean;
 };
+
+const VIRTUAL_OPTION_HEIGHT = 40;
+const VIRTUAL_OPTION_THRESHOLD = 100;
+const VIRTUAL_OPTION_OVERSCAN = 4;
 
 type SereneSelectProps = {
   className?: string;
@@ -55,6 +60,9 @@ function getNextEnabledIndex(options: SelectOption[], startIndex: number, direct
 }
 
 function getOptionText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
   return Children.toArray(node)
     .map((child): string => {
       if (typeof child === "string" || typeof child === "number") {
@@ -65,7 +73,7 @@ function getOptionText(node: ReactNode): string {
     .join("");
 }
 
-function parseSelectOptions(children: ReactNode): SelectOption[] {
+function parseSelectOptions(children: ReactNode, searchable: boolean): SelectOption[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement(child) || child.type !== "option") {
       return [];
@@ -85,12 +93,84 @@ function parseSelectOptions(children: ReactNode): SelectOption[] {
       {
         value: String(rawValue),
         label: childProps.children ?? String(rawValue),
-        searchText: getOptionText(childProps.children ?? String(rawValue)).toLocaleLowerCase(),
+        searchText: searchable ? getOptionText(childProps.children ?? String(rawValue)).toLocaleLowerCase() : "",
         disabled: Boolean(childProps.disabled),
       },
     ];
   });
 }
+
+const SelectMenuOption = memo(function SelectMenuOption({
+  option,
+  index,
+  listboxId,
+  isSelected,
+  isHighlighted,
+  searchable,
+  virtualized,
+  optionCount,
+  onHighlight,
+  onSelect,
+}: {
+  option: SelectOption;
+  index: number;
+  listboxId: string;
+  isSelected: boolean;
+  isHighlighted: boolean;
+  searchable: boolean;
+  virtualized: boolean;
+  optionCount: number;
+  onHighlight: (index: number) => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      id={`${listboxId}-option-${index}`}
+      tabIndex={searchable ? -1 : undefined}
+      aria-selected={isSelected}
+      aria-posinset={virtualized ? index + 1 : undefined}
+      aria-setsize={virtualized ? optionCount : undefined}
+      disabled={option.disabled}
+      style={
+        virtualized
+          ? {
+              position: "absolute",
+              top: index * VIRTUAL_OPTION_HEIGHT,
+              left: 0,
+              width: "100%",
+              height: VIRTUAL_OPTION_HEIGHT,
+              paddingBlock: 0,
+            }
+          : undefined
+      }
+      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 sm:py-2 text-left text-sm transition ${
+        option.disabled
+          ? "cursor-not-allowed text-slate-400"
+          : isSelected
+            ? "bg-primary-fixed text-on-primary-fixed-variant"
+            : isHighlighted
+              ? "bg-surface-container-high text-on-surface"
+              : "text-on-surface hover:bg-surface-container-low hover:text-on-surface"
+      }`}
+      onMouseEnter={() => {
+        if (!option.disabled) onHighlight(index);
+      }}
+      onMouseDown={searchable ? (event) => event.preventDefault() : undefined}
+      onClick={() => {
+        if (!option.disabled) onSelect(option.value);
+      }}
+    >
+      <span className="truncate">{option.label}</span>
+      {isSelected ? (
+        <span className="material-symbols-outlined text-base" aria-hidden="true">
+          check
+        </span>
+      ) : null}
+    </button>
+  );
+});
 
 function computeDropdownStyle(
   triggerElement: HTMLElement,
@@ -154,10 +234,11 @@ export function SereneSelect({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const listboxRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const listboxId = useId();
 
-  const options = useMemo(() => parseSelectOptions(children), [children]);
+  const options = useMemo(() => parseSelectOptions(children, searchable), [children, searchable]);
   const selectedValue = value ?? "";
   const selectedIndex = options.findIndex((option) => option.value === selectedValue);
   const firstEnabledIndex = options.findIndex((option) => !option.disabled);
@@ -166,6 +247,7 @@ export function SereneSelect({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [scrollOffset, setScrollOffset] = useState(0);
   const filteredOptions = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
     return searchable && query ? options.filter((option) => option.searchText.includes(query)) : options;
@@ -175,6 +257,22 @@ export function SereneSelect({
       ? highlightedIndex
       : filteredOptions.findIndex((option) => !option.disabled);
   const isMenuVisible = isOpen && menuStyle !== null;
+  const virtualized = filteredOptions.length > VIRTUAL_OPTION_THRESHOLD;
+  const visibleCount = Math.ceil(menuMaxHeight / VIRTUAL_OPTION_HEIGHT) + VIRTUAL_OPTION_OVERSCAN * 2;
+  const windowStart = Math.min(
+    Math.max(0, filteredOptions.length - visibleCount),
+    Math.max(0, Math.floor(scrollOffset / VIRTUAL_OPTION_HEIGHT) - VIRTUAL_OPTION_OVERSCAN),
+  );
+  const visibleIndexes = virtualized
+    ? Array.from(
+        { length: Math.min(visibleCount, filteredOptions.length - windowStart) },
+        (_, offset) => windowStart + offset,
+      )
+    : filteredOptions.map((_, index) => index);
+  // Keep the active descendant mounted for keyboard navigation and screen readers.
+  if (virtualized && activeIndex >= 0 && !visibleIndexes.includes(activeIndex)) {
+    visibleIndexes.push(activeIndex);
+  }
 
   const selectedLabel = options[selectedIndex]?.label ?? options[firstEnabledIndex]?.label ?? selectedValue;
 
@@ -182,6 +280,7 @@ export function SereneSelect({
     setIsOpen(false);
     setHighlightedIndex(-1);
     setSearchQuery("");
+    setScrollOffset(0);
   }, []);
 
   const updateMenuPosition = useCallback(() => {
@@ -189,7 +288,17 @@ export function SereneSelect({
       return;
     }
 
-    setMenuStyle(computeDropdownStyle(triggerRef.current, options.length, menuMaxHeight, searchable ? 54 : 0));
+    const nextStyle = computeDropdownStyle(triggerRef.current, options.length, menuMaxHeight, searchable ? 54 : 0);
+    setMenuStyle((current) =>
+      current &&
+      current.top === nextStyle.top &&
+      current.bottom === nextStyle.bottom &&
+      current.left === nextStyle.left &&
+      current.width === nextStyle.width &&
+      current.maxHeight === nextStyle.maxHeight
+        ? current
+        : nextStyle,
+    );
   }, [menuMaxHeight, options.length, searchable]);
 
   const openMenu = useCallback(() => {
@@ -266,14 +375,22 @@ export function SereneSelect({
     }
 
     updateMenuPosition();
-    const handleViewportChange = () => updateMenuPosition();
+    let frameId: number | null = null;
+    const handleViewportChange = (event: Event) => {
+      // Scrolling the option list does not move its trigger.
+      if (event.type === "scroll" && event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        updateMenuPosition();
+      });
+    };
     window.addEventListener("resize", handleViewportChange);
     window.addEventListener("scroll", handleViewportChange, true);
-    document.addEventListener("scroll", handleViewportChange, true);
     return () => {
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
-      document.removeEventListener("scroll", handleViewportChange, true);
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
     };
   }, [isOpen, updateMenuPosition]);
 
@@ -409,64 +526,44 @@ export function SereneSelect({
                     onChange={(event) => {
                       setSearchQuery(event.target.value);
                       setHighlightedIndex(-1);
+                      setScrollOffset(0);
+                      if (listboxRef.current) listboxRef.current.scrollTop = 0;
                     }}
                   />
                 </div>
               ) : null}
               <div
+                ref={listboxRef}
                 id={listboxId}
                 role="listbox"
                 className="min-h-0 overflow-auto"
                 aria-label={ariaLabel}
                 aria-labelledby={ariaLabelledBy}
+                onScroll={virtualized ? (event) => setScrollOffset(event.currentTarget.scrollTop) : undefined}
               >
-                {filteredOptions.map((option, index) => {
-                  const isSelected = option.value === selectedValue;
-                  const isHighlighted = index === activeIndex;
-
-                  return (
-                    <button
-                      key={`${option.value}-${index}`}
-                      type="button"
-                      role="option"
-                      id={`${listboxId}-option-${index}`}
-                      tabIndex={searchable ? -1 : undefined}
-                      aria-selected={isSelected}
-                      disabled={option.disabled}
-                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 sm:py-2 text-left text-sm transition ${
-                        option.disabled
-                          ? "cursor-not-allowed text-slate-400"
-                          : isSelected
-                            ? "bg-primary-fixed text-on-primary-fixed-variant"
-                            : isHighlighted
-                              ? "bg-surface-container-high text-on-surface"
-                              : "text-on-surface hover:bg-surface-container-low hover:text-on-surface"
-                      }`}
-                      onMouseEnter={() => {
-                        if (option.disabled) {
-                          return;
-                        }
-
-                        setHighlightedIndex(index);
-                      }}
-                      onMouseDown={searchable ? (event) => event.preventDefault() : undefined}
-                      onClick={() => {
-                        if (option.disabled) {
-                          return;
-                        }
-
-                        commitValue(option.value);
-                      }}
-                    >
-                      <span className="truncate">{option.label}</span>
-                      {isSelected ? (
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">
-                          check
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
+                <div
+                  style={
+                    virtualized
+                      ? { position: "relative", height: filteredOptions.length * VIRTUAL_OPTION_HEIGHT }
+                      : undefined
+                  }
+                >
+                  {visibleIndexes.map((index) => (
+                    <SelectMenuOption
+                      key={`${filteredOptions[index].value}-${index}`}
+                      option={filteredOptions[index]}
+                      index={index}
+                      listboxId={listboxId}
+                      searchable={searchable}
+                      virtualized={virtualized}
+                      optionCount={filteredOptions.length}
+                      isSelected={filteredOptions[index].value === selectedValue}
+                      isHighlighted={index === activeIndex}
+                      onHighlight={setHighlightedIndex}
+                      onSelect={commitValue}
+                    />
+                  ))}
+                </div>
               </div>
               {filteredOptions.length === 0 ? (
                 <p role="status" className="px-3 py-4 text-sm text-on-surface-variant">

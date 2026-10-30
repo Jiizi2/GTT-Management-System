@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+import type { ItineraryItem } from "../../../shared/app-domain";
 import { useGroupDetailContext } from "../context/GroupDetailContext";
 import { ItineraryTimeline } from "./ItineraryTimeline";
 
@@ -13,6 +15,33 @@ export function GroupItineraryTab() {
   } = useGroupDetailContext();
 
   const canEditItinerary = !readOnly && !group.parentGroupId;
+  const renderActions = useCallback(
+    (item: ItineraryItem, index: number) => (
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary xl:h-8 xl:w-8"
+          aria-label={`Edit ${item.title}`}
+          onClick={() => handleOpenEditModal(index)}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            edit
+          </span>
+        </button>
+        <button
+          type="button"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary xl:h-8 xl:w-8"
+          aria-label={`Delete ${item.title}`}
+          onClick={() => handleOpenDeleteModal(index)}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            delete
+          </span>
+        </button>
+      </div>
+    ),
+    [handleOpenDeleteModal, handleOpenEditModal],
+  );
 
   return (
     <section className="rounded-3xl border border-outline-variant/45 bg-surface-container-lowest p-5 shadow-ambient">
@@ -58,37 +87,7 @@ export function GroupItineraryTab() {
         </div>
       )}
 
-      <ItineraryTimeline
-        items={itineraryItems}
-        renderActions={
-          canEditItinerary
-            ? (item, index) => (
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-primary/10 hover:text-brand-primary xl:h-8 xl:w-8"
-                    aria-label={`Edit ${item.title}`}
-                    onClick={() => handleOpenEditModal(index)}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      edit
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant/80 transition hover:bg-brand-tertiary/12 hover:text-brand-tertiary xl:h-8 xl:w-8"
-                    aria-label={`Delete ${item.title}`}
-                    onClick={() => handleOpenDeleteModal(index)}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      delete
-                    </span>
-                  </button>
-                </div>
-              )
-            : undefined
-        }
-      />
+      <ItineraryTimeline items={itineraryItems} renderActions={canEditItinerary ? renderActions : undefined} />
 
       {canEditItinerary && (
         <div className="mt-4">

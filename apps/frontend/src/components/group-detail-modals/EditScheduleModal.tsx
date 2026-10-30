@@ -1,7 +1,6 @@
 import { DatePickerInput, TimePickerInput } from "../date-time-pickers";
 import { ItineraryBusCountField } from "../itinerary-bus-count-field";
 import { SereneSelect } from "../serene-select";
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { useSaudiCityOptions } from "../../hooks/use-saudi-city-options";
 import {
   getAllowedTransportModes,
@@ -87,7 +86,6 @@ export function EditScheduleModal({
   onClose,
   onSave,
 }: EditScheduleModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const saudiCityOptions = useSaudiCityOptions(defaultSaudiCityOptions);
   const allowedTransportModes = getAllowedTransportModes(form.category);
   const showTransportModeField = allowedTransportModes.length > 0;
@@ -105,7 +103,7 @@ export function EditScheduleModal({
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="edit-schedule-title" size="2xl">
-        <div ref={dialogRef}>
+        <div>
           <ModalHeader titleId="edit-schedule-title" title="Edit Schedule" onClose={onClose} centered />
 
           <div className={modalScrollableBodyClassName}>

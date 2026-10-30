@@ -42,7 +42,7 @@ export function ManageRoleModals() {
     handleConfirmDeleteUser,
     handleSubmitManagedUserPassword,
   } = useManageRoleContext();
-  const createDrawerPresence = useMotionPresence(isCreateDrawerOpen, 280);
+  const createDrawerPresence = useMotionPresence(isCreateDrawerOpen);
 
   return (
     <>

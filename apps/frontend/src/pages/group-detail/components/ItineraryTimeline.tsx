@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import type { ItineraryItem } from "../../../shared/app-domain";
 import { getScheduleTypeOption, inferCategoryKey, resolveItineraryIcon } from "../../../shared/app-domain";
 import { buildItineraryFacts, buildItinerarySummary } from "./group-itinerary-display";
@@ -93,7 +93,7 @@ function formatItineraryActivityHeading(item: ItineraryItem, categoryKey: string
   return fallbackLabel;
 }
 
-export function ItineraryTimeline({
+function ItineraryTimelineContent({
   items,
   renderActions,
 }: {
@@ -188,3 +188,5 @@ export function ItineraryTimeline({
     </ol>
   );
 }
+
+export const ItineraryTimeline = memo(ItineraryTimelineContent);

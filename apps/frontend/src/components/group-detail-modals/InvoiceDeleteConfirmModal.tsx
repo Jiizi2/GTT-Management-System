@@ -1,4 +1,3 @@
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { ModalPortal, ModalShell, ModalFooter, ModalFooterButton } from "./shared";
 import type { InvoiceRow } from "../../pages/invoice/helpers/invoice-page-shared";
 
@@ -24,12 +23,11 @@ type InvoiceDeleteConfirmModalProps = {
  * Komponen ini menyelaraskan desain dialog konfirmasi dengan modal-modal di Group Detail.
  */
 export function InvoiceDeleteConfirmModal({ invoice, onClose, onConfirm }: InvoiceDeleteConfirmModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
 
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="delete-invoice-title" size="xl">
-        <div ref={dialogRef}>
+        <div>
           <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
               <span className="material-symbols-outlined" aria-hidden="true">

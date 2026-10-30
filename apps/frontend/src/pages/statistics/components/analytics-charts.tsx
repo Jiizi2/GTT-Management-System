@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import type { OperationalMonthlyPoint, VisaFunnelStage, VisaMonthlyPoint } from "../../../shared/analytics-types";
 import { visaStageLabel } from "../../../shared/analytics-types";
-import { usePrefersReducedMotion } from "../../../hooks/use-motion";
 
 const COLORS = {
   primary: "rgb(var(--color-primary))",
@@ -45,7 +44,6 @@ function ChartFrame({ children }: { children: React.ReactElement }) {
 }
 
 export function OperationalTrendChart({ data }: { data: OperationalMonthlyPoint[] }) {
-  const prefersReducedMotion = usePrefersReducedMotion();
   return (
     <ChartFrame>
       <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
@@ -54,7 +52,7 @@ export function OperationalTrendChart({ data }: { data: OperationalMonthlyPoint[
         <YAxis tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgb(var(--color-secondary) / 0.08)" }} />
         <Legend wrapperStyle={{ fontSize: "0.75rem", fontWeight: 600 }} />
-        <Bar name="Jamaah" dataKey="pax" fill={COLORS.primary} radius={[6, 6, 0, 0]} maxBarSize={38} isAnimationActive={!prefersReducedMotion} animationDuration={650} animationEasing="ease-out" />
+        <Bar name="Jamaah" dataKey="pax" fill={COLORS.primary} radius={[6, 6, 0, 0]} maxBarSize={38} isAnimationActive={false} />
         <Line
           name="Grup"
           type="monotone"
@@ -63,10 +61,7 @@ export function OperationalTrendChart({ data }: { data: OperationalMonthlyPoint[
           strokeWidth={2.5}
           dot={{ r: 3 }}
           activeDot={{ r: 5 }}
-          isAnimationActive={!prefersReducedMotion}
-          animationBegin={140}
-          animationDuration={680}
-          animationEasing="ease-out"
+          isAnimationActive={false}
         />
       </ComposedChart>
     </ChartFrame>
@@ -74,7 +69,6 @@ export function OperationalTrendChart({ data }: { data: OperationalMonthlyPoint[
 }
 
 export function VisaTrendChart({ data }: { data: VisaMonthlyPoint[] }) {
-  const prefersReducedMotion = usePrefersReducedMotion();
   return (
     <ChartFrame>
       <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
@@ -82,14 +76,13 @@ export function VisaTrendChart({ data }: { data: VisaMonthlyPoint[] }) {
         <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgb(var(--color-secondary) / 0.08)" }} />
-        <Bar name="Jamaah Terbit" dataKey="issuedPax" fill={COLORS.primary} radius={[6, 6, 0, 0]} maxBarSize={38} isAnimationActive={!prefersReducedMotion} animationDuration={650} animationEasing="ease-out" />
+        <Bar name="Jamaah Terbit" dataKey="issuedPax" fill={COLORS.primary} radius={[6, 6, 0, 0]} maxBarSize={38} isAnimationActive={false} />
       </ComposedChart>
     </ChartFrame>
   );
 }
 
 export function VisaFunnelChart({ data }: { data: VisaFunnelStage[] }) {
-  const prefersReducedMotion = usePrefersReducedMotion();
   const rows = data.map((item) => ({ ...item, label: visaStageLabel(item.stage) }));
   return (
     <ChartFrame>
@@ -98,7 +91,7 @@ export function VisaFunnelChart({ data }: { data: VisaFunnelStage[] }) {
         <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
         <YAxis type="category" dataKey="label" tick={axisTick} tickLine={false} axisLine={false} width={90} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgb(var(--color-secondary) / 0.08)" }} />
-        <Bar name="Jamaah" dataKey="pax" radius={[0, 6, 6, 0]} maxBarSize={26} isAnimationActive={!prefersReducedMotion} animationDuration={650} animationEasing="ease-out">
+        <Bar name="Jamaah" dataKey="pax" radius={[0, 6, 6, 0]} maxBarSize={26} isAnimationActive={false}>
           {rows.map((row) => (
             <Cell key={row.stage} fill={row.stage === "ISSUED" ? COLORS.primary : COLORS.secondary} />
           ))}

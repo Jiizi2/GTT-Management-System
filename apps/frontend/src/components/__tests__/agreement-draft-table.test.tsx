@@ -118,7 +118,7 @@ describe("AgreementDraftTable", () => {
       "aria-hidden",
       "true",
     );
-    act(() => vi.advanceTimersByTime(380));
+    act(() => vi.advanceTimersByTime(120));
     expect(screen.queryByText("Linked Groups (0)")).not.toBeInTheDocument();
     vi.useRealTimers();
   });

@@ -172,7 +172,7 @@ export function AgentShell({ session }: { session: AgentSession }) {
       >
         <Suspense fallback={<LoadingState label="Memuat halaman..." />}>
           <div
-            key={`${location.pathname}${location.search}`}
+            key={location.pathname}
             className="serene-route-surface"
             data-route-depth={location.pathname.split("/").filter(Boolean).length > 2 ? "detail" : "root"}
           >

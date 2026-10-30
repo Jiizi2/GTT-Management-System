@@ -75,7 +75,7 @@ export function MobileQuickActionsSheet({
   onClose: () => void;
   onSelectAction: (navId: NavId) => void;
 }) {
-  const { isPresent, motionState } = useMotionPresence(open, 280);
+  const { isPresent, motionState } = useMotionPresence(open);
   const dialogRef = useModalFocusTrap<HTMLElement>({
     isActive: open,
     onClose,

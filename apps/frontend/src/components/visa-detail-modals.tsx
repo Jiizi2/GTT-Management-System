@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
-import { type ReactNode, useId } from "react";
-import { Controller, useFieldArray, useForm } from "react-hook-form";
+import { type ReactNode, useId, useMemo } from "react";
+import { Controller, useFieldArray, useForm, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
@@ -540,6 +540,21 @@ export function SyarikahModal({
   );
 }
 
+function FlightLegRoute({ control, index }: { control: Control<VisaFlightDetailsInput>; index: number }) {
+  const [departure, arrival] = useWatch({
+    control,
+    name: [`flightLegs.${index}.departureAirportCode`, `flightLegs.${index}.arrivalAirportCode`],
+    exact: true,
+  });
+  return (
+    <span className="truncate text-sm font-extrabold text-slate-800">
+      {departure?.toUpperCase() || "FROM"}
+      <span className="mx-2 text-slate-400">→</span>
+      {arrival?.toUpperCase() || "TO"}
+    </span>
+  );
+}
+
 export function FlightDetailsModal({
   initialValue,
   agreementStartDate,
@@ -553,21 +568,24 @@ export function FlightDetailsModal({
   onClose: () => void;
   onSave: (flight: VisaFlightDetailsInput) => void | Promise<void>;
 }) {
+  const schema = useMemo(
+    () => createFlightDetailsModalSchema(agreementStartDate, agreementEndDate),
+    [agreementStartDate, agreementEndDate],
+  );
   const {
     register,
     control,
-    watch,
+    getValues,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<VisaFlightDetailsInput>({
-    resolver: zodResolver(createFlightDetailsModalSchema(agreementStartDate, agreementEndDate)),
+    resolver: zodResolver(schema),
     defaultValues: initialValue,
   });
   const { fields, append, remove } = useFieldArray({ control, name: "flightLegs" });
-  const watchedLegs = watch("flightLegs");
 
   const addLeg = (direction: "ONWARD" | "RETURN") => {
-    const directionLegs = getFlightLegsByDirection(watchedLegs, direction);
+    const directionLegs = getFlightLegsByDirection(getValues("flightLegs"), direction);
     const previous = directionLegs.at(-1);
     append({
       ...createEmptyFlightLeg(direction, directionLegs.length),
@@ -623,11 +641,7 @@ export function FlightDetailsModal({
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-primary/10 text-xs font-black text-brand-primary">
                       {position + 1}
                     </span>
-                    <span className="truncate text-sm font-extrabold text-slate-800">
-                      {watchedLegs[index]?.departureAirportCode?.toUpperCase() || "FROM"}
-                      <span className="mx-2 text-slate-400">→</span>
-                      {watchedLegs[index]?.arrivalAirportCode?.toUpperCase() || "TO"}
-                    </span>
+                    <FlightLegRoute control={control} index={index} />
                   </div>
                   <button
                     type="button"

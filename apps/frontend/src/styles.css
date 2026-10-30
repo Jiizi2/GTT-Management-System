@@ -164,10 +164,10 @@
   --checklist-reminder-border-rgb: 231 205 144;
   --checklist-reminder-bg-rgb: 255 248 236;
   --checklist-reminder-accent-rgb: 147 95 14;
-  --motion-instant: 160ms;
-  --motion-routine: 320ms;
-  --motion-structural: 460ms;
-  --motion-focal: 650ms;
+  --motion-instant: 100ms;
+  --motion-routine: 150ms;
+  --motion-structural: 180ms;
+  --motion-exit: 120ms;
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
 }
@@ -452,7 +452,7 @@ img {
   }
 
   .serene-card-interactive {
-    @apply rounded-2xl bg-surface-container-lowest shadow-ambient transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface-container-high;
+    @apply rounded-2xl bg-surface-container-lowest shadow-ambient transition-colors duration-150 hover:bg-surface-container-high;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background-image: var(--serene-card-gradient);
   }
@@ -534,7 +534,7 @@ img {
   }
 
   .serene-accordion-chevron {
-    @apply shrink-0 transition-transform duration-300 ease-out;
+    @apply shrink-0 transition-transform duration-150 ease-out;
   }
 
   .serene-accordion[open] .serene-accordion-chevron {
@@ -547,8 +547,7 @@ img {
   }
 
   .serene-accordion[open] .serene-accordion-content {
-  animation: serene-accordion-reveal 0.38s var(--motion-ease-out) forwards;
-    transform-origin: top;
+    animation: serene-fade-in var(--motion-instant) var(--motion-ease-out);
   }
 
   .serene-btn-primary {
@@ -671,7 +670,7 @@ img {
   .master-data-composer-form {
     row-gap: 0.875rem;
     padding-bottom: 8rem;
-  animation: master-data-composer-reveal 380ms var(--motion-ease-out);
+    animation: serene-fade-in var(--motion-routine) var(--motion-ease-out);
   }
 
   .master-data-composer-form > header {
@@ -768,17 +767,6 @@ img {
   @media (prefers-reduced-motion: reduce) {
     .master-data-composer-form {
       animation: none;
-    }
-  }
-
-  @keyframes master-data-composer-reveal {
-    from {
-      opacity: 0.72;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
     }
   }
 
@@ -976,7 +964,7 @@ img {
   }
 
   .serene-input {
-    @apply h-11 w-full rounded-md px-3 text-sm text-on-surface outline-none transition-all duration-200 placeholder:text-on-surface-variant/55;
+    @apply h-11 w-full rounded-md px-3 text-sm text-on-surface outline-none transition-colors duration-100 placeholder:text-on-surface-variant/55;
   }
 
   .serene-input-sm {
@@ -992,7 +980,7 @@ img {
   }
 
   .serene-select {
-    @apply h-11 w-full appearance-none rounded-md px-3 pr-9 text-sm text-on-surface outline-none transition-all duration-200 placeholder:text-on-surface-variant/55;
+    @apply h-11 w-full appearance-none rounded-md px-3 pr-9 text-sm text-on-surface outline-none transition-colors duration-100 placeholder:text-on-surface-variant/55;
   }
 
   .serene-select:disabled {
@@ -1000,11 +988,11 @@ img {
   }
 
   .serene-select-soft {
-    @apply h-10 w-full rounded-lg pl-2.5 pr-8 text-sm font-semibold text-on-surface outline-none transition-all duration-200;
+    @apply h-10 w-full rounded-lg pl-2.5 pr-8 text-sm font-semibold text-on-surface outline-none transition-colors duration-100;
   }
 
   .serene-select-pill {
-    @apply inline-flex items-center rounded-lg pl-2.5 pr-8 py-1 text-[11px] font-bold tracking-[0.08em] outline-none transition-all duration-200;
+    @apply inline-flex items-center rounded-lg pl-2.5 pr-8 py-1 text-[11px] font-bold tracking-[0.08em] outline-none transition-colors duration-100;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background-color: rgb(var(--color-surface-container-lowest));
     color: rgb(var(--color-text-secondary));
@@ -1017,7 +1005,7 @@ img {
   }
 
   .serene-textarea {
-    @apply w-full rounded-md px-3 py-2 text-sm text-on-surface outline-none transition-all duration-200 placeholder:text-on-surface-variant/55;
+    @apply w-full rounded-md px-3 py-2 text-sm text-on-surface outline-none transition-colors duration-100 placeholder:text-on-surface-variant/55;
   }
 
   .serene-input,
@@ -1063,31 +1051,26 @@ img {
   .serene-modal-overlay {
     @apply fixed inset-0;
     background-color: rgb(var(--serene-overlay-rgb) / var(--serene-overlay-opacity));
-    animation: serene-overlay-in var(--motion-routine) var(--motion-ease-out) both;
+    animation: serene-overlay-in var(--motion-instant) var(--motion-ease-out);
   }
 
   .serene-modal-shell {
     @apply overflow-hidden rounded-3xl shadow-float;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background: var(--serene-floating-surface);
-    animation: serene-dialog-in 380ms var(--motion-ease-out) both;
   }
 
   .agreement-draft-edit-overlay {
     animation-duration: var(--motion-instant);
   }
 
-  .agreement-draft-edit-overlay .serene-modal-shell {
-    animation: serene-fade-in var(--motion-instant) var(--motion-ease-out) both;
-  }
-
   .serene-modal-overlay[data-motion-state="closed"] {
     pointer-events: none;
-    animation: serene-overlay-out 220ms var(--motion-ease-in) both;
+    animation: serene-overlay-out var(--motion-exit) var(--motion-ease-in) both;
   }
 
   .serene-modal-overlay[data-motion-state="closed"] .serene-modal-shell {
-    animation: serene-dialog-out 220ms var(--motion-ease-in) both;
+    animation: none;
   }
 
   .serene-drawer-shell {
@@ -1095,7 +1078,7 @@ img {
   }
 
   .serene-modal-overlay[data-motion-state="closed"] .serene-drawer-shell {
-    animation: serene-drawer-out 280ms var(--motion-ease-in) both;
+    animation: serene-drawer-out var(--motion-exit) var(--motion-ease-in) both;
   }
 
   .serene-bottom-sheet {
@@ -1103,7 +1086,7 @@ img {
   }
 
   .serene-modal-overlay[data-motion-state="closed"] .serene-bottom-sheet {
-    animation: serene-sheet-out 280ms var(--motion-ease-in) both;
+    animation: serene-sheet-out var(--motion-exit) var(--motion-ease-in) both;
   }
 
   .serene-dialog-header {
@@ -1195,7 +1178,6 @@ img {
 @keyframes serene-overlay-in {
   from {
     opacity: 0;
-    backdrop-filter: blur(0);
   }
   to {
     opacity: 1;
@@ -1208,44 +1190,17 @@ img {
   }
   to {
     opacity: 0;
-    backdrop-filter: blur(0);
-  }
-}
-
-@keyframes serene-dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.985);
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-@keyframes serene-dialog-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(4px) scale(0.99);
   }
 }
 
 @keyframes serene-drawer-in {
   from {
     opacity: 0.72;
-    transform: translateX(28px);
-    clip-path: inset(0 0 0 10%);
+    transform: translateX(12px);
   }
   to {
     opacity: 1;
     transform: translateX(0);
-    clip-path: inset(0);
   }
 }
 
@@ -1256,20 +1211,18 @@ img {
   }
   to {
     opacity: 0;
-    transform: translateX(22px);
+    transform: translateX(8px);
   }
 }
 
 @keyframes serene-sheet-in {
   from {
     opacity: 0.72;
-    transform: translateY(28px);
-    clip-path: inset(12% 0 0);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    clip-path: inset(0);
   }
 }
 
@@ -1280,18 +1233,7 @@ img {
   }
   to {
     opacity: 0;
-    transform: translateY(22px);
-  }
-}
-
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
     transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -1306,29 +1248,12 @@ img {
   }
 }
 
-@keyframes serene-accordion-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-    max-height: 0;
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    max-height: 1000px;
-  }
-}
-
 .animate-page-fade-in {
-  animation: page-fade-in 0.38s var(--motion-ease-out);
+  animation: serene-fade-in var(--motion-routine) var(--motion-ease-out);
 }
 
 .serene-route-surface {
-  animation: serene-route-focus-in 700ms var(--motion-ease-out) both;
-}
-
-.serene-route-surface[data-route-depth="detail"] {
-  animation-name: serene-route-detail-in;
+  animation: serene-fade-in var(--motion-routine) var(--motion-ease-out);
 }
 
 .serene-shell-offset {
@@ -1342,30 +1267,11 @@ img {
 }
 
 .serene-feedback-toast {
-  animation: serene-feedback-settle 380ms var(--motion-ease-out) both;
+  animation: serene-slide-down var(--motion-routine) var(--motion-ease-out) both;
 }
 
-.serene-data-reveal > * {
-  animation: serene-data-item-in 480ms var(--motion-ease-out) both;
-  animation-delay: calc(var(--motion-index, 0) * 36ms);
-}
-
-.serene-data-reveal > :nth-child(1) { --motion-index: 0; }
-.serene-data-reveal > :nth-child(2) { --motion-index: 1; }
-.serene-data-reveal > :nth-child(3) { --motion-index: 2; }
-.serene-data-reveal > :nth-child(4) { --motion-index: 3; }
-.serene-data-reveal > :nth-child(5) { --motion-index: 4; }
-.serene-data-reveal > :nth-child(6) { --motion-index: 5; }
-.serene-data-reveal > :nth-child(7) { --motion-index: 6; }
-.serene-data-reveal > :nth-child(n + 8) { --motion-index: 7; }
-
-.serene-metric-value {
-  animation: serene-value-change 420ms var(--motion-ease-out) both;
-}
-
-.serene-chart-reveal {
-  animation: serene-chart-in 520ms var(--motion-ease-out) both;
-}
+/* Lists, metric values, and charts stay visible as data arrives or changes.
+   Keep motion on navigation and explicit interactions, without row staggering. */
 
 .serene-data-region {
   position: relative;
@@ -1431,8 +1337,8 @@ img {
   grid-template-rows: 0fr;
   opacity: 0;
   transition:
-    grid-template-rows 380ms var(--motion-ease-out),
-    opacity 240ms ease-out;
+    grid-template-rows var(--motion-exit) var(--motion-ease-out),
+    opacity var(--motion-exit) ease-out;
 }
 
 .serene-disclosure-grid[data-open="true"] {
@@ -1440,97 +1346,15 @@ img {
   opacity: 1;
 }
 
-@keyframes serene-route-focus-in {
-  from {
-    opacity: 0.62;
-    clip-path: inset(0 0 12px 0 round 16px);
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    clip-path: inset(0 round 0);
-    filter: blur(0);
-  }
-}
-
-@keyframes serene-route-detail-in {
-  from {
-    opacity: 0.66;
-    transform: translateX(14px);
-    clip-path: inset(0 0 0 12px round 16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-    clip-path: inset(0 round 0);
-  }
-}
-
 @keyframes serene-route-old {
   to {
     opacity: 0;
-    filter: blur(2px);
-    clip-path: inset(0 2% 0 0 round 16px);
   }
 }
 
 @keyframes serene-route-new {
   from {
     opacity: 0;
-    filter: blur(2px);
-    clip-path: inset(0 0 10px 0 round 16px);
-  }
-}
-
-@keyframes serene-feedback-settle {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-    box-shadow: 0 8px 20px -18px rgb(var(--serene-shadow-rgb) / 0.12);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    box-shadow: var(--serene-shadow-float);
-  }
-}
-
-@keyframes serene-data-item-in {
-  from {
-    opacity: 0;
-    transform: translateY(7px);
-    clip-path: inset(0 0 10% 0 round 10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    clip-path: inset(0 round 0);
-  }
-}
-
-@keyframes serene-value-change {
-  from {
-    opacity: 0.35;
-    transform: translateY(4px);
-    clip-path: inset(18% 0 0);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    clip-path: inset(0);
-  }
-}
-
-@keyframes serene-chart-in {
-  from {
-    opacity: 0.5;
-    clip-path: inset(8% 0 0);
-    filter: blur(1.5px);
-  }
-  to {
-    opacity: 1;
-    clip-path: inset(0);
-    filter: blur(0);
   }
 }
 
@@ -1545,55 +1369,38 @@ img {
 }
 
 @supports (view-transition-name: dashboard-route) {
-  .serene-sidebar-frame nav [aria-current="page"],
-  .serene-mobile-navigation [aria-current="page"],
-  .agent-top-navigation [aria-current="page"],
-  .agent-mobile-navigation [aria-current="page"] {
-    view-transition-name: dashboard-active-navigation;
-  }
-
   .serene-route-surface {
     view-transition-name: dashboard-route;
     animation: none;
   }
 
+  ::view-transition-group(root),
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none;
   }
 
   ::view-transition-group(dashboard-route) {
-    animation-duration: 700ms;
+    animation-duration: var(--motion-routine);
     animation-timing-function: var(--motion-ease-out);
-  }
-
-  ::view-transition-group(dashboard-active-navigation) {
-    animation-duration: 600ms;
-    animation-timing-function: var(--motion-ease-out);
-  }
-
-  ::view-transition-old(dashboard-active-navigation),
-  ::view-transition-new(dashboard-active-navigation) {
-    animation-duration: 420ms;
-    animation-timing-function: ease-out;
   }
 
   ::view-transition-old(dashboard-route) {
-    animation: serene-route-old 300ms var(--motion-ease-in) both;
+    animation: serene-route-old var(--motion-instant) var(--motion-ease-in) both;
   }
 
   ::view-transition-new(dashboard-route) {
-    animation: serene-route-new 700ms var(--motion-ease-out) both;
+    animation: serene-route-new var(--motion-routine) var(--motion-ease-out) both;
   }
 }
 
 .animate-slide-down {
-  animation: serene-slide-down 0.32s var(--motion-ease-out) forwards;
+  animation: serene-slide-down var(--motion-instant) var(--motion-ease-out) forwards;
 }
 
 /* Global Form Alert Animation */
 [role="alert"] {
-  animation: serene-slide-down 0.28s var(--motion-ease-out) forwards;
+  animation: serene-slide-down var(--motion-instant) var(--motion-ease-out) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1601,6 +1408,7 @@ img {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 120ms !important;
     transition-property: color, background-color, border-color, opacity !important;
@@ -1625,10 +1433,9 @@ img {
     transform: none;
   }
 
+  ::view-transition-group(dashboard-route),
   ::view-transition-old(dashboard-route),
-  ::view-transition-new(dashboard-route),
-  ::view-transition-old(dashboard-active-navigation),
-  ::view-transition-new(dashboard-active-navigation) {
+  ::view-transition-new(dashboard-route) {
     animation: none !important;
   }
 }

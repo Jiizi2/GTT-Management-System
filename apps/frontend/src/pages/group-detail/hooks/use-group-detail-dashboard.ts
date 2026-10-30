@@ -804,12 +804,12 @@ export function useGroupDetailDashboard({
     handleCloseScheduleModal();
   };
 
-  const handleOpenEditModal = (index: number) => {
+  const handleOpenEditModal = useCallback((index: number) => {
     setEditingIndex(index);
     editSuggestedHotelNameRef.current = "";
     editSuggestedFromHotelNameRef.current = "";
     setEditScheduleForm(applyEditHotelAutofill(createEditScheduleForm(itineraryItems[index])));
-  };
+  }, [applyEditHotelAutofill, itineraryItems]);
 
   const handleCloseEditModal = () => {
     setEditingIndex(null);
@@ -818,9 +818,9 @@ export function useGroupDetailDashboard({
     setEditScheduleForm(null);
   };
 
-  const handleOpenDeleteModal = (index: number) => {
+  const handleOpenDeleteModal = useCallback((index: number) => {
     setDeletingIndex(index);
-  };
+  }, []);
 
   const handleCloseDeleteModal = () => {
     setDeletingIndex(null);
