@@ -1,4 +1,3 @@
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { ModalPortal, ModalShell, ModalFooter, ModalFooterButton } from "./shared";
 import type { ItineraryItem } from "../../shared/app-domain";
 
@@ -38,12 +37,11 @@ type DeleteConfirmModalProps = {
  * @returns {JSX.Element} Modal konfirmasi penghapusan
  */
 export function DeleteConfirmModal({ item, onClose, onConfirm }: DeleteConfirmModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
 
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="delete-itinerary-title" size="xl">
-        <div ref={dialogRef}>
+        <div>
           <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
               <span className="material-symbols-outlined" aria-hidden="true">

@@ -1,4 +1,3 @@
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { ModalPortal, ModalShell, ModalFooter, ModalFooterButton } from "./shared";
 
 const modalBodyClassName = "serene-dialog-body px-5 py-4";
@@ -36,12 +35,11 @@ type UnlinkGroupConfirmModalProps = {
  * @returns {JSX.Element} Modal konfirmasi unlink grup
  */
 export function UnlinkGroupConfirmModal({ groupCode, onClose, onConfirm }: UnlinkGroupConfirmModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
 
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="unlink-group-title" size="xl">
-        <div ref={dialogRef}>
+        <div>
           <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700">
               <span className="material-symbols-outlined" aria-hidden="true">

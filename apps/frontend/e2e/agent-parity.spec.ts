@@ -287,6 +287,7 @@ test("Shared search controls preserve filters and focus across Agent lists", asy
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
     await search.fill("pencarian-tanpa-hasil");
     await expect(page.locator(".serene-empty-state")).toBeVisible();
+    await expect(search).toBeFocused();
     await page.getByRole("button", { name: "Hapus pencarian" }).click();
     await expect(search).toHaveValue("");
     await expect(search).toBeFocused();

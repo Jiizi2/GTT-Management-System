@@ -1,7 +1,6 @@
 import { DatePickerInput, TimePickerInput } from "../date-time-pickers";
 import { ItineraryBusCountField } from "../itinerary-bus-count-field";
 import { SereneSelect } from "../serene-select";
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { useSaudiCityOptions } from "../../hooks/use-saudi-city-options";
 import {
   getAllowedTransportModes,
@@ -100,7 +99,6 @@ export function ScheduleModal({
   onAddAnother,
   onRemovePending,
 }: ScheduleModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   // Save commits the queued trips plus the current entry when it is complete.
   const saveCount = pendingItems.length + (isAddAnotherDisabled ? 0 : 1);
   const saveLabel = saveCount > 1 ? `Save ${saveCount} Trips` : "Save Schedule";
@@ -121,7 +119,7 @@ export function ScheduleModal({
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="schedule-modal-title" size="4xl">
-        <div ref={dialogRef}>
+        <div>
           <ModalHeader titleId="schedule-modal-title" title="Add New Schedule" onClose={onClose} />
 
           <div className={modalScrollableBodyClassName}>

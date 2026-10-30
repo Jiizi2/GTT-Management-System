@@ -4,7 +4,6 @@ import { useForm, Controller } from "react-hook-form";
 import { DatePickerInput } from "../date-time-pickers";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../form-accessibility";
 import { SereneSelect } from "../serene-select";
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { createGroupEditModalSchema } from "./schemas";
 import { getMinimumBusCountForPax } from "../../shared/app-domain";
 import { ModalPortal, ModalShell, ModalHeader, ModalFooter, ModalFooterButton } from "./shared";
@@ -88,7 +87,6 @@ export function GroupEditModal({
   onClose,
   onSave,
 }: GroupEditModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const groupEditModalSchema = useMemo(() => createGroupEditModalSchema(), []);
   const {
     register,
@@ -132,11 +130,20 @@ export function GroupEditModal({
   const previewPax = Number.parseInt((watchedPax ?? "").trim(), 10);
   const effectivePax = Number.isFinite(previewPax) && previewPax > 0 ? previewPax : groupPax;
   const minimumRequiredBusCount = useMemo(() => getMinimumBusCountForPax(effectivePax), [effectivePax]);
+  const parentGroupOptions = useMemo(
+    () => [
+      <option key="none" value="none">-- Mandiri (Tidak Terhubung) --</option>,
+      ...groups.filter((item) => item.code !== groupCode).map((item) => (
+        <option key={item.id || item.code} value={item.id}>{item.code} - {item.name}</option>
+      )),
+    ],
+    [groups, groupCode],
+  );
 
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="group-edit-title" size="xl">
-        <div id="group-edit-modal" ref={dialogRef}>
+        <div id="group-edit-modal">
           <ModalHeader titleId="group-edit-title" title="Edit Group" onClose={onClose} />
 
           <form
@@ -212,14 +219,7 @@ export function GroupEditModal({
                       value={field.value ?? "none"}
                       onChange={(event) => field.onChange(event.target.value)}
                     >
-                      <option value="none">-- Mandiri (Tidak Terhubung) --</option>
-                      {groups
-                        .filter((g) => g.code !== groupCode)
-                        .map((g) => (
-                          <option key={g.id || g.code} value={g.id}>
-                            {g.code} - {g.name}
-                          </option>
-                        ))}
+                      {parentGroupOptions}
                     </SereneSelect>
                   )}
                 />

@@ -45,7 +45,7 @@ function RowActions({ draft, expanded, onToggle, onEdit, onDelete, deletePending
         </button>
       </DetailOverflowMenu>
       <button type="button" className={iconButtonClass} aria-label={expanded ? `Tutup detail ${draft.agreementNumber}` : `Buka detail ${draft.agreementNumber}`} aria-expanded={expanded} onClick={onToggle}>
-        <span className={`material-symbols-outlined text-xl transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} aria-hidden="true">expand_more</span>
+        <span className={`material-symbols-outlined text-xl transition-transform duration-150 ${expanded ? "rotate-180" : ""}`} aria-hidden="true">expand_more</span>
       </button>
     </div>
   );
@@ -87,7 +87,7 @@ function AnimatedExpandedGroups({
   expanded,
   ...props
 }: ComponentProps<typeof ExpandedGroups> & { expanded: boolean }) {
-  const { isPresent } = useMotionPresence(expanded, 380);
+  const { isPresent } = useMotionPresence(expanded);
 
   if (!isPresent) {
     return null;

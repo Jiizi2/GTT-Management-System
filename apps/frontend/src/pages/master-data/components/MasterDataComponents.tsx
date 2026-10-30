@@ -160,7 +160,7 @@ export function MasterDataFormDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const { isPresent, motionState } = useMotionPresence(isOpen, 280);
+  const { isPresent, motionState } = useMotionPresence(isOpen);
   const drawerRef = useModalFocusTrap<HTMLElement>({ isActive: isOpen, onClose });
 
   useEffect(() => {
@@ -181,7 +181,7 @@ export function MasterDataFormDrawer({
 
   return createPortal(
     <div
-      className="serene-modal-overlay fixed inset-0 z-[180] bg-scrim/35 backdrop-blur-[2px]"
+      className="serene-modal-overlay fixed inset-0 z-[180] bg-scrim/35"
       data-motion-state={motionState}
       aria-hidden={!isOpen}
       onMouseDown={isOpen ? onClose : undefined}

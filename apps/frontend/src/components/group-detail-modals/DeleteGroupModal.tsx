@@ -1,4 +1,3 @@
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { ModalPortal, ModalShell, ModalFooter, ModalFooterButton } from "./shared";
 
 const modalBodyClassName = "serene-dialog-body px-5 py-4";
@@ -50,13 +49,12 @@ export function DeleteGroupModal({
   onClose,
   onConfirm,
 }: DeleteGroupModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const hasChildGroups = childGroupCount > 0;
 
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="delete-group-title" size="xl">
-        <div ref={dialogRef}>
+        <div>
           <div className={modalHeaderBarClassName}>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-tertiary/15 text-brand-tertiary">
               <span className="material-symbols-outlined" aria-hidden="true">

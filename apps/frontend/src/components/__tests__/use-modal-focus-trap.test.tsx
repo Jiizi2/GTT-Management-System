@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { useModalFocusTrap } from '../use-modal-focus-trap';
+import { DialogShell } from '../dialog-shell';
 import { useState } from 'react';
 
 // jsdom has no layout engine, so offsetParent is always null.
@@ -51,11 +52,39 @@ function TestModalEmpty({ isActive, onClose }: { isActive: boolean; onClose?: ()
 }
 
 describe('useModalFocusTrap', () => {
+  it('focuses a dialog opened after mount and restores focus when closed', async () => {
+    function DialogHarness() {
+      const [open, setOpen] = useState(false);
+      return <>
+        <button onClick={() => setOpen(true)}>Open input dialog</button>
+        <DialogShell isOpen={open} onClose={() => setOpen(false)} title="Input">
+          <input aria-label="Modal data" />
+        </DialogShell>
+      </>;
+    }
+    render(<DialogHarness />);
+    const trigger = screen.getByRole('button', { name: 'Open input dialog' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close Input popup' })).toHaveFocus());
+    const input = screen.getByRole('textbox', { name: 'Modal data' });
+    input.focus();
+    fireEvent.change(input, { target: { value: 'Data jamaah' } });
+    expect(input).toHaveFocus();
+    fireEvent.keyDown(input, { key: 'Tab' });
+    expect(screen.getByRole('button', { name: 'Close Input popup' })).toHaveFocus();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close Input popup' })).toHaveFocus());
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   afterEach(() => {
+    cleanup();
     document.body.innerHTML = '';
   });
 

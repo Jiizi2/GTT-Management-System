@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { FieldErrorMessage, getFieldAriaInvalid, getFieldDescribedBy } from "../form-accessibility";
-import { useModalFocusTrap } from "../use-modal-focus-trap";
 import { noteModalSchema } from "./schemas";
 import { ModalPortal, ModalShell, ModalHeader, ModalFooter, ModalFooterButton } from "./shared";
 import type { NoteFormState } from "../../shared/app-domain";
@@ -42,7 +41,6 @@ type NoteModalProps = {
  * @returns {JSX.Element} Modal dengan form catatan
  */
 export function NoteModal({ onClose, onSave }: NoteModalProps) {
-  const dialogRef = useModalFocusTrap<HTMLDivElement>({ onClose });
   const {
     register,
     watch,
@@ -64,7 +62,7 @@ export function NoteModal({ onClose, onSave }: NoteModalProps) {
   return (
     <ModalPortal>
       <ModalShell onClose={onClose} ariaLabelledBy="note-modal-title" size="2xl">
-        <div ref={dialogRef}>
+        <div>
           <ModalHeader titleId="note-modal-title" title="Add New Note" onClose={onClose} centered />
 
           <form

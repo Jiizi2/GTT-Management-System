@@ -22,7 +22,8 @@ export function usePrefersReducedMotion(): boolean {
   return useSyncExternalStore(subscribeToReducedMotion, getReducedMotionSnapshot, () => true);
 }
 
-export function useMotionPresence(isOpen: boolean, exitDurationMs = 240) {
+// Keep the default aligned with --motion-exit in styles.css.
+export function useMotionPresence(isOpen: boolean, exitDurationMs = 120) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [isPresent, setIsPresent] = useState(isOpen);
 
@@ -44,7 +45,8 @@ export function useMotionPresence(isOpen: boolean, exitDurationMs = 240) {
   }, [exitDurationMs, isOpen, isPresent, prefersReducedMotion]);
 
   return {
-    isPresent,
+    // Mount in the opening render so focus effects can see the dialog ref.
+    isPresent: isOpen || isPresent,
     motionState: isOpen ? "open" : "closed",
   } as const;
 }
