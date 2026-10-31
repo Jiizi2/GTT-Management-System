@@ -134,12 +134,19 @@ describe("H-1 checklist filters", () => {
     expect(result.current.paginatedPendingGroups[0].groupCode).toBe("TOMORROW");
   });
 
-  it("groups trips, filters completed trips, and resets a no-results search without claiming readiness", () => {
+  it("shows trip cards and driver controls directly, filters completed trips, and resets a no-results search", () => {
     render(<ChecklistScreen groups={[group("901"), readyGroup("902", "2026-11-01")]} />, { wrapper });
     const attention = screen.getByRole("region", { name: "Need Attention" });
-    expect(within(attention).getAllByRole("heading", { name: "901" })).toHaveLength(1);
-    expect(within(attention).getByText("3 trips")).toBeInTheDocument();
+    expect(within(attention).getAllByRole("article")).toHaveLength(3);
+    const driverInputs = within(attention).getAllByRole("textbox", { name: "Driver Name" });
+    expect(driverInputs).toHaveLength(3);
+    driverInputs.forEach((input) => expect(input).toBeVisible());
+    expect(within(attention).getAllByRole("button", { name: "Confirm Assignment" })).toHaveLength(3);
+    const completed = screen.getByRole("region", { name: "Completed" });
+    expect(within(completed).getByText("Ahmed")).toBeVisible();
+    expect(within(completed).getByRole("button", { name: "Cancel" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /^Today/ }));
+    expect(within(attention).getAllByRole("article")).toHaveLength(1);
     expect(screen.queryByRole("region", { name: "Completed" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Tomorrow/ }));
     expect(screen.getByRole("region", { name: "Completed" })).toBeInTheDocument();

@@ -5,7 +5,6 @@ import { useChecklistWorkspace } from "./checklist/hooks/use-checklist-workspace
 import { ChecklistNeedAttentionCard } from "./checklist/components/ChecklistNeedAttentionCard";
 import { ChecklistCompletedCard } from "./checklist/components/ChecklistCompletedCard";
 import { ChecklistCancelModal } from "./checklist/components/ChecklistCancelModal";
-import { ChecklistGroupSection } from "./checklist/components/ChecklistGroupSection";
 import { AgentFilterSelect } from "../components/agent-filter-select";
 import { DataBoundary, type DataQueryState } from "../components/data-boundary";
 import { ChecklistSkeleton } from "../components/skeleton";
@@ -41,8 +40,8 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
     isClear,
     pendingTotalPages,
     completedTotalPages,
-    paginatedPendingGroups,
-    paginatedCompletedGroups,
+    paginatedPendingItems,
+    paginatedCompletedItems,
     pendingRangeStart,
     pendingRangeEnd,
     completedRangeStart,
@@ -178,38 +177,33 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
                 </span>
               </div>
               {pendingGroups.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-on-surface-variant">Open a group to review trips and assign drivers.</p>
-                  {paginatedPendingGroups.map((group) => (
-                    <ChecklistGroupSection key={group.groupCode} group={group} expandForSearch={hasGroupCodeQuery}>
-                      {group.items.map((item) => {
-                        const draft = driverDrafts[item.id] ?? { name: "", phone: "", plateNumber: "" };
-                        const requiredDriverCount = getRequiredDriverCount(item);
-                        const assignedDrivers = confirmedDrivers[item.id]?.drivers.slice(0, requiredDriverCount) ?? [];
-                        const isConfirmDisabled =
-                          assignedDrivers.length >= requiredDriverCount ||
-                          !draft.name.trim() ||
-                          !draft.phone.trim() ||
-                          !draft.plateNumber.trim();
-                        return (
-                          <ChecklistNeedAttentionCard
-                            key={item.id}
-                            item={item}
-                            draft={draft}
-                            assignedDrivers={assignedDrivers}
-                            requiredDriverCount={requiredDriverCount}
-                            isTwoDaysAway={isTwoDaysAwayChecklistItem(item)}
-                            groupRecord={groupsByCode.get(item.groupCode.trim().toUpperCase())}
-                            copiedItemId={copiedItemId}
-                            isConfirmDisabled={isConfirmDisabled}
-                            onCopyTripWithoutDriverName={handleCopyTripWithoutDriverName}
-                            onDraftChange={handleDraftChange}
-                            onConfirmDriver={handleConfirmDriver}
-                          />
-                        );
-                      })}
-                    </ChecklistGroupSection>
-                  ))}
+                <div className="serene-data-reveal space-y-4">
+                  {paginatedPendingItems.map((item) => {
+                    const draft = driverDrafts[item.id] ?? { name: "", phone: "", plateNumber: "" };
+                    const requiredDriverCount = getRequiredDriverCount(item);
+                    const assignedDrivers = confirmedDrivers[item.id]?.drivers.slice(0, requiredDriverCount) ?? [];
+                    const isConfirmDisabled =
+                      assignedDrivers.length >= requiredDriverCount ||
+                      !draft.name.trim() ||
+                      !draft.phone.trim() ||
+                      !draft.plateNumber.trim();
+                    return (
+                      <ChecklistNeedAttentionCard
+                        key={item.id}
+                        item={item}
+                        draft={draft}
+                        assignedDrivers={assignedDrivers}
+                        requiredDriverCount={requiredDriverCount}
+                        isTwoDaysAway={isTwoDaysAwayChecklistItem(item)}
+                        groupRecord={groupsByCode.get(item.groupCode.trim().toUpperCase())}
+                        copiedItemId={copiedItemId}
+                        isConfirmDisabled={isConfirmDisabled}
+                        onCopyTripWithoutDriverName={handleCopyTripWithoutDriverName}
+                        onDraftChange={handleDraftChange}
+                        onConfirmDriver={handleConfirmDriver}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-on-surface-variant">No pending driver assignments for these filters.</p>
@@ -233,28 +227,24 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
                     {completedGroups.length} groups · {completedItems.length} trips assigned
                   </span>
                 </div>
-                <div className="space-y-3">
-                  {paginatedCompletedGroups.map((group) => (
-                    <ChecklistGroupSection key={group.groupCode} group={group} expandForSearch={hasGroupCodeQuery}>
-                      {group.items.map((item) => {
-                        const assignment = confirmedDrivers[item.id];
-                        if (!assignment) return null;
-                        return (
-                          <ChecklistCompletedCard
-                            key={item.id}
-                            item={item}
-                            assignment={assignment}
-                            isTwoDaysAway={isTwoDaysAwayChecklistItem(item)}
-                            groupRecord={groupsByCode.get(item.groupCode.trim().toUpperCase())}
-                            requiredDriverCount={getRequiredDriverCount(item)}
-                            copiedItemId={copiedItemId}
-                            onOpenCancelConfirm={handleOpenCancelConfirm}
-                            onCopyDriver={handleCopyDriver}
-                          />
-                        );
-                      })}
-                    </ChecklistGroupSection>
-                  ))}
+                <div className="serene-data-reveal space-y-3">
+                  {paginatedCompletedItems.map((item) => {
+                    const assignment = confirmedDrivers[item.id];
+                    if (!assignment) return null;
+                    return (
+                      <ChecklistCompletedCard
+                        key={item.id}
+                        item={item}
+                        assignment={assignment}
+                        isTwoDaysAway={isTwoDaysAwayChecklistItem(item)}
+                        groupRecord={groupsByCode.get(item.groupCode.trim().toUpperCase())}
+                        requiredDriverCount={getRequiredDriverCount(item)}
+                        copiedItemId={copiedItemId}
+                        onOpenCancelConfirm={handleOpenCancelConfirm}
+                        onCopyDriver={handleCopyDriver}
+                      />
+                    );
+                  })}
                 </div>
                 <PaginationControls
                   currentPage={completedPage}

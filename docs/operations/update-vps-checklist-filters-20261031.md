@@ -1,12 +1,13 @@
-# Update VPS: filter hari dan pengelompokan H-1 Checklist
+# Update VPS: filter hari dan kartu H-1 Checklist
 
-Branch: `feat/checklist-day-filters-20261031`. Target PR: `master`.
+Branch koreksi kartu: `fix/checklist-original-cards-20261031`. Target PR: `master`.
 Jalankan setelah PR digabung, dari direktori deployment dan dengan file
 environment production yang selama ini dipakai VPS.
 
 Rilis ini menambahkan filter All Days, Today, Tomorrow, dan In 2 Days; pencarian
-nomor/nama grup termasuk grup terkait; serta panel trip per grup di bagian Need
-Attention dan Completed. Pagination mengikuti jumlah grup. Draft driver tetap
+nomor/nama grup termasuk grup terkait. Kartu trip di Need Attention dan Completed
+memakai tampilan sebelumnya dan langsung terlihat tanpa membuka panel grup.
+Pagination mengikuti jumlah grup. Draft driver tetap
 tersimpan selama pengguna mengganti filter.
 
 Cukup build dan recreate service `web`. PR ini tidak memerlukan migrasi database,
@@ -97,10 +98,11 @@ Refresh penuh browser (`Ctrl+Shift+R`), lalu buka H-1 Checklist:
 
 - Pilih Today, Tomorrow, dan In 2 Days. Trip yang tampil mengikuti hari pilihan;
   jumlah pada tombol mengikuti pencarian dan filter agent.
-- Cari nomor atau nama grup, termasuk nomor/nama grup terkait. Panel grup terbuka
-  saat pencarian dan menampilkan trip yang sesuai.
-- Buka panel grup di Need Attention dan Completed. Periksa detail trip, jumlah
-  grup/trip, serta pagination. Mengganti filter mengembalikan halaman ke awal.
+- Cari nomor atau nama grup, termasuk nomor/nama grup terkait. Kartu trip yang
+  sesuai langsung tampil beserta kontrol driver, tanpa membuka panel grup.
+- Periksa kartu Need Attention dan Completed: detail trip, form driver, tombol
+  copy/cancel, jumlah grup/trip, serta pagination. Mengganti filter mengembalikan
+  halaman ke awal.
 - Coba pencarian tanpa hasil, lalu Reset filters. Hasil kosong tidak menampilkan
   status Clear; reset mengembalikan semua hari, agent, dan pencarian.
 - Isi draft driver tanpa menekan Confirm, ganti filter hari, lalu kembali.
