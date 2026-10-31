@@ -36,6 +36,8 @@ export type ChecklistItemsGroup = {
   items: ChecklistItem[];
 };
 
+export type ChecklistDayFilter = "all" | "today" | "tomorrow" | "day-after-tomorrow";
+
 export const groupChecklistItemsByGroup = (items: ChecklistItem[]): ChecklistItemsGroup[] => {
   const groupedItems = new Map<string, ChecklistItemsGroup>();
 
@@ -253,6 +255,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   const [cancelTargetItemId, setCancelTargetItemId] = useState<string | null>(null);
   const [groupCodeQuery, setGroupCodeQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
+  const [dayFilter, setDayFilter] = useState<ChecklistDayFilter>("all");
   const [pendingPage, setPendingPage] = useState(1);
   const [completedPage, setCompletedPage] = useState(1);
   const normalizedGroupCodeQuery = groupCodeQuery.trim().toLowerCase();
@@ -267,12 +270,29 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   
   const isTwoDaysAwayChecklistItem = (item: ChecklistItem): boolean => item.tripDate === dayAfterTomorrowIso;
   
-  const searchedChecklistItems = checklistItems.filter((item) => {
+  const matchingChecklistItems = checklistItems.filter((item) => {
     if (agentFilter !== "all" && item.agentId !== agentFilter) return false;
     if (!normalizedGroupCodeQuery) return true;
     const codes = item.groupCodes ?? [item.groupCode];
-    return codes.some((code) => code.toLowerCase().includes(normalizedGroupCodeQuery));
+    const names = codes.map((code) => groupsByCode.get(code.trim().toUpperCase())?.name ?? "");
+    return [item.groupName, ...codes, ...names].some((value) =>
+      value.toLowerCase().includes(normalizedGroupCodeQuery),
+    );
   });
+
+  const dayFilterOptions = [
+    { value: "all" as const, label: "All Days", date: "" },
+    { value: "today" as const, label: "Today", date: getLocalIsoDateWithOffset(0) },
+    { value: "tomorrow" as const, label: "Tomorrow", date: getLocalIsoDateWithOffset(1) },
+    { value: "day-after-tomorrow" as const, label: "In 2 Days", date: dayAfterTomorrowIso },
+  ].map((option) => ({
+    ...option,
+    count: matchingChecklistItems.filter((item) => !option.date || item.tripDate === option.date).length,
+  }));
+  const selectedDay = dayFilterOptions.find((option) => option.value === dayFilter)!;
+  const searchedChecklistItems = matchingChecklistItems.filter(
+    (item) => !selectedDay.date || item.tripDate === selectedDay.date,
+  );
   
   const pendingItems = searchedChecklistItems.filter((item) => !isChecklistItemCompleted(item));
   const completedItems = searchedChecklistItems.filter((item) => isChecklistItemCompleted(item));
@@ -280,7 +300,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   const pendingGroups = useMemo(() => groupChecklistItemsByGroup(pendingItems), [pendingItems]);
   const completedGroups = useMemo(() => groupChecklistItemsByGroup(completedItems), [completedItems]);
   
-  const isClear = pendingItems.length === 0;
+  const isClear = searchedChecklistItems.length > 0 && pendingItems.length === 0;
   const pendingTotalPages = Math.max(1, Math.ceil(pendingGroups.length / CHECKLIST_PAGE_SIZE));
   const completedTotalPages = Math.max(1, Math.ceil(completedGroups.length / CHECKLIST_PAGE_SIZE));
   
@@ -362,7 +382,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   useEffect(() => {
     setPendingPage(1);
     setCompletedPage(1);
-  }, [normalizedGroupCodeQuery, agentFilter]);
+  }, [normalizedGroupCodeQuery, agentFilter, dayFilter]);
 
   useEffect(() => {
     if (!cancelTargetItem) {
@@ -627,6 +647,10 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
     groupCodeQuery,
     agentFilter,
     setAgentFilter,
+    dayFilter,
+    setDayFilter,
+    dayFilterOptions,
+    selectedDay,
     setGroupCodeQuery,
     pendingPage,
     setPendingPage,

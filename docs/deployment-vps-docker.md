@@ -244,6 +244,9 @@ Setelah domain siap, set:
 
 ## Step 7: Update Aplikasi
 
+Untuk rilis filter hari, pencarian, dan pengelompokan H-1 Checklist, ikuti
+[panduan update VPS checklist](operations/update-vps-checklist-filters-20261031.md).
+
 Untuk rilis skeleton loading GTT Ops dan Portal Agent, ikuti
 [panduan update VPS skeleton loading](operations/update-vps-skeleton-loading-20261030.md).
 
