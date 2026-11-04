@@ -1,6 +1,7 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { GroupLifecycleStatus, GroupTone, VisaStatus } from "@prisma/client";
+import { Inject, Injectable, Optional } from "@nestjs/common";
+import { GroupLifecycleStatus, GroupTone, VisaBusStatus, VisaStatus } from "@prisma/client";
 import { AgentsService } from "../agents/agents.service";
+import { DirectoryService, type MuassasahRecord } from "../directory/directory.service";
 import type { GroupRepository } from "../domain/repositories/group.repository";
 import type { GroupSummaryRecord } from "../groups/groups.service-types";
 import { AnalyticsQueryDto, type AnalyticsMonthWindow } from "./dto/analytics-query.dto";
@@ -10,6 +11,8 @@ import type {
   MonthlyPoint,
   OperationalAnalytics,
   VisaAnalytics,
+  VisaMuassasahBreakdownItem,
+  VisaTypeBreakdownItem,
 } from "./analytics.types";
 
 const DEFAULT_WINDOW: AnalyticsMonthWindow = 12;
@@ -85,30 +88,118 @@ function readIssuedDateIso(group: GroupSummaryRecord): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
 }
 
+const UNASSIGNED_MUASSASAH_LABEL = "Belum Ditentukan";
+
+function isUnassignedSyarikah(raw: string | undefined | null): boolean {
+  const trimmed = raw?.trim().toLowerCase() ?? "";
+  return !trimmed || trimmed === "not assigned" || trimmed === "-" || trimmed === "pending provider selection";
+}
+
+function readGroupVisaType(group: GroupSummaryRecord): "VISA_ONLY" | "VISA_PLUS" {
+  const rawBusStatus = String(group.visaSetup?.busStatus ?? "").trim().toUpperCase();
+  if (rawBusStatus === VisaBusStatus.VISA_PLUS || rawBusStatus === "VISA+" || rawBusStatus === "VISA PLUS") {
+    return "VISA_PLUS";
+  }
+  if (rawBusStatus === VisaBusStatus.VISA_ONLY || rawBusStatus === "VISA ONLY") {
+    return "VISA_ONLY";
+  }
+  const notes = Array.isArray(group.notes) ? group.notes : [];
+  for (const note of notes) {
+    const text = typeof note?.text === "string" ? note.text : "";
+    if (/^bus status\s*:/i.test(text)) {
+      if (/visa\s*\+|visa[\s_-]*plus|bus\s*(internal|luar)/i.test(text)) {
+        return "VISA_PLUS";
+      }
+      if (/visa[\s_-]*only/i.test(text)) {
+        return "VISA_ONLY";
+      }
+    }
+  }
+  return "VISA_ONLY";
+}
+
+function resolveGroupMuassasah(
+  group: GroupSummaryRecord,
+  directoryMuassasah: MuassasahRecord[],
+): { muassasahId: string | null; name: string; isUnassigned: boolean } {
+  const raw = group.visaSetup?.syarikah?.trim().replace(/\s+/g, " ") ?? "";
+  if (isUnassignedSyarikah(raw)) {
+    return { muassasahId: null, name: UNASSIGNED_MUASSASAH_LABEL, isUnassigned: true };
+  }
+  const lower = raw.toLowerCase();
+  const matched = directoryMuassasah.find((item) => item.name.toLowerCase() === lower);
+  if (matched) {
+    return { muassasahId: matched.id, name: matched.name, isUnassigned: false };
+  }
+  return { muassasahId: null, name: raw, isUnassigned: false };
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(
     private readonly agentsService: AgentsService,
     @Inject("GroupRepository") private readonly groups: GroupRepository,
+    @Optional() private readonly directoryService?: DirectoryService,
   ) {}
 
   private resolveWindow(query: AnalyticsQueryDto): AnalyticsMonthWindow {
     return query.months ?? DEFAULT_WINDOW;
   }
 
-  private async loadGroups(agentId?: string): Promise<GroupSummaryRecord[]> {
+  private async loadDirectoryMuassasah(): Promise<MuassasahRecord[]> {
+    if (!this.directoryService) {
+      return [];
+    }
+    return this.directoryService.listMuassasah();
+  }
+
+  private filterGroupsByMuassasah(
+    groups: GroupSummaryRecord[],
+    rawMuassasahFilter: string | undefined,
+    directoryMuassasah: MuassasahRecord[],
+  ): GroupSummaryRecord[] {
+    const filter = rawMuassasahFilter?.trim();
+    if (!filter || filter.toLowerCase() === "all") {
+      return groups;
+    }
+    const lowerFilter = filter.toLowerCase();
+    if (lowerFilter === "unassigned" || lowerFilter === UNASSIGNED_MUASSASAH_LABEL.toLowerCase()) {
+      return groups.filter((group) => resolveGroupMuassasah(group, directoryMuassasah).isUnassigned);
+    }
+    const matchedDirectory = directoryMuassasah.find(
+      (item) => item.id === filter || item.name.toLowerCase() === lowerFilter,
+    );
+    const targetNameLower = matchedDirectory ? matchedDirectory.name.toLowerCase() : lowerFilter;
+    return groups.filter((group) => {
+      const resolved = resolveGroupMuassasah(group, directoryMuassasah);
+      return (
+        !resolved.isUnassigned &&
+        (resolved.muassasahId === filter || resolved.name.toLowerCase() === targetNameLower)
+      );
+    });
+  }
+
+  private async loadGroups(
+    agentId?: string,
+    muassasah?: string,
+    directoryMuassasah?: MuassasahRecord[],
+  ): Promise<GroupSummaryRecord[]> {
     const result = await this.groups.findAll(undefined, {
       projection: "summary",
       agentId: agentId?.trim() || undefined,
     });
-    const items = Array.isArray(result) ? result : result.items;
-    return items as GroupSummaryRecord[];
+    const items = (Array.isArray(result) ? result : result.items) as GroupSummaryRecord[];
+    if (!muassasah?.trim() || muassasah.trim().toLowerCase() === "all") {
+      return items;
+    }
+    const dir = directoryMuassasah ?? (await this.loadDirectoryMuassasah());
+    return this.filterGroupsByMuassasah(items, muassasah, dir);
   }
 
   async operational(query: AnalyticsQueryDto): Promise<OperationalAnalytics> {
     const months = this.resolveWindow(query);
     const buckets = buildMonthBuckets(months, new Date());
-    const groups = await this.loadGroups(query.agentId);
+    const groups = await this.loadGroups(query.agentId, query.muassasah);
 
     const monthlyByKey = new Map<string, { groups: number; pax: number }>();
     for (const bucket of buckets) {
@@ -170,7 +261,8 @@ export class AnalyticsService {
   async visa(query: AnalyticsQueryDto): Promise<VisaAnalytics> {
     const months = this.resolveWindow(query);
     const buckets = buildMonthBuckets(months, new Date());
-    const groups = await this.loadGroups(query.agentId);
+    const directoryMuassasah = await this.loadDirectoryMuassasah();
+    const groups = await this.loadGroups(query.agentId, query.muassasah, directoryMuassasah);
 
     // Everything is measured in pilgrims (pax), mirroring the Visa Tracking
     // issued statistics. Issued pax are bucketed by their issued-date month
@@ -185,6 +277,49 @@ export class AnalyticsService {
       funnelPax.set(stage, 0);
     }
 
+    const muassasahMap = new Map<
+      string,
+      {
+        muassasahId: string | null;
+        name: string;
+        isUnassigned: boolean;
+        groups: number;
+        totalPax: number;
+        issuedGroups: number;
+        issuedPax: number;
+      }
+    >();
+
+    const filterTrimmed = query.muassasah?.trim() ?? "";
+    const hasSpecificMuassasahFilter = Boolean(filterTrimmed && filterTrimmed.toLowerCase() !== "all");
+    for (const m of directoryMuassasah) {
+      if (!m.isActive) continue;
+      if (
+        hasSpecificMuassasahFilter &&
+        m.id !== filterTrimmed &&
+        m.name.toLowerCase() !== filterTrimmed.toLowerCase()
+      ) {
+        continue;
+      }
+      muassasahMap.set(m.name.toLowerCase(), {
+        muassasahId: m.id,
+        name: m.name,
+        isUnassigned: false,
+        groups: 0,
+        totalPax: 0,
+        issuedGroups: 0,
+        issuedPax: 0,
+      });
+    }
+
+    const visaTypeMap: Record<
+      "VISA_ONLY" | "VISA_PLUS",
+      { groups: number; totalPax: number; issuedGroups: number; issuedPax: number }
+    > = {
+      VISA_ONLY: { groups: 0, totalPax: 0, issuedGroups: 0, issuedPax: 0 },
+      VISA_PLUS: { groups: 0, totalPax: 0, issuedGroups: 0, issuedPax: 0 },
+    };
+
     let totalPax = 0;
     let issuedPax = 0;
     let missingIssuedDatePax = 0;
@@ -194,9 +329,40 @@ export class AnalyticsService {
       totalPax += pax;
 
       const status = readVisaStatus(group);
+      const isIssued = status === VisaStatus.ISSUED;
       funnelPax.set(status, (funnelPax.get(status) ?? 0) + pax);
 
-      if (status !== VisaStatus.ISSUED) {
+      const resolvedMuassasah = resolveGroupMuassasah(group, directoryMuassasah);
+      const muassasahKey = resolvedMuassasah.isUnassigned
+        ? "__unassigned__"
+        : resolvedMuassasah.name.toLowerCase();
+      const existingMuassasah = muassasahMap.get(muassasahKey) ?? {
+        muassasahId: resolvedMuassasah.muassasahId,
+        name: resolvedMuassasah.name,
+        isUnassigned: resolvedMuassasah.isUnassigned,
+        groups: 0,
+        totalPax: 0,
+        issuedGroups: 0,
+        issuedPax: 0,
+      };
+      existingMuassasah.groups += 1;
+      existingMuassasah.totalPax += pax;
+      if (isIssued) {
+        existingMuassasah.issuedGroups += 1;
+        existingMuassasah.issuedPax += pax;
+      }
+      muassasahMap.set(muassasahKey, existingMuassasah);
+
+      const visaType = readGroupVisaType(group);
+      const typeBucket = visaTypeMap[visaType];
+      typeBucket.groups += 1;
+      typeBucket.totalPax += pax;
+      if (isIssued) {
+        typeBucket.issuedGroups += 1;
+        typeBucket.issuedPax += pax;
+      }
+
+      if (!isIssued) {
         continue;
       }
       issuedPax += pax;
@@ -215,6 +381,47 @@ export class AnalyticsService {
 
     const issuedRate = totalPax > 0 ? Math.round((issuedPax / totalPax) * 1000) / 10 : 0;
 
+    const byMuassasah: VisaMuassasahBreakdownItem[] = [...muassasahMap.values()]
+      .sort((a, b) => {
+        if (a.isUnassigned !== b.isUnassigned) {
+          return a.isUnassigned ? 1 : -1;
+        }
+        return (
+          b.issuedPax - a.issuedPax ||
+          b.totalPax - a.totalPax ||
+          a.name.localeCompare(b.name)
+        );
+      })
+      .map((item) => ({
+        muassasahId: item.muassasahId,
+        name: item.name,
+        groups: item.groups,
+        totalPax: item.totalPax,
+        issuedGroups: item.issuedGroups,
+        issuedPax: item.issuedPax,
+        notIssuedPax: item.totalPax - item.issuedPax,
+        issuedRate: item.totalPax > 0 ? Math.round((item.issuedPax / item.totalPax) * 1000) / 10 : 0,
+      }));
+
+    const byVisaType: VisaTypeBreakdownItem[] = (
+      [
+        { visaType: "VISA_ONLY", label: "Visa Only" },
+        { visaType: "VISA_PLUS", label: "Visa+" },
+      ] as const
+    ).map(({ visaType, label }) => {
+      const bucket = visaTypeMap[visaType];
+      return {
+        visaType,
+        label,
+        groups: bucket.groups,
+        totalPax: bucket.totalPax,
+        issuedGroups: bucket.issuedGroups,
+        issuedPax: bucket.issuedPax,
+        notIssuedPax: bucket.totalPax - bucket.issuedPax,
+        issuedRate: bucket.totalPax > 0 ? Math.round((bucket.issuedPax / bucket.totalPax) * 1000) / 10 : 0,
+      };
+    });
+
     return {
       range: buildRange(buckets, months),
       totals: {
@@ -229,13 +436,18 @@ export class AnalyticsService {
         const value = monthlyByKey.get(bucket.month) ?? { issuedPax: 0 };
         return { month: bucket.month, label: bucket.label, issuedPax: value.issuedPax };
       }),
+      byMuassasah,
+      byVisaType,
     };
   }
 
   async agents(query: AnalyticsQueryDto): Promise<AgentAnalytics> {
     const months = this.resolveWindow(query);
     const buckets = buildMonthBuckets(months, new Date());
-    const [agents, groups] = await Promise.all([this.agentsService.list(), this.loadGroups(query.agentId)]);
+    const [agents, groups] = await Promise.all([
+      this.agentsService.list(),
+      this.loadGroups(query.agentId, query.muassasah),
+    ]);
 
     const statsByAgent = new Map<string, { groups: number; pax: number; visaIssuedPax: number }>();
     for (const group of groups) {

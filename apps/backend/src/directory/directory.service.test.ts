@@ -86,6 +86,19 @@ describe("DirectoryService (memory)", () => {
     expect((await service.listDrivers())[0]).toMatchObject({ muassasahId: null, muassasahName: null });
     expect((await service.listVehicles())[0]).toMatchObject({ muassasahId: null, muassasahName: null });
   });
+
+  it("upserts muassasah from syarikah name and ignores placeholder values", async () => {
+    const service = makeService();
+    expect(await service.upsertMuassasahFromSyarikah("Not assigned")).toBeNull();
+    expect(await service.upsertMuassasahFromSyarikah("-")).toBeNull();
+
+    const first = await service.upsertMuassasahFromSyarikah("  Daleel   Maalem ");
+    expect(first).toMatchObject({ name: "Daleel Maalem", isActive: true });
+
+    const second = await service.upsertMuassasahFromSyarikah("daleel maalem");
+    expect(second?.id).toBe(first?.id);
+    expect(second?.name).toBe("Daleel Maalem");
+  });
 });
 
 describe("DirectoryService scoped Prisma names", () => {

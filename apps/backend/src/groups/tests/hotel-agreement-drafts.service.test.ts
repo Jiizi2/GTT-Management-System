@@ -84,6 +84,10 @@ describe("HotelAgreementDrafts", () => {
       expect(created).toMatchObject({ muassasahId: muassasah.id, muassasahName: "Directory Muassasah" });
       await directory.updateMuassasah(muassasah.id, { name: "Renamed Muassasah" });
       expect(await service.findAll()).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id, muassasahName: "Renamed Muassasah" })]));
+      await groupsService.create(createGroupPayload({ code: "DRAFT-M-001", arrivalDate: "2026-10-10", returnDate: "2026-10-15" }));
+      await service.assign(created.id, { groupCode: "DRAFT-M-001" });
+      const assignedGroup = await groupsService.findOneByIdOrCode("DRAFT-M-001") as { visaSetup?: { syarikah?: string } };
+      expect(assignedGroup.visaSetup?.syarikah).toBe("Renamed Muassasah");
       expect(await service.update(created.id, { ...payload, status: AgreementApprovalStatus.APPROVED })).toMatchObject({ muassasahId: muassasah.id });
       expect(await service.update(created.id, { ...payload, muassasahId: null })).toMatchObject({ muassasahId: null, muassasahName: null });
       await expect(service.create({ ...payload, muassasahId: "missing-muassasah" })).rejects.toThrow("not found");

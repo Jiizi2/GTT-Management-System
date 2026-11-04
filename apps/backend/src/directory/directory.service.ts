@@ -170,11 +170,20 @@ export class DirectoryService {
       };
     }
     try {
+      const previous = name
+        ? await this.prisma.muassasah.findUnique?.({ where: { id }, select: { name: true } })
+        : null;
       const updated = await this.prisma.muassasah.update({
         where: { id },
         data,
         include: { _count: { select: { drivers: true, vehicles: true } } },
       });
+      if (name && previous?.name && previous.name !== name) {
+        await this.prisma.visaSetup?.updateMany?.({
+          where: { syarikah: { equals: previous.name, mode: "insensitive" } },
+          data: { syarikah: name },
+        });
+      }
       const { _count, ...row } = updated;
       return { ...row, driverCount: _count.drivers, vehicleCount: _count.vehicles };
     } catch (error) {
@@ -192,10 +201,48 @@ export class DirectoryService {
       for (const vehicle of this.memoryVehicles) if (vehicle.muassasahId === id) vehicle.muassasahId = null;
       return { deleted: true, id };
     }
-    await this.prisma.muassasah.delete({ where: { id } }).catch(() => {
+    const deleted = await this.prisma.muassasah.delete({ where: { id } }).catch(() => {
       throw new NotFoundException(`Muassasah '${id}' not found.`);
     });
+    if (deleted?.name) {
+      await this.prisma.visaSetup?.updateMany?.({
+        where: { syarikah: { equals: deleted.name, mode: "insensitive" } },
+        data: { syarikah: "Not assigned" },
+      });
+    }
     return { deleted: true, id };
+  }
+
+  /** Ensures a Syarikah / Muassasah name saved on VisaSetup exists in Master Data and returns the canonical record. */
+  async upsertMuassasahFromSyarikah(rawName?: string | null): Promise<MuassasahRecord | null> {
+    const name = rawName?.trim().replace(/\s+/g, " ");
+    if (!name) return null;
+    const lower = name.toLowerCase();
+    if (lower === "not assigned" || lower === "-" || lower === "pending provider selection") {
+      return null;
+    }
+
+    if (this.dataSource === "memory") {
+      const existing = this.memoryMuassasah.find((item) => item.name.toLowerCase() === lower);
+      if (existing) {
+        return {
+          ...existing,
+          driverCount: this.memoryDrivers.filter((d) => d.muassasahId === existing.id).length,
+          vehicleCount: this.memoryVehicles.filter((v) => v.muassasahId === existing.id).length,
+        };
+      }
+      return this.createMuassasah({ name });
+    }
+
+    const existing = await this.prisma.muassasah.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+      include: { _count: { select: { drivers: true, vehicles: true } } },
+    });
+    if (existing) {
+      const { _count, ...row } = existing;
+      return { ...row, driverCount: _count.drivers, vehicleCount: _count.vehicles };
+    }
+    return this.createMuassasah({ name });
   }
 
   // ----- Drivers -----

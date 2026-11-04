@@ -17,6 +17,8 @@ describe("analytics query helpers", () => {
     assert.equal(buildAnalyticsQueryString(12, "agent-a"), "months=12&agentId=agent-a");
     assert.equal(buildAnalyticsQueryString(12, "all"), "months=12");
     assert.equal(buildAnalyticsQueryString(12, ""), "months=12");
+    assert.equal(buildAnalyticsQueryString(12, "all", "Daleel Maalem"), "months=12&muassasah=Daleel+Maalem");
+    assert.equal(buildAnalyticsQueryString(12, "agent-a", "all"), "months=12&agentId=agent-a");
   });
 
   runCase("exposes only the supported month windows", () => {

@@ -11,7 +11,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { OperationalMonthlyPoint, VisaFunnelStage, VisaMonthlyPoint } from "../../../shared/analytics-types";
+import type {
+  OperationalMonthlyPoint,
+  VisaFunnelStage,
+  VisaMonthlyPoint,
+  VisaMuassasahBreakdownItem,
+  VisaTypeBreakdownItem,
+} from "../../../shared/analytics-types";
 import { visaStageLabel } from "../../../shared/analytics-types";
 
 const COLORS = {
@@ -96,6 +102,90 @@ export function VisaFunnelChart({ data }: { data: VisaFunnelStage[] }) {
             <Cell key={row.stage} fill={row.stage === "ISSUED" ? COLORS.primary : COLORS.secondary} />
           ))}
         </Bar>
+      </BarChart>
+    </ChartFrame>
+  );
+}
+
+function truncateAxisLabel(value: string, maxLength = 18): string {
+  const clean = String(value ?? "").trim();
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 1)}…` : clean;
+}
+
+export function MuassasahIssuedChart({ data }: { data: VisaMuassasahBreakdownItem[] }) {
+  const rows = data.filter((item) => item.totalPax > 0);
+  const displayRows = rows.length > 0 ? rows : data;
+  const chartHeight = Math.max(240, displayRows.length * 36 + 40);
+
+  return (
+    <div className="serene-chart-reveal max-h-80 w-full overflow-y-auto pr-1">
+      <div style={{ height: `${chartHeight}px` }} className="w-full min-w-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={displayRows} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+            <CartesianGrid stroke={COLORS.grid} horizontal={false} />
+            <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={axisTick}
+              tickLine={false}
+              axisLine={false}
+              width={140}
+              interval={0}
+              tickFormatter={(value: string) => truncateAxisLabel(value, 18)}
+            />
+            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgb(var(--color-secondary) / 0.08)" }} />
+            <Legend wrapperStyle={{ fontSize: "0.75rem", fontWeight: 600 }} />
+            <Bar
+              name="Jamaah Terbit"
+              dataKey="issuedPax"
+              stackId="pax"
+              fill={COLORS.primary}
+              radius={[0, 4, 4, 0]}
+              maxBarSize={22}
+              isAnimationActive={false}
+            />
+            <Bar
+              name="Belum Terbit"
+              dataKey="notIssuedPax"
+              stackId="pax"
+              fill={COLORS.secondary}
+              radius={[0, 4, 4, 0]}
+              maxBarSize={22}
+              isAnimationActive={false}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+export function VisaTypeChart({ data }: { data: VisaTypeBreakdownItem[] }) {
+  return (
+    <ChartFrame>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 16 }}>
+        <CartesianGrid stroke={COLORS.grid} horizontal={false} />
+        <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} allowDecimals={false} />
+        <YAxis type="category" dataKey="label" tick={axisTick} tickLine={false} axisLine={false} width={84} />
+        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgb(var(--color-secondary) / 0.08)" }} />
+        <Legend wrapperStyle={{ fontSize: "0.75rem", fontWeight: 600 }} />
+        <Bar
+          name="Jamaah Terbit"
+          dataKey="issuedPax"
+          fill={COLORS.primary}
+          radius={[0, 6, 6, 0]}
+          maxBarSize={24}
+          isAnimationActive={false}
+        />
+        <Bar
+          name="Belum Terbit"
+          dataKey="notIssuedPax"
+          fill={COLORS.secondary}
+          radius={[0, 6, 6, 0]}
+          maxBarSize={24}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ChartFrame>
   );

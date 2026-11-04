@@ -409,7 +409,10 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         stayEnd: toUtcMidnightDate(normalizedPayload.stayEnd),
         notes: normalizedPayload.notes ?? null,
       },
-      include: { agent: { select: { id: true, code: true, name: true } } },
+      include: {
+        agent: { select: { id: true, code: true, name: true } },
+        muassasah: { select: { name: true } },
+      },
     });
 
     await this.prisma.visaHotelAgreement.updateMany({
@@ -425,6 +428,20 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         stayEnd: toUtcMidnightDate(normalizedPayload.stayEnd),
       },
     });
+
+    if (updated.muassasah?.name) {
+      await this.prisma.visaSetup?.updateMany?.({
+        where: {
+          hotelAgreements: { some: { sourceDraftId: existing.id } },
+          OR: [
+            { syarikah: "Not assigned" },
+            { syarikah: "-" },
+            { syarikah: "" },
+          ],
+        },
+        data: { syarikah: updated.muassasah.name },
+      });
+    }
 
     const { remainingPax, assignedGroups } = await this.getPrismaDraftRemainingAndGroups(updated);
     return this.mapPrismaDraft(updated, remainingPax, assignedGroups);
@@ -453,7 +470,10 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
     try {
       assignmentResult = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('hotel-draft-assignment'), hashtext(${draftId}))`;
-        const draft = await tx.hotelAgreementDraft.findUnique({ where: { id: draftId } });
+        const draft = await tx.hotelAgreementDraft.findUnique({
+          where: { id: draftId },
+          include: { muassasah: { select: { name: true } } },
+        });
         if (!draft) throw new NotFoundException(`Hotel agreement draft '${draftId}' not found.`);
 
         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -481,6 +501,7 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
         returnDate: true,
         visaSetup: {
           select: {
+            syarikah: true,
             hotelAgreements: {
               select: {
                 id: true,
@@ -546,12 +567,19 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
 
     const paxToAssign = Math.min(targetGroup.pax, minRemaining);
 
+        const currentSyarikah = targetGroup.visaSetup?.syarikah?.trim().toLowerCase() ?? "";
+        const shouldSetSyarikahFromDraft =
+          Boolean(draft.muassasah?.name) &&
+          (!currentSyarikah || currentSyarikah === "not assigned" || currentSyarikah === "-");
+
         const visaSetup = await tx.visaSetup.upsert({
           where: { groupId: targetGroup.id },
-          update: {},
+          update: shouldSetSyarikahFromDraft && draft.muassasah?.name
+            ? { syarikah: draft.muassasah.name }
+            : {},
           create: {
             groupId: targetGroup.id,
-            syarikah: "Not assigned",
+            syarikah: draft.muassasah?.name || "Not assigned",
           },
           select: { id: true },
         });

@@ -66,7 +66,7 @@ export class GroupsService {
   }
 
   async create(payload: CreateGroupDto): Promise<GroupDetailRecord> {
-    const normalizedPayload = await this.withValidatedAgent(payload);
+    const normalizedPayload = await this.withSyncedSyarikah(await this.withValidatedAgent(payload));
     const created = await this.commandService.create(normalizedPayload);
     await this.writeAuditLog("group.created", "group", created, {
       code: payload.code.trim().toUpperCase(),
@@ -106,10 +106,10 @@ export class GroupsService {
     // Replacing operational details (including an itinerary) must not require the
     // current owner to still be active. Ownership is unchanged here; only create
     // and the dedicated reassign endpoint are allowed to validate/change it.
-    const normalizedPayload: CreateGroupDto = {
+    const normalizedPayload = await this.withSyncedSyarikah({
       ...payload,
       agentId: existingAgentId || requestedAgentId || GTT_DIRECT_AGENT_ID,
-    };
+    });
     const replaced = await this.commandService.replace(idOrCode, normalizedPayload);
     await this.writeAuditLog("group.replaced", "group", replaced, {
       idOrCode,
@@ -542,6 +542,44 @@ export class GroupsService {
     const agentId = payload.agentId?.trim() || GTT_DIRECT_AGENT_ID;
     if (this.agentsService) await this.agentsService.assertActive(agentId);
     return { ...payload, agentId };
+  }
+
+  private async withSyncedSyarikah(payload: CreateGroupDto): Promise<CreateGroupDto> {
+    if (!this.directoryService || !payload.visaSetup?.syarikah) {
+      return payload;
+    }
+    try {
+      const synced = await this.directoryService.upsertMuassasahFromSyarikah(payload.visaSetup.syarikah);
+      if (synced) {
+        return {
+          ...payload,
+          visaSetup: {
+            ...payload.visaSetup,
+            syarikah: synced.name,
+          },
+        };
+      }
+    } catch (error) {
+      this.logger.warn({ err: error }, "Failed to sync VisaSetup syarikah with Muassasah directory");
+    }
+    return payload;
+  }
+
+  async syncSyarikahFromMuassasahIfUnassigned(idOrCode: string, muassasahName?: string | null): Promise<void> {
+    const cleanName = muassasahName?.trim();
+    if (!cleanName || this.dataSource !== "memory") return;
+    try {
+      const group = (await this.findOneByIdOrCode(idOrCode)) as {
+        visaSetup?: { syarikah?: string } | null;
+      };
+      if (!group?.visaSetup) return;
+      const current = group.visaSetup.syarikah?.trim().toLowerCase() ?? "";
+      if (!current || current === "not assigned" || current === "-") {
+        group.visaSetup.syarikah = cleanName;
+      }
+    } catch {
+      // Ignore if group lookup fails
+    }
   }
 
   private addDaysToIsoDate(isoDate: string, dayOffset: number): string {

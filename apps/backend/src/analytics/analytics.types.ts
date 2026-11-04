@@ -41,6 +41,28 @@ export type VisaMonthlyPoint = MonthlyPoint & {
   issuedPax: number;
 };
 
+export type VisaMuassasahBreakdownItem = {
+  muassasahId: string | null;
+  name: string;
+  groups: number;
+  totalPax: number;
+  issuedGroups: number;
+  issuedPax: number;
+  notIssuedPax: number;
+  issuedRate: number;
+};
+
+export type VisaTypeBreakdownItem = {
+  visaType: "VISA_ONLY" | "VISA_PLUS";
+  label: "Visa Only" | "Visa+";
+  groups: number;
+  totalPax: number;
+  issuedGroups: number;
+  issuedPax: number;
+  notIssuedPax: number;
+  issuedRate: number;
+};
+
 export type VisaAnalytics = {
   range: AnalyticsRange;
   totals: {
@@ -52,6 +74,8 @@ export type VisaAnalytics = {
   };
   funnel: VisaFunnelStage[];
   monthly: VisaMonthlyPoint[];
+  byMuassasah: VisaMuassasahBreakdownItem[];
+  byVisaType: VisaTypeBreakdownItem[];
 };
 
 export type AgentPerformanceRow = {
