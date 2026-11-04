@@ -40,6 +40,28 @@ export type VisaMonthlyPoint = {
   issuedPax: number;
 };
 
+export type VisaMuassasahBreakdownItem = {
+  muassasahId: string | null;
+  name: string;
+  groups: number;
+  totalPax: number;
+  issuedGroups: number;
+  issuedPax: number;
+  notIssuedPax: number;
+  issuedRate: number;
+};
+
+export type VisaTypeBreakdownItem = {
+  visaType: "VISA_ONLY" | "VISA_PLUS";
+  label: "Visa Only" | "Visa+";
+  groups: number;
+  totalPax: number;
+  issuedGroups: number;
+  issuedPax: number;
+  notIssuedPax: number;
+  issuedRate: number;
+};
+
 export type VisaAnalytics = {
   range: AnalyticsRange;
   totals: {
@@ -51,6 +73,8 @@ export type VisaAnalytics = {
   };
   funnel: VisaFunnelStage[];
   monthly: VisaMonthlyPoint[];
+  byMuassasah: VisaMuassasahBreakdownItem[];
+  byVisaType: VisaTypeBreakdownItem[];
 };
 
 export type AgentPerformanceRow = {
@@ -88,11 +112,14 @@ export function visaStageLabel(stage: string): string {
  * Build the query string for an analytics request. `agentId` of "all" (or empty)
  * is treated as "no agent filter" and omitted so the backend returns every agent.
  */
-export function buildAnalyticsQueryString(months: number, agentId?: string): string {
+export function buildAnalyticsQueryString(months: number, agentId?: string, muassasah?: string): string {
   const params = new URLSearchParams();
   params.set("months", String(months));
   if (agentId && agentId !== "all") {
     params.set("agentId", agentId);
+  }
+  if (muassasah && muassasah !== "all") {
+    params.set("muassasah", muassasah);
   }
   return params.toString();
 }

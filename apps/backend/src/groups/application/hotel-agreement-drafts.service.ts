@@ -51,7 +51,12 @@ export class HotelAgreementDraftsService {
     draftId: string,
     payload: AssignHotelAgreementDraftDto,
   ): Promise<unknown> {
-    return (await this.withMuassasah([await this.agreementDraftRepo.assign(draftId, payload)]))[0];
+    const assigned = (await this.withMuassasah([await this.agreementDraftRepo.assign(draftId, payload)]))[0];
+    const muassasahName = (assigned as { muassasahName?: string | null } | undefined)?.muassasahName;
+    if (this.groupsService && muassasahName) {
+      await this.groupsService.syncSyarikahFromMuassasahIfUnassigned(payload.groupCode, muassasahName);
+    }
+    return assigned;
   }
 
   async unassign(draftId: string, groupCode?: string): Promise<unknown> {

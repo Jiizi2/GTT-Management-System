@@ -487,24 +487,63 @@ export function PaymentStatusModal({
 
 export function SyarikahModal({
   initialValue,
+  muassasahOptions = [],
+  isLoading = false,
+  loadError,
   onClose,
   onSave,
 }: {
   initialValue: string;
+  muassasahOptions?: Array<{ id: string; name: string; isActive?: boolean }>;
+  isLoading?: boolean;
+  loadError?: string;
   onClose: () => void;
   onSave: (nextValue: string) => void | Promise<void>;
 }) {
+  const normalizedInitial =
+    initialValue.trim() &&
+    initialValue.trim().toLowerCase() !== "not assigned" &&
+    initialValue.trim() !== "-" &&
+    initialValue.trim().toLowerCase() !== "pending provider selection"
+      ? initialValue.trim()
+      : "";
+
+  const resolvedOptions = useMemo(() => {
+    const active = muassasahOptions.filter((item) => item.isActive !== false);
+    if (
+      normalizedInitial &&
+      !active.some((item) => item.name.toLowerCase() === normalizedInitial.toLowerCase())
+    ) {
+      return [{ id: normalizedInitial, name: normalizedInitial, isActive: true }, ...active];
+    }
+    return active;
+  }, [muassasahOptions, normalizedInitial]);
+
+  const matchedInitialValue =
+    resolvedOptions.find((item) => item.name.toLowerCase() === normalizedInitial.toLowerCase())?.name ??
+    normalizedInitial;
+
   const {
-    register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<{ value: string }>({
     resolver: zodResolver(syarikahModalSchema),
     defaultValues: {
-      value: initialValue,
+      value: matchedInitialValue,
     },
   });
   const valueErrorMessage = errors.value?.message;
+  const options = [
+    <option key="empty" value="" disabled>
+      {isLoading ? "Loading muassasah..." : "Select Muassasah"}
+    </option>,
+    ...resolvedOptions.map((item) => (
+      <option key={item.id} value={item.name}>
+        {item.name}
+      </option>
+    )),
+  ];
 
   return (
     <ModalShell
@@ -517,25 +556,39 @@ export function SyarikahModal({
           onClose={onClose}
           onSave={() => void handleSubmit(({ value }) => void onSave(value.trim()))()}
           saveLabel="Save Changes"
+          isSaveDisabled={isLoading}
           isSaving={isSubmitting}
         />
       }
     >
       <label className={modalFieldClassName}>
         <span>Syarikah / Provider Agency</span>
-        <input
-          id="visa-syarikah"
-          className={modalInputClassName}
-          type="text"
-          placeholder="e.g. Al-Tayyar"
-          {...register("value")}
-          aria-invalid={getFieldAriaInvalid(valueErrorMessage)}
-          aria-describedby={getFieldDescribedBy("visa-syarikah", {
-            errorMessage: valueErrorMessage,
-          })}
-        />
+        <div className="relative">
+          <Controller
+            control={control}
+            name="value"
+            render={({ field }) => (
+              <SereneSelect
+                id="visa-syarikah"
+                className={modalSelectClassName}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                disabled={isLoading}
+                searchable
+                searchPlaceholder="Cari nama muassasah..."
+                aria-invalid={getFieldAriaInvalid(valueErrorMessage)}
+                aria-describedby={getFieldDescribedBy("visa-syarikah", {
+                  errorMessage: valueErrorMessage,
+                })}
+              >
+                {options}
+              </SereneSelect>
+            )}
+          />
+        </div>
       </label>
       <FieldErrorMessage fieldId="visa-syarikah" message={valueErrorMessage} className={modalErrorClassName} />
+      {loadError ? <p className={modalErrorClassName}>{loadError}</p> : null}
     </ModalShell>
   );
 }

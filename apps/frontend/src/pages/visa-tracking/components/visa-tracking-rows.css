@@ -1,6 +1,6 @@
 .visa-filter-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 6px;
   border: 1px solid rgb(var(--color-outline-variant) / 0.35);
@@ -47,6 +47,11 @@
 .visa-filter-bar .visa-filter-field button:focus-visible {
   outline: 2px solid rgb(var(--color-primary));
   outline-offset: 2px;
+}
+@media (max-width: 1023px) {
+  .visa-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 639px) {
   .visa-filter-bar {

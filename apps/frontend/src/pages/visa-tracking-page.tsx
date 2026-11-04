@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { AgreementApprovalStatus, GroupData, VisaTrackingRow, VisaFilterId } from "../shared/app-domain";
 import { AgentFilterSelect } from "../components/agent-filter-select";
 import { PaginationControls } from "../components/pagination-controls";
@@ -6,12 +6,18 @@ import { PageHeroSection } from "../components/page-hero-section";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { Button } from "../components/button";
 import { SereneSelect } from "../components/serene-select";
+import { useMuassasahQuery } from "../hooks/use-directory-backend";
 import { useThemeMode } from "../theme/theme-provider";
 import { useVisaTracking, desktopTableGridTemplate, getVisaRowGroupKey } from "./visa-tracking/hooks/use-visa-tracking";
 import { VisaTrackingStats } from "./visa-tracking/components/VisaTrackingStats";
 import { VisaTrackingRowGroup } from "./visa-tracking/components/VisaTrackingRowGroup";
 import { DataBoundary, type DataQueryState } from "../components/data-boundary";
 import { ListSkeleton, MetricsSkeleton } from "../components/skeleton";
+
+function isUnassignedSyarikah(raw: string | undefined): boolean {
+  const normalized = raw?.trim().toLowerCase() ?? "";
+  return !normalized || normalized === "not assigned" || normalized === "-" || normalized === "pending provider selection";
+}
 
 export function VisaTrackingScreen({
   groups,
@@ -34,7 +40,44 @@ export function VisaTrackingScreen({
   const isDarkMode = theme === "dark";
 
   const [agentFilter, setAgentFilter] = useState("all");
-  const scopedGroups = agentFilter === "all" ? groups : groups.filter((group) => group.agentId === agentFilter);
+  const [muassasahFilter, setMuassasahFilter] = useState("all");
+  const muassasahQuery = useMuassasahQuery();
+
+  const muassasahOptions = useMemo(() => {
+    const namesByLower = new Map<string, string>();
+    for (const item of muassasahQuery.data ?? []) {
+      if (item.isActive && item.name.trim()) {
+        namesByLower.set(item.name.trim().toLowerCase(), item.name.trim());
+      }
+    }
+    for (const group of groups) {
+      const syarikah = group.visaSetup?.syarikah?.trim() ?? "";
+      if (!isUnassignedSyarikah(syarikah)) {
+        const key = syarikah.toLowerCase();
+        if (!namesByLower.has(key)) {
+          namesByLower.set(key, syarikah);
+        }
+      }
+    }
+    return Array.from(namesByLower.values()).sort((a, b) => a.localeCompare(b));
+  }, [groups, muassasahQuery.data]);
+
+  const scopedGroups = useMemo(() => {
+    return groups.filter((group) => {
+      if (agentFilter !== "all" && group.agentId !== agentFilter) {
+        return false;
+      }
+      if (muassasahFilter === "all") {
+        return true;
+      }
+      const syarikah = group.visaSetup?.syarikah?.trim() ?? "";
+      if (muassasahFilter === "unassigned") {
+        return isUnassignedSyarikah(syarikah);
+      }
+      return !isUnassignedSyarikah(syarikah) && syarikah.toLowerCase() === muassasahFilter.trim().toLowerCase();
+    });
+  }, [agentFilter, groups, muassasahFilter]);
+
   const state = useVisaTracking({
     groups: scopedGroups,
     agentLabel:
@@ -168,6 +211,26 @@ export function VisaTrackingScreen({
             leadingIcon="business"
           />
         )}
+
+        <div className="visa-filter-field">
+          <span className="material-symbols-outlined visa-filter-icon" aria-hidden="true">apartment</span>
+          <SereneSelect
+            className="visa-filter-control"
+            value={muassasahFilter}
+            onChange={(event) => setMuassasahFilter(event.target.value)}
+            aria-label="Filter by Muassasah"
+            searchable
+            searchPlaceholder="Cari nama muassasah..."
+          >
+            <option value="all">All Muassasah</option>
+            {muassasahOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+            <option value="unassigned">Belum Ditentukan</option>
+          </SereneSelect>
+        </div>
 
         <div className="visa-filter-field">
           <span className="material-symbols-outlined visa-filter-icon" aria-hidden="true">calendar_month</span>

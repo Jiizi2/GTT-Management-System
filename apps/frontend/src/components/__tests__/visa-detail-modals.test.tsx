@@ -307,8 +307,13 @@ describe('AgentAssignmentModal', () => {
 });
 
 describe('SyarikahModal', () => {
+  const muassasahOptions = [
+    { id: 'muassasah-1', name: 'Al-Tayyar', isActive: true },
+    { id: 'muassasah-2', name: 'Daleel Maalem', isActive: true },
+  ];
   const defaultProps = {
     initialValue: 'Al-Tayyar',
+    muassasahOptions,
     onClose: vi.fn(),
     onSave: vi.fn(),
   };
@@ -327,15 +332,10 @@ describe('SyarikahModal', () => {
     expect(screen.getByText('Update the provider agency used for visa coordination.')).toBeInTheDocument();
   });
 
-  it('renders syarikah input field', () => {
+  it('renders syarikah select field from Muassasah options', () => {
     render(<SyarikahModal {...defaultProps} />);
     expect(screen.getByText('Syarikah / Provider Agency')).toBeInTheDocument();
-  });
-
-  it('displays initial value in input', () => {
-    render(<SyarikahModal {...defaultProps} />);
-    const input = screen.getByPlaceholderText('e.g. Al-Tayyar');
-    expect(input).toHaveValue('Al-Tayyar');
+    expect(screen.getByText('Al-Tayyar')).toBeInTheDocument();
   });
 
   it('calls onClose when close button is clicked', () => {
@@ -345,7 +345,7 @@ describe('SyarikahModal', () => {
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
 
-  it('calls onSave with trimmed value when save is clicked', async () => {
+  it('calls onSave with selected muassasah when save is clicked', async () => {
     render(<SyarikahModal {...defaultProps} />);
     const saveButton = screen.getByText('Save Changes');
     fireEvent.click(saveButton);
@@ -355,10 +355,8 @@ describe('SyarikahModal', () => {
     });
   });
 
-  it('shows validation error when input is empty', async () => {
-    render(<SyarikahModal {...defaultProps} initialValue="" />);
-    const input = screen.getByPlaceholderText('e.g. Al-Tayyar');
-    fireEvent.change(input, { target: { value: '' } });
+  it('shows validation error when selection is empty', async () => {
+    render(<SyarikahModal {...defaultProps} initialValue="Not assigned" />);
 
     const saveButton = screen.getByText('Save Changes');
     fireEvent.click(saveButton);

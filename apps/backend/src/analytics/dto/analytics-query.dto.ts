@@ -16,4 +16,9 @@ export class AnalyticsQueryDto {
   @IsString()
   @MaxLength(191)
   agentId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(191)
+  muassasah?: string;
 }

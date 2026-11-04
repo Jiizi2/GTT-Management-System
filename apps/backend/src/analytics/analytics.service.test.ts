@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentStatus, AgentType, GroupLifecycleStatus, GroupTone, VisaStatus } from "@prisma/client";
+import { AgentStatus, AgentType, GroupLifecycleStatus, GroupTone, VisaBusStatus, VisaStatus } from "@prisma/client";
 import type { AgentsService } from "../agents/agents.service";
+import type { DirectoryService } from "../directory/directory.service";
 import type { GroupRepository } from "../domain/repositories/group.repository";
 import { AnalyticsService } from "./analytics.service";
 
@@ -32,7 +33,12 @@ const groupFixtures = [
     packageName: "Umrah Reguler",
     tone: GroupTone.ACTIVE,
     lifecycleStatus: GroupLifecycleStatus.ACTIVE,
-    visaSetup: { visaStatus: VisaStatus.ISSUED, issuedDate: thisMonthDate() },
+    visaSetup: {
+      visaStatus: VisaStatus.ISSUED,
+      issuedDate: thisMonthDate(),
+      syarikah: "Daleel Maalem",
+      busStatus: VisaBusStatus.VISA_PLUS,
+    },
   },
   {
     id: "g2",
@@ -43,7 +49,12 @@ const groupFixtures = [
     packageName: "Umrah Reguler",
     tone: GroupTone.INACTIVE,
     lifecycleStatus: GroupLifecycleStatus.COMPLETED,
-    visaSetup: { visaStatus: VisaStatus.PENDING, issuedDate: null },
+    visaSetup: {
+      visaStatus: VisaStatus.PENDING,
+      issuedDate: null,
+      syarikah: "Daleel Maalem",
+      busStatus: VisaBusStatus.VISA_ONLY,
+    },
   },
   {
     id: "g3",
@@ -54,7 +65,12 @@ const groupFixtures = [
     packageName: "Umrah Plus Turki",
     tone: GroupTone.ACTIVE,
     lifecycleStatus: GroupLifecycleStatus.ACTIVE,
-    visaSetup: { visaStatus: VisaStatus.DRAFT, issuedDate: null },
+    visaSetup: {
+      visaStatus: VisaStatus.DRAFT,
+      issuedDate: null,
+      syarikah: "Rawaf Mina",
+      busStatus: VisaBusStatus.VISA_ONLY,
+    },
   },
 ];
 
@@ -134,5 +150,66 @@ describe("AnalyticsService", () => {
       visaIssuedRate: 66.7,
     });
     expect(result.agents[1]).toMatchObject({ agentId: "agent-b", groups: 1, pax: 15, visaIssuedPax: 0 });
+  });
+
+  it("computes byMuassasah, byVisaType, and supports filtering by muassasah", async () => {
+    const directory = {
+      listMuassasah: vi.fn().mockResolvedValue([
+        { id: "m-1", name: "Daleel Maalem", isActive: true, driverCount: 0, vehicleCount: 0 },
+        { id: "m-2", name: "Rawaf Mina", isActive: true, driverCount: 0, vehicleCount: 0 },
+      ]),
+    } as unknown as DirectoryService;
+    const service = new AnalyticsService(makeAgents(agentFixtures), makeGroupRepo(groupFixtures), directory);
+
+    const visaAll = await service.visa({ months: 12 });
+    expect(visaAll.byMuassasah).toEqual([
+      {
+        muassasahId: "m-1",
+        name: "Daleel Maalem",
+        groups: 2,
+        totalPax: 60,
+        issuedGroups: 1,
+        issuedPax: 40,
+        notIssuedPax: 20,
+        issuedRate: 66.7,
+      },
+      {
+        muassasahId: "m-2",
+        name: "Rawaf Mina",
+        groups: 1,
+        totalPax: 15,
+        issuedGroups: 0,
+        issuedPax: 0,
+        notIssuedPax: 15,
+        issuedRate: 0,
+      },
+    ]);
+    expect(visaAll.byVisaType).toEqual([
+      {
+        visaType: "VISA_ONLY",
+        label: "Visa Only",
+        groups: 2,
+        totalPax: 35,
+        issuedGroups: 0,
+        issuedPax: 0,
+        notIssuedPax: 35,
+        issuedRate: 0,
+      },
+      {
+        visaType: "VISA_PLUS",
+        label: "Visa+",
+        groups: 1,
+        totalPax: 40,
+        issuedGroups: 1,
+        issuedPax: 40,
+        notIssuedPax: 0,
+        issuedRate: 100,
+      },
+    ]);
+
+    const filtered = await service.visa({ months: 12, muassasah: "Daleel Maalem" });
+    expect(filtered.totals).toMatchObject({ totalPax: 60, issuedPax: 40, notIssuedPax: 20 });
+    expect(filtered.byMuassasah).toHaveLength(1);
+    expect(filtered.byMuassasah[0]?.name).toBe("Daleel Maalem");
   });
 });

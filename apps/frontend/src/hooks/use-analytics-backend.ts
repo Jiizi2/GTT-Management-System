@@ -12,10 +12,11 @@ import {
 export type AnalyticsFilters = {
   months: AnalyticsMonthWindow;
   agentId?: string;
+  muassasah?: string;
 };
 
 function buildAnalyticsPath(resource: string, filters: AnalyticsFilters): string {
-  return `/analytics/${resource}?${buildAnalyticsQueryString(filters.months, filters.agentId)}`;
+  return `/analytics/${resource}?${buildAnalyticsQueryString(filters.months, filters.agentId, filters.muassasah)}`;
 }
 
 async function fetchAnalytics<T>(resource: string, filters: AnalyticsFilters, signal?: AbortSignal): Promise<T> {
@@ -34,7 +35,7 @@ async function fetchAnalytics<T>(resource: string, filters: AnalyticsFilters, si
 
 export function useOperationalAnalyticsQuery(filters: AnalyticsFilters) {
   return useQuery({
-    queryKey: ["analytics", "operational", filters.months, filters.agentId ?? "all"],
+    queryKey: ["analytics", "operational", filters.months, filters.agentId ?? "all", filters.muassasah ?? "all"],
     queryFn: ({ signal }) => fetchAnalytics<OperationalAnalytics>("operational", filters, signal),
     staleTime: 60_000,
   });
@@ -42,7 +43,7 @@ export function useOperationalAnalyticsQuery(filters: AnalyticsFilters) {
 
 export function useVisaAnalyticsQuery(filters: AnalyticsFilters) {
   return useQuery({
-    queryKey: ["analytics", "visa", filters.months, filters.agentId ?? "all"],
+    queryKey: ["analytics", "visa", filters.months, filters.agentId ?? "all", filters.muassasah ?? "all"],
     queryFn: ({ signal }) => fetchAnalytics<VisaAnalytics>("visa", filters, signal),
     staleTime: 60_000,
   });
@@ -50,7 +51,7 @@ export function useVisaAnalyticsQuery(filters: AnalyticsFilters) {
 
 export function useAgentAnalyticsQuery(filters: AnalyticsFilters) {
   return useQuery({
-    queryKey: ["analytics", "agents", filters.months, filters.agentId ?? "all"],
+    queryKey: ["analytics", "agents", filters.months, filters.agentId ?? "all", filters.muassasah ?? "all"],
     queryFn: ({ signal }) => fetchAnalytics<AgentAnalytics>("agents", filters, signal),
     staleTime: 60_000,
   });

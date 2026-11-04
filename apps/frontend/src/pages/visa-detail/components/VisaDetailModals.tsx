@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useAgentsQuery } from "../../../hooks/use-agents-backend";
+import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
 import { formatLocalIsoDate } from "../../../shared/app-domain";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
 import { resolveGroupFlightDetails } from "../visa-detail-helpers";
@@ -111,6 +112,7 @@ export function VisaDetailModals() {
       ? [group.agent, ...activeAgents]
       : activeAgents;
 
+  const muassasahQuery = useMuassasahQuery();
   const syarikahValue = group?.visaSetup?.syarikah?.trim() ?? "";
   const flightAgreementBounds = resolveFlightAgreementDateBounds([...makkahAgreements, ...madinahAgreements]);
 
@@ -174,7 +176,14 @@ export function VisaDetailModals() {
           ) : null}
 
           {activeModal === "syarikah" ? (
-            <LazySyarikahModal initialValue={syarikahValue} onClose={closeModal} onSave={saveSyarikah} />
+            <LazySyarikahModal
+              initialValue={syarikahValue}
+              muassasahOptions={muassasahQuery.data ?? []}
+              isLoading={muassasahQuery.isLoading}
+              loadError={muassasahQuery.isError ? "Muassasah list could not be loaded." : undefined}
+              onClose={closeModal}
+              onSave={saveSyarikah}
+            />
           ) : null}
 
           {activeModal === "flight" ? (
