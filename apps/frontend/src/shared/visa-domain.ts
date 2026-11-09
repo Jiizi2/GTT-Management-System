@@ -503,6 +503,53 @@ export function generateMuassasahHijaziWhatsappCopyText(
   return lines.join("\n");
 }
 
+function getDraftAvailablePaxForRange(
+  draft: HotelAgreementDraft,
+  rangeStartIso: string,
+  rangeEndIso: string,
+): number {
+  const assignedGroups = draft.assignedGroups ?? [];
+  const hasDatedAssignments =
+    assignedGroups.length > 0 &&
+    assignedGroups.some(
+      (g: any) =>
+        isIsoDateValue((g.stayStart ?? g.stayStartIso ?? "").trim()) &&
+        isIsoDateValue((g.stayEnd ?? g.stayEndIso ?? "").trim()),
+    );
+
+  if (!hasDatedAssignments || !isIsoDateValue(rangeStartIso) || !isIsoDateValue(rangeEndIso)) {
+    return draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+  }
+
+  const startMs = Date.parse(rangeStartIso);
+  const endMs = Date.parse(rangeEndIso);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || startMs >= endMs) {
+    return draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+  }
+
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  let minRemaining = draft.pax;
+  for (let currentMs = startMs; currentMs < endMs; currentMs += oneDayMs) {
+    const night = new Date(currentMs).toISOString().slice(0, 10);
+    const occupiedOnNight = assignedGroups
+      .filter((g: any) => {
+        const gStart = (g.stayStart ?? g.stayStartIso ?? "").trim();
+        const gEnd = (g.stayEnd ?? g.stayEndIso ?? "").trim();
+        if (isIsoDateValue(gStart) && isIsoDateValue(gEnd)) {
+          return night >= gStart && night < gEnd;
+        }
+        return true;
+      })
+      .reduce((sum: number, g: any) => sum + (g.pax || 0), 0);
+    const remainingOnNight = Math.max(0, draft.pax - occupiedOnNight);
+    if (remainingOnNight < minRemaining) {
+      minRemaining = remainingOnNight;
+    }
+  }
+
+  return minRemaining;
+}
+
 export function filterAgreementDrafts(
   drafts: HotelAgreementDraft[],
   params: {
@@ -523,24 +570,33 @@ export function filterAgreementDrafts(
   const groupReturn = (params.groupReturnDate ?? "").trim() || (params.rowReturnIso ?? "").trim();
 
   for (const draft of drafts) {
+    if (draft.status === "Rejected") {
+      continue;
+    }
+
     const draftKey = `${draft.city}:${draft.agreementNumber.trim().toUpperCase()}`;
     if (params.connectedAgreementKeys.has(draftKey)) {
       continue;
     }
 
-    // 1. Group Travel Period Filtering (Option A: Fully Contained)
+    const draftStart = (draft.stayStartIso ?? "").trim();
+    const draftEnd = (draft.stayEndIso ?? "").trim();
+    let overlapStart = draftStart;
+    let overlapEnd = draftEnd;
+
+    // 1. Group Travel Period Filtering (Overlap with group travel period)
     if (isIsoDateValue(groupArrival) && isIsoDateValue(groupReturn)) {
-      const draftStart = (draft.stayStartIso ?? "").trim();
-      const draftEnd = (draft.stayEndIso ?? "").trim();
       if (isIsoDateValue(draftStart) && isIsoDateValue(draftEnd)) {
-        if (draftStart < groupArrival || draftEnd > groupReturn) {
+        if (draftStart >= groupReturn || draftEnd <= groupArrival) {
           continue;
         }
+        overlapStart = draftStart > groupArrival ? draftStart : groupArrival;
+        overlapEnd = draftEnd < groupReturn ? draftEnd : groupReturn;
       }
     }
 
-    // Linked drafts can serve other groups while their remaining pax is sufficient.
-    const availablePax = draft.remainingPax !== undefined ? draft.remainingPax : draft.pax;
+    // Linked drafts can serve other groups while their remaining pax on the overlapping nights is sufficient.
+    const availablePax = getDraftAvailablePaxForRange(draft, overlapStart, overlapEnd);
     if (availablePax < params.totalPax) {
       continue;
     }

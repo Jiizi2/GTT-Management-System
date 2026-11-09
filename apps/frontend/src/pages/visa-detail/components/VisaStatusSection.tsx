@@ -10,7 +10,6 @@ export function VisaStatusSection() {
     paymentTone,
     raudhahTone,
     raudhahStatusText,
-    draftAssignFeedback,
     openVisaStatusModal,
     openVisaTypeModal,
     openPaymentStatusModal,
@@ -119,23 +118,6 @@ export function VisaStatusSection() {
           </button>
         </article>
       </section>
-
-      {draftAssignFeedback ? (
-        <section
-          className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm ${
-            draftAssignFeedback.tone === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-700"
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
-            {draftAssignFeedback.tone === "success" ? "check_circle" : "warning"}
-          </span>
-          <p className="font-semibold">{draftAssignFeedback.message}</p>
-        </section>
-      ) : null}
     </div>
   );
 }

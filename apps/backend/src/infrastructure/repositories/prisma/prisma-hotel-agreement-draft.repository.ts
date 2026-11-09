@@ -515,9 +515,6 @@ export class PrismaHotelAgreementDraftRepository implements HotelAgreementDraftR
       },
         });
         if (!targetGroup) throw new NotFoundException(`Group '${normalizedGroupCode}' not found.`);
-        if (targetGroup.agentId !== draft.agentId) {
-          throw new BadRequestException("Hotel agreement dan Group harus berasal dari Agent yang sama.");
-        }
 
     const customStart = payload.stayStart ? toIsoDateOnly(payload.stayStart) : undefined;
     const customEnd = payload.stayEnd ? toIsoDateOnly(payload.stayEnd) : undefined;

@@ -159,10 +159,11 @@ function AgreementInboxDraftAssignmentList({
     };
 
     const targetNights = getStayNights(coverageStartIso, coverageEndIso);
+    const requiredPax = Math.max(1, group?.pax ?? 1);
 
     return drafts
       .filter((draft) => {
-        if (draft.city !== city) return false;
+        if (draft.city !== city || draft.status === "Rejected") return false;
 
         const draftStart = (draft.stayStartIso ?? "").trim();
         const draftEnd = (draft.stayEndIso ?? "").trim();
@@ -222,8 +223,8 @@ function AgreementInboxDraftAssignmentList({
           isFullCoverage,
         };
       })
-      .filter((item) => item.minRemaining > 0);
-  }, [drafts, city, coverageStartIso, coverageEndIso]);
+      .filter((item) => item.minRemaining >= requiredPax);
+  }, [drafts, city, coverageStartIso, coverageEndIso, group?.pax]);
 
   const fullCoverageDrafts = useMemo(() => eligibleDrafts.filter((d) => d.isFullCoverage), [eligibleDrafts]);
   const partialCoverageDrafts = useMemo(() => eligibleDrafts.filter((d) => !d.isFullCoverage), [eligibleDrafts]);
@@ -250,7 +251,7 @@ function AgreementInboxDraftAssignmentList({
                 <div className="flex flex-wrap items-center gap-2">
                   <h5 className="break-words text-sm font-bold text-slate-900">{draft.hotelName}</h5>
                   <span className="inline-flex rounded-md border border-slate-200 bg-surface-container-lowest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
-                    Pax {draft.remainingPax !== undefined && draft.remainingPax < draft.pax ? `${minRemaining}/${draft.pax}` : draft.pax}
+                    Pax {(draft.remainingPax !== undefined && draft.remainingPax < draft.pax) || minRemaining < draft.pax ? `${minRemaining}/${draft.pax}` : draft.pax}
                   </span>
                   <span
                     className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${
@@ -412,6 +413,7 @@ export function HotelAgreementSection() {
     coverageStartIso,
     coverageEndIso,
     assigningAgreementDraftId,
+    draftAssignFeedback,
     openAddHotelInline,
     openAgreementEditor,
     openDeleteAgreementConfirm,
@@ -433,6 +435,22 @@ export function HotelAgreementSection() {
 
   return (
     <section className="grid min-w-0 gap-4 xl:grid-cols-2">
+      {draftAssignFeedback ? (
+        <div
+          className={`min-w-0 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm xl:col-span-2 ${
+            draftAssignFeedback.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-rose-200 bg-rose-50 text-rose-700"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="material-symbols-outlined mt-0.5 text-base" aria-hidden="true">
+            {draftAssignFeedback.tone === "success" ? "check_circle" : "warning"}
+          </span>
+          <p className="font-semibold">{draftAssignFeedback.message}</p>
+        </div>
+      ) : null}
       {dateGapWarnings.crossCityWarning ? (
         <div className="min-w-0 xl:col-span-2">
           <AgreementDateGapWarning message={dateGapWarnings.crossCityWarning} />
