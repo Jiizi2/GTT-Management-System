@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DatePickerInput } from "../date-time-pickers";
 import { ResponsiveDisclosure } from "../responsive-disclosure";
 import { SereneSelect } from "../serene-select";
+import { WhatsappCopyMenu } from "../whatsapp-copy-menu";
+import { copyTextToClipboard } from "../../shared/clipboard";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -94,5 +96,41 @@ describe("limited viewport space", () => {
     fireEvent.click(screen.getByRole("button"));
     const popup = screen.getByRole("listbox").parentElement!;
     expect(Number.parseFloat(popup.style.maxHeight)).toBeLessThanOrEqual(86);
+  });
+});
+
+describe("WhatsApp copy on iPad / WebKit", () => {
+  it("does not close before click when WebKit blurs the focused menu button with null relatedTarget, and falls back to execCommand copy", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("NotAllowedError")) },
+    });
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+
+    const copiedTexts: string[] = [];
+    render(
+      <WhatsappCopyMenu
+        isCopied={false}
+        onCopy={async (format) => {
+          if (await copyTextToClipboard(`payload:${format}`)) {
+            copiedTexts.push(format);
+          }
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy WhatsApp details" }));
+    const generalBtn = screen.getByRole("button", { name: "General" });
+    const hijaziBtn = screen.getByRole("button", { name: "Muassasah Hijazi" });
+    expect(generalBtn).toHaveFocus();
+
+    // Simulate iPadOS WebKit blurring the auto-focused first option with relatedTarget: null on tap before click fires.
+    fireEvent.blur(generalBtn, { relatedTarget: null });
+    expect(hijaziBtn).toBeInTheDocument();
+
+    fireEvent.click(hijaziBtn);
+    await waitFor(() => expect(copiedTexts).toEqual(["muassasah-hijazi"]));
+    expect(execCommand).toHaveBeenCalledWith("copy");
   });
 });

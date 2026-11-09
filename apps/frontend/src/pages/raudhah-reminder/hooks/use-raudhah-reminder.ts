@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Domain from "../../../shared/app-domain";
+import { copyTextToClipboard } from "../../../shared/clipboard";
 import { buildRaudhahReminderTemplate } from "../../../shared/raudhah-reminder-template.js";
 import type { GroupData, GroupRaudhahStatus } from "../../../shared/app-domain";
 
@@ -589,12 +590,8 @@ export function useRaudhahReminder({
   );
 
   const handleCopyTemplate = async (item: ReminderItem) => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(item.reminderTemplate);
-      }
-    } catch {
-      // fallback
+    if (!(await copyTextToClipboard(item.reminderTemplate))) {
+      return;
     }
 
     setCopiedItemId(item.id);

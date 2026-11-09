@@ -10,6 +10,7 @@ import { buildRaudhahReminderTemplate } from "../../../shared/raudhah-reminder-t
 import { agreementDraftQueryKeys, groupQueryKeys } from "../../../shared/query-keys";
 import { useModalFocusTrap } from "../../../components/use-modal-focus-trap";
 import { reassignGroupAgentInBackend } from "../../../hooks/groups-backend-api";
+import { copyTextToClipboard } from "../../../shared/clipboard";
 import { selectGroupForFlightCopy } from "../../../shared/group-flight-summary";
 import type {
   GroupAgreementHotel,
@@ -682,12 +683,8 @@ export function useVisaTrackingDetail({
   };
 
   const handleCopyRaudhahReminder = async () => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(raudhahReminderTemplate);
-      }
-    } catch {
-      // No-op fallback
+    if (!(await copyTextToClipboard(raudhahReminderTemplate))) {
+      return;
     }
 
     setIsRaudhahTemplateCopied(true);
@@ -706,12 +703,8 @@ export function useVisaTrackingDetail({
     const text = format === "general"
       ? generateWhatsappCopyText(copyGroup, familyGroups)
       : generateMuassasahHijaziWhatsappCopyText(copyGroup, familyGroups);
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      }
-    } catch {
-      // fallback
+    if (!(await copyTextToClipboard(text))) {
+      return;
     }
 
     setIsWhatsappCopied(true);

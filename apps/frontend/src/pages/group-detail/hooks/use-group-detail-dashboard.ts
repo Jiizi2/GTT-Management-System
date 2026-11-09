@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import * as Domain from "../../../shared/app-domain";
+import { copyTextToClipboard } from "../../../shared/clipboard";
 import type {
   EditScheduleFormState,
   GroupData,
@@ -139,31 +140,6 @@ interface CompactAgreementSummary {
 
 function formatAgreementHotelCount(count: number): string {
   return count === 1 ? "1 hotel" : `${count} hotels`;
-}
-
-function formatCompactIsoDateRange(startIso: string, endIso: string): string {
-  const normalizedStartIso = startIso.trim();
-  const normalizedEndIso = endIso.trim();
-  const hasStart = isIsoDateValue(normalizedStartIso);
-  const hasEnd = isIsoDateValue(normalizedEndIso);
-
-  if (hasStart && hasEnd) {
-    if (normalizedStartIso === normalizedEndIso) {
-      return formatVisaShortDate(normalizedStartIso);
-    }
-
-    return `${formatVisaShortDate(normalizedStartIso)} - ${formatVisaShortDate(normalizedEndIso)}`;
-  }
-
-  if (hasStart) {
-    return `Start ${formatVisaShortDate(normalizedStartIso)}`;
-  }
-
-  if (hasEnd) {
-    return `End ${formatVisaShortDate(normalizedEndIso)}`;
-  }
-
-  return "Dates pending";
 }
 
 function formatCompactAgreementStayRange(hotels: GroupAgreementHotel[]): string {
@@ -910,12 +886,8 @@ export function useGroupDetailDashboard({
       "```",
     ].join("\n");
 
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(payload);
-      }
-    } catch {
-      // No-op fallback
+    if (!(await copyTextToClipboard(payload))) {
+      return;
     }
 
     setIsMusyrifCopied(true);
@@ -937,12 +909,8 @@ export function useGroupDetailDashboard({
     const text = format === "general"
       ? generateWhatsappCopyText(groupForCopy, familyGroups)
       : generateMuassasahHijaziWhatsappCopyText(groupForCopy, familyGroups);
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      }
-    } catch {
-      // fallback
+    if (!(await copyTextToClipboard(text))) {
+      return;
     }
 
     setIsWhatsappCopied(true);
