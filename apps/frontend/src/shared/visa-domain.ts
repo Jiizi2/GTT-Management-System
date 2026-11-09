@@ -452,17 +452,9 @@ export function generateMuassasahHijaziWhatsappCopyText(
   if (!group) return "";
 
   const allGroups = familyGroups && familyGroups.length > 0 ? familyGroups : [group];
-  const groupNumbers = allGroups.map((item) => item.code.trim()).filter(Boolean);
-  const combinedPax = allGroups.reduce((total, item) => total + (item.pax || 0), 0);
-  const lines = [
-    `GROUP NUMBER : ${groupNumbers.join(", ") || "[GROUP NUMBER]"}`,
-    `NO OF PAX : ${combinedPax}`,
-    "NATIONALITY : INDONESIA",
-    "",
-  ];
+  const lines: string[] = [];
 
-  const printHotels = (label: string, hotelsByGroup: GroupAgreementHotel[][]) => {
-    const hotels = hotelsByGroup.flat();
+  const printHotels = (label: string, hotels: GroupAgreementHotel[]) => {
     const entries = hotels.length > 0 ? hotels : [undefined];
     entries.forEach((hotel, index) => {
       if (index > 0) lines.push("");
@@ -473,9 +465,16 @@ export function generateMuassasahHijaziWhatsappCopyText(
     });
   };
 
-  printHotels("MAKKAH", allGroups.map((item) => item.visaSetup?.makkahHotels ?? []));
-  lines.push("");
-  printHotels("MADEENA", allGroups.map((item) => item.visaSetup?.madinahHotels ?? []));
+  allGroups.forEach((item, groupIndex) => {
+    if (groupIndex > 0) lines.push("");
+    lines.push(`GROUP NUMBER : ${item.code.trim() || "[GROUP NUMBER]"}`);
+    lines.push(`NO OF PAX : ${item.pax || 0}`);
+    lines.push("NATIONALITY : INDONESIA");
+    lines.push("");
+    printHotels("MAKKAH", item.visaSetup?.makkahHotels ?? []);
+    lines.push("");
+    printHotels("MADEENA", item.visaSetup?.madinahHotels ?? []);
+  });
   lines.push("");
 
   const { arrival, departure } = resolveGroupFlightSummary(group);

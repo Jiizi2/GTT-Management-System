@@ -73,10 +73,13 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
     };
   }, [isOpen]);
 
-  const copy = (format: WhatsappCopyFormat) => {
-    setIsOpen(false);
-    triggerRef.current?.focus();
-    void onCopy(format);
+  const copy = async (format: WhatsappCopyFormat) => {
+    try {
+      await onCopy(format);
+    } finally {
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    }
   };
 
   return (
@@ -85,7 +88,7 @@ export function WhatsappCopyMenu({ isCopied, onCopy, className = "" }: WhatsappC
       className={`relative ${className}`}
       onBlur={(event) => {
         const target = event.relatedTarget as Node | null;
-        if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false);
+        if (target && !containerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false);
       }}
     >
       <button

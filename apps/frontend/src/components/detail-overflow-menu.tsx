@@ -77,7 +77,7 @@ export function DetailOverflowMenu({ children, label = "More actions", triggerCl
       className="relative shrink-0"
       onBlur={(event) => {
         const target = event.relatedTarget as Node | null;
-        if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false);
+        if (target && !containerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false);
       }}
     >
       <button

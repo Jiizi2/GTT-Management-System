@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Domain from "../../../shared/app-domain";
 import { fetchBackendParsed } from "../../../shared/api-client";
+import { copyTextToClipboard } from "../../../shared/clipboard";
 import type {
   ChecklistDriverAssignment,
   ChecklistDriverDraft,
@@ -16,7 +17,6 @@ const {
   createEmptyChecklistDraft,
   formatChecklistCopyDate,
   formatScheduleTime,
-  getChecklistDayLabel,
   getLocalIsoDateWithOffset,
 } = Domain;
 
@@ -520,12 +520,8 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
       "```",
     ].join("\n");
 
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(payload);
-      }
-    } catch {
-      // fallback
+    if (!(await copyTextToClipboard(payload))) {
+      return;
     }
 
     setCopiedItemId(itemId);
@@ -568,12 +564,8 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
       "```",
     ].join("\n");
 
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(payload);
-      }
-    } catch {
-      // fallback
+    if (!(await copyTextToClipboard(payload))) {
+      return;
     }
 
     setCopiedItemId(itemId);

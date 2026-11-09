@@ -1,11 +1,11 @@
-import assert from "node:assert/strict";
-import { describe } from "vitest";
+import { describe, expect } from "vitest";
 import type { GroupAgreementHotel, GroupData, VisaTrackingRow, HotelAgreementDraft } from "../shared/app-domain.js";
 import {
   buildVisaAgreementNumber,
   formatVisaDateWithYear,
   formatVisaLongDate,
   formatVisaShortDate,
+  generateMuassasahHijaziWhatsappCopyText,
   generateWhatsappCopyText,
   getGroupAgreementHotelsByCity,
   hasMissingHotelAllocation,
@@ -19,6 +19,11 @@ import {
   getInclusiveDays,
 } from "../shared/visa-domain.js";
 import { runCase } from "../test/run-case.js";
+
+const assert = {
+  equal: <T>(actual: T, expected: T) => expect(actual).toBe(expected),
+  deepEqual: <T>(actual: T, expected: T) => expect(actual).toEqual(expected),
+};
 
 function createAgreementHotel(overrides: Partial<GroupAgreementHotel> = {}): GroupAgreementHotel {
   return {
@@ -95,6 +100,8 @@ function createVisaRow(overrides: Partial<VisaTrackingRow> = {}): VisaTrackingRo
     raudhahTone: "muted",
     makkahVerified: 40,
     madinahVerified: 40,
+    makkahHotelWaived: false,
+    madinahHotelWaived: false,
     ...overrides,
   };
 }
@@ -397,12 +404,25 @@ function testGenerateWhatsappCopyText(): void {
   assert.equal(emptyText.includes("[AIRPORT] / [FLIGHT_NO] / [FLIGHT_TIME] / [FLIGHT_DATE]"), true);
   assert.equal(emptyText.includes("🏨 *BRN MAKKAH*\n*[HOTEL MAKKAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
   assert.equal(emptyText.includes("🏨 *BRN MADINAH*\n*[HOTEL MADINAH NAME]*\n📅 [START_DATE] - [END_DATE]\n└─ [GROUP_CODE]: [BRN_CODE] ([PAX] PAX)"), true);
+
+  const singleHijazi = generateMuassasahHijaziWhatsappCopyText(group);
+  assert.equal(singleHijazi.includes("GROUP NUMBER : 902133273\nNO OF PAX : 5"), true);
+  assert.equal(singleHijazi.includes("HOTEL NAME MAKKAH : Swissotel\nCheck in : 28/03/2026\nCheck out: 31/03/2026\nagreements number: 18014399405337794"), true);
+
+  const familyHijazi = generateMuassasahHijaziWhatsappCopyText(group, [group, childGroup]);
+  assert.equal(
+    familyHijazi.includes(
+      "GROUP NUMBER : 902133273\nNO OF PAX : 5\nNATIONALITY : INDONESIA\n\nHOTEL NAME MAKKAH : Swissotel\nCheck in : 28/03/2026\nCheck out: 31/03/2026\nagreements number: 18014399405337794\n\nHOTEL NAME MADEENA : Burj Almarjan\nCheck in : 23/03/2026\nCheck out: 28/03/2026\nagreements number: 15762599591351269\n\nGROUP NUMBER : 902133274\nNO OF PAX : 12\nNATIONALITY : INDONESIA\n\nHOTEL NAME MAKKAH : Swissotel\nCheck in : 28/03/2026\nCheck out: 31/03/2026\nagreements number: 18014399405337794\n\nHOTEL NAME MADEENA : Burj Almarjan\nCheck in : 23/03/2026\nCheck out: 28/03/2026\nagreements number: 15762599591351269\n\nENTRY DATE WITH FLIGHT NO : QR1190",
+    ),
+    true,
+  );
 }
 
 function testFilterAgreementDrafts(): void {
   const drafts: HotelAgreementDraft[] = [
     {
       id: "d1",
+      agentId: "agent-a",
       city: "makkah",
       agentName: "Agent A",
       hotelName: "Swissotel",
@@ -419,6 +439,7 @@ function testFilterAgreementDrafts(): void {
     },
     {
       id: "d2",
+      agentId: "agent-b",
       city: "makkah",
       agentName: "Agent B",
       hotelName: "Hilton",
@@ -435,6 +456,7 @@ function testFilterAgreementDrafts(): void {
     },
     {
       id: "d3",
+      agentId: "agent-c",
       city: "makkah",
       agentName: "Agent C",
       hotelName: "Fairmont",
@@ -451,6 +473,7 @@ function testFilterAgreementDrafts(): void {
     },
     {
       id: "d4",
+      agentId: "agent-d",
       city: "makkah",
       agentName: "Agent D",
       hotelName: "Pullman",
@@ -467,6 +490,7 @@ function testFilterAgreementDrafts(): void {
     },
     {
       id: "d5",
+      agentId: "agent-e",
       city: "madinah",
       agentName: "Agent E",
       hotelName: "Oberoi",
@@ -483,6 +507,7 @@ function testFilterAgreementDrafts(): void {
     },
     {
       id: "d6",
+      agentId: "agent-f",
       city: "makkah",
       agentName: "Agent F",
       hotelName: "Makkah Palace",
@@ -502,6 +527,7 @@ function testFilterAgreementDrafts(): void {
     },
     {
       id: "d7",
+      agentId: "agent-g",
       city: "makkah",
       agentName: "Agent G",
       hotelName: "Rejected Hotel",
