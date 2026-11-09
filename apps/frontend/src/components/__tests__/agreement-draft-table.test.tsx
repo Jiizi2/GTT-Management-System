@@ -149,4 +149,27 @@ describe("AgreementDraftTable", () => {
       ),
     ).toBe(true);
   });
+
+  it("prefills group number input with linkedGroupCode when row is expanded", () => {
+    render(
+      <AgreementDraftTable
+        drafts={[draft]}
+        linkedGroupCode="GRP-001"
+        assignmentGroupCodes={{}}
+        onAssignmentGroupCodeChange={vi.fn()}
+        onAssignToGroup={vi.fn()}
+        onUnassignFromGroup={vi.fn()}
+        onStartEdit={vi.fn()}
+        onDeleteRequest={vi.fn()}
+        onStatusChange={vi.fn()}
+        statusChangePending={false}
+        deleteDraftMutationPending={false}
+        assignDraftMutationPending={false}
+        unassignDraftMutationPending={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Buka detail AGR-001" }));
+    expect(screen.getByLabelText("Group number")).toHaveValue("GRP-001");
+  });
 });

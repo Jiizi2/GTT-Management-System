@@ -330,23 +330,26 @@ describe("HotelAgreementDrafts", () => {
       await createMemoryServices();
 
     try {
-      // 1. Create two groups
+      // 1. Create two groups (including cross-agent group sharing remaining quota)
       await groupsService.create(
         createGroupPayload({
           code: "GROUP-A",
+          agentId: "agent-a",
           pax: 23,
         }),
       );
       await groupsService.create(
         createGroupPayload({
           code: "GROUP-B",
+          agentId: "agent-b",
           pax: 7,
         }),
       );
 
-      // 2. Create a draft with 30 pax
+      // 2. Create a draft with 30 pax owned by agent-a
       const draft = (await draftsService.create({
         city: AgreementCity.MADINAH,
+        agentId: "agent-a",
         hotelName: "Swissotel Madinah",
         agreementNumber: "AG-MULTI-30",
         pax: 30,

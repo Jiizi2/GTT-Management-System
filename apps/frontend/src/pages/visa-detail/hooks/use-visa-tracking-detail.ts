@@ -429,7 +429,7 @@ export function useVisaTrackingDetail({
 
     const groupArrival = group?.arrivalDate || row.departureIso || "";
     const groupReturn = group?.returnDate || row.returnIso || "";
-    const existing = city === "makkah" ? makkahAgreements : madinahAgreements;
+    const existing = [...makkahAgreements, ...madinahAgreements];
     const { start, end } = getUncoveredPeriod(city, groupArrival, groupReturn, existing);
     setCoverageStartIso(start);
     setCoverageEndIso(end);

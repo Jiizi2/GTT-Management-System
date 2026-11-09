@@ -499,6 +499,22 @@ function testFilterAgreementDrafts(): void {
       assignmentStatus: "Partially Assigned",
       createdAtIso: "2026-06-20T00:00:00Z",
       updatedAtIso: "2026-06-20T00:00:00Z",
+    },
+    {
+      id: "d7",
+      city: "makkah",
+      agentName: "Agent G",
+      hotelName: "Rejected Hotel",
+      agreementNumber: "AG-7",
+      pax: 50,
+      remainingPax: 50,
+      status: "Rejected",
+      stayStartIso: "2026-06-24",
+      stayEndIso: "2026-07-02",
+      notes: "",
+      assignmentStatus: "Unassigned",
+      createdAtIso: "2026-06-20T00:00:00Z",
+      updatedAtIso: "2026-06-20T00:00:00Z",
     }
   ];
 
@@ -509,8 +525,10 @@ function testFilterAgreementDrafts(): void {
     connectedAgreementKeys: new Set(),
   });
 
-  assert.equal(result.makkah.length, 1);
-  assert.equal(result.makkah[0].id, "d1");
+  assert.deepEqual(
+    result.makkah.map((d) => d.id),
+    ["d3", "d6", "d4", "d1"]
+  );
 
   assert.equal(result.madinah.length, 1);
   assert.equal(result.madinah[0].id, "d5");

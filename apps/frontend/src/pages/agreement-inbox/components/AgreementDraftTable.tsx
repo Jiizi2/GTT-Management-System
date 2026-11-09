@@ -136,7 +136,7 @@ export function AgreementDraftTable({ drafts, linkedGroupCode, assignmentGroupCo
               assignment={<Badge status={assignmentBadgeStatus(draft)}>{draft.assignmentStatus}</Badge>}
               actions={<RowActions draft={draft} expanded={expanded} onToggle={() => setExpandedDraftId(expanded ? null : draft.id)} onEdit={onStartEdit} onDelete={onDeleteRequest} deletePending={deleteDraftMutationPending} />}
             />
-            <AnimatedExpandedGroups expanded={expanded} draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? ""} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} isLastDraft={isLastDraft} />
+            <AnimatedExpandedGroups expanded={expanded} draft={draft} linkedGroupCode={linkedGroupCode} assignmentGroupCode={assignmentGroupCodes[draft.id] ?? linkedGroupCode} onAssignmentGroupCodeChange={onAssignmentGroupCodeChange} onAssignToGroup={onAssignToGroup} onUnassignFromGroup={onUnassignFromGroup} assignPending={assignDraftMutationPending} unassignPending={unassignDraftMutationPending} isLastDraft={isLastDraft} />
           </article>
         );
       })}
