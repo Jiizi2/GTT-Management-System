@@ -2,6 +2,41 @@ import type { GroupAgreementHotel, GroupData, VisaTrackingRow } from "./app-doma
 import type { HotelAgreementDraft } from "./app-domain-types.js";
 import { resolveGroupFlightSummary, type ResolvedGroupFlight } from "./group-flight-summary";
 
+function hasVisaSetupFlightSource(summary: { arrival?: ResolvedGroupFlight; departure?: ResolvedGroupFlight }): boolean {
+  return (
+    summary.arrival?.source === "legs" ||
+    summary.arrival?.source === "legacy" ||
+    summary.departure?.source === "legs" ||
+    summary.departure?.source === "legacy"
+  );
+}
+
+function resolveFamilyGroupsFlights(group: GroupData, allGroups: GroupData[]) {
+  const defaultSummary = resolveGroupFlightSummary(group);
+  const summaries = allGroups.map((item) => ({
+    group: item,
+    groupCode: item.code?.trim() || "[GROUP_CODE]",
+    summary: resolveGroupFlightSummary(item),
+  }));
+  const fallbackVisaSummary =
+    (hasVisaSetupFlightSource(defaultSummary) ? defaultSummary : undefined) ??
+    summaries.find((entry) => hasVisaSetupFlightSource(entry.summary))?.summary;
+
+  return summaries.map((entry) => {
+    if (fallbackVisaSummary) {
+      return {
+        ...entry,
+        summary: hasVisaSetupFlightSource(entry.summary) ? entry.summary : fallbackVisaSummary,
+      };
+    }
+    const hasOwnSummary = Boolean(entry.summary.arrival || entry.summary.departure);
+    return {
+      ...entry,
+      summary: hasOwnSummary ? entry.summary : defaultSummary,
+    };
+  });
+}
+
 function formatLocalIsoDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -246,26 +281,10 @@ export function generateWhatsappCopyText(
   if (!group) return "";
 
   const visaType = group.visaSetup?.busStatus === "Visa+" ? "VISA+" : "VISA ONLY";
-  const combinedPax = familyGroups && familyGroups.length > 1
-    ? familyGroups.reduce((acc, g) => acc + g.pax, 0)
-    : (group.pax || 0);
-  const paxCount = String(combinedPax).padStart(2, "0");
+  const allGroups = familyGroups && familyGroups.length > 0 ? familyGroups : [group];
+  const isMultiGroup = allGroups.length > 1;
   const lines: string[] = [];
   lines.push(`*NEED MOFA ${visaType} GROUP CODE*`);
-
-  if (familyGroups && familyGroups.length > 1) {
-    familyGroups.forEach((g, i) => {
-      const prefix = i === familyGroups.length - 1 ? "└─" : "├─";
-      lines.push(`${prefix} ${g.code || "[GROUP_CODE]"} (${g.pax || 0} PAX)`);
-    });
-    lines.push(`*TOTAL: ${paxCount} PAX*`);
-  } else {
-    lines.push(`${group.code || "[GROUP_CODE]"} *( ${paxCount} PAX )*`);
-  }
-  lines.push("");
-
-  lines.push("✈️ *Flight Detail*");
-  const flightSummary = resolveGroupFlightSummary(group);
 
   const formatFlightDate = (isoDateStr?: string, dateStr?: string, yearStr?: string) => {
     if (isoDateStr) {
@@ -291,9 +310,6 @@ export function generateWhatsappCopyText(
     const dateFormatted = formatFlightDate(flight?.date, flight?.displayDate, flight?.year);
     return `${city} / ${flightNo} / ${time} / ${dateFormatted}`;
   };
-  lines.push(formatFlightLine(flightSummary.arrival));
-  lines.push(formatFlightLine(flightSummary.departure));
-  lines.push("");
 
   const formatBrnDate = (isoDateStr?: string) => {
     if (!isoDateStr) return "[DATE]";
@@ -313,8 +329,6 @@ export function generateWhatsappCopyText(
     agreementNumber: string;
     pax: number;
   };
-
-  const allGroups = familyGroups && familyGroups.length > 0 ? familyGroups : [group];
 
   const toEntries = (
     g: GroupData,
@@ -377,39 +391,71 @@ export function generateWhatsappCopyText(
       .filter(Boolean)
       .sort()[0] ?? "";
 
-  // Multiple groups → each group becomes its own block (code as the header) with
-  // its own Makkah/Madinah hotels; single group keeps the flat layout with the
-  // code inline on the BRN line.
-  const isMultiGroup = allGroups.length > 1;
+  const groupedFlights = new Map<string, { arrivalLine: string; departureLine: string; groups: GroupData[] }>();
+  for (const entry of resolveFamilyGroupsFlights(group, allGroups)) {
+    const arrivalLine = formatFlightLine(entry.summary.arrival);
+    const departureLine = formatFlightLine(entry.summary.departure);
+    const key = `${arrivalLine}\n${departureLine}`;
+    if (!groupedFlights.has(key)) {
+      groupedFlights.set(key, { arrivalLine, departureLine, groups: [] });
+    }
+    groupedFlights.get(key)!.groups.push(entry.group);
+  }
 
-  allGroups.forEach((g, gi) => {
-    const makkahHotels = toEntries(g, g.visaSetup?.makkahHotels);
-    const madinahHotels = toEntries(g, g.visaSetup?.madinahHotels);
-
-    // Order the two city sections by whichever stay starts first (chronological).
-    const cities = [
-      { label: "🏨 *BRN MAKKAH*", hotels: makkahHotels, defaultName: "[HOTEL MAKKAH NAME]", start: earliestStart(makkahHotels) },
-      { label: "🏨 *BRN MADINAH*", hotels: madinahHotels, defaultName: "[HOTEL MADINAH NAME]", start: earliestStart(madinahHotels) },
-    ].sort((a, b) => {
-      if (a.start && b.start) return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
-      if (a.start) return -1;
-      if (b.start) return 1;
-      return 0;
-    });
-
-    if (isMultiGroup) {
-      if (gi > 0) {
-        lines.push("");
-      }
-      lines.push(`*${g.code || "[GROUP_CODE]"} (${g.pax || 0} PAX)*`);
+  const flightClusters = Array.from(groupedFlights.values());
+  flightClusters.forEach((cluster, clusterIndex) => {
+    if (clusterIndex > 0) {
+      lines.push("");
     }
 
-    cities.forEach((city, ci) => {
-      if (ci > 0) {
-        lines.push("");
+    const clusterPax = cluster.groups.reduce((acc, g) => acc + (g.pax || 0), 0);
+    const paxCount = String(clusterPax).padStart(2, "0");
+    if (cluster.groups.length > 1) {
+      cluster.groups.forEach((g, i) => {
+        const prefix = i === cluster.groups.length - 1 ? "└─" : "├─";
+        lines.push(`${prefix} ${g.code || "[GROUP_CODE]"} (${g.pax || 0} PAX)`);
+      });
+      lines.push(`*TOTAL: ${paxCount} PAX*`);
+    } else {
+      const singleGroup = cluster.groups[0]!;
+      lines.push(`${singleGroup.code || "[GROUP_CODE]"} *( ${paxCount} PAX )*`);
+    }
+    lines.push("");
+
+    lines.push("✈️ *Flight Detail*");
+    lines.push(cluster.arrivalLine);
+    lines.push(cluster.departureLine);
+    lines.push("");
+
+    cluster.groups.forEach((g, gi) => {
+      const makkahHotels = toEntries(g, g.visaSetup?.makkahHotels);
+      const madinahHotels = toEntries(g, g.visaSetup?.madinahHotels);
+
+      // Order the two city sections by whichever stay starts first (chronological).
+      const cities = [
+        { label: "🏨 *BRN MAKKAH*", hotels: makkahHotels, defaultName: "[HOTEL MAKKAH NAME]", start: earliestStart(makkahHotels) },
+        { label: "🏨 *BRN MADINAH*", hotels: madinahHotels, defaultName: "[HOTEL MADINAH NAME]", start: earliestStart(madinahHotels) },
+      ].sort((a, b) => {
+        if (a.start && b.start) return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
+        if (a.start) return -1;
+        if (b.start) return 1;
+        return 0;
+      });
+
+      if (isMultiGroup) {
+        if (gi > 0) {
+          lines.push("");
+        }
+        lines.push(`*${g.code || "[GROUP_CODE]"} (${g.pax || 0} PAX)*`);
       }
-      lines.push(city.label);
-      printCityHotels(city.hotels, city.defaultName, !isMultiGroup);
+
+      cities.forEach((city, ci) => {
+        if (ci > 0) {
+          lines.push("");
+        }
+        lines.push(city.label);
+        printCityHotels(city.hotels, city.defaultName, !isMultiGroup);
+      });
     });
   });
 
@@ -465,39 +511,55 @@ export function generateMuassasahHijaziWhatsappCopyText(
     });
   };
 
-  allGroups.forEach((item, groupIndex) => {
-    if (groupIndex > 0) lines.push("");
-    lines.push(`GROUP NUMBER : ${item.code.trim() || "[GROUP NUMBER]"}`);
-    lines.push(`NO OF PAX : ${item.pax || 0}`);
-    lines.push("NATIONALITY : INDONESIA");
+  const hijaziFlightBlocks = new Map<string, { blockLines: string[]; groups: GroupData[] }>();
+  for (const entry of resolveFamilyGroupsFlights(group, allGroups)) {
+    const { arrival, departure } = entry.summary;
+    const arrivalNumber = arrival?.flightNumber;
+    const departureNumber = departure?.flightNumber;
+    const arrivalDate = formatHijaziDate(
+      firstNonEmpty(arrival?.date, entry.group.arrivalDate, group.arrivalDate),
+      arrival?.displayDate,
+      arrival?.year,
+    );
+    const departureDate = formatHijaziDate(
+      firstNonEmpty(departure?.date, entry.group.returnDate, group.returnDate),
+      departure?.displayDate,
+      departure?.year,
+    );
+    const arrivalTime = arrival?.time ?? "";
+    const departureTime = departure?.time ?? "";
+    const blockLines = [
+      `ENTRY DATE WITH FLIGHT NO : ${arrivalNumber || "[FLIGHT NO]"}`,
+      `Date: ${arrivalDate} (${formatHijaziTime(arrivalTime)})`,
+      "",
+      `EXIT DATE WITH FLIGHT NO : ${departureNumber || "[FLIGHT NO]"}`,
+      `Date: ${departureDate} (${formatHijaziTime(departureTime)})`,
+    ];
+    const key = blockLines.join("\n");
+    if (!hijaziFlightBlocks.has(key)) {
+      hijaziFlightBlocks.set(key, { blockLines, groups: [] });
+    }
+    hijaziFlightBlocks.get(key)!.groups.push(entry.group);
+  }
+
+  const hijaziClusters = Array.from(hijaziFlightBlocks.values());
+  hijaziClusters.forEach((cluster, clusterIndex) => {
+    if (clusterIndex > 0) {
+      lines.push("");
+    }
+    cluster.groups.forEach((item, groupIndex) => {
+      if (groupIndex > 0) lines.push("");
+      lines.push(`GROUP NUMBER : ${item.code.trim() || "[GROUP NUMBER]"}`);
+      lines.push(`NO OF PAX : ${item.pax || 0}`);
+      lines.push("NATIONALITY : INDONESIA");
+      lines.push("");
+      printHotels("MAKKAH", item.visaSetup?.makkahHotels ?? []);
+      lines.push("");
+      printHotels("MADEENA", item.visaSetup?.madinahHotels ?? []);
+    });
     lines.push("");
-    printHotels("MAKKAH", item.visaSetup?.makkahHotels ?? []);
-    lines.push("");
-    printHotels("MADEENA", item.visaSetup?.madinahHotels ?? []);
+    lines.push(...cluster.blockLines);
   });
-  lines.push("");
-
-  const { arrival, departure } = resolveGroupFlightSummary(group);
-  const arrivalNumber = arrival?.flightNumber;
-  const departureNumber = departure?.flightNumber;
-  const arrivalDate = formatHijaziDate(
-    firstNonEmpty(arrival?.date, group.arrivalDate),
-    arrival?.displayDate,
-    arrival?.year,
-  );
-  const departureDate = formatHijaziDate(
-    firstNonEmpty(departure?.date, group.returnDate),
-    departure?.displayDate,
-    departure?.year,
-  );
-  const arrivalTime = arrival?.time ?? "";
-  const departureTime = departure?.time ?? "";
-
-  lines.push(`ENTRY DATE WITH FLIGHT NO : ${arrivalNumber || "[FLIGHT NO]"}`);
-  lines.push(`Date: ${arrivalDate} (${formatHijaziTime(arrivalTime)})`);
-  lines.push("");
-  lines.push(`EXIT DATE WITH FLIGHT NO : ${departureNumber || "[FLIGHT NO]"}`);
-  lines.push(`Date: ${departureDate} (${formatHijaziTime(departureTime)})`);
 
   return lines.join("\n");
 }

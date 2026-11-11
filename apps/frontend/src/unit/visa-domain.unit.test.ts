@@ -416,6 +416,70 @@ function testGenerateWhatsappCopyText(): void {
     ),
     true,
   );
+
+  // Test familyGroups with different flights (and deduplication for groups sharing a flight)
+  const differentFlightGroup: GroupData = {
+    ...group,
+    code: "902133275",
+    pax: 8,
+    itinerary: [
+      {
+        date: "23 Mar",
+        year: "2026",
+        category: "Arrival",
+        title: "Landing MED",
+        meta: "17:40 | GA-980",
+        icon: "flight_land",
+        flightNumber: "GA-980",
+        isoDate: "2026-03-23",
+        time: "17:40",
+        from: "CGK",
+        to: "MED",
+      },
+      {
+        date: "15 Apr",
+        year: "2026",
+        category: "Departure",
+        title: "Departure JED",
+        meta: "19:40 | GA-981",
+        icon: "flight_takeoff",
+        flightNumber: "GA-981",
+        isoDate: "2026-04-15",
+        time: "19:40",
+        from: "JED",
+        to: "CGK",
+      },
+    ],
+  };
+
+  const mixedFlightText = generateWhatsappCopyText(group, [group, childGroup, differentFlightGroup]);
+  assert.equal(
+    mixedFlightText.includes(
+      "*NEED MOFA VISA ONLY GROUP CODE*\n├─ 902133273 (5 PAX)\n└─ 902133274 (12 PAX)\n*TOTAL: 17 PAX*\n\n✈️ *Flight Detail*\nJEDDAH / QR1190 / 07.30 / 22 MAR 2026\nJEDDAH / SV822 / 12.55 / 14 APR 2026\n\n*902133273 (5 PAX)*",
+    ),
+    true,
+  );
+  assert.equal(
+    mixedFlightText.includes(
+      "902133275 *( 08 PAX )*\n\n✈️ *Flight Detail*\nMADINAH / GA-980 / 17.40 / 23 MAR 2026\nJEDDAH / GA-981 / 19.40 / 15 APR 2026\n\n*902133275 (8 PAX)*",
+    ),
+    true,
+  );
+  assert.equal(mixedFlightText.split("JEDDAH / QR1190 / 07.30 / 22 MAR 2026").length - 1, 1);
+
+  const mixedHijaziText = generateMuassasahHijaziWhatsappCopyText(group, [group, childGroup, differentFlightGroup]);
+  assert.equal(
+    mixedHijaziText.includes(
+      "GROUP NUMBER : 902133274\nNO OF PAX : 12\nNATIONALITY : INDONESIA\n\nHOTEL NAME MAKKAH : Swissotel\nCheck in : 28/03/2026\nCheck out: 31/03/2026\nagreements number: 18014399405337794\n\nHOTEL NAME MADEENA : Burj Almarjan\nCheck in : 23/03/2026\nCheck out: 28/03/2026\nagreements number: 15762599591351269\n\nENTRY DATE WITH FLIGHT NO : QR1190\nDate: 22/03/2026 (07.30)\n\nEXIT DATE WITH FLIGHT NO : SV822\nDate: 14/04/2026 (12.55)\n\nGROUP NUMBER : 902133275",
+    ),
+    true,
+  );
+  assert.equal(
+    mixedHijaziText.includes(
+      "ENTRY DATE WITH FLIGHT NO : GA-980\nDate: 23/03/2026 (17.40)\n\nEXIT DATE WITH FLIGHT NO : GA-981\nDate: 15/04/2026 (19.40)",
+    ),
+    true,
+  );
 }
 
 function testFilterAgreementDrafts(): void {
