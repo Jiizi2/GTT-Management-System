@@ -286,7 +286,7 @@ function AgreementInboxDraftAssignmentList({
                 onClick={() => onAssignDraft(draft, overlapStart, overlapEnd)}
                 disabled={!isAssignable}
               >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                <span className={`material-symbols-outlined text-base ${isAssigning ? "animate-spin" : ""}`} aria-hidden="true">
                   {isAssigning ? "sync" : "link"}
                 </span>
                 <span>{isAssigning ? "Assigning..." : "Assign"}</span>
@@ -299,7 +299,7 @@ function AgreementInboxDraftAssignmentList({
   };
 
   return (
-    <section className="mt-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
+    <section className="animate-slide-down mt-3 rounded-2xl border border-slate-200 bg-surface-container-lowest p-4 shadow-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-brand-primary">Agreement Inbox</p>
@@ -342,7 +342,7 @@ function AgreementInboxDraftAssignmentList({
         </div>
       </div>
 
-      <DataBoundary query={queryState ?? { data: isLoading || isError ? undefined : drafts, isPending: isLoading, isError }} skeleton={<ListSkeleton rows={2} label="Loading agreement inbox..." />} errorTitle="Agreement inbox belum berhasil dimuat.">
+      <DataBoundary query={queryState ? { ...queryState, isFetching: false } : { data: isLoading || isError ? undefined : drafts, isPending: isLoading, isError }} skeleton={<ListSkeleton rows={2} label="Loading agreement inbox..." />} errorTitle="Agreement inbox belum berhasil dimuat.">
       {eligibleDrafts.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500">
           Tidak ada draft {cityLabel} yang cocok dengan periode dan kapasitas yang dicari.
@@ -437,7 +437,7 @@ export function HotelAgreementSection() {
     <section className="grid min-w-0 gap-4 xl:grid-cols-2">
       {draftAssignFeedback ? (
         <div
-          className={`min-w-0 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm xl:col-span-2 ${
+          className={`animate-slide-down min-w-0 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm xl:col-span-2 ${
             draftAssignFeedback.tone === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-800"
               : "border-rose-200 bg-rose-50 text-rose-700"
@@ -506,9 +506,10 @@ export function HotelAgreementSection() {
             const canDeleteAgreement = makkahAgreementIdSet.has(agreement.id);
             const assignedDraft = assignedDraftByAgreementId.get(agreement.id);
             const statusLabel = getAgreementStatusLabel(agreement.status);
+            const agreementKey = `${agreement.agreementNumber.trim().toUpperCase() || agreement.id}:${agreement.stayStartIso}:${agreement.stayEndIso}`;
 
             return (
-              <details key={agreement.id} className="serene-accordion min-w-0 max-w-full">
+              <details key={agreementKey} className="serene-accordion animate-slide-down min-w-0 max-w-full">
                 <summary className="serene-accordion-summary min-w-0 max-w-full flex-col">
                   <div className="flex w-full min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
@@ -675,9 +676,10 @@ export function HotelAgreementSection() {
             const canDeleteAgreement = madinahAgreementIdSet.has(agreement.id);
             const assignedDraft = assignedDraftByAgreementId.get(agreement.id);
             const statusLabel = getAgreementStatusLabel(agreement.status);
+            const agreementKey = `${agreement.agreementNumber.trim().toUpperCase() || agreement.id}:${agreement.stayStartIso}:${agreement.stayEndIso}`;
 
             return (
-              <details key={agreement.id} className="serene-accordion min-w-0 max-w-full">
+              <details key={agreementKey} className="serene-accordion animate-slide-down min-w-0 max-w-full">
                 <summary className="serene-accordion-summary min-w-0 max-w-full flex-col">
                   <div className="flex w-full min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">

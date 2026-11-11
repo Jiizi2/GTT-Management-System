@@ -598,13 +598,96 @@ export function useVisaTrackingDetail({
     closeModal();
   };
 
+  const applyOptimisticGroupUpdate = useCallback(
+    (targetGroupCode: string, updater: (group: GroupData) => GroupData) => {
+      const normalizedCode = targetGroupCode.trim().toUpperCase();
+      queryClient.setQueriesData<GroupData[]>({ queryKey: groupQueryKeys.all }, (current) =>
+        Array.isArray(current)
+          ? current.map((item) => (item.code.trim().toUpperCase() === normalizedCode ? updater(item) : item))
+          : current,
+      );
+    },
+    [queryClient],
+  );
+
   const assignAgreementDraft = async (
     draft: HotelAgreementDraft,
     selectedStart?: string,
     selectedEnd?: string,
   ) => {
+    const previousGroupQueries = queryClient.getQueriesData<GroupData[]>({ queryKey: groupQueryKeys.all });
+    const previousDraftQueries = queryClient.getQueriesData<HotelAgreementDraft[]>({
+      queryKey: agreementDraftQueryKeys.all,
+    });
+    const stayStartIso = (selectedStart || draft.stayStartIso || "").trim();
+    const stayEndIso = (selectedEnd || draft.stayEndIso || "").trim();
+    const assignedPax = Math.max(1, group?.pax ?? totalPax ?? 1);
+    const cityKey = draft.city === "makkah" ? "makkahHotels" : "madinahHotels";
+    const optimisticAgreement: GroupAgreementHotel = {
+      id: `optimistic-${draft.id}-${activeGroupCode}`,
+      sourceDraftId: draft.id,
+      hotelName: draft.hotelName,
+      agreementNumber: draft.agreementNumber,
+      pax: assignedPax,
+      status: draft.status,
+      stayStartIso,
+      stayEndIso,
+      ownerGroupCode: activeGroupCode,
+    };
+
     setAssigningAgreementDraftId(draft.id);
-    setDraftAssignFeedback(null);
+    setAddingHotelCity(null);
+    setDraftAssignFeedback({
+      tone: "success",
+      message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${activeGroupCode}.`,
+    });
+
+    applyOptimisticGroupUpdate(activeGroupCode, (currentGroup) => {
+      const currentVisaSetup = currentGroup.visaSetup ?? {
+        visaStatus: row.visaStatus,
+        issuedDate: row.issuedDateIso,
+        syarikah: "Not assigned",
+        paymentStatus: row.paymentStatus,
+        makkahHotels: [],
+        madinahHotels: [],
+        raudhahAppointments: [],
+      };
+      const nextHotels = [...currentVisaSetup[cityKey], optimisticAgreement].sort((a, b) =>
+        a.stayStartIso.localeCompare(b.stayStartIso),
+      );
+      const currentSyarikah = currentVisaSetup.syarikah?.trim() ?? "";
+      const nextSyarikah =
+        draft.muassasahName && (!currentSyarikah || currentSyarikah.toLowerCase() === "not assigned")
+          ? draft.muassasahName
+          : currentVisaSetup.syarikah;
+      return Domain.normalizeGroupStatus({
+        ...currentGroup,
+        visaSetup: {
+          ...currentVisaSetup,
+          syarikah: nextSyarikah,
+          [cityKey]: nextHotels,
+        },
+      });
+    });
+
+    queryClient.setQueriesData<HotelAgreementDraft[]>({ queryKey: agreementDraftQueryKeys.all }, (current) =>
+      Array.isArray(current)
+        ? current.map((item) =>
+            item.id === draft.id
+              ? {
+                  ...item,
+                  assignmentStatus: "Assigned",
+                  remainingPax: Math.max(0, (item.remainingPax ?? item.pax) - assignedPax),
+                  assignedGroups: [
+                    ...(item.assignedGroups ?? []),
+                    { groupCode: activeGroupCode, pax: assignedPax, stayStartIso, stayEndIso },
+                  ],
+                }
+              : item,
+          )
+        : current,
+    );
+
     try {
       await assignAgreementDraftInBackend({
         draftId: draft.id,
@@ -619,12 +702,14 @@ export function useVisaTrackingDetail({
       // Newly-assigned agreement can complete the second city; regenerate the base
       // trips (incl. the Makkah<->Madinah transfer) from the refetched group.
       onSyncVisaItinerary(activeGroupCode);
-      setAddingHotelCity(null);
-      setDraftAssignFeedback({
-        tone: "success",
-        message: `Agreement ${draft.agreementNumber} berhasil di-assign ke group ${activeGroupCode}.`,
-      });
     } catch (error: unknown) {
+      for (const [queryKey, data] of previousGroupQueries) {
+        queryClient.setQueryData(queryKey, data);
+      }
+      for (const [queryKey, data] of previousDraftQueries) {
+        queryClient.setQueryData(queryKey, data);
+      }
+      setAddingHotelCity(draft.city);
       setDraftAssignFeedback({
         tone: "error",
         message: formatVisaMutationError(error, "Agreement belum berhasil di-assign."),
@@ -652,12 +737,59 @@ export function useVisaTrackingDetail({
       return;
     }
 
-    setUnassigningAgreementDraftId(deleteAgreementDraft.draft.id);
-    setDraftAssignFeedback(null);
+    const targetDelete = deleteAgreementDraft;
+    const targetDraft = targetDelete.draft!;
+    const unassignedGroupCode = targetDelete.agreement.ownerGroupCode ?? activeGroupCode;
+    const normalizedUnassignedCode = unassignedGroupCode.trim().toUpperCase();
+    const cityKey = targetDelete.city === "makkah" ? "makkahHotels" : "madinahHotels";
+    const previousGroupQueries = queryClient.getQueriesData<GroupData[]>({ queryKey: groupQueryKeys.all });
+    const previousDraftQueries = queryClient.getQueriesData<HotelAgreementDraft[]>({
+      queryKey: agreementDraftQueryKeys.all,
+    });
+
+    setUnassigningAgreementDraftId(targetDraft.id);
+    setDeleteAgreementDraft(null);
+    setDraftAssignFeedback({
+      tone: "success",
+      message: `Agreement ${targetDelete.agreement.agreementNumber} berhasil dikembalikan ke Unassigned.`,
+    });
+
+    applyOptimisticGroupUpdate(unassignedGroupCode, (currentGroup) => {
+      if (!currentGroup.visaSetup) {
+        return currentGroup;
+      }
+      return Domain.normalizeGroupStatus({
+        ...currentGroup,
+        visaSetup: {
+          ...currentGroup.visaSetup,
+          [cityKey]: currentGroup.visaSetup[cityKey].filter((entry) => entry.id !== targetDelete.agreement.id),
+        },
+      });
+    });
+
+    queryClient.setQueriesData<HotelAgreementDraft[]>({ queryKey: agreementDraftQueryKeys.all }, (current) =>
+      Array.isArray(current)
+        ? current.map((item) => {
+            if (item.id !== targetDraft.id) {
+              return item;
+            }
+            const nextAssignedGroups = (item.assignedGroups ?? []).filter(
+              (g) => g.groupCode.trim().toUpperCase() !== normalizedUnassignedCode,
+            );
+            const occupiedPax = nextAssignedGroups.reduce((sum, g) => sum + g.pax, 0);
+            return {
+              ...item,
+              assignedGroups: nextAssignedGroups,
+              remainingPax: Math.max(0, item.pax - occupiedPax),
+              assignmentStatus: nextAssignedGroups.length > 0 ? "Assigned" : "Unassigned",
+            };
+          })
+        : current,
+    );
+
     try {
-      const unassignedGroupCode = deleteAgreementDraft.agreement.ownerGroupCode ?? activeGroupCode;
       await unassignAgreementDraftInBackend({
-        draftId: deleteAgreementDraft.draft.id,
+        draftId: targetDraft.id,
         groupCode: unassignedGroupCode,
       });
       await Promise.all([
@@ -667,18 +799,19 @@ export function useVisaTrackingDetail({
       // Removing the agreement can drop a city (and its transfer); resync the
       // base trips from the refetched group.
       onSyncVisaItinerary(unassignedGroupCode);
-      setDraftAssignFeedback({
-        tone: "success",
-        message: `Agreement ${deleteAgreementDraft.agreement.agreementNumber} berhasil dikembalikan ke Unassigned.`,
-      });
     } catch (error: unknown) {
+      for (const [queryKey, data] of previousGroupQueries) {
+        queryClient.setQueryData(queryKey, data);
+      }
+      for (const [queryKey, data] of previousDraftQueries) {
+        queryClient.setQueryData(queryKey, data);
+      }
       setDraftAssignFeedback({
         tone: "error",
         message: formatVisaMutationError(error, "Agreement belum berhasil di-unassign dari group."),
       });
     } finally {
       setUnassigningAgreementDraftId(null);
-      setDeleteAgreementDraft(null);
     }
   };
 
