@@ -1,6 +1,6 @@
 import * as Domain from "../../shared/app-domain";
 import type { GroupAgreementHotel, GroupData, HotelAgreementDraft, VisaFlightDetailsInput } from "../../shared/app-domain";
-import { createEmptyFlightLeg, createLegacyFlightLegs, getFlightLegsByDirection } from "../../shared/flight-plan";
+import { createEmptyFlightLeg, createLegacyFlightLegs, getFlightLegsByDirection, hasFlightLegContent } from "../../shared/flight-plan";
 
 export type Tone = "success" | "warning" | "muted" | "info" | "error";
 
@@ -27,6 +27,25 @@ export function resolveGroupFlightDetails(group: GroupData | null | undefined): 
       ...(returning.length > 0 ? returning : [createEmptyFlightLeg("RETURN")]),
     ],
   };
+}
+
+export function resolveFamilyGroupFlightCopySource(
+  currentGroup: GroupData | null | undefined,
+  familyGroups: GroupData[] | undefined,
+): { groupCode: string; flight: VisaFlightDetailsInput } | undefined {
+  if (!familyGroups || familyGroups.length === 0) return undefined;
+  const currentCode = currentGroup?.code?.trim().toUpperCase() ?? "";
+  for (const candidate of familyGroups) {
+    if (candidate.code.trim().toUpperCase() === currentCode) continue;
+    const resolved = resolveGroupFlightDetails(candidate);
+    if (resolved.flightLegs.some(hasFlightLegContent)) {
+      return {
+        groupCode: candidate.code,
+        flight: resolved,
+      };
+    }
+  }
+  return undefined;
 }
 
 export function getToneClasses(tone: Tone): string {

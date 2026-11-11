@@ -138,6 +138,63 @@ describe('FlightDetailsModal', () => {
     expect(screen.getByText('Tanggal kepulangan harus 29 Sept 2026 atau 30 Sept 2026.')).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
   });
+
+  it('supports smart paste, quick airport chips, auto-date fill, and mirroring onward route to return', async () => {
+    const onSave = vi.fn();
+    render(
+      <FlightDetailsModal
+        initialValue={{
+          flightLegs: [createEmptyFlightLeg('ONWARD'), createEmptyFlightLeg('RETURN')],
+        }}
+        defaultOnwardDate="2026-11-12"
+        defaultReturnDate="2026-11-20"
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    // 1. Test Smart Paste
+    fireEvent.change(screen.getByLabelText('Tempel jadwal tiket atau PNR'), {
+      target: { value: 'GA980 12NOV CGK-JED 11:50 17:40' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Terapkan jadwal/i }));
+
+    expect(await screen.findByText(/Berhasil mengisi 1 segmen/i)).toBeInTheDocument();
+
+    // 2. Mirror Onward route to Return in 1 click
+    fireEvent.click(screen.getByRole('button', { name: /Balik rute Onward/i }));
+
+    // 3. Click quick airport chip to change Return arrival to SUB in 1 click
+    fireEvent.click(screen.getByRole('button', { name: 'Pilih cepat SUB untuk To Return segmen 1' }));
+
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith({
+        flightLegs: [
+          expect.objectContaining({
+            direction: 'ONWARD',
+            departureAirportCode: 'CGK',
+            arrivalAirportCode: 'JED',
+            carrierCode: 'GA',
+            flightNumber: 'GA-980',
+            departureDate: '2026-11-12',
+            departureTime: '11:50',
+            arrivalDate: '2026-11-12',
+            arrivalTime: '17:40',
+          }),
+          expect.objectContaining({
+            direction: 'RETURN',
+            departureAirportCode: 'JED',
+            arrivalAirportCode: 'SUB',
+            carrierCode: 'GA',
+            departureDate: '2026-11-20',
+            arrivalDate: '2026-11-20',
+          }),
+        ],
+      });
+    });
+  });
 });
 
 describe('VisaStatusModal', () => {
