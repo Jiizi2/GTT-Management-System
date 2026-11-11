@@ -295,7 +295,7 @@ export function VisaDetailModals() {
                 onClick={() => void deleteAgreement()}
                 disabled={isUnassigningAgreement}
               >
-                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                <span className={`material-symbols-outlined text-base ${isUnassigningAgreement ? "animate-spin" : ""}`} aria-hidden="true">
                   {isUnassigningAgreement ? "sync" : deleteAgreementDraft.draft ? "link_off" : "delete"}
                 </span>
                 <span>{isUnassigningAgreement ? "Unassigning..." : deleteAgreementActionLabel}</span>

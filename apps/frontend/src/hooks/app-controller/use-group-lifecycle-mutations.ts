@@ -469,7 +469,9 @@ export function useGroupLifecycleMutations({
       const backendTargetGroupCode = normalizedSourceGroupCode ?? normalizedNextGroupCode;
       const rollbackSnapshot = captureGroupRecordsSnapshot();
 
-      navigateToVisaDetail(nextGroup.code, { replace: true });
+      if (!normalizedSourceGroupCode || normalizedSourceGroupCode !== nextGroup.code) {
+        navigateToVisaDetail(nextGroup.code, { replace: true });
+      }
 
       commitGroupRecords((current) => {
         const existingIndex = current.findIndex((item) => item.code === nextGroup.code);

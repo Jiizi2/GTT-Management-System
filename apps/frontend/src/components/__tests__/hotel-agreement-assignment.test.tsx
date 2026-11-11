@@ -1,14 +1,29 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { GroupAgreementHotel, GroupData, HotelAgreementDraft } from "../../shared/app-domain";
+import { buildVisaTrackingRowsFromGroups } from "../../shared/app-domain";
+import { agreementDraftQueryKeys, groupQueryKeys } from "../../shared/query-keys";
 import { filterAgreementDrafts } from "../../shared/visa-domain";
 import { getUncoveredPeriod } from "../../pages/visa-detail/visa-detail-helpers";
+import { useVisaTrackingDetail } from "../../pages/visa-detail/hooks/use-visa-tracking-detail";
 import { HotelAgreementSection } from "../../pages/visa-detail/components/HotelAgreementSection";
 
-const { mockVisaDetailContext } = vi.hoisted(() => ({ mockVisaDetailContext: vi.fn() }));
+const { mockVisaDetailContext, mockAssignDraftInBackend, mockUnassignDraftInBackend } = vi.hoisted(() => ({
+  mockVisaDetailContext: vi.fn(),
+  mockAssignDraftInBackend: vi.fn(),
+  mockUnassignDraftInBackend: vi.fn(),
+}));
 
 vi.mock("../../pages/visa-detail/context/VisaDetailContext", () => ({
   useVisaDetailContext: mockVisaDetailContext,
+}));
+
+vi.mock("../../hooks/use-agreement-drafts-query", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../hooks/use-agreement-drafts-query")>()),
+  assignAgreementDraftInBackend: mockAssignDraftInBackend,
+  unassignAgreementDraftInBackend: mockUnassignDraftInBackend,
 }));
 
 const group: GroupData = {
@@ -196,5 +211,115 @@ describe("shared hotel agreement assignment", () => {
     render(<HotelAgreementSection />);
     expect(screen.getByText("15762601634186802")).toBeInTheDocument();
     expect(screen.getByText("2251802632660180")).toBeInTheDocument();
+  });
+
+  it("optimistically updates group hotels and closes inline/modal UI immediately on assign and unassign", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    const draft: HotelAgreementDraft = {
+      id: "draft-opt-1",
+      agentId: "agent-1",
+      city: "makkah",
+      agentName: "Agent A",
+      hotelName: "Optimistic Makkah Hotel",
+      agreementNumber: "AG-OPT-100",
+      pax: 20,
+      remainingPax: 20,
+      assignedGroups: [],
+      status: "Approved",
+      stayStartIso: group.arrivalDate!,
+      stayEndIso: group.returnDate!,
+      notes: "",
+      assignmentStatus: "Unassigned",
+      createdAtIso: "2026-06-01T00:00:00Z",
+      updatedAtIso: "2026-06-01T00:00:00Z",
+    };
+
+    queryClient.setQueryData(groupQueryKeys.list("detail", false), [group]);
+    queryClient.setQueryData(agreementDraftQueryKeys.list("", "all"), [draft]);
+
+    let resolveAssign!: (val: HotelAgreementDraft) => void;
+    mockAssignDraftInBackend.mockReturnValueOnce(
+      new Promise<HotelAgreementDraft>((res) => {
+        resolveAssign = res;
+      }),
+    );
+
+    const row = buildVisaTrackingRowsFromGroups([group])[0]!;
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(
+      () =>
+        useVisaTrackingDetail({
+          row,
+          groups: (queryClient.getQueryData<GroupData[]>(groupQueryKeys.list("detail", false)) ?? [group]),
+          onBack: vi.fn(),
+          onDeleteGroup: vi.fn(),
+          onSaveGroup: vi.fn(() => ({ ok: true as const })),
+          onUpdateVisaStatus: vi.fn(),
+          onUpdateVisaType: vi.fn(),
+          onToggleHotelWaiver: vi.fn(),
+          onUpdatePaymentStatus: vi.fn(),
+          onUpdateSyarikah: vi.fn(),
+          onUpdateFlightDetails: vi.fn(),
+          onUpdateVisaHotel: vi.fn(),
+          onDeleteVisaHotel: vi.fn(),
+          onSyncVisaItinerary: vi.fn(),
+          onUpdateRaudhahAppointment: vi.fn(),
+          onClearRaudhahAppointment: vi.fn(),
+        }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.openAddHotelInline("makkah");
+    });
+    expect(result.current.addingHotelCity).toBe("makkah");
+
+    let assignPromise!: Promise<void>;
+    act(() => {
+      assignPromise = result.current.assignAgreementDraft(draft, group.arrivalDate, group.returnDate);
+    });
+
+    // Immediately updated before backend resolves
+    expect(result.current.addingHotelCity).toBeNull();
+    const optimisticGroups = queryClient.getQueryData<GroupData[]>(groupQueryKeys.list("detail", false))!;
+    expect(optimisticGroups[0]?.visaSetup?.makkahHotels).toHaveLength(1);
+    expect(optimisticGroups[0]?.visaSetup?.makkahHotels[0]?.agreementNumber).toBe("AG-OPT-100");
+
+    await act(async () => {
+      resolveAssign({ ...draft, assignmentStatus: "Assigned" });
+      await assignPromise;
+    });
+
+    // Now test optimistic unassign
+    const assignedHotel = optimisticGroups[0]!.visaSetup!.makkahHotels[0]!;
+    let resolveUnassign!: (val: HotelAgreementDraft) => void;
+    mockUnassignDraftInBackend.mockReturnValueOnce(
+      new Promise<HotelAgreementDraft>((res) => {
+        resolveUnassign = res;
+      }),
+    );
+
+    act(() => {
+      result.current.openDeleteAgreementConfirm("makkah", assignedHotel, true, draft);
+    });
+    expect(result.current.deleteAgreementDraft).not.toBeNull();
+
+    let unassignPromise!: Promise<void>;
+    act(() => {
+      unassignPromise = result.current.deleteAgreement();
+    });
+
+    // Modal closes and hotel is removed immediately before backend resolves
+    expect(result.current.deleteAgreementDraft).toBeNull();
+    const afterUnassignGroups = queryClient.getQueryData<GroupData[]>(groupQueryKeys.list("detail", false))!;
+    expect(afterUnassignGroups[0]?.visaSetup?.makkahHotels).toHaveLength(0);
+
+    await act(async () => {
+      resolveUnassign(draft);
+      await unassignPromise;
+    });
   });
 });

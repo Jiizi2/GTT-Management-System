@@ -1058,6 +1058,7 @@ img {
     @apply overflow-hidden rounded-3xl shadow-float;
     border: var(--serene-frame-border-width) solid var(--serene-frame-border-color);
     background: var(--serene-floating-surface);
+    animation: serene-zoom-in var(--motion-routine) var(--motion-ease-out);
   }
 
   .agreement-draft-edit-overlay {
