@@ -4,7 +4,7 @@ import { useAgentsQuery } from "../../../hooks/use-agents-backend";
 import { useMuassasahQuery } from "../../../hooks/use-directory-backend";
 import { formatLocalIsoDate } from "../../../shared/app-domain";
 import { useVisaDetailContext } from "../context/VisaDetailContext";
-import { resolveGroupFlightDetails } from "../visa-detail-helpers";
+import { resolveFamilyGroupFlightCopySource, resolveGroupFlightDetails } from "../visa-detail-helpers";
 import { resolveFlightAgreementDateBounds } from "../../../shared/visa-flight-date-validation";
 
 const LazyDeleteGroupModal = lazy(async () => ({
@@ -64,6 +64,7 @@ export function VisaDetailModals() {
     row,
     group,
     groups,
+    familyGroups,
     paymentStatus,
     activeModal,
     hotelCityDraft,
@@ -191,6 +192,9 @@ export function VisaDetailModals() {
               initialValue={resolveGroupFlightDetails(group)}
               agreementStartDate={flightAgreementBounds.agreementStartDate}
               agreementEndDate={flightAgreementBounds.agreementEndDate}
+              defaultOnwardDate={flightAgreementBounds.agreementStartDate || group?.arrivalDate || row.departureIso || ""}
+              defaultReturnDate={flightAgreementBounds.agreementEndDate || group?.returnDate || row.returnIso || ""}
+              copySourceFlight={resolveFamilyGroupFlightCopySource(group, familyGroups)}
               onClose={closeModal}
               onSave={saveFlightDetails}
             />

@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
-import { type ReactNode, useId, useMemo } from "react";
-import { Controller, useFieldArray, useForm, useWatch, type Control } from "react-hook-form";
+import { type ReactNode, useId, useMemo, useState } from "react";
+import { Controller, useFieldArray, useForm, useWatch, type Control, type UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod/v4";
 import { DatePickerInput, TimePickerInput } from "./date-time-pickers";
@@ -9,6 +9,7 @@ import { SereneSelect } from "./serene-select";
 import { FlightAirportField } from "./flight-airport-field";
 import { useModalFocusTrap } from "./use-modal-focus-trap";
 import type { AgentOption } from "../hooks/use-agents-backend";
+import { formatVisaDateWithYear } from "../shared/app-domain";
 import type {
   VisaFlightDetailsInput,
   VisaHotelEditFormState,
@@ -18,6 +19,14 @@ import type {
 } from "../shared/app-domain";
 import { validateFlightDatesAgainstAgreement } from "../shared/visa-flight-date-validation";
 import { createEmptyFlightLeg, getFlightLegsByDirection, normalizeFlightLegs } from "../shared/flight-plan";
+import {
+  addIsoDaysToDate,
+  buildMirroredReturnLegs,
+  computeAutoArrivalDate,
+  diffIsoDays,
+  extractCarrierAndFlightNumber,
+  parseFlightScheduleText,
+} from "../shared/flight-smart-paste";
 
 const modalOverlayClassName = "serene-modal-overlay z-[120]";
 const modalFieldClassName = "serene-field";
@@ -594,17 +603,135 @@ export function SyarikahModal({
 }
 
 function FlightLegRoute({ control, index }: { control: Control<VisaFlightDetailsInput>; index: number }) {
-  const [departure, arrival] = useWatch({
+  const [departure, arrival, carrierCode, flightNumber] = useWatch({
     control,
-    name: [`flightLegs.${index}.departureAirportCode`, `flightLegs.${index}.arrivalAirportCode`],
+    name: [
+      `flightLegs.${index}.departureAirportCode`,
+      `flightLegs.${index}.arrivalAirportCode`,
+      `flightLegs.${index}.carrierCode`,
+      `flightLegs.${index}.flightNumber`,
+    ],
     exact: true,
   });
+  const resolvedFlightBadge = flightNumber?.trim().toUpperCase() || carrierCode?.trim().toUpperCase() || "";
   return (
-    <span className="truncate text-sm font-extrabold text-slate-800">
-      {departure?.toUpperCase() || "FROM"}
-      <span className="mx-2 text-slate-400">→</span>
-      {arrival?.toUpperCase() || "TO"}
+    <span className="inline-flex items-center gap-2 truncate text-sm font-extrabold text-slate-800">
+      <span>
+        {departure?.toUpperCase() || "FROM"}
+        <span className="mx-2 text-slate-400">→</span>
+        {arrival?.toUpperCase() || "TO"}
+      </span>
+      {resolvedFlightBadge ? (
+        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">
+          {resolvedFlightBadge}
+        </span>
+      ) : null}
     </span>
+  );
+}
+
+const ORIGIN_QUICK_AIRPORTS = ["CGK", "SUB", "KNO", "UPG", "DOH", "DXB"] as const;
+const SAUDI_AND_TRANSIT_QUICK_AIRPORTS = ["JED", "MED", "DOH", "DXB", "AUH"] as const;
+
+function FlightArrivalDateControl({
+  control,
+  setValue,
+  index,
+  errorMessage,
+}: {
+  control: Control<VisaFlightDetailsInput>;
+  setValue: UseFormSetValue<VisaFlightDetailsInput>;
+  index: number;
+  errorMessage?: string;
+}) {
+  const [departureDate, arrivalDate] = useWatch({
+    control,
+    name: [`flightLegs.${index}.departureDate`, `flightLegs.${index}.arrivalDate`],
+    exact: true,
+  });
+  const dayOffset = departureDate && arrivalDate ? diffIsoDays(departureDate, arrivalDate) : 0;
+  const [customExpanded, setCustomExpanded] = useState(false);
+  const showDatePicker =
+    customExpanded ||
+    Boolean(errorMessage) ||
+    (!departureDate && Boolean(arrivalDate)) ||
+    (dayOffset !== null && dayOffset !== 0 && dayOffset !== 1);
+
+  return (
+    <div className="space-y-1.5 pt-0.5">
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="text-[10px] font-bold text-slate-500">Tiba:</span>
+        <button
+          type="button"
+          className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold transition ${
+            !showDatePicker && (dayOffset === 0 || !arrivalDate)
+              ? "bg-brand-primary text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-brand-primary/10 hover:text-brand-primary"
+          }`}
+          onClick={() => {
+            setCustomExpanded(false);
+            if (departureDate) {
+              setValue(`flightLegs.${index}.arrivalDate`, departureDate, { shouldDirty: true, shouldValidate: true });
+            }
+          }}
+        >
+          Hari sama
+        </button>
+        <button
+          type="button"
+          className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold transition ${
+            !showDatePicker && dayOffset === 1
+              ? "bg-brand-primary text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-brand-primary/10 hover:text-brand-primary"
+          }`}
+          onClick={() => {
+            setCustomExpanded(false);
+            if (departureDate) {
+              setValue(`flightLegs.${index}.arrivalDate`, addIsoDaysToDate(departureDate, 1), {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+            }
+          }}
+        >
+          +1 hari
+        </button>
+        <button
+          type="button"
+          className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold transition ${
+            showDatePicker
+              ? "bg-brand-primary/15 text-brand-primary"
+              : "bg-slate-100 text-slate-600 hover:bg-brand-primary/10 hover:text-brand-primary"
+          }`}
+          onClick={() => setCustomExpanded((prev) => !prev)}
+        >
+          {arrivalDate && dayOffset !== 0 && dayOffset !== 1 ? formatVisaDateWithYear(arrivalDate) : "Pilih tgl"}
+        </button>
+      </div>
+      {showDatePicker ? (
+        <Controller
+          control={control}
+          name={`flightLegs.${index}.arrivalDate`}
+          render={({ field: pickerField }) => (
+            <DatePickerInput
+              id={`flight-leg-${index}-arrival-date`}
+              inputClassName={modalInputClassName}
+              value={pickerField.value}
+              onChange={pickerField.onChange}
+              ariaInvalid={getFieldAriaInvalid(errorMessage)}
+              ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-arrival-date`, {
+                errorMessage,
+              })}
+            />
+          )}
+        />
+      ) : null}
+      <FieldErrorMessage
+        fieldId={`flight-leg-${index}-arrival-date`}
+        message={errorMessage}
+        className={modalErrorClassName}
+      />
+    </div>
   );
 }
 
@@ -612,15 +739,24 @@ export function FlightDetailsModal({
   initialValue,
   agreementStartDate,
   agreementEndDate,
+  defaultOnwardDate,
+  defaultReturnDate,
+  copySourceFlight,
   onClose,
   onSave,
 }: {
   initialValue: VisaFlightDetailsInput;
   agreementStartDate?: string;
   agreementEndDate?: string;
+  defaultOnwardDate?: string;
+  defaultReturnDate?: string;
+  copySourceFlight?: { groupCode: string; flight: VisaFlightDetailsInput };
   onClose: () => void;
   onSave: (flight: VisaFlightDetailsInput) => void | Promise<void>;
 }) {
+  const resolvedOnwardDate = defaultOnwardDate || agreementStartDate || "";
+  const resolvedReturnDate = defaultReturnDate || agreementEndDate || "";
+
   const schema = useMemo(
     () => createFlightDetailsModalSchema(agreementStartDate, agreementEndDate),
     [agreementStartDate, agreementEndDate],
@@ -629,27 +765,128 @@ export function FlightDetailsModal({
     register,
     control,
     getValues,
+    setValue,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<VisaFlightDetailsInput>({
     resolver: zodResolver(schema),
     defaultValues: initialValue,
   });
-  const { fields, append, remove } = useFieldArray({ control, name: "flightLegs" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "flightLegs" });
+
+  const [smartPasteText, setSmartPasteText] = useState("");
+  const [smartPasteFeedback, setSmartPasteFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const ensureDefaultDateIfEmpty = (index: number, direction: "ONWARD" | "RETURN") => {
+    const currentLeg = getValues(`flightLegs.${index}`);
+    if (!currentLeg || currentLeg.departureDate || currentLeg.arrivalDate) return;
+    const fallbackDate = direction === "ONWARD" ? resolvedOnwardDate : resolvedReturnDate;
+    if (!fallbackDate) return;
+    setValue(`flightLegs.${index}.departureDate`, fallbackDate, { shouldDirty: true });
+    setValue(
+      `flightLegs.${index}.arrivalDate`,
+      computeAutoArrivalDate(fallbackDate, currentLeg.departureTime, currentLeg.arrivalTime),
+      { shouldDirty: true },
+    );
+  };
+
+  const syncAutoArrivalDate = (index: number, nextDepDate?: string, nextDepTime?: string, nextArrTime?: string) => {
+    const currentLeg = getValues(`flightLegs.${index}`);
+    if (!currentLeg) return;
+    const depDate = nextDepDate ?? currentLeg.departureDate;
+    const depTime = nextDepTime ?? currentLeg.departureTime;
+    const arrTime = nextArrTime ?? currentLeg.arrivalTime;
+    if (!depDate) return;
+    const computed = computeAutoArrivalDate(depDate, depTime, arrTime);
+    if (computed) {
+      setValue(`flightLegs.${index}.arrivalDate`, computed, { shouldDirty: true });
+    }
+  };
+
+  const handleApplySmartPaste = () => {
+    const parsedLegs = parseFlightScheduleText(smartPasteText, {
+      defaultOnwardDate: resolvedOnwardDate,
+      defaultReturnDate: resolvedReturnDate,
+    });
+    if (parsedLegs.length === 0) {
+      setSmartPasteFeedback({
+        tone: "error",
+        message: "Format belum dikenali. Contoh: GA980 12NOV CGK-JED 11:50 17:40",
+      });
+      return;
+    }
+
+    const currentLegs = getValues("flightLegs");
+    const parsedOnward = getFlightLegsByDirection(parsedLegs, "ONWARD");
+    const parsedReturn = getFlightLegsByDirection(parsedLegs, "RETURN");
+    const existingOnward = getFlightLegsByDirection(currentLegs, "ONWARD");
+    const existingReturn = getFlightLegsByDirection(currentLegs, "RETURN");
+
+    const nextLegs = [
+      ...(parsedOnward.length > 0
+        ? parsedOnward
+        : existingOnward.length > 0
+          ? existingOnward
+          : [createEmptyFlightLeg("ONWARD")]),
+      ...(parsedReturn.length > 0
+        ? parsedReturn
+        : existingReturn.length > 0
+          ? existingReturn
+          : [createEmptyFlightLeg("RETURN")]),
+    ];
+
+    replace(nextLegs);
+    setSmartPasteFeedback({
+      tone: "success",
+      message: `Berhasil mengisi ${parsedLegs.length} segmen penerbangan dari teks.`,
+    });
+  };
+
+  const handleMirrorFromOnward = () => {
+    const currentLegs = getValues("flightLegs");
+    const mirroredReturn = buildMirroredReturnLegs(currentLegs, resolvedReturnDate);
+    if (mirroredReturn.length === 0) return;
+    const onwardLegs = getFlightLegsByDirection(currentLegs, "ONWARD");
+    replace([...(onwardLegs.length > 0 ? onwardLegs : [createEmptyFlightLeg("ONWARD")]), ...mirroredReturn]);
+    setSmartPasteFeedback({
+      tone: "success",
+      message: "Rute Return berhasil dibalik dari Onward.",
+    });
+  };
+
+  const handleCopyFromGroup = () => {
+    if (!copySourceFlight) return;
+    replace(copySourceFlight.flight.flightLegs);
+    setSmartPasteFeedback({
+      tone: "success",
+      message: `Jadwal penerbangan disalin dari grup ${copySourceFlight.groupCode}.`,
+    });
+  };
 
   const addLeg = (direction: "ONWARD" | "RETURN") => {
     const directionLegs = getFlightLegsByDirection(getValues("flightLegs"), direction);
     const previous = directionLegs.at(-1);
+    const fallbackDate =
+      previous?.arrivalDate ||
+      previous?.departureDate ||
+      (direction === "ONWARD" ? resolvedOnwardDate : resolvedReturnDate);
     append({
       ...createEmptyFlightLeg(direction, directionLegs.length),
       departureAirportCode: previous?.arrivalAirportCode ?? "",
-      departureDate: previous?.arrivalDate ?? "",
+      departureDate: fallbackDate,
+      arrivalDate: fallbackDate,
+      carrierCode: previous?.carrierCode ?? "",
     });
   };
 
   const renderDirection = (direction: "ONWARD" | "RETURN", title: string, description: string) => {
     const indexes = fields.flatMap((field, index) => (field.direction === direction ? [index] : []));
     const isTransit = indexes.length > 1;
+    const defaultDirectionDate = direction === "ONWARD" ? resolvedOnwardDate : resolvedReturnDate;
+
     return (
       <fieldset className={direction === "RETURN" ? "border-t border-slate-200 pt-5" : ""}>
         <legend className="sr-only">{title}</legend>
@@ -668,14 +905,26 @@ export function FlightDetailsModal({
             </div>
             <p className="mt-1 text-xs font-medium text-slate-600">{description}</p>
           </div>
-          <button
-            type="button"
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-extrabold text-brand-primary transition hover:bg-brand-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
-            onClick={() => addLeg(direction)}
-          >
-            <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
-            {indexes.length === 0 ? "Tambah penerbangan" : "Tambah transit"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {direction === "RETURN" ? (
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 transition hover:border-brand-primary/40 hover:bg-brand-primary/5 hover:text-brand-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                onClick={handleMirrorFromOnward}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">sync</span>
+                Balik rute Onward
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-extrabold text-brand-primary transition hover:bg-brand-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+              onClick={() => addLeg(direction)}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
+              {indexes.length === 0 ? "Tambah penerbangan" : "Tambah transit"}
+            </button>
+          </div>
         </div>
 
         <div className="divide-y divide-slate-200 border-y border-slate-200">
@@ -687,9 +936,19 @@ export function FlightDetailsModal({
           {indexes.map((index, position) => {
             const legErrors = errors.flightLegs?.[index];
             const field = fields[index];
+            const isOriginAirport =
+              (direction === "ONWARD" && position === 0) ||
+              (direction === "RETURN" && position === indexes.length - 1);
+            const fromQuickCodes =
+              direction === "ONWARD" && position === 0 ? ORIGIN_QUICK_AIRPORTS : SAUDI_AND_TRANSIT_QUICK_AIRPORTS;
+            const toQuickCodes =
+              direction === "RETURN" && position === indexes.length - 1
+                ? ORIGIN_QUICK_AIRPORTS
+                : SAUDI_AND_TRANSIT_QUICK_AIRPORTS;
+
             return (
               <div key={field.id} className="py-4">
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-3 flex items-center justify-between">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-primary/10 text-xs font-black text-brand-primary">
                       {position + 1}
@@ -708,45 +967,134 @@ export function FlightDetailsModal({
 
                 <input type="hidden" {...register(`flightLegs.${index}.direction`)} />
                 <input type="hidden" value={position} {...register(`flightLegs.${index}.sortOrder`, { valueAsNumber: true })} />
+                <input type="hidden" {...register(`flightLegs.${index}.carrierCode`)} />
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
-                  <label className={`${modalFieldClassName} lg:col-span-3`}>
-                    <span>Tanggal berangkat</span>
+                  <div className={`${modalFieldClassName} lg:col-span-2`}>
+                    <label htmlFor={`flight-leg-${index}-departure-date`}>Tanggal berangkat</label>
                     <Controller
                       control={control}
                       name={`flightLegs.${index}.departureDate`}
                       render={({ field: pickerField }) => (
-                        <DatePickerInput
-                          id={`flight-leg-${index}-departure-date`}
-                          inputClassName={modalInputClassName}
-                          value={pickerField.value}
-                          onChange={pickerField.onChange}
-                          ariaInvalid={getFieldAriaInvalid(legErrors?.departureDate?.message)}
-                          ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-departure-date`, {
-                            errorMessage: legErrors?.departureDate?.message,
-                          })}
-                        />
+                        <>
+                          <DatePickerInput
+                            id={`flight-leg-${index}-departure-date`}
+                            inputClassName={modalInputClassName}
+                            value={pickerField.value}
+                            onChange={(nextDate) => {
+                              pickerField.onChange(nextDate);
+                              syncAutoArrivalDate(index, nextDate);
+                            }}
+                            ariaInvalid={getFieldAriaInvalid(legErrors?.departureDate?.message)}
+                            ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-departure-date`, {
+                              errorMessage: legErrors?.departureDate?.message,
+                            })}
+                          />
+                          {position === 0 && defaultDirectionDate && pickerField.value !== defaultDirectionDate ? (
+                            <button
+                              type="button"
+                              className="mt-1 self-start rounded-md bg-brand-primary/10 px-1.5 py-0.5 text-[10px] font-extrabold text-brand-primary transition hover:bg-brand-primary/20"
+                              onClick={() => {
+                                pickerField.onChange(defaultDirectionDate);
+                                syncAutoArrivalDate(index, defaultDirectionDate);
+                              }}
+                            >
+                              Gunakan {formatVisaDateWithYear(defaultDirectionDate)}
+                            </button>
+                          ) : null}
+                        </>
                       )}
                     />
                     <FieldErrorMessage fieldId={`flight-leg-${index}-departure-date`} message={legErrors?.departureDate?.message} className={modalErrorClassName} />
-                  </label>
+                  </div>
+
                   <Controller
                     control={control}
                     name={`flightLegs.${index}.departureAirportCode`}
-                    render={({ field }) => (
+                    render={({ field: airportField }) => (
                       <FlightAirportField
                         id={`flight-leg-${index}-from`}
                         label="From"
                         accessibleLabel={`From ${title} segmen ${position + 1}`}
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        inputRef={field.ref}
+                        value={airportField.value}
+                        onChange={(nextCode) => {
+                          airportField.onChange(nextCode);
+                          if (nextCode) ensureDefaultDateIfEmpty(index, direction);
+                        }}
+                        onBlur={airportField.onBlur}
+                        inputRef={airportField.ref}
+                        quickCodes={fromQuickCodes}
+                        preferCustomWhenEmpty={direction === "ONWARD" && position === 0 && isOriginAirport}
                         errorMessage={legErrors?.departureAirportCode?.message}
                       />
                     )}
                   />
+
+                  <Controller
+                    control={control}
+                    name={`flightLegs.${index}.arrivalAirportCode`}
+                    render={({ field: airportField }) => (
+                      <FlightAirportField
+                        id={`flight-leg-${index}-to`}
+                        label="To"
+                        accessibleLabel={`To ${title} segmen ${position + 1}`}
+                        value={airportField.value}
+                        onChange={(nextCode) => {
+                          airportField.onChange(nextCode);
+                          if (nextCode) ensureDefaultDateIfEmpty(index, direction);
+                        }}
+                        onBlur={airportField.onBlur}
+                        inputRef={airportField.ref}
+                        quickCodes={toQuickCodes}
+                        preferCustomWhenEmpty={direction === "RETURN" && position === indexes.length - 1 && isOriginAirport}
+                        errorMessage={legErrors?.arrivalAirportCode?.message}
+                      />
+                    )}
+                  />
+
                   <label className={`${modalFieldClassName} lg:col-span-2`}>
+                    <span>Flight no.</span>
+                    <Controller
+                      control={control}
+                      name={`flightLegs.${index}.flightNumber`}
+                      render={({ field: flightField }) => (
+                        <input
+                          className={`${modalInputClassName} uppercase`}
+                          placeholder="GA-980 / SV817"
+                          value={flightField.value}
+                          onChange={(event) => {
+                            const raw = event.target.value.toUpperCase();
+                            flightField.onChange(raw);
+                            const { carrierCode } = extractCarrierAndFlightNumber(
+                              raw,
+                              getValues(`flightLegs.${index}.carrierCode`),
+                            );
+                            if (carrierCode) {
+                              setValue(`flightLegs.${index}.carrierCode`, carrierCode, { shouldDirty: true });
+                            }
+                            if (raw.trim()) {
+                              ensureDefaultDateIfEmpty(index, direction);
+                            }
+                          }}
+                          onBlur={() => {
+                            const { carrierCode, flightNumber } = extractCarrierAndFlightNumber(
+                              flightField.value,
+                              getValues(`flightLegs.${index}.carrierCode`),
+                            );
+                            if (flightNumber && flightNumber !== flightField.value) {
+                              flightField.onChange(flightNumber);
+                            }
+                            if (carrierCode) {
+                              setValue(`flightLegs.${index}.carrierCode`, carrierCode, { shouldDirty: true });
+                            }
+                            flightField.onBlur();
+                          }}
+                        />
+                      )}
+                    />
+                  </label>
+
+                  <label className={`${modalFieldClassName} lg:col-span-1`}>
                     <span>ETD</span>
                     <Controller
                       control={control}
@@ -756,7 +1104,10 @@ export function FlightDetailsModal({
                           id={`flight-leg-${index}-etd`}
                           inputClassName={modalInputClassName}
                           value={pickerField.value}
-                          onChange={pickerField.onChange}
+                          onChange={(nextTime) => {
+                            pickerField.onChange(nextTime);
+                            syncAutoArrivalDate(index, undefined, nextTime, undefined);
+                          }}
                           ariaInvalid={getFieldAriaInvalid(legErrors?.departureTime?.message)}
                           ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-etd`, {
                             errorMessage: legErrors?.departureTime?.message,
@@ -766,44 +1117,9 @@ export function FlightDetailsModal({
                     />
                     <FieldErrorMessage fieldId={`flight-leg-${index}-etd`} message={legErrors?.departureTime?.message} className={modalErrorClassName} />
                   </label>
-                  <label className={`${modalFieldClassName} lg:col-span-3`}>
-                    <span>Tanggal tiba</span>
-                    <Controller
-                      control={control}
-                      name={`flightLegs.${index}.arrivalDate`}
-                      render={({ field: pickerField }) => (
-                        <DatePickerInput
-                          id={`flight-leg-${index}-arrival-date`}
-                          inputClassName={modalInputClassName}
-                          value={pickerField.value}
-                          onChange={pickerField.onChange}
-                          ariaInvalid={getFieldAriaInvalid(legErrors?.arrivalDate?.message)}
-                          ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-arrival-date`, {
-                            errorMessage: legErrors?.arrivalDate?.message,
-                          })}
-                        />
-                      )}
-                    />
-                    <FieldErrorMessage fieldId={`flight-leg-${index}-arrival-date`} message={legErrors?.arrivalDate?.message} className={modalErrorClassName} />
-                  </label>
-                  <Controller
-                    control={control}
-                    name={`flightLegs.${index}.arrivalAirportCode`}
-                    render={({ field }) => (
-                      <FlightAirportField
-                        id={`flight-leg-${index}-to`}
-                        label="To"
-                        accessibleLabel={`To ${title} segmen ${position + 1}`}
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        inputRef={field.ref}
-                        errorMessage={legErrors?.arrivalAirportCode?.message}
-                      />
-                    )}
-                  />
-                  <label className={`${modalFieldClassName} lg:col-span-2`}>
-                    <span>ETA</span>
+
+                  <div className={`${modalFieldClassName} lg:col-span-2`}>
+                    <label htmlFor={`flight-leg-${index}-eta`}>ETA</label>
                     <Controller
                       control={control}
                       name={`flightLegs.${index}.arrivalTime`}
@@ -812,7 +1128,10 @@ export function FlightDetailsModal({
                           id={`flight-leg-${index}-eta`}
                           inputClassName={modalInputClassName}
                           value={pickerField.value}
-                          onChange={pickerField.onChange}
+                          onChange={(nextTime) => {
+                            pickerField.onChange(nextTime);
+                            syncAutoArrivalDate(index, undefined, undefined, nextTime);
+                          }}
                           ariaInvalid={getFieldAriaInvalid(legErrors?.arrivalTime?.message)}
                           ariaDescribedBy={getFieldDescribedBy(`flight-leg-${index}-eta`, {
                             errorMessage: legErrors?.arrivalTime?.message,
@@ -821,17 +1140,16 @@ export function FlightDetailsModal({
                       )}
                     />
                     <FieldErrorMessage fieldId={`flight-leg-${index}-eta`} message={legErrors?.arrivalTime?.message} className={modalErrorClassName} />
-                  </label>
-                  <label className={`${modalFieldClassName} lg:col-span-2`}>
-                    <span>Carrier</span>
-                    <input className={`${modalInputClassName} uppercase`} maxLength={3} placeholder="GA" {...register(`flightLegs.${index}.carrierCode`)} />
-                  </label>
-                  <label className={`${modalFieldClassName} lg:col-span-3`}>
-                    <span>Flight no.</span>
-                    <input className={`${modalInputClassName} uppercase`} placeholder="GA-980" {...register(`flightLegs.${index}.flightNumber`)} />
-                  </label>
-                  <label className={`${modalFieldClassName} lg:col-span-5`}>
-                    <span>Remarks</span>
+                    <FlightArrivalDateControl
+                      control={control}
+                      setValue={setValue}
+                      index={index}
+                      errorMessage={legErrors?.arrivalDate?.message}
+                    />
+                  </div>
+
+                  <label className={`${modalFieldClassName} lg:col-span-1`}>
+                    <span>Catatan</span>
                     <input className={modalInputClassName} placeholder="Opsional" {...register(`flightLegs.${index}.remarks`)} />
                   </label>
                 </div>
@@ -862,12 +1180,54 @@ export function FlightDetailsModal({
       }
     >
       <div className="space-y-5">
-        <p className="flex items-start gap-2 text-sm font-medium leading-relaxed text-slate-600">
-          <span className="material-symbols-outlined mt-0.5 text-base text-brand-primary" aria-hidden="true">info</span>
-          <span>
-            Pilih bandara Saudi atau pilih <strong>Bandara lain / transit</strong> untuk mengetik kode IATA seperti CGK, DOH, DXB, atau AUH. Tambahkan satu segmen untuk setiap penerbangan transit.
-          </span>
-        </p>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label htmlFor="flight-smart-paste-input" className="text-xs font-extrabold text-slate-800">
+              Isi Cepat dari Teks Tiket / PNR / WhatsApp
+            </label>
+            {copySourceFlight ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 self-start rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1 text-xs font-extrabold text-brand-primary transition hover:bg-brand-primary/20"
+                onClick={handleCopyFromGroup}
+              >
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">sync</span>
+                Salin dari {copySourceFlight.groupCode}
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <textarea
+              id="flight-smart-paste-input"
+              aria-label="Tempel jadwal tiket atau PNR"
+              rows={2}
+              value={smartPasteText}
+              onChange={(event) => setSmartPasteText(event.target.value)}
+              placeholder={"Tempel teks tiket/PNR di sini, contoh:\nGA980 12NOV CGK-JED 11:50 17:40\nGA981 20NOV JED-CGK 19:40 09:50+1"}
+              className="serene-input min-h-[3.25rem] flex-1 resize-y py-2 font-mono text-xs"
+            />
+            <button
+              type="button"
+              onClick={handleApplySmartPaste}
+              disabled={!smartPasteText.trim()}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-4 py-2 text-xs font-extrabold text-white transition hover:bg-brand-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">check_circle</span>
+              Terapkan jadwal
+            </button>
+          </div>
+          {smartPasteFeedback ? (
+            <p
+              className={`mt-2 text-xs font-semibold ${
+                smartPasteFeedback.tone === "success" ? "text-emerald-700" : "text-brand-tertiary"
+              }`}
+              role="status"
+            >
+              {smartPasteFeedback.message}
+            </p>
+          ) : null}
+        </div>
+
         {renderDirection("ONWARD", "Onward", "Penerbangan dari Indonesia menuju Arab Saudi.")}
         {renderDirection("RETURN", "Return", "Penerbangan dari Arab Saudi kembali ke Indonesia.")}
       </div>
