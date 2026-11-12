@@ -48,6 +48,17 @@ const NON_AIRPORT_Three_LETTER_TOKENS = new Set([
   "ETD", "ETA", "VIA", "DAN", "AND", "THE", "FOR", "PAX", "VIP", "BUS", "WIB", "WITA", "WIT", "KSA",
 ]);
 
+const KNOWN_ORIGIN_AND_TRANSIT_AIRPORTS = new Set([
+  "CGK", "SUB", "KNO", "UPG", "SOC", "BTH", "PLM", "BPN", "BDJ", "LOP", "PDG", "PKU", "YIA", "JOG", "SRG", "DPS", "BDO", "MDC", "PNK",
+  "DOH", "DXB", "AUH", "SHJ", "MCT", "BAH", "KWI", "AMM", "CAI", "IST", "SAW",
+  "SIN", "KUL", "PEN", "BKK", "DMK", "CMB", "MLE", "DAC", "DEL", "BOM", "MAA", "HYD", "BLR", "COK", "KHI", "LHE", "ISB", "MNL", "CAN", "HKG", "TPE", "ICN", "NRT", "HND", "ADD", "CMN",
+]);
+
+function isKnownAirportCode(code: string): boolean {
+  const upper = code.trim().toUpperCase();
+  return Boolean(findSaudiAirport(upper)) || KNOWN_ORIGIN_AND_TRANSIT_AIRPORTS.has(upper);
+}
+
 export function addIsoDaysToDate(isoDate: string, days: number): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
   const date = new Date(`${isoDate}T12:00:00.000Z`);
@@ -257,7 +268,16 @@ export function parseFlightScheduleText(
     let from = "";
     let to = "";
     const explicitPairMatch = /\b([A-Z]{3})\s*(?:->|→|-|\/)\s*([A-Z]{3})\b/.exec(withoutFlight);
-    const sixLetterMatch = /\b([A-Z]{3})([A-Z]{3})\b/.exec(withoutFlight);
+    const sixLetterMatch = Array.from(withoutFlight.matchAll(/\b([A-Z]{3})([A-Z]{3})\b/g)).find(
+      (m) =>
+        !findSaudiAirport(m[0]!) &&
+        !MONTH_MAP[m[0]!] &&
+        m[1] !== m[2] &&
+        !NON_AIRPORT_Three_LETTER_TOKENS.has(m[1]!) &&
+        !NON_AIRPORT_Three_LETTER_TOKENS.has(m[2]!) &&
+        isKnownAirportCode(m[1]!) &&
+        isKnownAirportCode(m[2]!),
+    );
 
     if (
       explicitPairMatch &&
@@ -266,12 +286,7 @@ export function parseFlightScheduleText(
     ) {
       from = explicitPairMatch[1]!;
       to = explicitPairMatch[2]!;
-    } else if (
-      sixLetterMatch &&
-      !NON_AIRPORT_Three_LETTER_TOKENS.has(sixLetterMatch[1]!) &&
-      !NON_AIRPORT_Three_LETTER_TOKENS.has(sixLetterMatch[2]!) &&
-      !MONTH_MAP[sixLetterMatch[0]!]
-    ) {
+    } else if (sixLetterMatch) {
       from = sixLetterMatch[1]!;
       to = sixLetterMatch[2]!;
     } else {
@@ -287,8 +302,11 @@ export function parseFlightScheduleText(
     // Check if the line mentions a Saudi city name (like WhatsApp format: "MADINAH / GA-980 / 17.40 / 13 OCT 2026")
     let saudiOnlyCityCode = "";
     if (!from && !to) {
-      const words = upper.split(/[\s/|,-]+/).filter(Boolean);
-      for (const word of words) {
+      const candidates = [
+        ...upper.split(/[/|,]+/).map((part) => part.trim()),
+        ...upper.split(/[\s/|,-]+/),
+      ].filter(Boolean);
+      for (const word of candidates) {
         const saudi = findSaudiAirport(word);
         if (saudi) {
           saudiOnlyCityCode = saudi.code;
@@ -298,6 +316,12 @@ export function parseFlightScheduleText(
     }
 
     if (!from && !to && !saudiOnlyCityCode && !flightNumber) {
+      const prev = segments.at(-1);
+      if (prev && !prev.date && (date || times.length > 0)) {
+        if (date) prev.date = date;
+        if (!prev.depTime && times[0]?.time) prev.depTime = times[0].time;
+        if (!prev.arrTime && times[1]?.time) prev.arrTime = times[1].time;
+      }
       continue;
     }
 
@@ -343,7 +367,7 @@ export function parseFlightScheduleText(
     const fallbackDate = direction === "ONWARD" ? (options.defaultOnwardDate ?? "") : (options.defaultReturnDate ?? "");
     const effectiveDate = seg.date || fallbackDate;
 
-    if (seg.saudiOnlyCityCode) {
+    if (seg.saudiOnlyCityCode || (!seg.from && !seg.to && !seg.arrTime)) {
       // Single-endpoint summary line (e.g. MADINAH / GA-980 / 17.40 / 13 OCT 2026)
       if (direction === "ONWARD") {
         resolvedLegs.push({

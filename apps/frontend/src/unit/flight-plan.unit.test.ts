@@ -115,6 +115,7 @@ describe("flight plan", () => {
     expect(waParsed).toHaveLength(2);
     expect(waParsed[0]).toMatchObject({
       direction: "ONWARD",
+      departureAirportCode: "",
       arrivalAirportCode: "MED",
       flightNumber: "GA-980",
       arrivalDate: "2026-10-13",
@@ -123,9 +124,33 @@ describe("flight plan", () => {
     expect(waParsed[1]).toMatchObject({
       direction: "RETURN",
       departureAirportCode: "JED",
+      arrivalAirportCode: "",
       flightNumber: "GA-981",
       departureDate: "2026-10-20",
       departureTime: "19:40",
+    });
+
+    const jeddahFirstParsed = parseFlightScheduleText(
+      "JEDDAH / SV-823 / 11.30 / 26 NOV 2026\nMADINAH / SV-844 / 02.00 / 11 DEC 2026",
+    );
+    expect(jeddahFirstParsed).toHaveLength(2);
+    expect(jeddahFirstParsed[0]).toMatchObject({
+      direction: "ONWARD",
+      departureAirportCode: "",
+      arrivalAirportCode: "JED",
+      flightNumber: "SV-823",
+      departureDate: "2026-11-26",
+      arrivalDate: "2026-11-26",
+      arrivalTime: "11:30",
+    });
+    expect(jeddahFirstParsed[1]).toMatchObject({
+      direction: "RETURN",
+      departureAirportCode: "MED",
+      arrivalAirportCode: "",
+      flightNumber: "SV-844",
+      departureDate: "2026-12-11",
+      arrivalDate: "2026-12-11",
+      departureTime: "02:00",
     });
   });
 
