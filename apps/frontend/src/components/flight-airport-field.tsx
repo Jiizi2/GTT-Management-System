@@ -33,7 +33,7 @@ export function FlightAirportField({
 }) {
   const [manual, setManual] = useState(preferCustomWhenEmpty && !value);
   const airport = findSaudiAirport(value);
-  const isCustom = manual || Boolean(value && !airport);
+  const isCustom = !airport && (manual || Boolean(value));
   const describedBy = getFieldDescribedBy(id, { errorMessage });
   const normalizedValue = value.trim().toUpperCase();
 
