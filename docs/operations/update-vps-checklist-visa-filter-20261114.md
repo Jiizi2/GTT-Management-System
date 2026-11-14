@@ -15,12 +15,13 @@ restart backend/PostgreSQL.
 
 ## 1. Simpan checkpoint frontend
 
-Jalankan seluruh langkah dalam satu sesi Bash. Ganti `/path/GTT-Management-System`
-dengan path repository deployment sebenarnya di VPS.
+Jalankan dari direktori deployment Compose di VPS (default konfigurasi repo di
+`deploy/systemd/gtt-backup-predeploy.service` adalah `/opt/gtt`; cek dengan
+`docker compose ls` jika lokasi folder berbeda):
 
 ```bash
 set -euo pipefail
-cd /path/GTT-Management-System
+cd /opt/gtt
 
 if [ -n "$(git status --porcelain)" ]; then
   printf '%s\n' 'Ada perubahan lokal di VPS. Selesaikan sebelum update.' >&2
@@ -57,20 +58,22 @@ git rev-parse HEAD > "$DEPLOY_CHECKPOINT/release-commit.txt"
 Pastikan commit merge PR filter Visa Only / Visa+ sudah masuk pada checkout. Jika
 PR belum digabung ke `master`, hentikan sebelum rebuild container.
 
-## 3. Jalankan backup predeploy
+## 3. Jalankan backup predeploy (jika terpasang)
 
-Ikuti [prosedur backup production yang terpasang](production-backup-implementation.md#backup-pertama-dan-pre-deployment).
-Set `RELEASE_SHA` pada konfigurasi backup (bila menggunakan systemd unit repo,
-di `/etc/gtt/backup.env`) ke commit dalam `release-commit.txt`, lalu jalankan:
+Jika host sudah mengaktifkan unit backup dari `deploy/systemd/`, update
+`RELEASE_SHA` di `/etc/gtt/backup.env` ke commit dalam
+`"$DEPLOY_CHECKPOINT/release-commit.txt"`, lalu jalankan:
 
 ```bash
-sudo systemctl start gtt-backup-predeploy.service
-sudo systemctl show gtt-backup-predeploy.service --property=Result --property=ExecMainStatus
-test "$(systemctl show gtt-backup-predeploy.service --property=Result --value)" = "success"
+if systemctl list-unit-files gtt-backup-predeploy.service | grep -q gtt-backup-predeploy.service; then
+  sudo systemctl start gtt-backup-predeploy.service
+  sudo systemctl show gtt-backup-predeploy.service --property=Result --property=ExecMainStatus
+  test "$(systemctl show gtt-backup-predeploy.service --property=Result --value)" = "success"
+fi
 ```
 
-Jika VPS memakai mekanisme backup lain, jalankan prosedur backup predeploy
-yang berlaku sebelum melanjutkan.
+Jika VPS belum memasang systemd backup tersebut, jalankan prosedur backup yang
+dipakai di VPS sebelum melanjutkan.
 
 ## 4. Build dan recreate container `web`
 
@@ -83,12 +86,14 @@ docker compose -f docker-compose.prod.yml logs --tail=80 web
 
 ## 5. Verifikasi
 
-Ganti `DOMAIN-APLIKASI` dengan domain production sebenarnya:
+Cek langsung dari host VPS (memakai `WEB_PORT` di `.env`, default `8080`) dan
+lewat domain HTTPS bila reverse proxy sudah terpasang:
 
 ```bash
-curl --fail --show-error https://DOMAIN-APLIKASI/ > /dev/null
-curl --fail --show-error https://DOMAIN-APLIKASI/api/health/live
-curl --fail --show-error https://DOMAIN-APLIKASI/api/health/ready
+set -a && [ -f .env ] && . ./.env && set +a
+curl --fail --show-error "http://127.0.0.1:${WEB_PORT:-8080}/" > /dev/null
+curl --fail --show-error "http://127.0.0.1:${WEB_PORT:-8080}/api/health/live"
+curl --fail --show-error "http://127.0.0.1:${WEB_PORT:-8080}/api/health/ready"
 ```
 
 Lakukan hard refresh browser (`Ctrl+Shift+R`), buka `/checklist`, lalu cek:
