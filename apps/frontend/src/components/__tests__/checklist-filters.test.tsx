@@ -73,6 +73,21 @@ function readyGroup(code: string, date: string) {
   return data;
 }
 
+function withVisaType(data: GroupData, busStatus: "Visa Only" | "Visa+"): GroupData {
+  return {
+    ...data,
+    visaSetup: {
+      visaStatus: "Issued",
+      syarikah: "Test Syarikah",
+      busStatus,
+      paymentStatus: "Paid",
+      makkahHotels: [],
+      madinahHotels: [],
+      raudhahAppointments: [],
+    },
+  };
+}
+
 const wrapper = ({ children }: { children: ReactNode }) => <ThemeProvider>{children}</ThemeProvider>;
 
 describe("H-1 checklist filters", () => {
@@ -179,5 +194,94 @@ describe("H-1 checklist filters", () => {
     expect(screen.queryByText("No upcoming trips in the next 3 days")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
     expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("filters checklist items by Visa Only and Visa+ while keeping day and visa counts aligned", () => {
+    const visaOnlyPending = withVisaType(group("VO-1", ["2026-10-31", "2026-11-01"], "Visa Only Group"), "Visa Only");
+    const visaPlusPending = withVisaType(group("VP-1", ["2026-10-31"], "Visa Plus Group"), "Visa+");
+    const defaultPending = group("DEF-1", ["2026-11-02"], "Default Visa Only Group");
+    const visaPlusCompleted = withVisaType(readyGroup("VP-DONE", "2026-10-31"), "Visa+");
+    const groups = [visaOnlyPending, visaPlusPending, defaultPending, visaPlusCompleted];
+
+    const { result } = renderHook(() => useChecklistWorkspace({ groups }));
+    expect(result.current.visaTypeFilterOptions.map((option) => option.count)).toEqual([5, 3, 2]);
+    expect(result.current.dayFilterOptions.map((option) => option.count)).toEqual([5, 3, 1, 1]);
+
+    act(() => result.current.setVisaTypeFilter("visa-only"));
+    expect(result.current.searchedChecklistItems.map((item) => item.groupCode)).toEqual(["VO-1", "VO-1", "DEF-1"]);
+    expect(result.current.dayFilterOptions.map((option) => option.count)).toEqual([3, 1, 1, 1]);
+
+    act(() => result.current.setDayFilter("today"));
+    expect(result.current.searchedChecklistItems.map((item) => item.groupCode)).toEqual(["VO-1"]);
+    expect(result.current.visaTypeFilterOptions.map((option) => option.count)).toEqual([3, 1, 2]);
+
+    act(() => result.current.setVisaTypeFilter("visa-plus"));
+    expect(result.current.searchedChecklistItems.map((item) => item.groupCode)).toEqual(["VP-1", "VP-DONE"]);
+    expect(result.current.dayFilterOptions.map((option) => option.count)).toEqual([2, 2, 0, 0]);
+  });
+
+  it("resets both group pagination sections when the visa type changes", () => {
+    const groups = [
+      ...Array.from({ length: 7 }, (_, i) => withVisaType(group(`P-${i}`, ["2026-10-31"]), "Visa+")),
+      ...Array.from({ length: 7 }, (_, i) => withVisaType(readyGroup(`C-${i}`, "2026-10-31"), "Visa+")),
+      withVisaType(group("VO-1", ["2026-10-31"]), "Visa Only"),
+    ];
+    const { result } = renderHook(() => useChecklistWorkspace({ groups }));
+    act(() => {
+      result.current.setPendingPage(2);
+      result.current.setCompletedPage(2);
+    });
+    expect(result.current.pendingPage).toBe(2);
+    expect(result.current.completedPage).toBe(2);
+
+    act(() => result.current.setVisaTypeFilter("visa-only"));
+    expect(result.current.pendingPage).toBe(1);
+    expect(result.current.completedPage).toBe(1);
+    expect(result.current.paginatedPendingGroups.map((item) => item.groupCode)).toEqual(["VO-1"]);
+  });
+
+  it("renders Visa Only and Visa+ filter buttons, filters sections, resets pagination, and resets filters", () => {
+    const visaOnlyPending = withVisaType(group("901", ["2026-10-31"], "Grup Visa Only"), "Visa Only");
+    const visaPlusPending = withVisaType(group("902", ["2026-10-31"], "Grup Visa Plus"), "Visa+");
+    const visaOnlyCompleted = withVisaType(readyGroup("903", "2026-10-31"), "Visa Only");
+    const extraVisaPlusGroups = Array.from({ length: 7 }, (_, index) =>
+      withVisaType(group(`VP-${index}`, ["2026-11-01"], `Extra ${index}`), "Visa+"),
+    );
+
+    render(
+      <ChecklistScreen groups={[visaOnlyPending, visaPlusPending, visaOnlyCompleted, ...extraVisaPlusGroups]} />,
+      { wrapper },
+    );
+
+    const visaFilterGroup = screen.getByRole("group", { name: "Filter by visa type" });
+    expect(within(visaFilterGroup).getByRole("button", { name: /^All Visa Types/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByRole("button", { name: "Go to page 2" })).toHaveAttribute("aria-current", "page");
+
+    fireEvent.click(within(visaFilterGroup).getByRole("button", { name: /^Visa Only/ }));
+    expect(within(visaFilterGroup).getByRole("button", { name: /^Visa Only/ })).toHaveAttribute("aria-pressed", "true");
+    const attention = screen.getByRole("region", { name: "Need Attention" });
+    expect(within(attention).getByText("Grup Visa Only")).toBeInTheDocument();
+    expect(within(attention).queryByText("Grup Visa Plus")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Completed" })).toBeInTheDocument();
+
+    fireEvent.click(within(visaFilterGroup).getByRole("button", { name: /^Visa\+/ }));
+    expect(within(attention).getByText("Grup Visa Plus")).toBeInTheDocument();
+    expect(within(attention).queryByText("Grup Visa Only")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Completed" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^In 2 Days/ }));
+    expect(screen.getByText("No trips match your filters")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    expect(within(visaFilterGroup).getByRole("button", { name: /^All Visa Types/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("region", { name: "Completed" })).toBeInTheDocument();
   });
 });

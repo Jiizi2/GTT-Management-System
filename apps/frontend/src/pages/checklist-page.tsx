@@ -1,4 +1,4 @@
-﻿import type { GroupData } from "../shared/app-domain";
+import type { GroupData } from "../shared/app-domain";
 import { PaginationControls } from "../components/pagination-controls";
 import { ThemeToggleButton } from "../components/theme-toggle-button";
 import { useChecklistWorkspace } from "./checklist/hooks/use-checklist-workspace";
@@ -8,6 +8,56 @@ import { ChecklistCancelModal } from "./checklist/components/ChecklistCancelModa
 import { AgentFilterSelect } from "../components/agent-filter-select";
 import { DataBoundary, type DataQueryState } from "../components/data-boundary";
 import { ChecklistSkeleton } from "../components/skeleton";
+
+type ChecklistFilterOption<T extends string> = {
+  value: T;
+  label: string;
+  count: number;
+};
+
+function ChecklistFilterGroup<T extends string>({
+  ariaLabel,
+  gridClassName,
+  options,
+  activeValue,
+  hasData,
+  spanFirstOnMobile = false,
+  onSelect,
+}: {
+  ariaLabel: string;
+  gridClassName: string;
+  options: ChecklistFilterOption<T>[];
+  activeValue: T;
+  hasData: boolean;
+  spanFirstOnMobile?: boolean;
+  onSelect: (value: T) => void;
+}) {
+  return (
+    <div className={gridClassName} role="group" aria-label={ariaLabel}>
+      {options.map((option, index) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={activeValue === option.value}
+          onClick={() => onSelect(option.value)}
+          className={`serene-focus-ring flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${
+            spanFirstOnMobile && index === 0 ? "col-span-2 sm:col-span-1" : ""
+          } ${
+            activeValue === option.value
+              ? "bg-primary text-on-primary"
+              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+          }`}
+        >
+          <span>{option.label}</span>
+          <span className="tabular-nums">
+            {hasData ? option.count : "—"}
+            <span className="sr-only"> trips</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; dataState?: DataQueryState }) {
   const state = useChecklistWorkspace({ groups });
@@ -25,6 +75,9 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
     dayFilter,
     setDayFilter,
     dayFilterOptions,
+    visaTypeFilter,
+    setVisaTypeFilter,
+    visaTypeFilterOptions,
     pendingPage,
     setPendingPage,
     completedPage,
@@ -55,13 +108,14 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
     handleCloseCancelConfirm,
     handleConfirmCancelAssignment,
   } = state;
-  const hasFilters = hasGroupCodeQuery || agentFilter !== "all" || dayFilter !== "all";
+  const hasFilters = hasGroupCodeQuery || agentFilter !== "all" || dayFilter !== "all" || visaTypeFilter !== "all";
   const resultGroupCount = new Set(searchedChecklistItems.map((item) => item.groupCode)).size;
   const hasData = !dataState || dataState.data !== undefined;
   const resetFilters = () => {
     setGroupCodeQuery("");
     setAgentFilter("all");
     setDayFilter("all");
+    setVisaTypeFilter("all");
   };
 
   return (
@@ -90,27 +144,23 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
           </label>
           <AgentFilterSelect value={agentFilter} onChange={setAgentFilter} variant="field" className="w-full sm:w-56" />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Filter by trip day">
-          {dayFilterOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={dayFilter === option.value}
-              onClick={() => setDayFilter(option.value)}
-              className={`serene-focus-ring flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${
-                dayFilter === option.value
-                  ? "bg-primary text-on-primary"
-                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-              }`}
-            >
-              <span>{option.label}</span>
-              <span className="tabular-nums">
-                {hasData ? option.count : "—"}
-                <span className="sr-only"> trips</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        <ChecklistFilterGroup
+          ariaLabel="Filter by trip day"
+          gridClassName="grid grid-cols-2 gap-2 sm:grid-cols-4"
+          options={dayFilterOptions}
+          activeValue={dayFilter}
+          hasData={hasData}
+          onSelect={setDayFilter}
+        />
+        <ChecklistFilterGroup
+          ariaLabel="Filter by visa type"
+          gridClassName="grid grid-cols-2 gap-2 sm:grid-cols-3"
+          options={visaTypeFilterOptions}
+          activeValue={visaTypeFilter}
+          hasData={hasData}
+          spanFirstOnMobile
+          onSelect={setVisaTypeFilter}
+        />
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/30 pt-3">
           <p className="text-sm text-on-surface-variant" role="status" aria-live="polite">
             {hasData ? (
@@ -147,7 +197,7 @@ export function ChecklistScreen({ groups, dataState }: { groups: GroupData[]; da
             </h2>
             <p className="mt-2 text-sm text-on-surface-variant">
               {hasFilters
-                ? "Try another day, agent, or group name. Reset filters to see all upcoming trips."
+                ? "Try another day, visa type, agent, or group name. Reset filters to see all upcoming trips."
                 : "No itinerary is scheduled for today, tomorrow, or the day after tomorrow."}
             </p>
             {!hasFilters && checklistItems.length === 0 && groupsWithItineraryCount > 0 ? (

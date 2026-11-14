@@ -37,6 +37,7 @@ export type ChecklistItemsGroup = {
 };
 
 export type ChecklistDayFilter = "all" | "today" | "tomorrow" | "day-after-tomorrow";
+export type ChecklistVisaTypeFilter = "all" | "visa-only" | "visa-plus";
 
 export const groupChecklistItemsByGroup = (items: ChecklistItem[]): ChecklistItemsGroup[] => {
   const groupedItems = new Map<string, ChecklistItemsGroup>();
@@ -256,6 +257,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   const [groupCodeQuery, setGroupCodeQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   const [dayFilter, setDayFilter] = useState<ChecklistDayFilter>("all");
+  const [visaTypeFilter, setVisaTypeFilter] = useState<ChecklistVisaTypeFilter>("all");
   const [pendingPage, setPendingPage] = useState(1);
   const [completedPage, setCompletedPage] = useState(1);
   const normalizedGroupCodeQuery = groupCodeQuery.trim().toLowerCase();
@@ -280,6 +282,13 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
     );
   });
 
+  const matchesVisaType = (item: ChecklistItem, filter: ChecklistVisaTypeFilter): boolean => {
+    if (filter === "all") return true;
+    const serviceType = resolveGroupServiceType(groupsByCode.get(item.groupCode.trim().toUpperCase()));
+    return filter === "visa-plus" ? serviceType === "Visa+" : serviceType === "Visa Only";
+  };
+
+  const visaMatchedItems = matchingChecklistItems.filter((item) => matchesVisaType(item, visaTypeFilter));
   const dayFilterOptions = [
     { value: "all" as const, label: "All Days", date: "" },
     { value: "today" as const, label: "Today", date: getLocalIsoDateWithOffset(0) },
@@ -287,12 +296,19 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
     { value: "day-after-tomorrow" as const, label: "In 2 Days", date: dayAfterTomorrowIso },
   ].map((option) => ({
     ...option,
-    count: matchingChecklistItems.filter((item) => !option.date || item.tripDate === option.date).length,
+    count: visaMatchedItems.filter((item) => !option.date || item.tripDate === option.date).length,
   }));
   const selectedDay = dayFilterOptions.find((option) => option.value === dayFilter)!;
-  const searchedChecklistItems = matchingChecklistItems.filter(
-    (item) => !selectedDay.date || item.tripDate === selectedDay.date,
-  );
+  const dayMatchedItems = matchingChecklistItems.filter((item) => !selectedDay.date || item.tripDate === selectedDay.date);
+  const visaTypeFilterOptions = [
+    { value: "all" as const, label: "All Visa Types" },
+    { value: "visa-only" as const, label: "Visa Only" },
+    { value: "visa-plus" as const, label: "Visa+" },
+  ].map((option) => ({
+    ...option,
+    count: dayMatchedItems.filter((item) => matchesVisaType(item, option.value)).length,
+  }));
+  const searchedChecklistItems = dayMatchedItems.filter((item) => matchesVisaType(item, visaTypeFilter));
   
   const pendingItems = searchedChecklistItems.filter((item) => !isChecklistItemCompleted(item));
   const completedItems = searchedChecklistItems.filter((item) => isChecklistItemCompleted(item));
@@ -382,7 +398,7 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
   useEffect(() => {
     setPendingPage(1);
     setCompletedPage(1);
-  }, [normalizedGroupCodeQuery, agentFilter, dayFilter]);
+  }, [normalizedGroupCodeQuery, agentFilter, dayFilter, visaTypeFilter]);
 
   useEffect(() => {
     if (!cancelTargetItem) {
@@ -642,6 +658,9 @@ export function useChecklistWorkspace({ groups }: { groups: GroupData[] }) {
     dayFilter,
     setDayFilter,
     dayFilterOptions,
+    visaTypeFilter,
+    setVisaTypeFilter,
+    visaTypeFilterOptions,
     selectedDay,
     setGroupCodeQuery,
     pendingPage,

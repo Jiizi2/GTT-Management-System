@@ -244,6 +244,9 @@ Setelah domain siap, set:
 
 ## Step 7: Update Aplikasi
 
+Untuk rilis filter Visa Only dan Visa+ pada H-1 Checklist, ikuti
+[panduan update VPS filter visa H-1 Checklist](operations/update-vps-checklist-visa-filter-20261114.md).
+
 Untuk rilis filter hari, pencarian, dan kartu H-1 Checklist, ikuti
 [panduan update VPS checklist](operations/update-vps-checklist-filters-20261031.md).
 
